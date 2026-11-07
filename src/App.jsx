@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Trophy, Users, Swords, MapPin, User, Plus, X, Phone, Shield, 
-  Calendar, Award, CheckCircle2, QrCode, Lock, ChevronRight, Search 
+  Calendar, Award, QrCode, Lock, Camera, Loader2 
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
@@ -21,12 +21,13 @@ export default function App() {
 
   // Formulario Registro Jugador
   const [nombre, setNombre] = useState('');
-  const [club, setClub] = useState('Country Club');
+  const [club, setClub] = useState('Country Club Huancayo');
   const [categoria, setCategoria] = useState('5ª A');
   const [telefono, setTelefono] = useState('');
+  const [fotoFile, setFotoFile] = useState(null);
+  const [fotoPreview, setFotoPreview] = useState(null);
   const [savingPlayer, setSavingPlayer] = useState(false);
 
-  // Sedes y Canchas Huancayo
   const clubesHuancayo = [
     { nombre: 'Country Club Huancayo', canchas: '3 Arcilla', zona: 'El Tambo', tel: '964-123456' },
     { nombre: 'Club Tauro Tenis', canchas: '2 Arcilla techadas', zona: 'San Carlos', tel: '954-987654' },
@@ -55,31 +56,66 @@ export default function App() {
     }
   }
 
+  function handleFileChange(e) {
+    const file = e.target.files[0];
+    if (file) {
+      setFotoFile(file);
+      setFotoPreview(URL.createObjectURL(file));
+    }
+  }
+
   async function handleCrearJugador(e) {
     e.preventDefault();
     if (!nombre.trim()) return;
 
     try {
       setSavingPlayer(true);
-      const { error } = await supabase.from('jugadores').insert([
+      let publicFotoUrl = null;
+
+      // 1. Si eligió foto, subirla al bucket 'avatars' de Supabase
+      if (fotoFile) {
+        const fileExt = fotoFile.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+        const filePath = `${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('avatars')
+          .upload(filePath, fotoFile);
+
+        if (uploadError) {
+          console.error('Error subiendo avatar:', uploadError);
+        } else {
+          const { data: publicUrlData } = supabase.storage
+            .from('avatars')
+            .getPublicUrl(filePath);
+          publicFotoUrl = publicUrlData.publicUrl;
+        }
+      }
+
+      // 2. Insertar en la tabla SQL 'jugadores'
+      const { error: insertError } = await supabase.from('jugadores').insert([
         {
           nombre: nombre.trim(),
           club: club.trim(),
           categoria,
           telefono: telefono.trim(),
+          foto_url: publicFotoUrl,
           elo: 1200,
         },
       ]);
 
-      if (error) throw error;
+      if (insertError) throw insertError;
 
+      // Limpiar formulario y cerrar
       setNombre('');
       setTelefono('');
+      setFotoFile(null);
+      setFotoPreview(null);
       setShowRegisterModal(false);
       await fetchJugadores();
       setTab('ranking');
     } catch (err) {
-      alert('Error al registrar jugador: ' + err.message);
+      alert('Error al registrar: ' + err.message);
     } finally {
       setSavingPlayer(false);
     }
@@ -97,7 +133,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#141414] text-[#F2EFEB] flex flex-col font-sans max-w-md mx-auto shadow-2xl pb-24 border-x border-stone-800 relative">
       
-      {/* Cabecera Principal */}
+      {/* Header */}
       <header className="px-5 py-3.5 bg-[#1C1B1A] border-b border-stone-800 flex justify-between items-center sticky top-0 z-30">
         <div>
           <span className="text-[10px] tracking-widest uppercase font-bold text-[#C86446]">Huancayo Circuit</span>
@@ -120,10 +156,10 @@ export default function App() {
         </div>
       </header>
 
-      {/* Contenido Dinámico por Pestaña */}
+      {/* Main Content */}
       <main className="p-4 flex-1 space-y-4">
         
-        {/* 1. INICIO */}
+        {/* INICIO */}
         {tab === 'inicio' && (
           <div className="space-y-4">
             <div className="bg-gradient-to-br from-[#2B2927] to-[#1C1B1A] p-5 rounded-2xl border border-stone-800 shadow-lg">
@@ -146,7 +182,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Banner Torneo */}
             <div className="bg-[#252422] p-4 rounded-xl border border-stone-800 flex justify-between items-center">
               <div>
                 <span className="text-[10px] text-emerald-400 font-semibold uppercase">Inscripciones Abiertas</span>
@@ -161,13 +196,19 @@ export default function App() {
               </button>
             </div>
 
-            {/* Top 3 Destacado */}
             <div>
               <h3 className="text-xs uppercase font-bold text-stone-400 tracking-wider mb-2">Líderes del Circuito</h3>
               {jugadores.slice(0, 3).map((j, idx) => (
                 <div key={j.id || idx} className="bg-[#252422] p-3 rounded-lg border border-stone-800 flex items-center justify-between mb-2">
                   <div className="flex items-center space-x-3">
                     <span className="font-mono text-sm font-black text-[#C86446] w-5">#{idx + 1}</span>
+                    <div className="w-9 h-9 rounded-full bg-stone-700 overflow-hidden flex items-center justify-center border border-stone-600">
+                      {j.foto_url ? (
+                        <img src={j.foto_url} alt={j.nombre} className="w-full h-full object-cover" />
+                      ) : (
+                        <User className="w-4 h-4 text-stone-400" />
+                      )}
+                    </div>
                     <div>
                       <p className="text-sm font-bold text-white">{j.nombre}</p>
                       <p className="text-xs text-stone-400">{j.club} · {j.categoria}</p>
@@ -182,7 +223,7 @@ export default function App() {
           </div>
         )}
 
-        {/* 2. RANKING */}
+        {/* RANKING */}
         {tab === 'ranking' && (
           <div className="space-y-4">
             <div className="flex justify-between items-center bg-[#252422] p-4 rounded-xl border border-stone-800">
@@ -204,7 +245,7 @@ export default function App() {
               <div className="text-center py-12 px-4 bg-[#252422] rounded-xl border border-stone-800">
                 <Users className="w-10 h-10 mx-auto text-stone-600 mb-2" />
                 <p className="text-sm font-medium text-stone-300">Aún no hay jugadores registrados</p>
-                <p className="text-xs text-stone-500 mt-1">Usa el botón "Nuevo" para registrar al primer tenista.</p>
+                <p className="text-xs text-stone-500 mt-1">Usa el botón "Nuevo" para registrarte.</p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -237,22 +278,31 @@ export default function App() {
           </div>
         )}
 
-        {/* 3. PARTIDOS / RETOS */}
+        {/* RETOS */}
         {tab === 'match' && (
           <div className="space-y-4">
             <div className="bg-[#252422] p-5 rounded-xl border border-stone-800 text-center">
               <Swords className="w-10 h-10 text-[#C86446] mx-auto mb-2" />
               <h3 className="text-base font-bold text-white">Retos Directos ELO</h3>
-              <p className="text-xs text-stone-400 mt-1">Desafía a rivales de tu categoría en Huancayo y sube en la tabla.</p>
+              <p className="text-xs text-stone-400 mt-1">Desafía rivales en Huancayo y reporta el resultado al administrador.</p>
             </div>
 
             <div className="space-y-2">
               <h4 className="text-xs uppercase font-bold text-stone-400 tracking-wider">Jugadores Disponibles</h4>
               {jugadores.map((j) => (
                 <div key={j.id} className="bg-[#252422] p-3 rounded-lg border border-stone-800 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-bold text-white">{j.nombre}</p>
-                    <p className="text-xs text-stone-400">{j.club} · {j.categoria}</p>
+                  <div className="flex items-center space-x-2.5">
+                    <div className="w-8 h-8 rounded-full bg-stone-700 overflow-hidden flex items-center justify-center">
+                      {j.foto_url ? (
+                        <img src={j.foto_url} alt={j.nombre} className="w-full h-full object-cover" />
+                      ) : (
+                        <User className="w-4 h-4 text-stone-400" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-white">{j.nombre}</p>
+                      <p className="text-xs text-stone-400">{j.club} · {j.categoria}</p>
+                    </div>
                   </div>
                   {j.telefono ? (
                     <a
@@ -272,12 +322,12 @@ export default function App() {
           </div>
         )}
 
-        {/* 4. CLUBES Y CANCHAS */}
+        {/* CANCHAS */}
         {tab === 'clubs' && (
           <div className="space-y-3">
             <div className="bg-[#252422] p-4 rounded-xl border border-stone-800">
               <h3 className="text-sm font-bold text-white uppercase tracking-wider">Sedes Afiliadas en Huancayo</h3>
-              <p className="text-xs text-stone-400 mt-1">Canchas disponibles para juego libre y partidos de ranking.</p>
+              <p className="text-xs text-stone-400 mt-1">Canchas disponibles para juego libre y partidos oficiales.</p>
             </div>
 
             {clubesHuancayo.map((c, idx) => (
@@ -307,7 +357,7 @@ export default function App() {
           </div>
         )}
 
-        {/* 5. TORNEOS */}
+        {/* TORNEOS */}
         {tab === 'torneos' && (
           <div className="space-y-4">
             <div className="bg-[#252422] p-5 rounded-2xl border border-stone-800">
@@ -317,8 +367,8 @@ export default function App() {
                 </span>
                 <span className="text-xs text-stone-400">Cierre: 30 Nov</span>
               </div>
-              <h3 className="text-lg font-black text-white">Torneo Oficial Huancayo 2026</h3>
-              <p className="text-xs text-stone-300 mt-1">Cuadro eliminatorio con ronda consuelo. Suma puntos directos al ranking oficial.</p>
+              <h3 className="text-lg font-black text-white">Torneo Apertura Huancayo 2026</h3>
+              <p className="text-xs text-stone-300 mt-1">Cuadro eliminatorio con ronda consuelo. Suma puntos al ranking oficial.</p>
               
               <div className="grid grid-cols-2 gap-2 mt-4 text-xs bg-[#1C1B1A] p-3 rounded-xl border border-stone-800">
                 <div>
@@ -342,10 +392,10 @@ export default function App() {
         )}
       </main>
 
-      {/* Modal: Registro de Jugador */}
+      {/* Modal: Registro con FOTO */}
       {showRegisterModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#252422] border border-stone-700 w-full max-w-sm rounded-2xl p-5 shadow-2xl">
+          <div className="bg-[#252422] border border-stone-700 w-full max-w-sm rounded-2xl p-5 shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-base font-bold text-white">Crear Perfil de Tenista</h3>
               <button onClick={() => setShowRegisterModal(false)} className="text-stone-400 hover:text-white">
@@ -354,12 +404,35 @@ export default function App() {
             </div>
 
             <form onSubmit={handleCrearJugador} className="space-y-3">
+              {/* Selector de Foto */}
+              <div className="flex flex-col items-center justify-center mb-2">
+                <label className="cursor-pointer group flex flex-col items-center">
+                  <div className="w-20 h-20 rounded-full bg-stone-800 border-2 border-dashed border-[#C86446] flex items-center justify-center overflow-hidden relative group-hover:border-[#b05338] transition">
+                    {fotoPreview ? (
+                      <img src={fotoPreview} alt="Preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="text-center p-2">
+                        <Camera className="w-6 h-6 text-[#C86446] mx-auto mb-1" />
+                        <span className="text-[9px] text-stone-400 block leading-tight">Subir foto</span>
+                      </div>
+                    )}
+                  </div>
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    onChange={handleFileChange} 
+                    className="hidden" 
+                  />
+                </label>
+                <span className="text-[10px] text-stone-500 mt-1">Toca para elegir desde tu celular</span>
+              </div>
+
               <div>
                 <label className="text-xs text-stone-400 block mb-1">Nombre completo *</label>
                 <input
                   type="text"
                   required
-                  placeholder="Ej. Carlos Mendoza"
+                  placeholder="Ej. Juan Pérez"
                   value={nombre}
                   onChange={(e) => setNombre(e.target.value)}
                   className="w-full bg-[#1C1B1A] border border-stone-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#C86446]"
@@ -413,9 +486,15 @@ export default function App() {
                 <button
                   type="submit"
                   disabled={savingPlayer}
-                  className="w-full bg-[#C86446] hover:bg-[#b05338] disabled:opacity-50 text-white font-bold py-2.5 rounded-lg text-sm shadow-md transition"
+                  className="w-full bg-[#C86446] hover:bg-[#b05338] disabled:opacity-50 text-white font-bold py-2.5 rounded-lg text-sm shadow-md transition flex items-center justify-center gap-2"
                 >
-                  {savingPlayer ? 'Guardando...' : 'Completar Registro'}
+                  {savingPlayer ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" /> Subiendo perfil...
+                    </>
+                  ) : (
+                    'Completar Registro con Foto'
+                  )}
                 </button>
               </div>
             </form>
@@ -423,7 +502,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Modal: Torneo y Pago Yape/Plin */}
+      {/* Modal: Torneo y Pago */}
       {showTournamentModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[#252422] border border-stone-700 w-full max-w-sm rounded-2xl p-5 shadow-2xl space-y-3">
@@ -456,7 +535,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Modal: Panel Admin con PIN */}
+      {/* Modal: Panel Admin */}
       {showAdminModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[#252422] border border-stone-700 w-full max-w-sm rounded-2xl p-5 shadow-2xl">
@@ -516,7 +595,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Barra de Navegación Inferior (5 Pestañas) */}
+      {/* Navegación Inferior */}
       <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-[#1C1B1A] border-t border-stone-800 flex justify-around py-2.5 px-1 z-40">
         <button onClick={() => setTab('inicio')} className={`flex flex-col items-center text-[10px] ${tab === 'inicio' ? 'text-[#C86446] font-bold' : 'text-stone-400'}`}>
           <Trophy className="w-4 h-4 mb-1" />
