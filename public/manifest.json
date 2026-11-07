@@ -1,0 +1,8 @@
+{
+  "name": "Huancayo Tennis Hub",
+  "short_name": "Tennis Hub",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1C1B1A",
+  "theme_color": "#1C1B1A"
+}
