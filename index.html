@@ -5,17 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>MatchPoint - Tenis Huancayo</title>
 
-    <!-- Configuración para iPhone / iPad (iOS) -->
+    <!-- Tailwind CSS (Restaura todo el diseño oscuro, tarjetas y estilos) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Configuración para iPhone / iOS -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Tenis HYO" />
     <link rel="apple-touch-icon" href="/icon.png" />
 
-    <!-- Configuración para Android -->
+    <!-- Configuración para Android / PWA -->
     <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#1C1B1A" />
+    <meta name="theme-color" content="#141414" />
   </head>
-  <body class="bg-[#141414] select-none text-white">
+  <body class="bg-[#141414] text-[#F2EFEB] select-none antialiased">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
