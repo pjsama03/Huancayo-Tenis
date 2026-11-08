@@ -6,7 +6,6 @@ import {
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
-// --- COMPRESIÓN NATIVA DE IMÁGENES ---
 const compressImage = (file) => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -57,7 +56,8 @@ const compressImage = (file) => {
 };
 
 export default function App() {
-  const [tab, setTab] = useState('ranking');
+  // Orden de pestañas priorizando Perfil a la izquierda
+  const [tab, setTab] = useState('perfil');
   const [jugadores, setJugadores] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -71,11 +71,12 @@ export default function App() {
   const [authPassword, setAuthPassword] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
 
-  // Perfil
+  // Perfil detallado con preguntas ELO / Categoría
   const [nombre, setNombre] = useState('');
   const [club, setClub] = useState('Country Club Huancayo');
   const [categoria, setCategoria] = useState('4ª');
   const [telefono, setTelefono] = useState('');
+  const [experiencia, setExperiencia] = useState('Intermedio'); // Filtro clave para calibración ELO
   const [fotoFile, setFotoFile] = useState(null);
   const [fotoPreview, setFotoPreview] = useState(null);
   const [isCompressing, setIsCompressing] = useState(false);
@@ -147,7 +148,6 @@ export default function App() {
     }
   }
 
-  // Selección de Imagen (Sin capture="user" para permitir galería)
   async function handleFileChange(e) {
     const file = e.target.files[0];
     if (file) {
@@ -220,6 +220,7 @@ export default function App() {
     }
   }
 
+  // Calibración inicial ELO basada en la experiencia y categoría seleccionada
   async function handleCompleteProfile(e) {
     e.preventDefault();
     if (!nombre.trim()) return;
@@ -234,16 +235,21 @@ export default function App() {
           .from('avatars')
           .upload(fileName, fotoFile);
 
-        if (uploadError) {
-            console.error('Error subiendo a Storage:', uploadError);
-            alert('Perfil creado, pero hubo un error con la foto.');
-        } else {
+        if (!uploadError) {
             const { data: publicUrlData } = supabase.storage
               .from('avatars')
               .getPublicUrl(fileName);
             publicFotoUrl = publicUrlData.publicUrl;
         }
       }
+
+      // Asignación de ELO base según categoría y nivel reportado
+      let baseElo = 1200;
+      if (categoria === '1ª') baseElo = 1550;
+      else if (categoria === '2ª') baseElo = 1450;
+      else if (categoria === '3ª') baseElo = 1350;
+      else if (categoria === '4ª') baseElo = 1200;
+      else if (experiencia === 'Competitivo Avanzado') baseElo += 100;
 
       const { data, error } = await supabase.from('jugadores').insert([
         {
@@ -254,7 +260,7 @@ export default function App() {
           categoria,
           telefono: telefono.trim(),
           foto_url: publicFotoUrl,
-          elo: 1200,
+          elo: baseElo,
           victorias: 0,
           derrotas: 0
         },
@@ -286,7 +292,7 @@ export default function App() {
   function handleLogout() {
     localStorage.removeItem('tennis_user_session');
     setCurrentUser(null);
-    setTab('ranking');
+    setTab('perfil');
   }
 
   async function handleProcesarPartido(e) {
@@ -333,7 +339,7 @@ export default function App() {
         derrotas: (player2.derrotas || 0) + (actual2 === 0 ? 1 : 0)
       }).eq('id', player2.id);
 
-      alert(`✅ Partido Registrado!\n\n` +
+      alert(`✅ Partido Registrado:\n\n` +
             `${player1.nombre}: ${newElo1} ELO (${delta1 >= 0 ? '+' : ''}${delta1})\n` +
             `${player2.nombre}: ${newElo2} ELO (${delta2 >= 0 ? '+' : ''}${delta2})`);
 
@@ -376,7 +382,8 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans max-w-md mx-auto shadow-2xl pb-24 border-x border-slate-800 relative">
       
-      <header className="px-5 py-4 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 flex justify-between items-center sticky top-0 z-30">
+      {/* Header optimizado con margen superior seguro para evitar solapamiento con la isla dinámica / notch */}
+      <header className="pt-safe px-5 py-4 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 flex justify-between items-center sticky top-0 z-30">
         <div className="flex items-center space-x-2.5">
           <div className="w-8 h-8 rounded-lg bg-lime-400 flex items-center justify-center font-black text-slate-950 text-base shadow-[0_0_15px_rgba(163,230,53,0.35)]">
             🎾
@@ -415,74 +422,8 @@ export default function App() {
       </header>
 
       <main className="p-4 flex-1 space-y-4">
-        {/* RANKING */}
-        {tab === 'ranking' && (
-          <div className="space-y-4">
-            <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl flex justify-between items-center">
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-lime-400">Circuito Oficial</span>
-                <h2 className="text-base font-black text-white">Tabla ELO</h2>
-                <p className="text-xs text-slate-400">K=32 · {jugadores.length} tenistas</p>
-              </div>
-              <button
-                onClick={() => setShowMatchModal(true)}
-                className="bg-slate-800 hover:bg-slate-750 border border-slate-700 text-lime-400 font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5"
-              >
-                <Swords className="w-4 h-4" /> Score
-              </button>
-            </div>
 
-            <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Copa de Clubes</h3>
-              <div className="grid grid-cols-2 gap-2">
-                {clubStats.slice(0, 4).map((c, i) => (
-                  <div key={i} className="bg-slate-900 border border-slate-800 p-3 rounded-2xl">
-                    <span className="text-[10px] font-mono text-lime-400 font-bold block">#{i + 1} {c.nombre.replace('Club ', '')}</span>
-                    <span className="text-sm font-black text-white">{c.totalElo} pts</span>
-                    <span className="text-[10px] text-slate-500 block">{c.sociosCount} tenistas</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Ranking Individual</h3>
-              {loading ? (
-                <div className="text-center py-10 text-slate-500 text-xs">Cargando...</div>
-              ) : jugadores.map((j, idx) => (
-                <div 
-                  key={j.id || idx}
-                  className="bg-slate-900 p-3.5 rounded-2xl border border-slate-800 flex items-center justify-between"
-                >
-                  <div className="flex items-center space-x-3">
-                    <div className={`w-7 text-center font-mono font-black text-sm ${idx === 0 ? 'text-amber-400' : idx === 1 ? 'text-slate-300' : idx === 2 ? 'text-amber-600' : 'text-slate-500'}`}>
-                      #{idx + 1}
-                    </div>
-                    <div className="w-10 h-10 rounded-full bg-slate-800 overflow-hidden flex items-center justify-center border border-slate-700">
-                      {j.foto_url ? (
-                        <img src={j.foto_url} alt={j.nombre} className="w-full h-full object-cover" />
-                      ) : (
-                        <User className="w-5 h-5 text-slate-400" />
-                      )}
-                    </div>
-                    <div>
-                      <p className="text-sm font-black text-white leading-tight">{j.nombre}</p>
-                      <p className="text-xs text-slate-400">
-                        {j.club || 'Independiente'} · <span className="text-lime-400 font-bold">{j.categoria || '4ª'}</span>
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-base font-mono font-black text-lime-400">{j.elo || 1200}</span>
-                    <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">ELO</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* PERFIL */}
+        {/* 1. PERFIL (Ahora ubicado primero a la izquierda por defecto) */}
         {tab === 'perfil' && (
           <div className="space-y-4">
             {currentUser && myPlayer ? (
@@ -533,10 +474,10 @@ export default function App() {
               </div>
             ) : (
               <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl text-center space-y-4">
-                <User className="w-12 h-12 text-slate-600 mx-auto" />
+                <User className="w-12 h-12 text-lime-400 mx-auto" />
                 <div>
-                  <h3 className="text-base font-black text-white">Accede a tu Perfil</h3>
-                  <p className="text-xs text-slate-400 mt-1">Regístrate para figurar en la tabla.</p>
+                  <h3 className="text-base font-black text-white">Tu Perfil de Tenista</h3>
+                  <p className="text-xs text-slate-400 mt-1">Inicia sesión o regístrate para configurar tu categoría y empezar a sumar puntos ELO oficiales.</p>
                 </div>
                 <div className="flex gap-2 justify-center pt-2">
                   <button
@@ -557,13 +498,79 @@ export default function App() {
           </div>
         )}
 
-        {/* RETOS */}
+        {/* 2. RANKING */}
+        {tab === 'ranking' && (
+          <div className="space-y-4">
+            <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl flex justify-between items-center">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-lime-400">Circuito Oficial</span>
+                <h2 className="text-base font-black text-white">Ranking ELO</h2>
+              </div>
+              <button
+                onClick={() => setShowMatchModal(true)}
+                className="bg-lime-400 hover:bg-lime-300 text-slate-950 font-black px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow"
+              >
+                <Swords className="w-4 h-4" /> Subir Score
+              </button>
+            </div>
+
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Copa de Clubes</h3>
+              <div className="grid grid-cols-2 gap-2">
+                {clubStats.slice(0, 4).map((c, i) => (
+                  <div key={i} className="bg-slate-900 border border-slate-800 p-3 rounded-2xl">
+                    <span className="text-[10px] font-mono text-lime-400 font-bold block">#{i + 1} {c.nombre.replace('Club ', '')}</span>
+                    <span className="text-sm font-black text-white">{c.totalElo} pts</span>
+                    <span className="text-[10px] text-slate-500 block">{c.sociosCount} tenistas</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Clasificación General</h3>
+              {loading ? (
+                <div className="text-center py-10 text-slate-500 text-xs">Cargando...</div>
+              ) : jugadores.map((j, idx) => (
+                <div 
+                  key={j.id || idx}
+                  className="bg-slate-900 p-3.5 rounded-2xl border border-slate-800 flex items-center justify-between"
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className={`w-7 text-center font-mono font-black text-sm ${idx === 0 ? 'text-amber-400' : idx === 1 ? 'text-slate-300' : idx === 2 ? 'text-amber-600' : 'text-slate-500'}`}>
+                      #{idx + 1}
+                    </div>
+                    <div className="w-10 h-10 rounded-full bg-slate-800 overflow-hidden flex items-center justify-center border border-slate-700">
+                      {j.foto_url ? (
+                        <img src={j.foto_url} alt={j.nombre} className="w-full h-full object-cover" />
+                      ) : (
+                        <User className="w-5 h-5 text-slate-400" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-sm font-black text-white leading-tight">{j.nombre}</p>
+                      <p className="text-xs text-slate-400">
+                        {j.club || 'Independiente'} · <span className="text-lime-400 font-bold">{j.categoria || '4ª'}</span>
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-base font-mono font-black text-lime-400">{j.elo || 1200}</span>
+                    <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">ELO</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 3. RETOS */}
         {tab === 'match' && (
           <div className="space-y-4">
             <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl flex justify-between items-center">
               <div>
-                <h3 className="text-sm font-black text-white">Desafíos</h3>
-                <p className="text-xs text-slate-400">Pacta encuentros por WhatsApp</p>
+                <h3 className="text-sm font-black text-white">Desafíos Directos</h3>
+                <p className="text-xs text-slate-400">Pacta encuentros por WhatsApp y sube tu resultado</p>
               </div>
               <button
                 onClick={() => setShowMatchModal(true)}
@@ -593,7 +600,7 @@ export default function App() {
                     </div>
                     {j.telefono ? (
                       <a
-                        href={`https://wa.me/51${j.telefono.replace(/\D/g, '')}?text=Hola%20${encodeURIComponent(j.nombre)},%20te%20escribo%20desde%20MatchPoint.`}
+                        href={`https://wa.me/51${j.telefono.replace(/\D/g, '')}?text=Hola%20${encodeURIComponent(j.nombre)},%20te%20escribo%20desde%20MatchPoint%20para%20jugar%20un%20partido%20de%20ranking.`}
                         target="_blank"
                         rel="noreferrer"
                         className="bg-slate-800 hover:bg-slate-750 text-lime-400 border border-slate-700 text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition"
@@ -607,12 +614,12 @@ export default function App() {
           </div>
         )}
 
-        {/* CANCHAS */}
+        {/* 4. CANCHAS */}
         {tab === 'clubs' && (
           <div className="space-y-3">
             <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800">
               <h3 className="text-sm font-black text-white">Sedes en Huancayo</h3>
-              <p className="text-xs text-slate-400 mt-1">Monitorea el clima.</p>
+              <p className="text-xs text-slate-400 mt-1">Monitorea el clima de la arcilla en tiempo real.</p>
             </div>
 
             {clubesHuancayo.map((c, idx) => {
@@ -651,7 +658,7 @@ export default function App() {
           </div>
         )}
 
-        {/* TORNEOS */}
+        {/* 5. TORNEOS */}
         {tab === 'torneos' && (
           <div className="space-y-4">
             <div className="bg-slate-900 p-5 rounded-3xl border border-slate-800 relative overflow-hidden">
@@ -662,7 +669,7 @@ export default function App() {
                 <span className="text-xs text-slate-400">Cupos: 16</span>
               </div>
               <h3 className="text-lg font-black text-white">Torneo Apertura Huancayo</h3>
-              <p className="text-xs text-slate-400 mt-1">Cuadro oficial ELO.</p>
+              <p className="text-xs text-slate-400 mt-1">Cuadro oficial ELO con ronda consuelo.</p>
               
               <div className="grid grid-cols-2 gap-2 mt-4 text-xs bg-slate-950 p-3.5 rounded-2xl border border-slate-800">
                 <div>
@@ -686,8 +693,7 @@ export default function App() {
         )}
       </main>
 
-      {/* Modales */}
-      {/* AUTH */}
+      {/* MODAL: AUTH */}
       {showAuthModal && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl">
@@ -731,7 +737,7 @@ export default function App() {
                   disabled={authLoading}
                   className="w-full bg-lime-400 hover:bg-lime-300 disabled:opacity-50 text-slate-950 font-black py-3 rounded-xl text-xs transition"
                 >
-                  {authLoading ? 'Verificando...' : (authMode === 'login' ? 'Entrar' : 'Continuar')}
+                  {authLoading ? 'Verificando...' : (authMode === 'login' ? 'Entrar' : 'Continuar al Perfil')}
                 </button>
               </div>
 
@@ -749,12 +755,12 @@ export default function App() {
         </div>
       )}
 
-      {/* PERFIL SETUP (FOTO NATIVA) */}
+      {/* MODAL: CONFIGURACIÓN DE PERFIL CON FILTROS ELO */}
       {showProfileSetup && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
-            <h3 className="text-base font-black text-white mb-1">Configura tu Ficha</h3>
-            <p className="text-xs text-slate-400 mb-4">Esta info aparecerá en el ranking.</p>
+            <h3 className="text-base font-black text-white mb-1">Calibra tu Ficha ELO</h3>
+            <p className="text-xs text-slate-400 mb-4">Responde estos datos para establecer tu nivel inicial en el circuito.</p>
 
             <form onSubmit={handleCompleteProfile} className="space-y-3">
               
@@ -781,12 +787,12 @@ export default function App() {
                   ref={fileInputRef}
                 />
                 <span className="text-[10px] text-slate-400 mt-1.5">
-                  {isCompressing ? 'Optimizando...' : 'Toca para subir foto'}
+                  {isCompressing ? 'Optimizando...' : 'Toca para subir tu foto'}
                 </span>
               </div>
 
               <div>
-                <label className="text-xs text-slate-400 block mb-1">Nombre completo *</label>
+                <label className="text-xs text-slate-400 block mb-1">Nombre y Apellido *</label>
                 <input
                   type="text"
                   required
@@ -798,7 +804,7 @@ export default function App() {
               </div>
 
               <div>
-                <label className="text-xs text-slate-400 block mb-1">Club o Cancha</label>
+                <label className="text-xs text-slate-400 block mb-1">Club o Cancha Habitual</label>
                 <select
                   value={club}
                   onChange={(e) => setClub(e.target.value)}
@@ -814,30 +820,43 @@ export default function App() {
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-xs text-slate-400 block mb-1">Categoría</label>
+                  <label className="text-xs text-slate-400 block mb-1">Categoría Oficial</label>
                   <select
                     value={categoria}
                     onChange={(e) => setCategoria(e.target.value)}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-2 text-sm text-white focus:outline-none focus:border-lime-400"
                   >
-                    <option value="1ª">1ª</option>
-                    <option value="2ª">2ª</option>
-                    <option value="3ª">3ª</option>
-                    <option value="4ª">4ª</option>
+                    <option value="1ª">1ª Categoría</option>
+                    <option value="2ª">2ª Categoría</option>
+                    <option value="3ª">3ª Categoría</option>
+                    <option value="4ª">4ª Categoría</option>
                     <option value="5ª A">5ª A</option>
                     <option value="5ª B">5ª B</option>
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs text-slate-400 block mb-1">WhatsApp</label>
-                  <input
-                    type="tel"
-                    placeholder="999..."
-                    value={telefono}
-                    onChange={(e) => setTelefono(e.target.value)}
+                  <label className="text-xs text-slate-400 block mb-1">Nivel / Experiencia</label>
+                  <select
+                    value={experiencia}
+                    onChange={(e) => setExperiencia(e.target.value)}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-2 text-sm text-white focus:outline-none focus:border-lime-400"
-                  />
+                  >
+                    <option value="Intermedio">Intermedio</option>
+                    <option value="Avanzado">Avanzado</option>
+                    <option value="Competitivo Avanzado">Competitivo Pro</option>
+                  </select>
                 </div>
+              </div>
+
+              <div>
+                <label className="text-xs text-slate-400 block mb-1">WhatsApp de contacto</label>
+                <input
+                  type="tel"
+                  placeholder="999..."
+                  value={telefono}
+                  onChange={(e) => setTelefono(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-2 text-sm text-white focus:outline-none focus:border-lime-400"
+                />
               </div>
 
               <div className="pt-2">
@@ -847,9 +866,9 @@ export default function App() {
                   className="w-full bg-lime-400 hover:bg-lime-300 disabled:opacity-50 text-slate-950 font-black py-3 rounded-xl text-xs transition flex items-center justify-center gap-2"
                 >
                   {savingPlayer ? (
-                    <><Loader2 className="w-4 h-4 animate-spin" /> Guardando...</>
+                    <><Loader2 className="w-4 h-4 animate-spin" /> Calibrando ELO...</>
                   ) : (
-                    'Guardar y Entrar'
+                    'Guardar Perfil e Ingresar'
                   )}
                 </button>
               </div>
@@ -858,13 +877,13 @@ export default function App() {
         </div>
       )}
 
-      {/* MATCH MODAL */}
+      {/* MODAL: SUBIR SCORE */}
       {showMatchModal && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-base font-black text-white flex items-center gap-1.5">
-                <Swords className="w-4 h-4 text-lime-400" /> Reportar Partido
+                <Swords className="w-4 h-4 text-lime-400" /> Reportar Partido ELO
               </h3>
               <button onClick={() => setShowMatchModal(false)} className="text-slate-400 hover:text-white">
                 <X className="w-5 h-5" />
@@ -914,7 +933,7 @@ export default function App() {
               </div>
 
               <div>
-                <label className="text-xs text-slate-400 block mb-1">Ganador</label>
+                <label className="text-xs text-slate-400 block mb-1">Ganador del Encuentro</label>
                 <select
                   value={winnerId}
                   onChange={(e) => setWinnerId(e.target.value)}
@@ -933,7 +952,7 @@ export default function App() {
                   disabled={calculatingMatch}
                   className="w-full bg-lime-400 hover:bg-lime-300 disabled:opacity-50 text-slate-950 font-black py-3 rounded-xl text-xs transition"
                 >
-                  {calculatingMatch ? 'Calculando...' : 'Confirmar Resultado'}
+                  {calculatingMatch ? 'Calculando ELO...' : 'Confirmar y Actualizar Tabla'}
                 </button>
               </div>
             </form>
@@ -941,7 +960,7 @@ export default function App() {
         </div>
       )}
 
-      {/* TORNEO MODAL */}
+      {/* MODAL: TORNEO YAPE/PLIN */}
       {showTournamentModal && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl space-y-3">
@@ -959,22 +978,22 @@ export default function App() {
             </div>
 
             <p className="text-xs text-slate-400 leading-relaxed">
-              Realiza el pago y envía tu constancia por WhatsApp.
+              Realiza el pago y envía tu constancia por WhatsApp para validar tu cupo y asignarte el cuadro.
             </p>
 
             <a
-              href={`https://wa.me/51964000000?text=Hola,%20adjunto%20comprobante%20de%20S/%20${precioTorneo}`}
+              href={`https://wa.me/51964000000?text=Hola,%20adjunto%20mi%20comprobante%20de%20S/%20${precioTorneo}%20para%20el%20Torneo`}
               target="_blank"
               rel="noreferrer"
               className="block w-full text-center bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-3 rounded-xl text-xs transition"
             >
-              Enviar Constancia
+              Enviar Constancia al WhatsApp
             </a>
           </div>
         </div>
       )}
 
-      {/* ADMIN MODAL */}
+      {/* MODAL: ADMIN */}
       {showAdminModal && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl">
@@ -989,7 +1008,7 @@ export default function App() {
 
             {!isAdminAuth ? (
               <form onSubmit={handleVerifyAdmin} className="space-y-3">
-                <p className="text-xs text-slate-400">Clave de administrador:</p>
+                <p className="text-xs text-slate-400">Clave de organizador:</p>
                 <input
                   type="password"
                   placeholder="PIN (1234)"
@@ -1036,21 +1055,21 @@ export default function App() {
         </div>
       )}
 
-      {/* NAV */}
+      {/* NAVEGACIÓN INFERIOR (Perfil primero a la izquierda) */}
       <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-slate-900/95 backdrop-blur-md border-t border-slate-800 flex justify-around py-3 px-1 z-40">
-        <button 
-          onClick={() => setTab('ranking')} 
-          className={`flex flex-col items-center text-[10px] transition ${tab === 'ranking' ? 'text-lime-400 font-black' : 'text-slate-400'}`}
-        >
-          <Trophy className="w-4 h-4 mb-1" />
-          Ranking
-        </button>
         <button 
           onClick={() => setTab('perfil')} 
           className={`flex flex-col items-center text-[10px] transition ${tab === 'perfil' ? 'text-lime-400 font-black' : 'text-slate-400'}`}
         >
           <User className="w-4 h-4 mb-1" />
           Perfil
+        </button>
+        <button 
+          onClick={() => setTab('ranking')} 
+          className={`flex flex-col items-center text-[10px] transition ${tab === 'ranking' ? 'text-lime-400 font-black' : 'text-slate-400'}`}
+        >
+          <Trophy className="w-4 h-4 mb-1" />
+          Ranking
         </button>
         <button 
           onClick={() => setTab('match')} 
