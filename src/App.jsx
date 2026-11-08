@@ -2,29 +2,27 @@ import React, { useState, useEffect } from 'react';
 import { 
   Trophy, Swords, MapPin, User, Plus, X, Phone, Shield, 
   Calendar, Award, QrCode, Lock, CloudRain, Sun, 
-  DollarSign, TrendingUp, AlertTriangle, Users, ChevronRight
+  AlertTriangle, Users, LogIn, LogOut, Edit3, CheckCircle2
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
 export default function App() {
   const [tab, setTab] = useState('ranking');
   const [jugadores, setJugadores] = useState([]);
-  const [partidos, setPartidos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [myPlayerId, setMyPlayerId] = useState(null);
 
-  // Modales
-  const [showRegisterModal, setShowRegisterModal] = useState(false);
-  const [showAdminModal, setShowAdminModal] = useState(false);
-  const [showMatchModal, setShowMatchModal] = useState(false);
-  const [showTournamentModal, setShowTournamentModal] = useState(false);
+  // Sesión y Auth del Usuario
+  const [currentUser, setCurrentUser] = useState(null);
+  const [authMode, setAuthMode] = useState('login'); // 'login' o 'signup'
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showProfileSetup, setShowProfileSetup] = useState(false);
 
-  // Auth Admin y Finanzas
-  const [adminPin, setAdminPin] = useState('');
-  const [isAdminAuth, setIsAdminAuth] = useState(false);
-  const [precioTorneo, setPrecioTorneo] = useState(40);
+  // Form Auth
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
 
-  // Registro de Jugador
+  // Form Perfil / Registro
   const [nombre, setNombre] = useState('');
   const [club, setClub] = useState('Country Club Huancayo');
   const [categoria, setCategoria] = useState('4ª');
@@ -32,19 +30,29 @@ export default function App() {
   const [fotoUrl, setFotoUrl] = useState('');
   const [savingPlayer, setSavingPlayer] = useState(false);
 
-  // Registro de Partido ELO
+  // Modales adicionales
+  const [showAdminModal, setShowAdminModal] = useState(false);
+  const [showMatchModal, setShowMatchModal] = useState(false);
+  const [showTournamentModal, setShowTournamentModal] = useState(false);
+
+  // Panel Admin
+  const [adminPin, setAdminPin] = useState('');
+  const [isAdminAuth, setIsAdminAuth] = useState(false);
+  const precioTorneo = 40;
+
+  // Form Partido ELO
   const [p1Id, setP1Id] = useState('');
   const [p2Id, setP2Id] = useState('');
   const [score, setScore] = useState('6-4, 6-3');
   const [winnerId, setWinnerId] = useState('');
   const [calculatingMatch, setCalculatingMatch] = useState(false);
 
-  // Estado del Clima reportado por la comunidad
+  // Clima
   const [climaSedes, setClimaSedes] = useState({
-    'Country Club Huancayo': { estado: 'Seco / Jugable', icono: 'sol', hora: 'Hace 15m' },
-    'Club Tauro Tenis': { estado: 'Techado / Óptimo', icono: 'sol', hora: 'Hace 30m' },
-    'Academia Romina Cutipa': { estado: 'Llovizna leve', icono: 'lluvia', hora: 'Hace 5m' },
-    'Complejo Shyam Huilca': { estado: 'Seco / Jugable', icono: 'sol', hora: 'Hace 1h' }
+    'Country Club Huancayo': { estado: 'Seco / Jugable', hora: 'Hace 15m' },
+    'Club Tauro Tenis': { estado: 'Techado / Óptimo', hora: 'Hace 30m' },
+    'Academia Romina Cutipa': { estado: 'Llovizna leve', hora: 'Hace 5m' },
+    'Complejo Shyam Huilca': { estado: 'Seco / Jugable', hora: 'Hace 1h' }
   });
 
   const clubesHuancayo = [
@@ -56,45 +64,92 @@ export default function App() {
 
   useEffect(() => {
     fetchData();
+    checkLocalSession();
   }, []);
+
+  function checkLocalSession() {
+    const session = localStorage.getItem('tennis_user_session');
+    if (session) {
+      try {
+        setCurrentUser(JSON.parse(session));
+      } catch (e) {
+        localStorage.removeItem('tennis_user_session');
+      }
+    }
+  }
 
   async function fetchData() {
     try {
       setLoading(true);
-      const { data: jugadoresData, error: errJ } = await supabase
+      const { data, error } = await supabase
         .from('jugadores')
         .select('*')
         .order('elo', { ascending: false });
 
-      if (errJ) throw errJ;
-      const list = jugadoresData || [];
-      setJugadores(list);
-
-      const storedId = localStorage.getItem('tennis_my_player_id');
-      if (storedId && list.some(j => j.id.toString() === storedId)) {
-        setMyPlayerId(storedId);
-      } else if (list.length > 0) {
-        setMyPlayerId(list[0].id.toString());
-      }
-
-      // Cargar historial de partidos si existe la tabla
-      const { data: partidosData } = await supabase
-        .from('partidos')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      if (partidosData) setPartidos(partidosData);
-
+      if (error) throw error;
+      setJugadores(data || []);
     } catch (err) {
-      console.error('Error cargando datos:', err);
+      console.error('Error cargando ranking:', err);
     } finally {
       setLoading(false);
     }
   }
 
-  // Creación de jugador
-  async function handleCrearJugador(e) {
+  // Manejador de Autenticación (Login / Registro)
+  async function handleAuth(e) {
+    e.preventDefault();
+    if (!authEmail.trim() || !authPassword.trim()) return;
+
+    try {
+      setAuthLoading(true);
+
+      if (authMode === 'signup') {
+        // Verificar si el correo ya existe
+        const { data: existing } = await supabase
+          .from('jugadores')
+          .select('id')
+          .eq('email', authEmail.trim())
+          .maybeSingle();
+
+        if (existing) {
+          alert('Este correo ya tiene una cuenta. Inicia sesión.');
+          setAuthMode('login');
+          return;
+        }
+
+        // Abrir paso de completar perfil
+        setShowAuthModal(false);
+        setShowProfileSetup(true);
+      } else {
+        // Iniciar Sesión
+        const { data, error } = await supabase
+          .from('jugadores')
+          .select('*')
+          .eq('email', authEmail.trim())
+          .eq('password', authPassword.trim())
+          .maybeSingle();
+
+        if (error || !data) {
+          alert('Credenciales incorrectas. Verifica tu correo y contraseña.');
+          return;
+        }
+
+        setCurrentUser(data);
+        localStorage.setItem('tennis_user_session', JSON.stringify(data));
+        setShowAuthModal(false);
+        setAuthEmail('');
+        setAuthPassword('');
+        setTab('perfil');
+      }
+    } catch (err) {
+      alert('Error: ' + err.message);
+    } finally {
+      setAuthLoading(false);
+    }
+  }
+
+  // Guardar Perfil tras Registro
+  async function handleCompleteProfile(e) {
     e.preventDefault();
     if (!nombre.trim()) return;
 
@@ -102,6 +157,8 @@ export default function App() {
       setSavingPlayer(true);
       const { data, error } = await supabase.from('jugadores').insert([
         {
+          email: authEmail.trim(),
+          password: authPassword.trim(),
           nombre: nombre.trim(),
           club: club.trim(),
           categoria,
@@ -116,32 +173,40 @@ export default function App() {
       if (error) throw error;
 
       if (data && data[0]) {
-        localStorage.setItem('tennis_my_player_id', data[0].id.toString());
-        setMyPlayerId(data[0].id.toString());
+        setCurrentUser(data[0]);
+        localStorage.setItem('tennis_user_session', JSON.stringify(data[0]));
       }
 
+      setShowProfileSetup(false);
+      setAuthEmail('');
+      setAuthPassword('');
       setNombre('');
       setTelefono('');
       setFotoUrl('');
-      setShowRegisterModal(false);
       await fetchData();
       setTab('perfil');
     } catch (err) {
-      alert('Error al registrar: ' + err.message);
+      alert('Error guardando perfil: ' + err.message);
     } finally {
       setSavingPlayer(false);
     }
   }
 
-  // Motor Oficial ELO y Registro de Encuentro
+  function handleLogout() {
+    localStorage.removeItem('tennis_user_session');
+    setCurrentUser(null);
+    setTab('ranking');
+  }
+
+  // Motor ELO Oficial
   async function handleProcesarPartido(e) {
     e.preventDefault();
     if (!p1Id || !p2Id || !winnerId) {
-      alert('Selecciona a ambos tenistas y define al ganador.');
+      alert('Selecciona ambos jugadores y define al ganador.');
       return;
     }
     if (p1Id === p2Id) {
-      alert('Debes seleccionar rivales distintos.');
+      alert('Los rivales deben ser diferentes.');
       return;
     }
 
@@ -166,7 +231,6 @@ export default function App() {
       const newElo1 = Math.max(800, R1 + delta1);
       const newElo2 = Math.max(800, R2 + delta2);
 
-      // Guardar jugadores actualizados en Supabase
       await supabase.from('jugadores').update({
         elo: newElo1,
         victorias: (player1.victorias || 0) + (actual1 === 1 ? 1 : 0),
@@ -179,24 +243,12 @@ export default function App() {
         derrotas: (player2.derrotas || 0) + (actual2 === 0 ? 1 : 0)
       }).eq('id', player2.id);
 
-      // Registrar en tabla de partidos (opcional/seguro)
-      await supabase.from('partidos').insert([
-        {
-          jugador1_nombre: player1.nombre,
-          jugador2_nombre: player2.nombre,
-          marcador: score,
-          ganador_nombre: actual1 === 1 ? player1.nombre : player2.nombre,
-          puntos_elo: Math.abs(delta1)
-        }
-      ]).select();
-
-      alert(`✅ Marcador Procesado Oficialmente:\n\n` +
+      alert(`✅ Partido Registrado:\n\n` +
             `${player1.nombre}: ${newElo1} ELO (${delta1 >= 0 ? '+' : ''}${delta1})\n` +
             `${player2.nombre}: ${newElo2} ELO (${delta2 >= 0 ? '+' : ''}${delta2})`);
 
       setShowMatchModal(false);
       await fetchData();
-      setTab('ranking');
     } catch (err) {
       alert('Error al registrar resultado: ' + err.message);
     } finally {
@@ -206,14 +258,10 @@ export default function App() {
 
   function reportarLluvia(clubName) {
     const actual = climaSedes[clubName]?.estado;
-    const nuevoEstado = actual.includes('Lluvia') ? 'Seco / Jugable' : 'Lluvia / Cancha Pesada';
+    const nuevo = actual.includes('Lluvia') ? 'Seco / Jugable' : 'Lluvia / Cancha Pesada';
     setClimaSedes({
       ...climaSedes,
-      [clubName]: {
-        estado: nuevoEstado,
-        icono: nuevoEstado.includes('Lluvia') ? 'lluvia' : 'sol',
-        hora: 'Ahora mismo'
-      }
+      [clubName]: { estado: nuevo, hora: 'Ahora mismo' }
     });
   }
 
@@ -226,21 +274,21 @@ export default function App() {
     }
   }
 
-  // Ranking acumulativo por clubes de Huancayo
+  // Club ranking acumulativo
   const clubStats = clubesHuancayo.map(c => {
     const socios = jugadores.filter(j => j.club === c.nombre);
     const totalElo = socios.reduce((sum, j) => sum + (j.elo || 1200), 0);
-    const avgElo = socios.length > 0 ? Math.round(totalElo / socios.length) : 0;
-    return { ...c, sociosCount: socios.length, totalElo, avgElo };
+    return { ...c, sociosCount: socios.length, totalElo };
   }).sort((a, b) => b.totalElo - a.totalElo);
 
-  const myPlayer = jugadores.find(j => j.id.toString() === myPlayerId) || jugadores[0] || null;
+  // Perfil activo
+  const myPlayer = currentUser ? jugadores.find(j => j.id === currentUser.id) || currentUser : null;
   const myRankPos = myPlayer ? jugadores.findIndex(j => j.id === myPlayer.id) + 1 : 0;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans max-w-md mx-auto shadow-2xl pb-24 border-x border-slate-800 relative selection:bg-lime-400 selection:text-black">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans max-w-md mx-auto shadow-2xl pb-24 border-x border-slate-800 relative">
       
-      {/* Header Playtomic Pro */}
+      {/* Header */}
       <header className="px-5 py-4 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 flex justify-between items-center sticky top-0 z-30">
         <div className="flex items-center space-x-2.5">
           <div className="w-8 h-8 rounded-lg bg-lime-400 flex items-center justify-center font-black text-slate-950 text-base shadow-[0_0_15px_rgba(163,230,53,0.35)]">
@@ -251,55 +299,58 @@ export default function App() {
             <h1 className="text-base font-black tracking-tight text-white leading-tight">MATCHPOINT</h1>
           </div>
         </div>
+
         <div className="flex items-center space-x-2">
+          {currentUser ? (
+            <button 
+              onClick={() => setTab('perfil')}
+              className="flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 px-2.5 py-1.5 rounded-xl text-xs font-bold text-lime-400"
+            >
+              <User className="w-3.5 h-3.5" />
+              <span className="max-w-[70px] truncate">{currentUser.nombre.split(' ')[0]}</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => { setAuthMode('login'); setShowAuthModal(true); }}
+              className="bg-lime-400 hover:bg-lime-300 text-slate-950 px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1 shadow-md shadow-lime-500/10"
+            >
+              <LogIn className="w-3.5 h-3.5" /> Entrar
+            </button>
+          )}
+
           <button 
             onClick={() => setShowAdminModal(true)}
-            className="p-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-slate-300 transition"
-            title="Panel Admin y Finanzas"
+            className="p-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-slate-300"
+            title="Panel Admin"
           >
             <Lock className="w-4 h-4 text-lime-400" />
           </button>
-          <div className="flex items-center space-x-1.5 bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-1 rounded-full">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span className="text-[11px] text-emerald-400 font-bold font-mono">En vivo</span>
-          </div>
         </div>
       </header>
 
-      {/* Botones de Acción Inmediata */}
-      <div className="px-4 pt-3 flex gap-2">
-        <button
-          onClick={() => setShowRegisterModal(true)}
-          className="flex-1 bg-lime-400 hover:bg-lime-300 text-slate-950 font-black py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md shadow-lime-500/10 transition active:scale-95"
-        >
-          <Plus className="w-4 h-4 stroke-[3]" /> Crear Jugador
-        </button>
-        <button
-          onClick={() => setShowMatchModal(true)}
-          className="flex-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-lime-400 font-black py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition active:scale-95"
-        >
-          <Swords className="w-4 h-4 stroke-[2.5]" /> Subir Resultado
-        </button>
-      </div>
-
-      {/* Contenido Principal */}
+      {/* Main Content */}
       <main className="p-4 flex-1 space-y-4">
 
-        {/* 1. RANKING INDIVIDUAL Y POR CLUBES */}
+        {/* 1. RANKING */}
         {tab === 'ranking' && (
           <div className="space-y-4">
-            {/* Tarjeta de Reglas ELO FNT */}
             <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl flex justify-between items-center">
               <div>
                 <span className="text-[10px] font-bold uppercase tracking-wider text-lime-400">Circuito Oficial Huancayo</span>
                 <h2 className="text-base font-black text-white">Tabla Clasificatoria ELO</h2>
                 <p className="text-xs text-slate-400">Factor dinámico K=32 · {jugadores.length} tenistas</p>
               </div>
+              <button
+                onClick={() => setShowMatchModal(true)}
+                className="bg-slate-800 hover:bg-slate-750 border border-slate-700 text-lime-400 font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5"
+              >
+                <Swords className="w-4 h-4" /> Score
+              </button>
             </div>
 
             {/* Clasificación de Clubes */}
             <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Copa de Clubes (Puntaje Acumulado)</h3>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Copa de Clubes</h3>
               <div className="grid grid-cols-2 gap-2">
                 {clubStats.slice(0, 4).map((c, i) => (
                   <div key={i} className="bg-slate-900 border border-slate-800 p-3 rounded-2xl">
@@ -315,12 +366,11 @@ export default function App() {
             <div className="space-y-2">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Ranking Individual</h3>
               {loading ? (
-                <div className="text-center py-10 text-slate-500 text-xs">Sincronizando circuito...</div>
+                <div className="text-center py-10 text-slate-500 text-xs">Cargando circuito...</div>
               ) : jugadores.map((j, idx) => (
                 <div 
                   key={j.id || idx}
-                  onClick={() => { setMyPlayerId(j.id.toString()); setTab('perfil'); }}
-                  className="bg-slate-900 hover:bg-slate-850 p-3.5 rounded-2xl border border-slate-800 flex items-center justify-between cursor-pointer transition active:scale-[0.99]"
+                  className="bg-slate-900 p-3.5 rounded-2xl border border-slate-800 flex items-center justify-between"
                 >
                   <div className="flex items-center space-x-3">
                     <div className={`w-7 text-center font-mono font-black text-sm ${idx === 0 ? 'text-amber-400' : idx === 1 ? 'text-slate-300' : idx === 2 ? 'text-amber-600' : 'text-slate-500'}`}>
@@ -353,83 +403,87 @@ export default function App() {
         {/* 2. MI PERFIL */}
         {tab === 'perfil' && (
           <div className="space-y-4">
-            {myPlayer ? (
-              <>
-                <div className="bg-slate-900 border border-slate-800 p-2.5 rounded-2xl flex items-center justify-between text-xs">
-                  <span className="text-slate-400 pl-2">Seleccionar Perfil:</span>
-                  <select 
-                    value={myPlayer.id.toString()}
-                    onChange={(e) => {
-                      setMyPlayerId(e.target.value);
-                      localStorage.setItem('tennis_my_player_id', e.target.value);
-                    }}
-                    className="bg-slate-800 text-lime-400 font-bold px-3 py-1.5 rounded-xl border border-slate-700 focus:outline-none"
+            {currentUser && myPlayer ? (
+              <div className="bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-6 text-center shadow-xl relative overflow-hidden">
+                <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-lime-400 to-emerald-500"></div>
+                
+                <div className="w-24 h-24 mx-auto rounded-full bg-slate-800 p-1 border-2 border-lime-400 mb-3 shadow-[0_0_20px_rgba(163,230,53,0.25)]">
+                  <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center bg-slate-900">
+                    {myPlayer.foto_url ? (
+                      <img src={myPlayer.foto_url} alt={myPlayer.nombre} className="w-full h-full object-cover" />
+                    ) : (
+                      <User className="w-12 h-12 text-slate-500" />
+                    )}
+                  </div>
+                </div>
+
+                <h2 className="text-xl font-black text-white">{myPlayer.nombre}</h2>
+                <p className="text-xs text-slate-400 mt-0.5">{myPlayer.club || 'Independiente'}</p>
+                <div className="inline-block mt-2 bg-lime-400/10 text-lime-400 border border-lime-400/30 text-xs font-black px-3 py-1 rounded-full uppercase">
+                  Categoría {myPlayer.categoria || '4ª'}
+                </div>
+
+                {/* Métricas del Jugador */}
+                <div className="grid grid-cols-3 gap-2 mt-6 pt-6 border-t border-slate-800/80">
+                  <div className="bg-slate-900/80 p-3 rounded-2xl border border-slate-800">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 block">Posición</span>
+                    <span className="text-lg font-black text-white font-mono">#{myRankPos}</span>
+                  </div>
+                  <div className="bg-slate-900/80 p-3 rounded-2xl border border-slate-800">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 block">ELO FNT</span>
+                    <span className="text-lg font-black text-lime-400 font-mono">{myPlayer.elo || 1200}</span>
+                  </div>
+                  <div className="bg-slate-900/80 p-3 rounded-2xl border border-slate-800">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 block">Record W/L</span>
+                    <span className="text-lg font-black text-white font-mono">
+                      {myPlayer.victorias || 0}-{myPlayer.derrotas || 0}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Acciones de Cuenta (Sin autoreto) */}
+                <div className="mt-6 pt-4 border-t border-slate-800/80 flex gap-2">
+                  <button 
+                    onClick={handleLogout}
+                    className="w-full bg-slate-800 hover:bg-slate-700 text-rose-400 font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 transition"
                   >
-                    {jugadores.map(j => (
-                      <option key={j.id} value={j.id.toString()}>{j.nombre}</option>
-                    ))}
-                  </select>
+                    <LogOut className="w-4 h-4" /> Cerrar Sesión
+                  </button>
                 </div>
-
-                <div className="bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-6 text-center shadow-xl relative overflow-hidden">
-                  <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-lime-400 to-emerald-500"></div>
-                  
-                  <div className="w-24 h-24 mx-auto rounded-full bg-slate-800 p-1 border-2 border-lime-400 mb-3 shadow-[0_0_20px_rgba(163,230,53,0.25)]">
-                    <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center bg-slate-900">
-                      {myPlayer.foto_url ? (
-                        <img src={myPlayer.foto_url} alt={myPlayer.nombre} className="w-full h-full object-cover" />
-                      ) : (
-                        <User className="w-12 h-12 text-slate-500" />
-                      )}
-                    </div>
-                  </div>
-
-                  <h2 className="text-xl font-black text-white">{myPlayer.nombre}</h2>
-                  <p className="text-xs text-slate-400 mt-0.5">{myPlayer.club || 'Independiente'}</p>
-                  <div className="inline-block mt-2 bg-lime-400/10 text-lime-400 border border-lime-400/30 text-xs font-black px-3 py-1 rounded-full uppercase">
-                    Categoría {myPlayer.categoria || '4ª'}
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2 mt-6 pt-6 border-t border-slate-800/80">
-                    <div className="bg-slate-900/80 p-3 rounded-2xl border border-slate-800">
-                      <span className="text-[10px] uppercase font-bold text-slate-500 block">Posición</span>
-                      <span className="text-lg font-black text-white font-mono">#{myRankPos}</span>
-                    </div>
-                    <div className="bg-slate-900/80 p-3 rounded-2xl border border-slate-800">
-                      <span className="text-[10px] uppercase font-bold text-slate-500 block">ELO FNT</span>
-                      <span className="text-lg font-black text-lime-400 font-mono">{myPlayer.elo || 1200}</span>
-                    </div>
-                    <div className="bg-slate-900/80 p-3 rounded-2xl border border-slate-800">
-                      <span className="text-[10px] uppercase font-bold text-slate-500 block">Record W/L</span>
-                      <span className="text-lg font-black text-white font-mono">
-                        {myPlayer.victorias || 0}-{myPlayer.derrotas || 0}
-                      </span>
-                    </div>
-                  </div>
-
-                  {myPlayer.telefono && (
-                    <a
-                      href={`https://wa.me/51${myPlayer.telefono.replace(/\D/g, '')}?text=Hola%20${encodeURIComponent(myPlayer.nombre)},%20vi%20tu%20perfil%20en%20MatchPoint%20y%20quiero%20pactar%20un%20partido%20de%20tenis.`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="mt-5 w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-3 rounded-2xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 transition"
-                    >
-                      <Phone className="w-4 h-4 fill-slate-950" /> Retar por WhatsApp
-                    </a>
-                  )}
+              </div>
+            ) : (
+              <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl text-center space-y-4">
+                <User className="w-12 h-12 text-slate-600 mx-auto" />
+                <div>
+                  <h3 className="text-base font-black text-white">Accede a tu Perfil de Jugador</h3>
+                  <p className="text-xs text-slate-400 mt-1">Crea una cuenta o inicia sesión para registrar tus partidos y escalar en el ranking.</p>
                 </div>
-              </>
-            ) : null}
+                <div className="flex gap-2 justify-center pt-2">
+                  <button
+                    onClick={() => { setAuthMode('login'); setShowAuthModal(true); }}
+                    className="bg-lime-400 text-slate-950 font-black px-5 py-2.5 rounded-xl text-xs"
+                  >
+                    Iniciar Sesión
+                  </button>
+                  <button
+                    onClick={() => { setAuthMode('signup'); setShowAuthModal(true); }}
+                    className="bg-slate-800 text-white font-bold px-5 py-2.5 rounded-xl text-xs border border-slate-700"
+                  >
+                    Registrarme
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
-        {/* 3. RETOS Y PARTIDOS */}
+        {/* 3. RETOS */}
         {tab === 'match' && (
           <div className="space-y-4">
             <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl flex justify-between items-center">
               <div>
                 <h3 className="text-sm font-black text-white">Desafíos Directos</h3>
-                <p className="text-xs text-slate-400">Pacta encuentros por WhatsApp y sube el score</p>
+                <p className="text-xs text-slate-400">Pacta encuentros por WhatsApp</p>
               </div>
               <button
                 onClick={() => setShowMatchModal(true)}
@@ -439,56 +493,50 @@ export default function App() {
               </button>
             </div>
 
-            {/* Regla de Asistencia y Penalización */}
-            <div className="bg-amber-500/10 border border-amber-500/30 p-3 rounded-2xl flex items-center gap-3">
-              <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
-              <p className="text-[11px] text-amber-200 leading-tight">
-                <strong>Fair Play Huancayo:</strong> La inasistencia no justificada a un reto pactado se computa como W.O. (-32 pts ELO).
-              </p>
-            </div>
-
             <div className="space-y-2">
-              {jugadores.map((j) => (
-                <div key={j.id} className="bg-slate-900 p-3.5 rounded-2xl border border-slate-800 flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-9 h-9 rounded-full bg-slate-800 overflow-hidden flex items-center justify-center border border-slate-700">
-                      {j.foto_url ? (
-                        <img src={j.foto_url} alt={j.nombre} className="w-full h-full object-cover" />
-                      ) : (
-                        <User className="w-5 h-5 text-slate-400" />
-                      )}
+              {jugadores
+                .filter(j => !currentUser || j.id !== currentUser.id) // Ocultar al usuario actual de la lista de rivales
+                .map((j) => (
+                  <div key={j.id} className="bg-slate-900 p-3.5 rounded-2xl border border-slate-800 flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-9 h-9 rounded-full bg-slate-800 overflow-hidden flex items-center justify-center border border-slate-700">
+                        {j.foto_url ? (
+                          <img src={j.foto_url} alt={j.nombre} className="w-full h-full object-cover" />
+                        ) : (
+                          <User className="w-5 h-5 text-slate-400" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-sm font-black text-white">{j.nombre}</p>
+                        <p className="text-xs text-slate-400">{j.club || 'Independiente'} · <span className="text-lime-400">{j.elo || 1200} pts</span></p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-black text-white">{j.nombre}</p>
-                      <p className="text-xs text-slate-400">{j.club || 'Independiente'} · <span className="text-lime-400">{j.elo || 1200} pts</span></p>
-                    </div>
+                    {j.telefono ? (
+                      <a
+                        href={`https://wa.me/51${j.telefono.replace(/\D/g, '')}?text=Hola%20${encodeURIComponent(j.nombre)},%20te%20escribo%20desde%20MatchPoint%20para%20jugar%20un%20partido%20de%20ranking.`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="bg-slate-800 hover:bg-slate-750 text-lime-400 border border-slate-700 text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition"
+                      >
+                        <Phone className="w-3.5 h-3.5" /> Retar
+                      </a>
+                    ) : null}
                   </div>
-                  {j.telefono ? (
-                    <a
-                      href={`https://wa.me/51${j.telefono.replace(/\D/g, '')}?text=Hola%20${encodeURIComponent(j.nombre)},%20te%20escribo%20desde%20MatchPoint%20para%20jugar%20un%20partido%20de%20ranking.`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="bg-slate-800 hover:bg-slate-750 text-lime-400 border border-slate-700 text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition"
-                    >
-                      <Phone className="w-3.5 h-3.5" /> Retar
-                    </a>
-                  ) : null}
-                </div>
-              ))}
+                ))}
             </div>
           </div>
         )}
 
-        {/* 4. CANCHAS Y CLIMA CROWDSOURCING */}
+        {/* 4. CANCHAS */}
         {tab === 'clubs' && (
           <div className="space-y-3">
             <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800">
               <h3 className="text-sm font-black text-white">Estado de Sedes en Huancayo</h3>
-              <p className="text-xs text-slate-400 mt-1">Monitorea el estado de la arcilla antes de reservar.</p>
+              <p className="text-xs text-slate-400 mt-1">Monitorea el estado de la arcilla antes de jugar.</p>
             </div>
 
             {clubesHuancayo.map((c, idx) => {
-              const infoClima = climaSedes[c.nombre] || { estado: 'Seco', icono: 'sol', hora: 'Hoy' };
+              const infoClima = climaSedes[c.nombre] || { estado: 'Seco', hora: 'Hoy' };
               const isRain = infoClima.estado.includes('Lluvia');
 
               return (
@@ -534,15 +582,15 @@ export default function App() {
                 <span className="text-xs text-slate-400">Cupos: 16 tenistas</span>
               </div>
               <h3 className="text-lg font-black text-white">Torneo Apertura Huancayo 2026</h3>
-              <p className="text-xs text-slate-400 mt-1">Cuadro eliminatorio con ronda consuelo. Suma puntos directos al ranking oficial.</p>
+              <p className="text-xs text-slate-400 mt-1">Cuadro eliminatorio oficial con puntaje ELO.</p>
               
               <div className="grid grid-cols-2 gap-2 mt-4 text-xs bg-slate-950 p-3.5 rounded-2xl border border-slate-800">
                 <div>
-                  <span className="text-slate-500 block font-semibold">Costo Inscripción:</span>
+                  <span className="text-slate-500 block font-semibold">Inscripción:</span>
                   <span className="font-black text-lime-400 text-sm">S/ {precioTorneo}.00</span>
                 </div>
                 <div>
-                  <span className="text-slate-500 block font-semibold">Sede Principal:</span>
+                  <span className="text-slate-500 block font-semibold">Sede:</span>
                   <span className="font-black text-white text-sm">Country Club</span>
                 </div>
               </div>
@@ -558,24 +606,82 @@ export default function App() {
         )}
       </main>
 
-      {/* Modal: Registrar Jugador */}
-      {showRegisterModal && (
+      {/* Modal: Autenticación (Login / Registro de Credenciales) */}
+      {showAuthModal && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-base font-black text-white">Nuevo Tenista</h3>
-              <button onClick={() => setShowRegisterModal(false)} className="text-slate-400 hover:text-white">
+              <h3 className="text-base font-black text-white">
+                {authMode === 'login' ? 'Iniciar Sesión' : 'Crear Cuenta'}
+              </h3>
+              <button onClick={() => setShowAuthModal(false)} className="text-slate-400 hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleCrearJugador} className="space-y-3">
+            <form onSubmit={handleAuth} className="space-y-3">
               <div>
-                <label className="text-xs text-slate-400 block mb-1">Nombre y Apellido *</label>
+                <label className="text-xs text-slate-400 block mb-1">Correo electrónico o Celular *</label>
                 <input
                   type="text"
                   required
-                  placeholder="Ej. Juan Diego Pérez"
+                  placeholder="ejemplo@correo.com"
+                  value={authEmail}
+                  onChange={(e) => setAuthEmail(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-lime-400"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-slate-400 block mb-1">Contraseña *</label>
+                <input
+                  type="password"
+                  required
+                  placeholder="••••••••"
+                  value={authPassword}
+                  onChange={(e) => setAuthPassword(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-lime-400"
+                />
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={authLoading}
+                  className="w-full bg-lime-400 hover:bg-lime-300 disabled:opacity-50 text-slate-950 font-black py-3 rounded-xl text-xs transition"
+                >
+                  {authLoading ? 'Verificando...' : (authMode === 'login' ? 'Entrar a mi Cuenta' : 'Continuar al Perfil')}
+                </button>
+              </div>
+
+              <div className="text-center pt-2">
+                <button
+                  type="button"
+                  onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}
+                  className="text-xs text-lime-400 hover:underline font-semibold"
+                >
+                  {authMode === 'login' ? '¿No tienes cuenta? Regístrate aquí' : '¿Ya tienes cuenta? Inicia sesión'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Configuración de Perfil tras Registro */}
+      {showProfileSetup && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl">
+            <h3 className="text-base font-black text-white mb-1">Configura tu Ficha de Tenista</h3>
+            <p className="text-xs text-slate-400 mb-4">Esta información aparecerá en el ranking de Huancayo.</p>
+
+            <form onSubmit={handleCompleteProfile} className="space-y-3">
+              <div>
+                <label className="text-xs text-slate-400 block mb-1">Nombre completo *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej. Juan Pérez"
                   value={nombre}
                   onChange={(e) => setNombre(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-lime-400"
@@ -583,7 +689,7 @@ export default function App() {
               </div>
 
               <div>
-                <label className="text-xs text-slate-400 block mb-1">Club o Cancha Habitual</label>
+                <label className="text-xs text-slate-400 block mb-1">Club o Cancha habitual</label>
                 <select
                   value={club}
                   onChange={(e) => setClub(e.target.value)}
@@ -605,16 +711,16 @@ export default function App() {
                     onChange={(e) => setCategoria(e.target.value)}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-2 text-sm text-white focus:outline-none focus:border-lime-400"
                   >
-                    <option value="1ª">1ª Categoría</option>
-                    <option value="2ª">2ª Categoría</option>
-                    <option value="3ª">3ª Categoría</option>
-                    <option value="4ª">4ª Categoría</option>
+                    <option value="1ª">1ª</option>
+                    <option value="2ª">2ª</option>
+                    <option value="3ª">3ª</option>
+                    <option value="4ª">4ª</option>
                     <option value="5ª A">5ª A</option>
                     <option value="5ª B">5ª B</option>
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs text-slate-400 block mb-1">WhatsApp / Móvil</label>
+                  <label className="text-xs text-slate-400 block mb-1">WhatsApp</label>
                   <input
                     type="tel"
                     placeholder="999..."
@@ -626,7 +732,7 @@ export default function App() {
               </div>
 
               <div>
-                <label className="text-xs text-slate-400 block mb-1">Foto URL (Opcional)</label>
+                <label className="text-xs text-slate-400 block mb-1">URL de Foto (Opcional)</label>
                 <input
                   type="url"
                   placeholder="https://..."
@@ -642,7 +748,7 @@ export default function App() {
                   disabled={savingPlayer}
                   className="w-full bg-lime-400 hover:bg-lime-300 disabled:opacity-50 text-slate-950 font-black py-3 rounded-xl text-xs transition"
                 >
-                  {savingPlayer ? 'Guardando...' : 'Completar Registro'}
+                  {savingPlayer ? 'Creando Perfil...' : 'Guardar y Entrar al Circuito'}
                 </button>
               </div>
             </form>
@@ -650,13 +756,13 @@ export default function App() {
         </div>
       )}
 
-      {/* Modal: Subir Marcador ELO */}
+      {/* Modal: Subir Score */}
       {showMatchModal && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-base font-black text-white flex items-center gap-1.5">
-                <Swords className="w-4 h-4 text-lime-400" /> Reportar Partido Oficial
+                <Swords className="w-4 h-4 text-lime-400" /> Reportar Partido
               </h3>
               <button onClick={() => setShowMatchModal(false)} className="text-slate-400 hover:text-white">
                 <X className="w-5 h-5" />
@@ -706,14 +812,14 @@ export default function App() {
               </div>
 
               <div>
-                <label className="text-xs text-slate-400 block mb-1">Ganador del Partido</label>
+                <label className="text-xs text-slate-400 block mb-1">Ganador</label>
                 <select
                   value={winnerId}
                   onChange={(e) => setWinnerId(e.target.value)}
                   required
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-lime-400 font-bold"
                 >
-                  <option value="">Elige quién se llevó el triunfo...</option>
+                  <option value="">Elige al ganador...</option>
                   {p1Id && <option value={p1Id}>{jugadores.find(j => j.id.toString() === p1Id)?.nombre}</option>}
                   {p2Id && <option value={p2Id}>{jugadores.find(j => j.id.toString() === p2Id)?.nombre}</option>}
                 </select>
@@ -725,7 +831,7 @@ export default function App() {
                   disabled={calculatingMatch}
                   className="w-full bg-lime-400 hover:bg-lime-300 disabled:opacity-50 text-slate-950 font-black py-3 rounded-xl text-xs transition"
                 >
-                  {calculatingMatch ? 'Calculando nuevo ELO...' : 'Confirmar y Actualizar Tabla'}
+                  {calculatingMatch ? 'Calculando nuevo ELO...' : 'Confirmar Resultado'}
                 </button>
               </div>
             </form>
@@ -733,7 +839,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Modal: Torneo y Pago Yape/Plin */}
+      {/* Modal: Torneo Yape/Plin */}
       {showTournamentModal && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl space-y-3">
@@ -766,7 +872,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Modal: Panel Admin y Finanzas */}
+      {/* Modal: Panel Admin */}
       {showAdminModal && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl">
@@ -781,7 +887,7 @@ export default function App() {
 
             {!isAdminAuth ? (
               <form onSubmit={handleVerifyAdmin} className="space-y-3">
-                <p className="text-xs text-slate-400">Clave secreta de socio / organizador:</p>
+                <p className="text-xs text-slate-400">Clave secreta de administrador:</p>
                 <input
                   type="password"
                   placeholder="PIN (1234)"
@@ -798,7 +904,6 @@ export default function App() {
               </form>
             ) : (
               <div className="space-y-4">
-                {/* Métricas Financieras en Vivo */}
                 <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 space-y-2">
                   <span className="text-[10px] font-bold uppercase text-lime-400">Simulador de Ingresos Torneo</span>
                   <div className="grid grid-cols-2 gap-2 text-xs">
@@ -814,12 +919,6 @@ export default function App() {
                 </div>
 
                 <div className="space-y-2">
-                  <button 
-                    onClick={() => { setShowAdminModal(false); setShowMatchModal(true); }}
-                    className="w-full bg-slate-800 hover:bg-slate-750 text-lime-400 text-xs font-bold py-2.5 rounded-xl text-left px-3.5 border border-slate-700"
-                  >
-                    + Validar Partido Manual
-                  </button>
                   <a
                     href="https://supabase.com"
                     target="_blank"
@@ -835,7 +934,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Navegación Inferior Playtomic */}
+      {/* Barra de Navegación Inferior */}
       <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-slate-900/95 backdrop-blur-md border-t border-slate-800 flex justify-around py-3 px-1 z-40">
         <button 
           onClick={() => setTab('ranking')} 
