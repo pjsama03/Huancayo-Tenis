@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Trophy, Swords, MapPin, User, Plus, X, Phone, Shield, 
   Calendar, Award, QrCode, Lock, CloudRain, Sun, 
@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
-// --- UTILIDAD DE COMPRESIÓN NATIVA DE IMÁGENES ---
+// --- COMPRESIÓN NATIVA DE IMÁGENES ---
 const compressImage = (file) => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -15,7 +15,6 @@ const compressImage = (file) => {
       const img = new Image();
       img.src = event.target.result;
       img.onload = () => {
-        // Reducir la imagen a un máximo de 800x800 px
         const maxWidth = 800;
         const maxHeight = 800;
         let width = img.width;
@@ -39,10 +38,9 @@ const compressImage = (file) => {
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, width, height);
 
-        // Convertir a JPEG comprimido al 80% de calidad
         canvas.toBlob((blob) => {
           if (!blob) {
-            reject(new Error("Fallo en la compresión del canvas"));
+            reject(new Error("Fallo en compresión"));
             return;
           }
           const newFile = new File([blob], `avatar_${Date.now()}.jpg`, {
@@ -52,9 +50,9 @@ const compressImage = (file) => {
           resolve({ file: newFile, preview: canvas.toDataURL('image/jpeg', 0.8) });
         }, 'image/jpeg', 0.8);
       };
-      img.onerror = (error) => reject(error);
+      img.onerror = (err) => reject(err);
     };
-    reader.onerror = (error) => reject(error);
+    reader.onerror = (err) => reject(err);
   });
 };
 
@@ -63,18 +61,17 @@ export default function App() {
   const [jugadores, setJugadores] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Sesión y Auth
+  // Auth y Sesión
   const [currentUser, setCurrentUser] = useState(null);
   const [authMode, setAuthMode] = useState('login'); 
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showProfileSetup, setShowProfileSetup] = useState(false);
 
-  // Formulario Auth
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
 
-  // Formulario Perfil con Foto
+  // Perfil
   const [nombre, setNombre] = useState('');
   const [club, setClub] = useState('Country Club Huancayo');
   const [categoria, setCategoria] = useState('4ª');
@@ -84,24 +81,25 @@ export default function App() {
   const [isCompressing, setIsCompressing] = useState(false);
   const [savingPlayer, setSavingPlayer] = useState(false);
 
+  const fileInputRef = useRef(null);
+
   // Modales
   const [showAdminModal, setShowAdminModal] = useState(false);
   const [showMatchModal, setShowMatchModal] = useState(false);
   const [showTournamentModal, setShowTournamentModal] = useState(false);
 
-  // Panel Admin
+  // Admin
   const [adminPin, setAdminPin] = useState('');
   const [isAdminAuth, setIsAdminAuth] = useState(false);
   const precioTorneo = 40;
 
-  // Formulario Partido ELO
+  // ELO
   const [p1Id, setP1Id] = useState('');
   const [p2Id, setP2Id] = useState('');
   const [score, setScore] = useState('6-4, 6-3');
   const [winnerId, setWinnerId] = useState('');
   const [calculatingMatch, setCalculatingMatch] = useState(false);
 
-  // Clima
   const [climaSedes, setClimaSedes] = useState({
     'Country Club Huancayo': { estado: 'Seco / Jugable', hora: 'Hace 15m' },
     'Club Tauro Tenis': { estado: 'Techado / Óptimo', hora: 'Hace 30m' },
@@ -143,13 +141,13 @@ export default function App() {
       if (error) throw error;
       setJugadores(data || []);
     } catch (err) {
-      console.error('Error cargando ranking:', err);
+      console.error('Error:', err);
     } finally {
       setLoading(false);
     }
   }
 
-  // --- PROCESAMIENTO SILENCIOSO DE LA FOTO ---
+  // Selección de Imagen (Sin capture="user" para permitir galería)
   async function handleFileChange(e) {
     const file = e.target.files[0];
     if (file) {
@@ -159,13 +157,19 @@ export default function App() {
         setFotoFile(compressed.file);
         setFotoPreview(compressed.preview);
       } catch (error) {
-        console.error("Error optimizando la imagen:", error);
-        alert("Hubo un problema al preparar tu foto. Intenta con otra.");
+        console.error("Error optimizando imagen:", error);
+        alert("Problema al preparar foto.");
       } finally {
         setIsCompressing(false);
       }
     }
   }
+
+  const triggerFileInput = () => {
+    if (fileInputRef.current) {
+        fileInputRef.current.click();
+    }
+  };
 
   async function handleAuth(e) {
     e.preventDefault();
@@ -182,7 +186,7 @@ export default function App() {
           .maybeSingle();
 
         if (existing) {
-          alert('Este correo ya está registrado. Inicia sesión.');
+          alert('Correo ya registrado. Inicia sesión.');
           setAuthMode('login');
           return;
         }
@@ -225,21 +229,19 @@ export default function App() {
       let publicFotoUrl = null;
 
       if (fotoFile) {
-        // Generar un nombre único para el archivo
         const fileName = `avatar_${Date.now()}_${Math.random().toString(36).substring(2)}.jpg`;
-
         const { error: uploadError } = await supabase.storage
           .from('avatars')
           .upload(fileName, fotoFile);
 
         if (uploadError) {
-          console.error('Error subiendo imagen a Supabase:', uploadError);
-          alert('Tu perfil se creará, pero hubo un error guardando la foto. Verifica los permisos de Storage.');
+            console.error('Error subiendo a Storage:', uploadError);
+            alert('Perfil creado, pero hubo un error con la foto.');
         } else {
-          const { data: publicUrlData } = supabase.storage
-            .from('avatars')
-            .getPublicUrl(fileName);
-          publicFotoUrl = publicUrlData.publicUrl;
+            const { data: publicUrlData } = supabase.storage
+              .from('avatars')
+              .getPublicUrl(fileName);
+            publicFotoUrl = publicUrlData.publicUrl;
         }
       }
 
@@ -331,7 +333,7 @@ export default function App() {
         derrotas: (player2.derrotas || 0) + (actual2 === 0 ? 1 : 0)
       }).eq('id', player2.id);
 
-      alert(`✅ Partido Oficial Registrado:\n\n` +
+      alert(`✅ Partido Registrado!\n\n` +
             `${player1.nombre}: ${newElo1} ELO (${delta1 >= 0 ? '+' : ''}${delta1})\n` +
             `${player2.nombre}: ${newElo2} ELO (${delta2 >= 0 ? '+' : ''}${delta2})`);
 
@@ -358,7 +360,7 @@ export default function App() {
     if (adminPin === '1234') {
       setIsAdminAuth(true);
     } else {
-      alert('PIN de Administrador Incorrecto');
+      alert('PIN Incorrecto');
     }
   }
 
@@ -418,7 +420,7 @@ export default function App() {
           <div className="space-y-4">
             <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl flex justify-between items-center">
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-lime-400">Circuito Oficial Huancayo</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-lime-400">Circuito Oficial</span>
                 <h2 className="text-base font-black text-white">Tabla ELO</h2>
                 <p className="text-xs text-slate-400">K=32 · {jugadores.length} tenistas</p>
               </div>
@@ -446,7 +448,7 @@ export default function App() {
             <div className="space-y-2">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Ranking Individual</h3>
               {loading ? (
-                <div className="text-center py-10 text-slate-500 text-xs">Cargando circuito...</div>
+                <div className="text-center py-10 text-slate-500 text-xs">Cargando...</div>
               ) : jugadores.map((j, idx) => (
                 <div 
                   key={j.id || idx}
@@ -480,7 +482,7 @@ export default function App() {
           </div>
         )}
 
-        {/* MI PERFIL */}
+        {/* PERFIL */}
         {tab === 'perfil' && (
           <div className="space-y-4">
             {currentUser && myPlayer ? (
@@ -509,11 +511,11 @@ export default function App() {
                     <span className="text-lg font-black text-white font-mono">#{myRankPos}</span>
                   </div>
                   <div className="bg-slate-900/80 p-3 rounded-2xl border border-slate-800">
-                    <span className="text-[10px] uppercase font-bold text-slate-500 block">ELO FNT</span>
+                    <span className="text-[10px] uppercase font-bold text-slate-500 block">ELO</span>
                     <span className="text-lg font-black text-lime-400 font-mono">{myPlayer.elo || 1200}</span>
                   </div>
                   <div className="bg-slate-900/80 p-3 rounded-2xl border border-slate-800">
-                    <span className="text-[10px] uppercase font-bold text-slate-500 block">Record W/L</span>
+                    <span className="text-[10px] uppercase font-bold text-slate-500 block">Record</span>
                     <span className="text-lg font-black text-white font-mono">
                       {myPlayer.victorias || 0}-{myPlayer.derrotas || 0}
                     </span>
@@ -534,7 +536,7 @@ export default function App() {
                 <User className="w-12 h-12 text-slate-600 mx-auto" />
                 <div>
                   <h3 className="text-base font-black text-white">Accede a tu Perfil</h3>
-                  <p className="text-xs text-slate-400 mt-1">Crea una cuenta o inicia sesión para registrar partidos.</p>
+                  <p className="text-xs text-slate-400 mt-1">Regístrate para figurar en la tabla.</p>
                 </div>
                 <div className="flex gap-2 justify-center pt-2">
                   <button
@@ -560,7 +562,7 @@ export default function App() {
           <div className="space-y-4">
             <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl flex justify-between items-center">
               <div>
-                <h3 className="text-sm font-black text-white">Desafíos Directos</h3>
+                <h3 className="text-sm font-black text-white">Desafíos</h3>
                 <p className="text-xs text-slate-400">Pacta encuentros por WhatsApp</p>
               </div>
               <button
@@ -610,7 +612,7 @@ export default function App() {
           <div className="space-y-3">
             <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800">
               <h3 className="text-sm font-black text-white">Sedes en Huancayo</h3>
-              <p className="text-xs text-slate-400 mt-1">Monitorea el clima de la arcilla.</p>
+              <p className="text-xs text-slate-400 mt-1">Monitorea el clima.</p>
             </div>
 
             {clubesHuancayo.map((c, idx) => {
@@ -657,10 +659,10 @@ export default function App() {
                 <span className="text-[10px] uppercase font-black text-lime-400 bg-lime-950/60 border border-lime-800/80 px-2.5 py-0.5 rounded-md">
                   Inscripciones Abiertas
                 </span>
-                <span className="text-xs text-slate-400">Cupos: 16 tenistas</span>
+                <span className="text-xs text-slate-400">Cupos: 16</span>
               </div>
               <h3 className="text-lg font-black text-white">Torneo Apertura Huancayo</h3>
-              <p className="text-xs text-slate-400 mt-1">Cuadro eliminatorio oficial ELO.</p>
+              <p className="text-xs text-slate-400 mt-1">Cuadro oficial ELO.</p>
               
               <div className="grid grid-cols-2 gap-2 mt-4 text-xs bg-slate-950 p-3.5 rounded-2xl border border-slate-800">
                 <div>
@@ -677,14 +679,15 @@ export default function App() {
                 onClick={() => setShowTournamentModal(true)}
                 className="w-full mt-4 bg-lime-400 hover:bg-lime-300 text-slate-950 font-black py-3 rounded-2xl text-xs transition"
               >
-                Inscribirme vía Yape / Plin
+                Inscribirme (Yape/Plin)
               </button>
             </div>
           </div>
         )}
       </main>
 
-      {/* Modal: Auth */}
+      {/* Modales */}
+      {/* AUTH */}
       {showAuthModal && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl">
@@ -728,7 +731,7 @@ export default function App() {
                   disabled={authLoading}
                   className="w-full bg-lime-400 hover:bg-lime-300 disabled:opacity-50 text-slate-950 font-black py-3 rounded-xl text-xs transition"
                 >
-                  {authLoading ? 'Verificando...' : (authMode === 'login' ? 'Entrar a mi Cuenta' : 'Continuar al Perfil')}
+                  {authLoading ? 'Verificando...' : (authMode === 'login' ? 'Entrar' : 'Continuar')}
                 </button>
               </div>
 
@@ -746,19 +749,20 @@ export default function App() {
         </div>
       )}
 
-      {/* Modal: Completar Perfil y Subida de Imagen Nativa */}
+      {/* PERFIL SETUP (FOTO NATIVA) */}
       {showProfileSetup && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
-            <h3 className="text-base font-black text-white mb-1">Configura tu Ficha de Tenista</h3>
-            <p className="text-xs text-slate-400 mb-4">Esta información aparecerá en el ranking de Huancayo.</p>
+            <h3 className="text-base font-black text-white mb-1">Configura tu Ficha</h3>
+            <p className="text-xs text-slate-400 mb-4">Esta info aparecerá en el ranking.</p>
 
             <form onSubmit={handleCompleteProfile} className="space-y-3">
               
-              {/* Carga y Compresión de Imagen */}
               <div className="flex flex-col items-center mb-3">
-                <label className="relative cursor-pointer">
-                  <div className="w-20 h-20 rounded-full bg-slate-950 border-2 border-dashed border-lime-400 flex items-center justify-center overflow-hidden hover:border-lime-300 transition">
+                <div 
+                  className="w-20 h-20 rounded-full bg-slate-950 border-2 border-dashed border-lime-400 flex items-center justify-center overflow-hidden hover:border-lime-300 transition cursor-pointer"
+                  onClick={triggerFileInput}
+                >
                     {isCompressing ? (
                        <Loader2 className="w-6 h-6 text-lime-400 animate-spin" />
                     ) : fotoPreview ? (
@@ -768,17 +772,16 @@ export default function App() {
                         <Camera className="w-6 h-6 text-lime-400 mx-auto" />
                       </div>
                     )}
-                  </div>
-                  <input 
-                    type="file" 
-                    accept="image/*" 
-                    capture="user"
-                    onChange={handleFileChange} 
-                    className="hidden" 
-                  />
-                </label>
+                </div>
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  onChange={handleFileChange} 
+                  className="hidden" 
+                  ref={fileInputRef}
+                />
                 <span className="text-[10px] text-slate-400 mt-1.5">
-                  {isCompressing ? 'Optimizando foto...' : 'Toca el círculo para subir foto'}
+                  {isCompressing ? 'Optimizando...' : 'Toca para subir foto'}
                 </span>
               </div>
 
@@ -795,7 +798,7 @@ export default function App() {
               </div>
 
               <div>
-                <label className="text-xs text-slate-400 block mb-1">Club o Cancha habitual</label>
+                <label className="text-xs text-slate-400 block mb-1">Club o Cancha</label>
                 <select
                   value={club}
                   onChange={(e) => setClub(e.target.value)}
@@ -844,9 +847,9 @@ export default function App() {
                   className="w-full bg-lime-400 hover:bg-lime-300 disabled:opacity-50 text-slate-950 font-black py-3 rounded-xl text-xs transition flex items-center justify-center gap-2"
                 >
                   {savingPlayer ? (
-                    <><Loader2 className="w-4 h-4 animate-spin" /> Guardando perfil...</>
+                    <><Loader2 className="w-4 h-4 animate-spin" /> Guardando...</>
                   ) : (
-                    'Guardar y Entrar al Circuito'
+                    'Guardar y Entrar'
                   )}
                 </button>
               </div>
@@ -855,7 +858,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Modal: Subir Score */}
+      {/* MATCH MODAL */}
       {showMatchModal && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl">
@@ -930,7 +933,7 @@ export default function App() {
                   disabled={calculatingMatch}
                   className="w-full bg-lime-400 hover:bg-lime-300 disabled:opacity-50 text-slate-950 font-black py-3 rounded-xl text-xs transition"
                 >
-                  {calculatingMatch ? 'Calculando nuevo ELO...' : 'Confirmar Resultado'}
+                  {calculatingMatch ? 'Calculando...' : 'Confirmar Resultado'}
                 </button>
               </div>
             </form>
@@ -938,7 +941,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Modal: Torneo Yape/Plin */}
+      {/* TORNEO MODAL */}
       {showTournamentModal && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl space-y-3">
@@ -956,22 +959,22 @@ export default function App() {
             </div>
 
             <p className="text-xs text-slate-400 leading-relaxed">
-              Realiza el pago y envía tu constancia por WhatsApp para validar tu cupo y asignarte el cuadro.
+              Realiza el pago y envía tu constancia por WhatsApp.
             </p>
 
             <a
-              href={`https://wa.me/51964000000?text=Hola,%20adjunto%20mi%20comprobante%20de%20S/%20${precioTorneo}%20para%20el%20Torneo`}
+              href={`https://wa.me/51964000000?text=Hola,%20adjunto%20comprobante%20de%20S/%20${precioTorneo}`}
               target="_blank"
               rel="noreferrer"
               className="block w-full text-center bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-3 rounded-xl text-xs transition"
             >
-              Enviar Constancia al WhatsApp
+              Enviar Constancia
             </a>
           </div>
         </div>
       )}
 
-      {/* Modal: Panel Admin */}
+      {/* ADMIN MODAL */}
       {showAdminModal && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl">
@@ -986,7 +989,7 @@ export default function App() {
 
             {!isAdminAuth ? (
               <form onSubmit={handleVerifyAdmin} className="space-y-3">
-                <p className="text-xs text-slate-400">Clave de organizador:</p>
+                <p className="text-xs text-slate-400">Clave de administrador:</p>
                 <input
                   type="password"
                   placeholder="PIN (1234)"
@@ -1024,7 +1027,7 @@ export default function App() {
                     rel="noreferrer"
                     className="block w-full bg-slate-800 hover:bg-slate-750 text-slate-200 text-xs font-bold py-2.5 rounded-xl text-left px-3.5 border border-slate-700"
                   >
-                    Base de Datos Supabase ↗
+                    Supabase ↗
                   </a>
                 </div>
               </div>
@@ -1033,7 +1036,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Navegación Inferior */}
+      {/* NAV */}
       <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-slate-900/95 backdrop-blur-md border-t border-slate-800 flex justify-around py-3 px-1 z-40">
         <button 
           onClick={() => setTab('ranking')} 
@@ -1047,7 +1050,7 @@ export default function App() {
           className={`flex flex-col items-center text-[10px] transition ${tab === 'perfil' ? 'text-lime-400 font-black' : 'text-slate-400'}`}
         >
           <User className="w-4 h-4 mb-1" />
-          Mi Perfil
+          Perfil
         </button>
         <button 
           onClick={() => setTab('match')} 
