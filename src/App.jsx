@@ -2,11 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Trophy, Swords, MapPin, User, X, Phone, Shield, 
   Calendar, QrCode, Lock, CloudRain, Sun, 
-  LogIn, LogOut, Camera, Loader2, Sparkles, Flame
+  LogIn, LogOut, Camera, Loader2, Sparkles, Flame, 
+  Clock, CheckCircle2, Users, Plus, ChevronRight, Eye
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
-// --- COMPRESIÓN NATIVA DE IMÁGENES (HTML5 CANVAS -> JPEG LIGERO) ---
+// --- COMPRESIÓN SILENCIOSA DE IMÁGENES (HTML5 CANVAS -> JPEG LIGERO) ---
 const compressImage = (file) => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -23,7 +24,7 @@ const compressImage = (file) => {
         canvas.width = w; canvas.height = h;
         canvas.getContext('2d').drawImage(img, 0, 0, w, h);
         canvas.toBlob((blob) => {
-          if (!blob) return reject(new Error('Error al comprimir'));
+          if (!blob) return reject(new Error('Error de compresión'));
           const newFile = new File([blob], `avatar_${Date.now()}.jpg`, { type: 'image/jpeg' });
           resolve({ file: newFile, preview: canvas.toDataURL('image/jpeg', 0.82) });
         }, 'image/jpeg', 0.82);
@@ -34,66 +35,66 @@ const compressImage = (file) => {
   });
 };
 
-// --- ESCALA OFICIAL HUANCAYO (0 A 5,500+ ELO) ---
+// --- CLASIFICACIÓN POR NIVELES Y CATEGORÍAS (0 A 5,000+ PUNTOS) ---
 const ESCALA_CATEGORIAS = [
-  { id: '5ª P', nombre: '5ª P · Principiante', min: 0, max: 600, badge: 'Bronce Base', color: 'text-amber-500 border-amber-500/30 bg-amber-500/10' },
-  { id: '5ª B', nombre: '5ª B · Inicial', min: 601, max: 1200, badge: 'Bronce Avanzado', color: 'text-orange-400 border-orange-400/30 bg-orange-400/10' },
-  { id: '5ª A', nombre: '5ª A · Consolidado', min: 1201, max: 1800, badge: 'Hierro Competitivo', color: 'text-sky-400 border-sky-400/30 bg-sky-400/10' },
-  { id: '4ª', nombre: '4ª Categoría', min: 1801, max: 2800, badge: 'Plata Huancayo', color: 'text-slate-200 border-slate-400/40 bg-slate-400/10' },
-  { id: '3ª', nombre: '3ª · Olimpo Huancayo', min: 2801, max: 3800, badge: 'Oro Local', color: 'text-yellow-400 border-yellow-400/40 bg-yellow-400/15' },
-  { id: '2ª', nombre: '2ª · Zafiro Nacional', min: 3801, max: 4800, badge: 'Zafiro Élite', color: 'text-cyan-300 border-cyan-400/40 bg-cyan-400/15' },
-  { id: '1ª', nombre: '1ª · Corona Pro', min: 4801, max: 6000, badge: 'Corona Pro', color: 'text-lime-400 border-lime-400/50 bg-lime-400/15' }
+  { id: '5ª P', nombre: '5ª P · Principiante', min: 0, max: 600, badge: 'Iniciación', color: 'text-amber-500 border-amber-500/30 bg-amber-500/10' },
+  { id: '5ª B', nombre: '5ª B · Inicial', min: 601, max: 1200, badge: 'Intermedio Bajo', color: 'text-orange-400 border-orange-400/30 bg-orange-400/10' },
+  { id: '5ª A', nombre: '5ª A · Consolidado', min: 1201, max: 1800, badge: 'Intermedio', color: 'text-sky-400 border-sky-400/30 bg-sky-400/10' },
+  { id: '4ª', nombre: '4ª Categoría', min: 1801, max: 2800, badge: 'Competitivo Regular', color: 'text-slate-200 border-slate-400/40 bg-slate-400/10' },
+  { id: '3ª', nombre: '3ª Categoría', min: 2801, max: 3800, badge: 'Nivel Máximo Local', color: 'text-yellow-400 border-yellow-400/40 bg-yellow-400/15' },
+  { id: '2ª', nombre: '2ª Categoría', min: 3801, max: 4800, badge: 'Zafiro Nacional', color: 'text-cyan-300 border-cyan-400/40 bg-cyan-400/15' },
+  { id: '1ª', nombre: '1ª Categoría', min: 4801, max: 6000, badge: 'Corona Pro', color: 'text-lime-400 border-lime-400/50 bg-lime-400/15' }
 ];
 
-const getInfoCategoria = (elo = 1000) => {
-  return ESCALA_CATEGORIAS.find(c => elo >= c.min && elo <= c.max) || ESCALA_CATEGORIAS[6];
+const getInfoCategoria = (puntos = 1000) => {
+  return ESCALA_CATEGORIAS.find(c => puntos >= c.min && puntos <= c.max) || ESCALA_CATEGORIAS[6];
 };
 
-// --- CUESTIONARIO TÉCNICO SITUACIONAL (4 PREGUNTAS) ---
+// --- CUESTIONARIO TÉCNICO SITUACIONAL (4 PREGUNTAS FILTRO) ---
 const PREGUNTAS_FILTRO = [
   {
-    titulo: '1. Segundo saque en punto de quiebre (30-40)',
+    titulo: '1. Segundo saque en punto de presión (30-40)',
     opciones: [
-      { texto: 'Empuje suave ("cuchara") para asegurar que pase la red', pts: 0 },
-      { texto: 'Mismo gesto que el primero pero lento; a veces doble falta', pts: 1 },
-      { texto: 'Saque regular colocado para poner la bola en juego', pts: 2 },
-      { texto: 'Slice o kick profundo con dirección para no quedar vendido', pts: 3 },
-      { texto: 'Varío efecto, bote y velocidad buscando ventaja directa', pts: 4 }
+      { texto: 'Empuje suave para asegurar que pase la red', pts: 0 },
+      { texto: 'Mismo gesto que el primero pero lento; riesgo de doble falta', pts: 1 },
+      { texto: 'Saque colocado con efecto para iniciar el punto', pts: 2 },
+      { texto: 'Slice o kick profundo con dirección elegida', pts: 3 },
+      { texto: 'Varío efecto y bote buscando ventaja táctica directa', pts: 4 }
     ]
   },
   {
-    titulo: '2. Dinámica de peloteo desde el fondo de cancha',
+    titulo: '2. Dinámica de peloteo de fondo de cancha',
     opciones: [
-      { texto: '2 o 3 intercambios y la pelota se va larga o a la malla', pts: 0 },
-      { texto: 'Sostengo 4 a 6 tiros si la bola viene cómoda al centro', pts: 1 },
-      { texto: 'Más de 8 peloteos cruzados y acelero bolas cortas', pts: 2 },
-      { texto: 'Topspin consistente, cambio de cruzado a paralelo con control', pts: 3 },
-      { texto: 'Domino ritmo, peso de bola, retroceso y contraataque', pts: 4 }
+      { texto: '2 o 3 intercambios y la pelota se va larga o a la red', pts: 0 },
+      { texto: 'Sostengo 4 a 6 tiros si la pelota viene cómoda al centro', pts: 1 },
+      { texto: 'Más de 8 peloteos cruzados y ataco bolas cortas', pts: 2 },
+      { texto: 'Topspin consistente con cambio de dirección controlado', pts: 3 },
+      { texto: 'Domino aceleración, retroceso y peso de pelota', pts: 4 }
     ]
   },
   {
-    titulo: '3. Respuesta ante bola rápida o pesada a las esquinas',
+    titulo: '3. Respuesta ante pelota rápida a las esquinas',
     opciones: [
       { texto: 'No llego a armar a tiempo y bloqueo como puedo o fallo', pts: 0 },
-      { texto: 'La paso alta al medio tratando únicamente de no fallar', pts: 1 },
-      { texto: 'Defiendo con globo alto para recuperar el centro de la cancha', pts: 2 },
-      { texto: 'Ajusto apoyos rápido y devuelvo profundo con slice o drive', pts: 3 },
+      { texto: 'Defiendo alto al medio buscando pasar la bola', pts: 1 },
+      { texto: 'Globo defensivo profundo para recuperar el centro', pts: 2 },
+      { texto: 'Apoyos firmes y devolución profunda con slice o drive', pts: 3 },
       { texto: 'Neutralizo el peso rival y contraataco o tiro drop-shot', pts: 4 }
     ]
   },
   {
     titulo: '4. Historial competitivo en partidos y torneos',
     opciones: [
-      { texto: 'Solo peloteos recreativos; casi no juego sets oficiales', pts: 0 },
+      { texto: 'Peloteos recreativos; casi no cuento sets oficiales', pts: 0 },
       { texto: 'Partidos amistosos esporádicos con amigos', pts: 1 },
       { texto: 'Partidos frecuentes de club/academia con sets y tie-breaks', pts: 2 },
-      { texto: 'Torneos internos de clubes en Huancayo superando rondas', pts: 3 },
-      { texto: 'Finales/semis en 4ª o 3ª abierta, o soy entrenador/profesor', pts: 4 }
+      { texto: 'Torneos internos de clubes superando rondas', pts: 3 },
+      { texto: 'Finales de torneos abiertos en 4ª/3ª, o soy instructor', pts: 4 }
     ]
   }
 ];
 
-const calcularEloProvisional = (resp) => {
+const calcularPuntosIniciales = (resp) => {
   const suma = resp.reduce((a, b) => a + b, 0);
   if (suma <= 3) return { elo: 350 + suma * 45, cat: '5ª P' };
   if (suma <= 7) return { elo: 700 + (suma - 4) * 90, cat: '5ª B' };
@@ -129,12 +130,64 @@ const calcularFactorDominio = (scoreStr) => {
   }
 };
 
+// --- SEDES PATROCINADAS CON FOTOS PREDETERMINADAS ---
+const SEDES_OFICIALES = [
+  {
+    nombre: 'Country Club Huancayo',
+    canchas: '3 Canchas de Arcilla',
+    zona: 'El Tambo',
+    tel: '964123456',
+    tarifa: 'S/ 15 por persona / hora',
+    sponsor: 'Sede Oficial Patrocinada',
+    img: 'https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?auto=format&fit=crop&w=900&q=80'
+  },
+  {
+    nombre: 'Club Tauro Tenis',
+    canchas: '2 Canchas de Arcilla Techadas',
+    zona: 'San Carlos',
+    tel: '954987654',
+    tarifa: 'Alquiler directo en sede',
+    sponsor: 'Sede Oficial Techada',
+    img: 'https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?auto=format&fit=crop&w=900&q=80'
+  },
+  {
+    nombre: 'Academia Romina Cutipa',
+    canchas: '2 Canchas de Arcilla',
+    zona: 'Huancayo Este',
+    tel: '999555444',
+    tarifa: 'Academia y Alquiler de Canchas',
+    sponsor: 'Academia Patrocinadora',
+    img: 'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?auto=format&fit=crop&w=900&q=80'
+  },
+  {
+    nombre: 'Complejo Shyam Huilca',
+    canchas: '1 Rápida / 1 Arcilla',
+    zona: 'Chilca',
+    tel: '988333222',
+    tarifa: 'Alquiler directo por hora',
+    sponsor: 'Sede Oficial Asociada',
+    img: 'https://images.unsplash.com/photo-1587280501635-68a0e82cd5ff?auto=format&fit=crop&w=900&q=80'
+  }
+];
+
+// --- 5 TORNEOS ACTIVOS POR CATEGORÍA (MÍNIMO 8 PARTICIPANTES) ---
+const TORNEOS_INICIALES = [
+  { id: 't-3a', cat: '3ª', titulo: 'Copa Apertura · 3ª Categoría', subtitulo: 'Olimpo Local · Maestros e Instructores', sede: 'Country Club Huancayo', fecha: '21 y 22 de Noviembre', precio: 40, min: 8, max: 16, inscritos: 8 },
+  { id: 't-4a', cat: '4ª', titulo: 'Copa Apertura · 4ª Categoría', subtitulo: 'Cuadro Eliminatorio + Ronda Consuelo', sede: 'Country Club Huancayo', fecha: '21 y 22 de Noviembre', precio: 40, min: 8, max: 16, inscritos: 11 },
+  { id: 't-5a', cat: '5ª A', titulo: 'Copa Apertura · 5ª Categoría A', subtitulo: 'Competitivo Consolidado', sede: 'Club Tauro Tenis', fecha: '28 y 29 de Noviembre', precio: 40, min: 8, max: 16, inscritos: 9 },
+  { id: 't-5b', cat: '5ª B', titulo: 'Copa Apertura · 5ª Categoría B', subtitulo: 'Nivel Intermedio Inicial', sede: 'Academia Romina Cutipa', fecha: '28 y 29 de Noviembre', precio: 40, min: 8, max: 16, inscritos: 7 },
+  { id: 't-5p', cat: '5ª P', titulo: 'Copa Apertura · 5ª Principiantes', subtitulo: 'Circuito de Iniciación Oficial', sede: 'Complejo Shyam Huilca', fecha: '5 y 6 de Diciembre', precio: 35, min: 8, max: 16, inscritos: 6 }
+];
+
 export default function App() {
+  // Navegación principal (Mi Perfil primero a la izquierda)
   const [tab, setTab] = useState('perfil');
+  const [retosSubTab, setRetosSubTab] = useState('mis_retos'); // 'mis_retos' | 'cartelera' | 'nuevo'
   const [jugadores, setJugadores] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filtroCat, setFiltroCat] = useState('Todas');
 
+  // Sesión y Autenticación
   const [currentUser, setCurrentUser] = useState(null);
   const [authMode, setAuthMode] = useState('login');
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -144,6 +197,7 @@ export default function App() {
   const [authPassword, setAuthPassword] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
 
+  // Registro con Cuestionario Técnico
   const [nombre, setNombre] = useState('');
   const [club, setClub] = useState('Country Club Huancayo');
   const [telefono, setTelefono] = useState('');
@@ -157,33 +211,54 @@ export default function App() {
   const fileInputRef = useRef(null);
   const profileAvatarInputRef = useRef(null);
 
+  // Modales Interactivos
+  const [selectedPlayerModal, setSelectedPlayerModal] = useState(null);
+  const [challengeTargetModal, setChallengeTargetModal] = useState(null);
+  const [challengeSede, setChallengeSede] = useState('Country Club Huancayo');
+  const [challengeFecha, setChallengeFecha] = useState('Sábado 16:00 hrs');
+
   const [showAdminModal, setShowAdminModal] = useState(false);
   const [showMatchModal, setShowMatchModal] = useState(false);
-  const [showTournamentModal, setShowTournamentModal] = useState(false);
+  const [selectedTorneoModal, setSelectedTorneoModal] = useState(null);
 
+  // Admin
   const [adminPin, setAdminPin] = useState('');
   const [isAdminAuth, setIsAdminAuth] = useState(false);
-  const precioTorneo = 40;
 
+  // Formulario de Subir Score
+  const [activeRetoId, setActiveRetoId] = useState(null);
   const [p1Id, setP1Id] = useState('');
   const [p2Id, setP2Id] = useState('');
   const [score, setScore] = useState('6-4, 6-3');
   const [winnerId, setWinnerId] = useState('');
   const [calculatingMatch, setCalculatingMatch] = useState(false);
 
-  const [climaSedes, setClimaSedes] = useState({
-    'Country Club Huancayo': { estado: 'Seco / Jugable', hora: 'Hace 15m' },
-    'Club Tauro Tenis': { estado: 'Techado / Óptimo', hora: 'Hace 30m' },
-    'Academia Romina Cutipa': { estado: 'Llovizna leve', hora: 'Hace 5m' },
-    'Complejo Shyam Huilca': { estado: 'Seco / Jugable', hora: 'Hace 1h' }
+  // Estado de Retos Programados (Cartelera Pública y Mis Desafíos)
+  const [retosProgramados, setRetosProgramados] = useState(() => {
+    const saved = localStorage.getItem('mp_retos_programados');
+    if (saved) {
+      try { return JSON.parse(saved); } catch { /* fallback */ }
+    }
+    return [
+      { id: 101, jugador1: 'Mateo Samaniego', jugador2: 'Alejandro Tovar', sede: 'Country Club Huancayo', fecha: 'Sábado 17:00 hrs', cat: '3ª vs 4ª', estado: 'Programado' },
+      { id: 102, jugador1: 'Diego Cárdenas', jugador2: 'Carlos Mendoza', sede: 'Academia Romina Cutipa', fecha: 'Domingo 10:00 hrs', cat: '4ª Categoría', estado: 'Programado' },
+      { id: 103, jugador1: 'Rodrigo Quispe', jugador2: 'Gonzalo Palacios', sede: 'Club Tauro Tenis', fecha: 'Domingo 18:30 hrs', cat: '3ª Categoría', estado: 'Programado' }
+    ];
   });
 
-  const clubesHuancayo = [
-    { nombre: 'Country Club Huancayo', canchas: '3 Arcilla', zona: 'El Tambo', tel: '964123456' },
-    { nombre: 'Club Tauro Tenis', canchas: '2 Arcilla techadas', zona: 'San Carlos', tel: '954987654' },
-    { nombre: 'Academia Romina Cutipa', canchas: '2 Arcilla', zona: 'Huancayo Este', tel: '999555444' },
-    { nombre: 'Complejo Shyam Huilca', canchas: '1 Rápida / 1 Arcilla', zona: 'Chilca', tel: '988333222' }
-  ];
+  // Estado Climático Verificable con Nombre de Jugador
+  const [climaSedes, setClimaSedes] = useState(() => {
+    const saved = localStorage.getItem('mp_clima_sedes');
+    if (saved) {
+      try { return JSON.parse(saved); } catch { /* fallback */ }
+    }
+    return {
+      'Country Club Huancayo': { estado: 'Soleado / Cancha Seca', hora: 'Hace 15 min', reportadoPor: 'Rodrigo Quispe' },
+      'Club Tauro Tenis': { estado: 'Techado / Óptimo', hora: 'Hace 30 min', reportadoPor: 'Gonzalo Palacios' },
+      'Academia Romina Cutipa': { estado: 'Nublado / Jugable', hora: 'Hace 10 min', reportadoPor: 'Diego Cárdenas' },
+      'Complejo Shyam Huilca': { estado: 'Soleado / Cancha Seca', hora: 'Hace 45 min', reportadoPor: 'Mateo Samaniego' }
+    };
+  });
 
   useEffect(() => {
     fetchData();
@@ -210,6 +285,26 @@ export default function App() {
     }
   }
 
+  const myPlayer = currentUser ? jugadores.find(j => j.id === currentUser.id) || currentUser : null;
+  const myRankPos = myPlayer ? jugadores.findIndex(j => j.id === myPlayer.id) + 1 : 0;
+  const myTotalMatches = myPlayer ? (myPlayer.victorias || 0) + (myPlayer.derrotas || 0) : 0;
+  const myWinRate = myTotalMatches > 0 ? Math.round(((myPlayer.victorias || 0) / myTotalMatches) * 100) : 0;
+  const myCatInfo = getInfoCategoria(myPlayer?.elo || 1000);
+
+  // Cálculo de barra de progreso
+  const puntosEnCat = Math.max(0, (myPlayer?.elo || 1000) - myCatInfo.min);
+  const totalRangoCat = myCatInfo.max - myCatInfo.min;
+  const faltanParaSubir = Math.max(0, myCatInfo.max + 1 - (myPlayer?.elo || 1000));
+  const enPromocion = myTotalMatches >= 5 && puntosEnCat >= (totalRangoCat * 0.90) && myCatInfo.id !== '1ª';
+
+  // Filtrar Mis Desafíos vs Cartelera de la Comunidad
+  const misRetos = retosProgramados.filter(r => {
+    if (!myPlayer) return false;
+    const miNombre = myPlayer.nombre.toLowerCase();
+    return r.jugador1.toLowerCase().includes(miNombre) || r.jugador2.toLowerCase().includes(miNombre);
+  });
+
+  // --- SUBIDA Y COMPRESIÓN DE FOTOS ---
   async function handleFileChange(e) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -249,6 +344,7 @@ export default function App() {
     }
   }
 
+  // --- AUTENTICACIÓN Y REGISTRO ---
   async function handleAuth(e) {
     e.preventDefault();
     if (!authEmail.trim() || !authPassword.trim()) return;
@@ -261,7 +357,7 @@ export default function App() {
           .eq('email', authEmail.trim())
           .maybeSingle();
         if (existing) {
-          alert('Este usuario ya existe. Inicia sesión.');
+          alert('Este correo o celular ya está registrado. Inicia sesión.');
           setAuthMode('login');
           return;
         }
@@ -304,7 +400,7 @@ export default function App() {
         }
       }
 
-      const calib = calcularEloProvisional(respuestasQuiz);
+      const calib = calcularPuntosIniciales(respuestasQuiz);
 
       const { data, error } = await supabase.from('jugadores').insert([{
         email: authEmail.trim(),
@@ -344,10 +440,42 @@ export default function App() {
     setTab('perfil');
   }
 
+  // --- CREAR NUEVO DESAFÍO OFICIAL ---
+  function handleConfirmarNuevoReto(e) {
+    e.preventDefault();
+    if (!challengeTargetModal) return;
+    const retadorNombre = myPlayer ? myPlayer.nombre : 'Jugador Local';
+    const catRetador = myPlayer ? getInfoCategoria(myPlayer.elo).id : '4ª';
+    const catRival = getInfoCategoria(challengeTargetModal.elo).id;
+
+    const nuevoReto = {
+      id: Date.now(),
+      jugador1: retadorNombre,
+      jugador2: challengeTargetModal.nombre,
+      sede: challengeSede,
+      fecha: challengeFecha,
+      cat: catRetador === catRival ? `Cat. ${catRetador}` : `Ascenso ${catRetador} vs ${catRival}`,
+      estado: 'Programado'
+    };
+
+    const actualizados = [nuevoReto, ...retosProgramados];
+    setRetosProgramados(actualizados);
+    localStorage.setItem('mp_retos_programados', JSON.stringify(actualizados));
+
+    // Abrir WhatsApp con mensaje estructurado
+    const telLimpio = (challengeTargetModal.telefono || '964000000').replace(/\D/g, '');
+    const msg = `Hola ${challengeTargetModal.nombre}, te he lanzado un desafío oficial por puntos en MATCHPOINT.\n🎾 Sede propuesta: ${challengeSede}\n📅 Horario: ${challengeFecha}\n¿Confirmamos cancha?`;
+    window.open(`https://wa.me/51${telLimpio}?text=${encodeURIComponent(msg)}`, '_blank');
+
+    setChallengeTargetModal(null);
+    setRetosSubTab('mis_retos');
+  }
+
+  // --- MOTOR MATEMÁTICO DE PUNTOS (DIVISOR 1200 + FACTOR DE DOMINIO) ---
   async function handleProcesarPartido(e) {
     e.preventDefault();
-    if (!p1Id || !p2Id || !winnerId) return alert('Completa los jugadores y el ganador.');
-    if (p1Id === p2Id) return alert('Los rivales deben ser distintos.');
+    if (!p1Id || !p2Id || !winnerId) return alert('Selecciona ambos tenistas y el ganador.');
+    if (p1Id === p2Id) return alert('Los rivales deben ser diferentes.');
 
     try {
       setCalculatingMatch(true);
@@ -397,66 +525,80 @@ export default function App() {
         derrotas: (player2.derrotas || 0) + (1 - S2)
       }).eq('id', player2.id);
 
+      // Si venía de un reto programado, retirarlo de pendientes
+      if (activeRetoId) {
+        const restantes = retosProgramados.filter(r => r.id !== activeRetoId);
+        setRetosProgramados(restantes);
+        localStorage.setItem('mp_retos_programados', JSON.stringify(restantes));
+        setActiveRetoId(null);
+      }
+
       alert(
-        `✅ Partido Oficial Procesado (${fdLabel})\n\n` +
-        `🎾 ${player1.nombre}: ${newElo1} pts (${delta1 >= 0 ? '+' : ''}${delta1}) · Cat. ${newCat1}\n` +
-        `🎾 ${player2.nombre}: ${newElo2} pts (${delta2 >= 0 ? '+' : ''}${delta2}) · Cat. ${newCat2}`
+        `✅ Resultado Oficial Registrado (${fdLabel})\n\n` +
+        `🎾 ${player1.nombre}: ${newElo1} Pts (${delta1 >= 0 ? '+' : ''}${delta1}) · Cat. ${newCat1}\n` +
+        `🎾 ${player2.nombre}: ${newElo2} Pts (${delta2 >= 0 ? '+' : ''}${delta2}) · Cat. ${newCat2}`
       );
 
       setShowMatchModal(false);
       await fetchData();
     } catch (err) {
-      alert('Error al procesar partido: ' + err.message);
+      alert('Error al procesar resultado: ' + err.message);
     } finally {
       setCalculatingMatch(false);
     }
   }
 
-  function reportarLluvia(clubName) {
-    const actual = climaSedes[clubName]?.estado || '';
-    const nuevo = actual.includes('Lluvia') ? 'Seco / Jugable' : 'Lluvia / Cancha Pesada';
-    setClimaSedes({ ...climaSedes, [clubName]: { estado: nuevo, hora: 'Ahora mismo' } });
+  // --- REPORTE CLIMÁTICO CON TRAZABILIDAD DE USUARIO ---
+  function cambiarClimaSede(clubName) {
+    if (!myPlayer) {
+      alert('Inicia sesión con tu perfil para reportar el estado del clima con tu nombre.');
+      setShowAuthModal(true);
+      return;
+    }
+    const estados = [
+      'Soleado / Cancha Seca',
+      'Nublado / Jugable',
+      'Llovizna leve / Precaución',
+      'Lluvia / Cancha Pesada'
+    ];
+    const actual = climaSedes[clubName]?.estado || estados[0];
+    const nextIdx = (estados.indexOf(actual) + 1) % estados.length;
+    const nuevoMapa = {
+      ...climaSedes,
+      [clubName]: {
+        estado: estados[nextIdx],
+        hora: 'Ahora mismo',
+        reportadoPor: myPlayer.nombre
+      }
+    };
+    setClimaSedes(nuevoMapa);
+    localStorage.setItem('mp_clima_sedes', JSON.stringify(nuevoMapa));
   }
 
-  const clubStats = clubesHuancayo.map(c => {
+  const clubStats = SEDES_OFICIALES.map(c => {
     const socios = jugadores.filter(j => j.club === c.nombre);
-    const totalElo = socios.reduce((sum, j) => sum + (j.elo || 1000), 0);
-    return { ...c, sociosCount: socios.length, totalElo };
-  }).sort((a, b) => b.totalElo - a.totalElo);
+    const totalPuntos = socios.reduce((sum, j) => sum + (j.elo || 1000), 0);
+    return { ...c, sociosCount: socios.length, totalPuntos };
+  }).sort((a, b) => b.totalPuntos - a.totalPuntos);
 
-  const myPlayer = currentUser ? jugadores.find(j => j.id === currentUser.id) || currentUser : null;
-  const myRankPos = myPlayer ? jugadores.findIndex(j => j.id === myPlayer.id) + 1 : 0;
-  const myTotalMatches = myPlayer ? (myPlayer.victorias || 0) + (myPlayer.derrotas || 0) : 0;
-  const myWinRate = myTotalMatches > 0 ? Math.round(((myPlayer.victorias || 0) / myTotalMatches) * 100) : 0;
-  const myCatInfo = getInfoCategoria(myPlayer?.elo || 1000);
-  const progresoCat = myPlayer
-    ? Math.min(100, Math.max(5, Math.round(((myPlayer.elo - myCatInfo.min) / (myCatInfo.max - myCatInfo.min)) * 100)))
-    : 0;
-  const enPromocion = progresoCat >= 92 && myCatInfo.id !== '1ª';
-
-  const jugadoresFiltrados = jugadores.filter(j => {
-    if (filtroCat === 'Todas') return true;
-    return getInfoCategoria(j.elo || 1000).id === filtroCat;
-  });
-
-  const previewCalib = calcularEloProvisional(respuestasQuiz);
+  const previewCalib = calcularPuntosIniciales(respuestasQuiz);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans max-w-md mx-auto shadow-2xl pb-28 border-x border-slate-800/80 relative">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans max-w-md mx-auto shadow-2xl pb-32 border-x border-slate-800/80 relative">
       
-      {/* HEADER OPTIMIZADO CON ESPACIO SUPERIOR (pt-11) PARA CELULARES */}
-      <header className="pt-11 pb-3.5 px-5 bg-slate-900/95 backdrop-blur-xl border-b border-slate-800/90 flex justify-between items-center sticky top-0 z-30 shadow-lg">
+      {/* HEADER OPTIMIZADO CON MARGEN SEGURO (pt-14) Y MARCA ESCALABLE */}
+      <header className="pt-14 pb-3.5 px-5 bg-slate-900/95 backdrop-blur-xl border-b border-slate-800/90 flex justify-between items-center sticky top-0 z-30 shadow-lg">
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-lime-400 to-emerald-500 flex items-center justify-center font-black text-slate-950 text-xl shadow-[0_0_20px_rgba(163,230,53,0.45)]">
             🎾
           </div>
           <div>
-            <span className="text-[10px] tracking-widest uppercase font-extrabold text-lime-400 block leading-none">
-              Huancayo Circuit
-            </span>
-            <h1 className="text-lg font-black tracking-tight text-white leading-tight mt-0.5">
+            <h1 className="text-xl font-black tracking-tight text-white leading-none">
               MATCHPOINT
             </h1>
+            <span className="text-[10px] tracking-wider uppercase font-bold text-lime-400 block mt-1">
+              Circuito Oficial de Tenis
+            </span>
           </div>
         </div>
 
@@ -464,10 +606,10 @@ export default function App() {
           {myPlayer ? (
             <button 
               onClick={() => setTab('perfil')}
-              className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-750 border border-lime-400/40 px-3 py-1.5 rounded-xl text-xs font-black text-lime-400"
+              className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-750 border border-lime-400/40 px-3 py-1.5 rounded-xl text-xs font-black text-lime-400 shadow-sm"
             >
               <User className="w-3.5 h-3.5" />
-              <span className="max-w-[90px] truncate">{myPlayer.nombre.split(' ')[0]}</span>
+              <span className="max-w-[85px] truncate">{myPlayer.nombre.split(' ')[0]}</span>
             </button>
           ) : (
             <button
@@ -481,6 +623,7 @@ export default function App() {
           <button 
             onClick={() => setShowAdminModal(true)}
             className="p-2 bg-slate-800/90 hover:bg-slate-750 border border-slate-700 rounded-xl text-slate-300"
+            title="Panel Organizador"
           >
             <Lock className="w-4 h-4 text-lime-400" />
           </button>
@@ -489,7 +632,9 @@ export default function App() {
 
       <main className="p-4 flex-1 space-y-4">
 
-        {/* 1. MI PERFIL (PRIMERO A LA IZQUIERDA, GRANDE E INTERACTIVO) */}
+        {/* =========================================================
+            1. PESTAÑA: MI PERFIL (PRIMERA A LA IZQUIERDA)
+        ========================================================= */}
         {tab === 'perfil' && (
           <div className="space-y-4">
             {myPlayer ? (
@@ -502,13 +647,14 @@ export default function App() {
                       ? 'bg-amber-500/10 text-amber-300 border-amber-500/30' 
                       : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
                   }`}>
-                    {myTotalMatches < 5 ? `⚡ Calibrando (${myTotalMatches}/5)` : '✔ Ranking Oficial'}
+                    {myTotalMatches < 5 ? `⚡ Calibrando (${myTotalMatches}/5)` : '✔ Nivel Oficial Verificado'}
                   </span>
                   <span className="text-[11px] font-mono font-bold text-slate-400">
                     {myCatInfo.badge}
                   </span>
                 </div>
 
+                {/* Foto de Perfil Grande con Cambio Directo */}
                 <div className="relative w-28 h-28 mx-auto mb-3">
                   <div 
                     onClick={() => profileAvatarInputRef.current?.click()}
@@ -549,24 +695,47 @@ export default function App() {
                     <Flame className="w-5 h-5 text-amber-400 shrink-0" />
                     <div>
                       <p className="text-xs font-black text-amber-300 uppercase">¡Match Point de Ascenso!</p>
-                      <p className="text-[11px] text-slate-300">A {myCatInfo.max + 1 - (myPlayer.elo || 0)} pts de subir de categoría.</p>
+                      <p className="text-[11px] text-slate-300">Estás a solo {faltanParaSubir} puntos de ascender a la siguiente categoría.</p>
                     </div>
                   </div>
                 )}
 
-                <div className="mt-5 bg-slate-950/80 p-3.5 rounded-2xl border border-slate-800/90 text-left">
-                  <div className="flex justify-between text-[11px] font-bold mb-1.5">
-                    <span className="text-slate-400">Rango {myCatInfo.id} ({myCatInfo.min}–{myCatInfo.max} pts)</span>
-                    <span className="text-lime-400 font-mono">{progresoCat}%</span>
+                {/* Barra de Progreso Explicativa (Sin porcentajes confusos) */}
+                {myTotalMatches < 5 ? (
+                  <div className="mt-5 bg-slate-950/80 p-3.5 rounded-2xl border border-slate-800/90 text-left">
+                    <div className="flex justify-between text-[11px] font-bold mb-1.5">
+                      <span className="text-slate-300">Fase de Calibración Inicial</span>
+                      <span className="text-amber-400 font-mono">Partido {myTotalMatches} de 5</span>
+                    </div>
+                    <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-amber-400 to-lime-400 rounded-full transition-all"
+                        style={{ width: `${Math.max(8, (myTotalMatches / 5) * 100)}%` }}
+                      ></div>
+                    </div>
+                    <span className="text-[10px] text-slate-400 mt-1.5 block">
+                      Te faltan {5 - myTotalMatches} partidos oficiales para fijar tu puesto en el ranking general.
+                    </span>
                   </div>
-                  <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-gradient-to-r from-lime-400 to-emerald-400 rounded-full"
-                      style={{ width: `${progresoCat}%` }}
-                    ></div>
+                ) : (
+                  <div className="mt-5 bg-slate-950/80 p-3.5 rounded-2xl border border-slate-800/90 text-left">
+                    <div className="flex justify-between text-[11px] font-bold mb-1.5">
+                      <span className="text-slate-300">Progreso en {myCatInfo.id} ({myCatInfo.min}–{myCatInfo.max} Pts)</span>
+                      <span className="text-lime-400 font-mono">Faltan {faltanParaSubir} Pts</span>
+                    </div>
+                    <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-lime-400 to-emerald-400 rounded-full transition-all"
+                        style={{ width: `${Math.min(100, Math.max(6, Math.round((puntosEnCat / totalRangoCat) * 100)))}%` }}
+                      ></div>
+                    </div>
+                    <span className="text-[10px] text-slate-400 mt-1.5 block">
+                      Acumulas {myPlayer.elo} puntos oficiales en el circuito.
+                    </span>
                   </div>
-                </div>
+                )}
 
+                {/* 4 Tarjetas de Estadísticas con Terminología Deportiva */}
                 <div className="grid grid-cols-4 gap-2 mt-4">
                   <div className="bg-slate-950/70 p-2.5 rounded-2xl border border-slate-800/80">
                     <span className="text-[9px] uppercase font-bold text-slate-500 block">Puesto</span>
@@ -575,7 +744,7 @@ export default function App() {
                     </span>
                   </div>
                   <div className="bg-slate-950/70 p-2.5 rounded-2xl border border-slate-800/80">
-                    <span className="text-[9px] uppercase font-bold text-slate-500 block">ELO</span>
+                    <span className="text-[9px] uppercase font-bold text-slate-500 block">Puntos</span>
                     <span className="text-base font-black text-lime-400 font-mono">{myPlayer.elo || 1000}</span>
                   </div>
                   <div className="bg-slate-950/70 p-2.5 rounded-2xl border border-slate-800/80">
@@ -585,23 +754,23 @@ export default function App() {
                     </span>
                   </div>
                   <div className="bg-slate-950/70 p-2.5 rounded-2xl border border-slate-800/80">
-                    <span className="text-[9px] uppercase font-bold text-slate-500 block">Win Rate</span>
+                    <span className="text-[9px] uppercase font-bold text-slate-500 block">Efectividad</span>
                     <span className="text-base font-black text-emerald-400 font-mono">{myWinRate}%</span>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2.5 mt-5 pt-4 border-t border-slate-800/80">
                   <button 
-                    onClick={() => setTab('match')}
-                    className="bg-lime-400 hover:bg-lime-300 text-slate-950 font-black py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5"
+                    onClick={() => { setTab('match'); setRetosSubTab('mis_retos'); }}
+                    className="bg-lime-400 hover:bg-lime-300 text-slate-950 font-black py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md"
                   >
-                    <Swords className="w-4 h-4" /> Ir a Retos
+                    <Swords className="w-4 h-4" /> Tus Desafíos
                   </button>
                   <button 
                     onClick={handleLogout}
                     className="bg-slate-800 hover:bg-slate-750 text-rose-400 font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 border border-slate-700"
                   >
-                    <LogOut className="w-4 h-4" /> Salir
+                    <LogOut className="w-4 h-4" /> Cerrar Sesión
                   </button>
                 </div>
               </div>
@@ -611,15 +780,15 @@ export default function App() {
                   <Trophy className="w-8 h-8" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-black text-white">Tu Ficha Oficial ELO</h3>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Responde las 4 preguntas técnicas situacionales para calibrar tu ELO inicial y competir en Huancayo.
+                  <h3 className="text-xl font-black text-white">Tu Ficha de Tenista</h3>
+                  <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                    Completa el test situacional de 4 preguntas para recibir tus puntos iniciales y calibrar tu categoría oficial en 5 partidos.
                   </p>
                 </div>
                 <div className="flex gap-2.5 justify-center pt-2">
                   <button
                     onClick={() => { setAuthMode('login'); setShowAuthModal(true); }}
-                    className="bg-lime-400 text-slate-950 font-black px-5 py-3 rounded-xl text-xs"
+                    className="bg-lime-400 text-slate-950 font-black px-5 py-3 rounded-xl text-xs shadow-md"
                   >
                     Iniciar Sesión
                   </button>
@@ -633,15 +802,16 @@ export default function App() {
               </div>
             )}
 
+            {/* Clasificación por Niveles y Categorías */}
             <div className="bg-slate-900/90 border border-slate-800/80 rounded-3xl p-4 space-y-2.5">
               <span className="text-[10px] font-black uppercase tracking-wider text-lime-400 block">
-                Bandas Oficiales ELO Huancayo (0 – 5,000+ pts)
+                Clasificación por Niveles y Categorías (0 – 5,000+ Puntos)
               </span>
               <div className="grid grid-cols-2 gap-1.5 text-[11px]">
                 {ESCALA_CATEGORIAS.map(c => (
                   <div key={c.id} className="bg-slate-950/70 border border-slate-800/80 px-2.5 py-1.5 rounded-xl flex justify-between items-center">
                     <span className="font-black text-white">{c.id}</span>
-                    <span className="font-mono text-lime-400 text-[10px]">{c.min}–{c.max} pts</span>
+                    <span className="font-mono text-lime-400 text-[10px]">{c.min}–{c.max} Pts</span>
                   </div>
                 ))}
               </div>
@@ -649,206 +819,410 @@ export default function App() {
           </div>
         )}
 
-        {/* 2. RANKING (CLASIFICACIÓN GENERAL PRIMERO, SIN BOTÓN SUBIR SCORE) */}
+        {/* =========================================================
+            2. PESTAÑA: RANKING (CLASIFICACIÓN GENERAL Y CLUBES)
+        ========================================================= */}
         {tab === 'ranking' && (
           <div className="space-y-4">
             <div className="bg-slate-900 border border-slate-800 p-4 rounded-3xl shadow-xl">
               <span className="text-[10px] font-extrabold uppercase tracking-widest text-lime-400 flex items-center gap-1">
-                <Sparkles className="w-3.5 h-3.5" /> Circuito Oficial Huancayo
+                <Sparkles className="w-3.5 h-3.5" /> Escalafón Oficial
               </span>
-              <h2 className="text-lg font-black text-white mt-0.5">Clasificación General ELO</h2>
-              <div className="flex gap-1.5 overflow-x-auto pt-3 pb-1">
-                {['Todas', '3ª', '4ª', '5ª A', '5ª B', '5ª P'].map(cat => (
+              <h2 className="text-lg font-black text-white mt-0.5">Clasificación General</h2>
+              <p className="text-[11px] text-slate-400">Toca a cualquier tenista para ver su ficha completa</p>
+              
+              <div className="flex gap-1.5 overflow-x-auto pt-3 pb-1 no-scrollbar">
+                {['Todas', '3ª', '4ª', '5ª A', '5ª B', '5ª P', 'Clubes'].map(cat => (
                   <button
                     key={cat}
                     onClick={() => setFiltroCat(cat)}
-                    className={`px-3 py-1 rounded-xl text-[11px] font-black shrink-0 border ${
+                    className={`px-3 py-1.5 rounded-xl text-[11px] font-black shrink-0 border transition ${
                       filtroCat === cat 
-                        ? 'bg-lime-400 text-slate-950 border-lime-400' 
+                        ? 'bg-lime-400 text-slate-950 border-lime-400 shadow-sm' 
                         : 'bg-slate-950 text-slate-400 border-slate-800'
                     }`}
                   >
-                    {cat === 'Todas' ? 'Todas' : `Cat. ${cat}`}
+                    {cat === 'Todas' ? 'Todas' : cat === 'Clubes' ? '🏆 Clubes' : `Cat. ${cat}`}
                   </button>
                 ))}
               </div>
             </div>
 
-            <div className="space-y-2.5">
-              {loading ? (
-                <div className="text-center py-12 text-slate-500 text-xs">Cargando clasificación...</div>
-              ) : jugadoresFiltrados.map((j, idx) => {
-                const catInfo = getInfoCategoria(j.elo || 1000);
-                const totalJ = (j.victorias || 0) + (j.derrotas || 0);
-                return (
-                  <div 
-                    key={j.id || idx}
-                    className={`p-3.5 rounded-2xl border flex items-center justify-between ${
-                      idx === 0 
-                        ? 'bg-gradient-to-r from-amber-500/15 via-slate-900 to-slate-900 border-amber-500/40' 
-                        : idx === 1 
-                        ? 'bg-gradient-to-r from-slate-300/10 via-slate-900 to-slate-900 border-slate-400/30'
-                        : idx === 2
-                        ? 'bg-gradient-to-r from-amber-700/15 via-slate-900 to-slate-900 border-amber-700/40'
-                        : 'bg-slate-900/90 border-slate-800/80'
-                    }`}
-                  >
-                    <div className="flex items-center space-x-3">
-                      <div className={`w-7 text-center font-mono font-black text-sm ${
-                        idx === 0 ? 'text-amber-400' : idx === 1 ? 'text-slate-300' : idx === 2 ? 'text-amber-600' : 'text-slate-500'
+            {filtroCat === 'Clubes' ? (
+              <div className="space-y-2.5">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">
+                  Clasificación Colectiva de Clubes y Academias
+                </h3>
+                {clubStats.map((c, i) => (
+                  <div key={i} className="bg-slate-900 border border-slate-800 p-4 rounded-2xl flex justify-between items-center">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-mono font-black text-sm ${
+                        i === 0 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40' : 'bg-slate-800 text-slate-300'
                       }`}>
-                        #{idx + 1}
-                      </div>
-                      <div className="w-12 h-12 rounded-full bg-slate-800 overflow-hidden flex items-center justify-center border-2 border-slate-700 shrink-0">
-                        {j.foto_url ? (
-                          <img src={j.foto_url} alt={j.nombre} className="w-full h-full object-cover" />
-                        ) : (
-                          <User className="w-6 h-6 text-slate-400" />
-                        )}
+                        #{i + 1}
                       </div>
                       <div>
-                        <div className="flex items-center gap-1.5">
-                          <p className="text-sm font-black text-white">{j.nombre}</p>
-                          {totalJ < 5 && (
-                            <span className="text-[9px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded-md">
-                              Calib. {totalJ}/5
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-[11px] text-slate-400 mt-0.5">
-                          {j.club || 'Independiente'} · <span className="text-lime-400 font-black">Cat. {catInfo.id}</span>
-                        </p>
+                        <h4 className="text-sm font-black text-white">{c.nombre}</h4>
+                        <p className="text-[11px] text-slate-400">{c.sociosCount} tenistas activos sumando puntos</p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <span className="text-base font-mono font-black text-lime-400">{j.elo || 1000}</span>
-                      <p className="text-[9px] text-slate-500 uppercase font-bold">
-                        {j.victorias || 0}G - {j.derrotas || 0}P
-                      </p>
+                      <span className="text-base font-mono font-black text-lime-400">{c.totalPuntos}</span>
+                      <span className="text-[9px] text-slate-500 block uppercase font-bold">Puntos</span>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="pt-3">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 px-1">
-                Copa de Clubes (Acumulado ELO)
-              </h3>
-              <div className="grid grid-cols-2 gap-2.5">
-                {clubStats.map((c, i) => (
-                  <div key={i} className="bg-slate-900/80 border border-slate-800 p-3.5 rounded-2xl">
-                    <span className="text-[10px] font-mono text-lime-400 font-extrabold block">
-                      #{i + 1} {c.nombre.replace('Club ', '')}
-                    </span>
-                    <span className="text-sm font-black text-white mt-0.5 block">{c.totalElo} pts</span>
-                    <span className="text-[10px] text-slate-500 block">{c.sociosCount} tenistas</span>
                   </div>
                 ))}
               </div>
-            </div>
+            ) : (
+              <div className="space-y-2.5">
+                {loading ? (
+                  <div className="text-center py-12 text-slate-500 text-xs">Cargando clasificación...</div>
+                ) : jugadores
+                    .filter(j => filtroCat === 'Todas' || getInfoCategoria(j.elo || 1000).id === filtroCat)
+                    .map((j, idx) => {
+                      const catInfo = getInfoCategoria(j.elo || 1000);
+                      const totalJ = (j.victorias || 0) + (j.derrotas || 0);
+                      return (
+                        <div 
+                          key={j.id || idx}
+                          onClick={() => setSelectedPlayerModal(j)}
+                          className={`p-3.5 rounded-2xl border flex items-center justify-between cursor-pointer active:scale-[0.99] transition ${
+                            idx === 0 
+                              ? 'bg-gradient-to-r from-amber-500/15 via-slate-900 to-slate-900 border-amber-500/40 shadow-md' 
+                              : idx === 1 
+                              ? 'bg-gradient-to-r from-slate-300/10 via-slate-900 to-slate-900 border-slate-400/30'
+                              : idx === 2
+                              ? 'bg-gradient-to-r from-amber-700/15 via-slate-900 to-slate-900 border-amber-700/40'
+                              : 'bg-slate-900/90 border-slate-800/80 hover:border-slate-700'
+                          }`}
+                        >
+                          <div className="flex items-center space-x-3">
+                            <div className={`w-7 text-center font-mono font-black text-sm ${
+                              idx === 0 ? 'text-amber-400' : idx === 1 ? 'text-slate-300' : idx === 2 ? 'text-amber-600' : 'text-slate-500'
+                            }`}>
+                              #{idx + 1}
+                            </div>
+                            <div className="w-12 h-12 rounded-full bg-slate-800 overflow-hidden flex items-center justify-center border-2 border-slate-700 shrink-0">
+                              {j.foto_url ? (
+                                <img src={j.foto_url} alt={j.nombre} className="w-full h-full object-cover" />
+                              ) : (
+                                <User className="w-6 h-6 text-slate-400" />
+                              )}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <p className="text-sm font-black text-white">{j.nombre}</p>
+                                {totalJ < 5 && (
+                                  <span className="text-[9px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded-md">
+                                    Calib. {totalJ}/5
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-slate-400 mt-0.5">
+                                {j.club || 'Independiente'} · <span className="text-lime-400 font-bold">Cat. {catInfo.id}</span>
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="text-right">
+                              <span className="text-base font-mono font-black text-lime-400">{j.elo || 1000}</span>
+                              <p className="text-[9px] text-slate-500 uppercase font-bold">
+                                Puntos
+                              </p>
+                            </div>
+                            <ChevronRight className="w-4 h-4 text-slate-600" />
+                          </div>
+                        </div>
+                      );
+                    })}
+              </div>
+            )}
           </div>
         )}
 
-        {/* 3. RETOS (ÚNICO BOTÓN SUBIR SCORE + VENTANA ±1,200 PTS) */}
+        {/* =========================================================
+            3. PESTAÑA CENTRAL: RETOS (3 VISTAS DIFERENCIADAS)
+        ========================================================= */}
         {tab === 'match' && (
           <div className="space-y-4">
-            <div className="bg-slate-900 border border-slate-800 p-4 rounded-3xl flex justify-between items-center shadow-lg">
-              <div>
-                <h3 className="text-sm font-black text-white flex items-center gap-1.5">
-                  <Swords className="w-4 h-4 text-lime-400" /> Desafíos Directos
-                </h3>
-                <p className="text-[11px] text-slate-400 mt-0.5">
-                  Ventana oficial permitida: ±1,200 pts ELO
-                </p>
+            {/* Selector de las 3 Sub-Vistas de Retos */}
+            <div className="bg-slate-900 border border-slate-800 p-4 rounded-3xl shadow-xl space-y-3">
+              <div className="flex justify-between items-center">
+                <div>
+                  <span className="text-[10px] font-extrabold uppercase tracking-widest text-lime-400 block">
+                    Centro Competitivo
+                  </span>
+                  <h2 className="text-lg font-black text-white">Desafíos y Partidos</h2>
+                </div>
+                <button
+                  onClick={() => setRetosSubTab('nuevo')}
+                  className="bg-lime-400 hover:bg-lime-300 text-slate-950 text-xs font-black px-3.5 py-2 rounded-xl flex items-center gap-1 shadow-md"
+                >
+                  <Plus className="w-4 h-4" /> Crear Desafío
+                </button>
               </div>
-              <button
-                onClick={() => setShowMatchModal(true)}
-                className="bg-lime-400 hover:bg-lime-300 text-slate-950 text-xs font-black px-3.5 py-2.5 rounded-xl shadow-md"
-              >
-                + Subir Score
-              </button>
+
+              <div className="grid grid-cols-3 gap-1.5 bg-slate-950 p-1.5 rounded-2xl border border-slate-800">
+                <button
+                  onClick={() => setRetosSubTab('mis_retos')}
+                  className={`py-2 rounded-xl text-[11px] font-black transition ${
+                    retosSubTab === 'mis_retos' ? 'bg-lime-400 text-slate-950 shadow' : 'text-slate-400'
+                  }`}
+                >
+                  Tus Desafíos ({misRetos.length})
+                </button>
+                <button
+                  onClick={() => setRetosSubTab('cartelera')}
+                  className={`py-2 rounded-xl text-[11px] font-black transition ${
+                    retosSubTab === 'cartelera' ? 'bg-lime-400 text-slate-950 shadow' : 'text-slate-400'
+                  }`}
+                >
+                  Cartelera ({retosProgramados.length})
+                </button>
+                <button
+                  onClick={() => setRetosSubTab('nuevo')}
+                  className={`py-2 rounded-xl text-[11px] font-black transition ${
+                    retosSubTab === 'nuevo' ? 'bg-lime-400 text-slate-950 shadow' : 'text-slate-400'
+                  }`}
+                >
+                  + Nuevo Reto
+                </button>
+              </div>
             </div>
 
-            <div className="space-y-2.5">
-              {jugadores
-                .filter(j => !myPlayer || j.id !== myPlayer.id)
-                .map((j) => {
-                  const diff = myPlayer ? Math.abs((myPlayer.elo || 1000) - (j.elo || 1000)) : 0;
-                  const dentroVentana = diff <= 1200;
-                  const catJ = getInfoCategoria(j.elo || 1000);
+            {/* VISTA A: TUS DESAFÍOS (CON EL BOTÓN EXCLUSIVO DE SUBIR SCORE) */}
+            {retosSubTab === 'mis_retos' && (
+              <div className="space-y-3">
+                <div className="flex justify-between items-center px-1">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                    Tus Partidos Pendientes
+                  </span>
+                  <button
+                    onClick={() => {
+                      if (myPlayer) setP1Id(myPlayer.id.toString());
+                      setActiveRetoId(null);
+                      setShowMatchModal(true);
+                    }}
+                    className="text-xs font-black text-lime-400 bg-lime-400/10 border border-lime-400/30 px-3 py-1.5 rounded-xl flex items-center gap-1"
+                  >
+                    <Swords className="w-3.5 h-3.5" /> + Subir Score
+                  </button>
+                </div>
 
-                  return (
-                    <div key={j.id} className="bg-slate-900 p-3.5 rounded-2xl border border-slate-800 flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-11 h-11 rounded-full bg-slate-800 overflow-hidden flex items-center justify-center border border-slate-700">
-                          {j.foto_url ? (
-                            <img src={j.foto_url} alt={j.nombre} className="w-full h-full object-cover" />
-                          ) : (
-                            <User className="w-5 h-5 text-slate-400" />
-                          )}
-                        </div>
-                        <div>
-                          <p className="text-sm font-black text-white">{j.nombre}</p>
-                          <p className="text-xs text-slate-400">
-                            Cat. <span className="text-lime-400 font-bold">{catJ.id}</span> · {j.elo || 1000} pts
-                          </p>
-                        </div>
-                      </div>
-
-                      {dentroVentana ? (
-                        <a
-                          href={`https://wa.me/51${(j.telefono || '964000000').replace(/\D/g, '')}?text=Hola%20${encodeURIComponent(j.nombre)},%20jugamos%20un%20reto%20por%20puntos%20en%20MatchPoint%20Huancayo?`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-xs font-black px-3 py-2 rounded-xl flex items-center gap-1.5"
-                        >
-                          <Phone className="w-3.5 h-3.5" /> Retar
-                        </a>
-                      ) : (
-                        <span className="text-[10px] font-bold text-slate-500 bg-slate-950 px-2.5 py-1.5 rounded-xl border border-slate-800">
-                          Fuera de rango
-                        </span>
-                      )}
+                {misRetos.length === 0 ? (
+                  <div className="bg-slate-900/90 border border-slate-800 p-6 rounded-3xl text-center space-y-3">
+                    <Swords className="w-10 h-10 text-lime-400 mx-auto opacity-80" />
+                    <div>
+                      <h4 className="text-sm font-black text-white">No tienes desafíos programados hoy</h4>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Reta a un tenista dentro de tu rango de puntos o registra el marcador de tu último partido.
+                      </p>
                     </div>
-                  );
-                })}
-            </div>
+                    <div className="flex gap-2 justify-center pt-1">
+                      <button
+                        onClick={() => setRetosSubTab('nuevo')}
+                        className="bg-lime-400 text-slate-950 font-black px-4 py-2.5 rounded-xl text-xs"
+                      >
+                        Buscar Rival para Retar
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (myPlayer) setP1Id(myPlayer.id.toString());
+                          setShowMatchModal(true);
+                        }}
+                        className="bg-slate-800 text-white font-bold px-4 py-2.5 rounded-xl text-xs border border-slate-700"
+                      >
+                        Subir Score
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  misRetos.map(r => (
+                    <div key={r.id} className="bg-gradient-to-r from-slate-900 to-slate-900/90 border border-lime-400/40 p-4 rounded-2xl space-y-3 shadow-lg">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] font-black uppercase bg-lime-400/15 text-lime-400 border border-lime-400/30 px-2.5 py-0.5 rounded-md">
+                          Tu Duelo Oficial · {r.cat}
+                        </span>
+                        <span className="text-[11px] text-amber-300 font-bold flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5" /> {r.estado}
+                        </span>
+                      </div>
+                      <div>
+                        <p className="text-base font-black text-white">
+                          {r.jugador1} <span className="text-lime-400 px-1">vs</span> {r.jugador2}
+                        </p>
+                        <p className="text-xs text-slate-400 mt-1">
+                          📍 {r.sede} · 📅 {r.fecha}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          const p1 = jugadores.find(j => j.nombre.toLowerCase().includes(r.jugador1.split(' ')[0].toLowerCase()));
+                          const p2 = jugadores.find(j => j.nombre.toLowerCase().includes(r.jugador2.split(' ')[0].toLowerCase()));
+                          if (p1) setP1Id(p1.id.toString());
+                          if (p2) setP2Id(p2.id.toString());
+                          setActiveRetoId(r.id);
+                          setShowMatchModal(true);
+                        }}
+                        className="w-full bg-lime-400 hover:bg-lime-300 text-slate-950 font-black py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5"
+                      >
+                        <CheckCircle2 className="w-4 h-4" /> Subir Score de este Partido
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* VISTA B: CARTELERA PÚBLICA (MODO ESPECTADOR) */}
+            {retosSubTab === 'cartelera' && (
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between px-1">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                    <Eye className="w-3.5 h-3.5 text-lime-400" /> Cartelera de Partidos Oficiales
+                  </span>
+                  <span className="text-[10px] text-slate-500 font-semibold">Modo Espectador</span>
+                </div>
+                {retosProgramados.map(r => (
+                  <div key={r.id} className="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] font-black text-lime-400 uppercase bg-lime-950/60 border border-lime-800/70 px-2.5 py-0.5 rounded-md">
+                        {r.cat} · Por Puntos Oficiales
+                      </span>
+                      <span className="text-[10px] text-emerald-400 font-bold">● Programado</span>
+                    </div>
+                    <p className="text-base font-black text-white">
+                      {r.jugador1} <span className="text-lime-400 px-1">vs</span> {r.jugador2}
+                    </p>
+                    <div className="flex justify-between items-center pt-2 border-t border-slate-800/80 text-xs text-slate-400">
+                      <span>📍 {r.sede}</span>
+                      <span>📅 {r.fecha}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* VISTA C: CREAR NUEVO DESAFÍO (VENTANA ±1,200 PUNTOS) */}
+            {retosSubTab === 'nuevo' && (
+              <div className="space-y-2.5">
+                <div className="bg-slate-900/70 border border-slate-800 p-3 rounded-2xl text-xs text-slate-300">
+                  <span className="font-black text-lime-400">Regla de Equidad:</span> Puedes retar a tenistas dentro de una ventana máxima de <span className="font-bold text-white">±1,200 Puntos</span> respecto a tu nivel actual.
+                </div>
+
+                {jugadores
+                  .filter(j => !myPlayer || j.id !== myPlayer.id)
+                  .map((j) => {
+                    const diff = myPlayer ? Math.abs((myPlayer.elo || 1000) - (j.elo || 1000)) : 0;
+                    const dentroVentana = diff <= 1200;
+                    const catJ = getInfoCategoria(j.elo || 1000);
+
+                    return (
+                      <div key={j.id} className={`p-3.5 rounded-2xl border flex items-center justify-between ${
+                        dentroVentana ? 'bg-slate-900 border-slate-800' : 'bg-slate-950/60 border-slate-900 opacity-60'
+                      }`}>
+                        <div className="flex items-center space-x-3">
+                          <div className="w-11 h-11 rounded-full bg-slate-800 overflow-hidden flex items-center justify-center border border-slate-700">
+                            {j.foto_url ? (
+                              <img src={j.foto_url} alt={j.nombre} className="w-full h-full object-cover" />
+                            ) : (
+                              <User className="w-5 h-5 text-slate-400" />
+                            )}
+                          </div>
+                          <div>
+                            <p className="text-sm font-black text-white">{j.nombre}</p>
+                            <p className="text-xs text-slate-400">
+                              Cat. <span className="text-lime-400 font-bold">{catJ.id}</span> · {j.elo || 1000} Pts
+                            </p>
+                          </div>
+                        </div>
+
+                        {dentroVentana ? (
+                          <button
+                            onClick={() => setChallengeTargetModal(j)}
+                            className="bg-lime-400 hover:bg-lime-300 text-slate-950 text-xs font-black px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow-sm"
+                          >
+                            <Swords className="w-3.5 h-3.5" /> Retar
+                          </button>
+                        ) : (
+                          <span className="text-[10px] font-bold text-slate-500 bg-slate-900 px-2.5 py-1.5 rounded-xl border border-slate-800">
+                            Fuera de rango
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
           </div>
         )}
 
-        {/* 4. CANCHAS */}
+        {/* =========================================================
+            4. PESTAÑA: CANCHAS (FOTOS PATROCINADAS Y CLIMA VERIFICADO)
+        ========================================================= */}
         {tab === 'clubs' && (
-          <div className="space-y-3">
-            <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800">
-              <h3 className="text-sm font-black text-white">Estado de Canchas en Huancayo</h3>
-              <p className="text-xs text-slate-400 mt-1">Toca el estado climático para reportar lluvia o cancha lista.</p>
+          <div className="space-y-4">
+            <div className="bg-slate-900 p-4 rounded-3xl border border-slate-800 shadow-lg">
+              <span className="text-[10px] font-extrabold uppercase tracking-widest text-lime-400 block">
+                Directorio Oficial
+              </span>
+              <h3 className="text-lg font-black text-white mt-0.5">Clubes y Canchas</h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Consulta disponibilidad por WhatsApp y revisa el reporte del clima verificado por jugadores.
+              </p>
             </div>
 
-            {clubesHuancayo.map((c, idx) => {
-              const infoClima = climaSedes[c.nombre] || { estado: 'Seco', hora: 'Hoy' };
-              const isRain = infoClima.estado.includes('Lluvia');
+            {SEDES_OFICIALES.map((c, idx) => {
+              const infoClima = climaSedes[c.nombre] || { estado: 'Soleado / Cancha Seca', hora: 'Hoy', reportadoPor: 'Admin' };
+              const isRain = infoClima.estado.includes('Lluvia') || infoClima.estado.includes('Llovizna');
+
               return (
-                <div key={idx} className="bg-slate-900 p-4 rounded-2xl border border-slate-800 space-y-3">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h4 className="text-sm font-black text-white">{c.nombre}</h4>
-                      <span className="text-xs text-lime-400 font-bold">{c.zona} · {c.canchas}</span>
+                <div key={idx} className="bg-slate-900 rounded-3xl border border-slate-800 overflow-hidden shadow-xl">
+                  {/* Imagen Predeterminada Patrocinada */}
+                  <div className="relative h-36 w-full bg-slate-800">
+                    <img src={c.img} alt={c.nombre} className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent"></div>
+                    <span className="absolute top-3 left-3 bg-slate-950/85 backdrop-blur-md text-lime-400 border border-lime-400/30 text-[10px] font-black uppercase px-2.5 py-1 rounded-full">
+                      ★ {c.sponsor}
+                    </span>
+                    <div className="absolute bottom-3 left-4 right-4 flex justify-between items-end">
+                      <div>
+                        <h4 className="text-base font-black text-white leading-tight">{c.nombre}</h4>
+                        <span className="text-xs text-lime-400 font-bold">{c.zona} · {c.canchas}</span>
+                      </div>
                     </div>
-                    <button
-                      onClick={() => reportarLluvia(c.nombre)}
-                      className={`text-[10px] px-2.5 py-1 rounded-xl font-bold flex items-center gap-1 border ${
-                        isRain ? 'bg-rose-950 text-rose-300 border-rose-800' : 'bg-slate-800 text-slate-300 border-slate-700'
-                      }`}
-                    >
-                      {isRain ? <CloudRain className="w-3.5 h-3.5 text-rose-400" /> : <Sun className="w-3.5 h-3.5 text-amber-400" />}
-                      {infoClima.estado}
-                    </button>
                   </div>
-                  <div className="pt-2 border-t border-slate-800 flex justify-between items-center text-xs">
-                    <span className="text-slate-500">Reporte: {infoClima.hora}</span>
-                    <a href={`https://wa.me/51${c.tel}`} target="_blank" rel="noreferrer" className="text-emerald-400 font-black">
-                      Reservar Cancha ↗
+
+                  {/* Estado Climático Verificado y Reserva */}
+                  <div className="p-4 space-y-3">
+                    <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800/90 flex justify-between items-center">
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-slate-500 block">
+                          Último Reporte Climático ({infoClima.hora})
+                        </span>
+                        <p className="text-xs font-black text-white mt-0.5 flex items-center gap-1.5">
+                          {isRain ? <CloudRain className="w-4 h-4 text-rose-400" /> : <Sun className="w-4 h-4 text-amber-400" />}
+                          {infoClima.estado}
+                        </p>
+                        <span className="text-[10px] text-lime-400/90 font-semibold block mt-0.5">
+                          ✔ Reportado por: {infoClima.reportadoPor}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => cambiarClimaSede(c.nombre)}
+                        className="bg-slate-800 hover:bg-slate-750 text-[10px] font-black text-slate-200 px-3 py-2 rounded-xl border border-slate-700 shrink-0"
+                      >
+                        Actualizar Clima
+                      </button>
+                    </div>
+
+                    <a
+                      href={`https://wa.me/51${c.tel}?text=Hola,%20escribo%20desde%20MATCHPOINT%20para%20consultar%20disponibilidad%20de%20cancha%20en%20${encodeURIComponent(c.nombre)}.`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-3 rounded-2xl text-xs flex items-center justify-center gap-2 shadow-md transition"
+                    >
+                      <Phone className="w-4 h-4" /> Consultar Disponibilidad (WhatsApp)
                     </a>
                   </div>
                 </div>
@@ -857,42 +1231,219 @@ export default function App() {
           </div>
         )}
 
-        {/* 5. TORNEOS */}
+        {/* =========================================================
+            5. PESTAÑA: TORNEOS (5 CATEGORÍAS ACTIVAS · MÍNIMO 8)
+        ========================================================= */}
         {tab === 'torneos' && (
           <div className="space-y-4">
-            <div className="bg-slate-900 p-5 rounded-3xl border border-slate-800 space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-[10px] uppercase font-black text-lime-400 bg-lime-950/60 border border-lime-800/80 px-2.5 py-0.5 rounded-md">
-                  Inscripciones Abiertas
-                </span>
-                <span className="text-xs text-slate-400">Por Categoría Oficial</span>
-              </div>
-              <h3 className="text-lg font-black text-white">Copa Apertura Bimestral Huancayo</h3>
-              <p className="text-xs text-slate-400">
-                Cuadros paralelos en 5ª P, 5ª B, 5ª A, 4ª y 3ª. Clasifica al Masters de Fin de Año (Top 8 de cada categoría).
+            <div className="bg-slate-900 p-4 rounded-3xl border border-slate-800 shadow-lg">
+              <span className="text-[10px] font-extrabold uppercase tracking-widest text-lime-400 block">
+                Calendario Oficial
+              </span>
+              <h3 className="text-lg font-black text-white mt-0.5">Torneos Activos por Categoría</h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Requisito oficial: Mínimo 8 participantes inscritos por categoría para aperturar y sortear el cuadro.
               </p>
-              <div className="grid grid-cols-2 gap-2 text-xs bg-slate-950 p-3.5 rounded-2xl border border-slate-800">
-                <div>
-                  <span className="text-slate-500 block font-semibold">Inscripción:</span>
-                  <span className="font-black text-lime-400 text-sm">S/ {precioTorneo}.00</span>
-                </div>
-                <div>
-                  <span className="text-slate-500 block font-semibold">Sede:</span>
-                  <span className="font-black text-white text-sm">Country Club</span>
-                </div>
-              </div>
-              <button 
-                onClick={() => setShowTournamentModal(true)}
-                className="w-full bg-lime-400 hover:bg-lime-300 text-slate-950 font-black py-3 rounded-2xl text-xs"
-              >
-                Inscribirme vía Yape / Plin
-              </button>
             </div>
+
+            {TORNEOS_INICIALES.map((t) => {
+              const cumpleMinimo = t.inscritos >= t.min;
+              const porcentajeCupo = Math.min(100, Math.round((t.inscritos / t.min) * 100));
+
+              return (
+                <div key={t.id} className="bg-slate-900 p-5 rounded-3xl border border-slate-800 space-y-3.5 shadow-xl">
+                  <div className="flex justify-between items-center">
+                    <span className={`text-[10px] uppercase font-black px-2.5 py-1 rounded-md border ${
+                      cumpleMinimo 
+                        ? 'text-lime-400 bg-lime-950/60 border-lime-800/80' 
+                        : 'text-amber-300 bg-amber-950/50 border-amber-800/70'
+                    }`}>
+                      {cumpleMinimo ? '✔ Cuadro Confirmado (+8)' : `⏳ Faltan ${t.min - t.inscritos} para el mínimo`}
+                    </span>
+                    <span className="text-xs font-mono font-bold text-slate-400">
+                      Cat. {t.cat}
+                    </span>
+                  </div>
+
+                  <div>
+                    <h4 className="text-base font-black text-white">{t.titulo}</h4>
+                    <p className="text-xs text-slate-400">{t.subtitulo}</p>
+                  </div>
+
+                  {/* Barra de Mínimo 8 Jugadores */}
+                  <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800">
+                    <div className="flex justify-between text-[11px] font-bold mb-1.5">
+                      <span className="text-slate-300 flex items-center gap-1">
+                        <Users className="w-3.5 h-3.5 text-lime-400" /> Inscritos: {t.inscritos} tenistas
+                      </span>
+                      <span className="text-lime-400 font-mono">Mínimo requerido: {t.min}</span>
+                    </div>
+                    <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full rounded-full ${cumpleMinimo ? 'bg-lime-400' : 'bg-amber-400'}`}
+                        style={{ width: `${porcentajeCupo}%` }}
+                      ></div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs bg-slate-950/60 p-3 rounded-2xl border border-slate-800/80">
+                    <div>
+                      <span className="text-slate-500 block font-semibold">Sede y Fecha:</span>
+                      <span className="font-bold text-white text-[11px]">{t.sede} · {t.fecha}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-slate-500 block font-semibold">Inscripción:</span>
+                      <span className="font-black text-lime-400 text-sm">S/ {t.precio}.00</span>
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={() => setSelectedTorneoModal(t)}
+                    className="w-full bg-lime-400 hover:bg-lime-300 text-slate-950 font-black py-3 rounded-2xl text-xs shadow-md transition"
+                  >
+                    Inscribirme en Categoría {t.cat} (Yape / Plin)
+                  </button>
+                </div>
+              );
+            })}
           </div>
         )}
       </main>
 
-      {/* MODAL LOGIN / REGISTRO */}
+      {/* =========================================================
+          MODAL: FICHA PÚBLICA DE TENISTA (AL TOCAR EN EL RANKING)
+      ========================================================= */}
+      {selectedPlayerModal && (
+        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl text-center relative">
+            <button 
+              onClick={() => setSelectedPlayerModal(null)} 
+              className="absolute top-4 right-4 text-slate-400 hover:text-white p-1"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="w-24 h-24 mx-auto rounded-full bg-slate-800 p-1 border-2 border-lime-400 mb-3 overflow-hidden flex items-center justify-center">
+              {selectedPlayerModal.foto_url ? (
+                <img src={selectedPlayerModal.foto_url} alt={selectedPlayerModal.nombre} className="w-full h-full rounded-full object-cover" />
+              ) : (
+                <User className="w-12 h-12 text-slate-400" />
+              )}
+            </div>
+
+            <h3 className="text-xl font-black text-white">{selectedPlayerModal.nombre}</h3>
+            <p className="text-xs text-slate-400 mt-0.5">{selectedPlayerModal.club || 'Independiente'}</p>
+
+            <div className="inline-block mt-2.5 px-3.5 py-1 rounded-full text-xs font-black uppercase bg-lime-400/15 text-lime-400 border border-lime-400/30">
+              {getInfoCategoria(selectedPlayerModal.elo).nombre}
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 mt-5">
+              <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800">
+                <span className="text-[9px] uppercase font-bold text-slate-500 block">Puntos</span>
+                <span className="text-base font-black text-lime-400 font-mono">{selectedPlayerModal.elo || 1000}</span>
+              </div>
+              <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800">
+                <span className="text-[9px] uppercase font-bold text-slate-500 block">Récord</span>
+                <span className="text-base font-black text-white font-mono">
+                  {selectedPlayerModal.victorias || 0}G-{selectedPlayerModal.derrotas || 0}P
+                </span>
+              </div>
+              <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800">
+                <span className="text-[9px] uppercase font-bold text-slate-500 block">Efectividad</span>
+                <span className="text-base font-black text-emerald-400 font-mono">
+                  {((selectedPlayerModal.victorias || 0) + (selectedPlayerModal.derrotas || 0)) > 0
+                    ? Math.round(((selectedPlayerModal.victorias || 0) / ((selectedPlayerModal.victorias || 0) + (selectedPlayerModal.derrotas || 0))) * 100)
+                    : 0}%
+                </span>
+              </div>
+            </div>
+
+            {(!myPlayer || myPlayer.id !== selectedPlayerModal.id) && (
+              <div className="mt-5">
+                {Math.abs(((myPlayer?.elo || 1000) - (selectedPlayerModal.elo || 1000))) <= 1200 ? (
+                  <button
+                    onClick={() => {
+                      const target = selectedPlayerModal;
+                      setSelectedPlayerModal(null);
+                      setChallengeTargetModal(target);
+                    }}
+                    className="w-full bg-lime-400 hover:bg-lime-300 text-slate-950 font-black py-3 rounded-2xl text-xs flex items-center justify-center gap-1.5"
+                  >
+                    <Swords className="w-4 h-4" /> Lanzar Desafío Oficial
+                  </button>
+                ) : (
+                  <div className="bg-slate-950 border border-slate-800 text-slate-500 text-xs font-bold py-2.5 rounded-2xl">
+                    Fuera de tu ventana de reto (±1,200 Pts)
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================
+          MODAL: PROGRAMAR NUEVO RETO Y PUBLICAR EN CARTELERA
+      ========================================================= */}
+      {challengeTargetModal && (
+        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-base font-black text-white flex items-center gap-1.5">
+                <Swords className="w-4 h-4 text-lime-400" /> Programar Desafío Oficial
+              </h3>
+              <button onClick={() => setChallengeTargetModal(null)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmarNuevoReto} className="space-y-3">
+              <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800">
+                <span className="text-[10px] uppercase font-bold text-lime-400 block">Rival Seleccionado</span>
+                <p className="text-sm font-black text-white">{challengeTargetModal.nombre}</p>
+                <span className="text-xs text-slate-400">{challengeTargetModal.elo || 1000} Puntos · Cat. {getInfoCategoria(challengeTargetModal.elo).id}</span>
+              </div>
+
+              <div>
+                <label className="text-xs text-slate-400 block mb-1">Cancha / Sede Propuesta</label>
+                <select
+                  value={challengeSede}
+                  onChange={(e) => setChallengeSede(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white"
+                >
+                  {SEDES_OFICIALES.map((s, i) => (
+                    <option key={i} value={s.nombre}>{s.nombre}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs text-slate-400 block mb-1">Día y Hora Tentativa</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej. Sábado 16:00 hrs"
+                  value={challengeFecha}
+                  onChange={(e) => setChallengeFecha(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full bg-lime-400 hover:bg-lime-300 text-slate-950 font-black py-3 rounded-xl text-xs flex items-center justify-center gap-1.5 mt-2"
+              >
+                <Phone className="w-4 h-4" /> Publicar en Cartelera y Coordinar por WhatsApp
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================
+          MODAL: INICIAR SESIÓN / CREAR CUENTA
+      ========================================================= */}
       {showAuthModal && (
         <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl">
@@ -926,7 +1477,7 @@ export default function App() {
                 disabled={authLoading}
                 className="w-full bg-lime-400 text-slate-950 font-black py-3 rounded-xl text-xs"
               >
-                {authLoading ? 'Verificando...' : (authMode === 'login' ? 'Entrar' : 'Continuar al Test ELO')}
+                {authLoading ? 'Verificando...' : (authMode === 'login' ? 'Entrar' : 'Continuar al Test Técnico')}
               </button>
               <button
                 type="button"
@@ -940,13 +1491,15 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL TEST DE CALIBRACIÓN ELO (4 PREGUNTAS) */}
+      {/* =========================================================
+          MODAL: TEST TÉCNICO DE CALIBRACIÓN (4 PREGUNTAS)
+      ========================================================= */}
       {showProfileSetup && (
         <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-3xl p-5 shadow-2xl overflow-y-auto max-h-[90vh]">
-            <h3 className="text-base font-black text-white">Calibración Técnica ELO</h3>
+            <h3 className="text-base font-black text-white">Calibración Técnica de Nivel</h3>
             <p className="text-xs text-slate-400 mb-3">
-              Responde las 4 situaciones de cancha para asignar tu ELO provisional (Calibrando 0/5).
+              Responde estas 4 situaciones de partido para calcular tus puntos iniciales provisionales (Calibrando 0/5).
             </p>
             <form onSubmit={handleCompleteProfile} className="space-y-3">
               <div className="flex flex-col items-center">
@@ -963,7 +1516,7 @@ export default function App() {
                   )}
                 </div>
                 <input type="file" accept="image/*" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
-                <span className="text-[10px] text-slate-400 mt-1">Toca para elegir foto de tu galería</span>
+                <span className="text-[10px] text-slate-400 mt-1">Toca para subir tu foto de la galería</span>
               </div>
 
               <div className="grid grid-cols-2 gap-2">
@@ -990,10 +1543,9 @@ export default function App() {
                 onChange={(e) => setClub(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
               >
-                <option value="Country Club Huancayo">Country Club Huancayo</option>
-                <option value="Club Tauro Tenis">Club Tauro Tenis</option>
-                <option value="Academia Romina Cutipa">Academia Romina Cutipa</option>
-                <option value="Complejo Shyam Huilca">Complejo Shyam Huilca</option>
+                {SEDES_OFICIALES.map((s, i) => (
+                  <option key={i} value={s.nombre}>{s.nombre}</option>
+                ))}
                 <option value="Independiente">Independiente</option>
               </select>
 
@@ -1019,8 +1571,8 @@ export default function App() {
               </div>
 
               <div className="bg-lime-400/10 border border-lime-400/30 p-3 rounded-2xl flex justify-between items-center">
-                <span className="text-xs font-black text-white">Provisional: Cat. {previewCalib.cat}</span>
-                <span className="text-base font-mono font-black text-lime-400">{previewCalib.elo} ELO</span>
+                <span className="text-xs font-black text-white">Nivel Provisional: Cat. {previewCalib.cat}</span>
+                <span className="text-base font-mono font-black text-lime-400">{previewCalib.elo} Pts</span>
               </div>
 
               <button
@@ -1028,14 +1580,16 @@ export default function App() {
                 disabled={savingPlayer || isCompressing}
                 className="w-full bg-lime-400 text-slate-950 font-black py-3 rounded-xl text-xs"
               >
-                {savingPlayer ? 'Guardando Ficha...' : 'Confirmar y Entrar al Circuito'}
+                {savingPlayer ? 'Guardando Ficha...' : 'Confirmar e Ingresar al Circuito'}
               </button>
             </form>
           </div>
         </div>
       )}
 
-      {/* MODAL SUBIR SCORE */}
+      {/* =========================================================
+          MODAL: SUBIR SCORE OFICIAL (EXCLUSIVO DE TUS RETOS)
+      ========================================================= */}
       {showMatchModal && (
         <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl">
@@ -1056,7 +1610,7 @@ export default function App() {
               >
                 <option value="">Tenista 1...</option>
                 {jugadores.map(j => (
-                  <option key={j.id} value={j.id.toString()}>{j.nombre} ({j.elo || 1000} pts · {getInfoCategoria(j.elo).id})</option>
+                  <option key={j.id} value={j.id.toString()}>{j.nombre} ({j.elo || 1000} Pts · Cat. {getInfoCategoria(j.elo).id})</option>
                 ))}
               </select>
 
@@ -1068,7 +1622,7 @@ export default function App() {
               >
                 <option value="">Tenista 2 (Rival)...</option>
                 {jugadores.map(j => (
-                  <option key={j.id} value={j.id.toString()}>{j.nombre} ({j.elo || 1000} pts · {getInfoCategoria(j.elo).id})</option>
+                  <option key={j.id} value={j.id.toString()}>{j.nombre} ({j.elo || 1000} Pts · Cat. {getInfoCategoria(j.elo).id})</option>
                 ))}
               </select>
 
@@ -1076,13 +1630,13 @@ export default function App() {
                 <input
                   type="text"
                   required
-                  placeholder="Marcador: Ej. 6-3, 6-2"
+                  placeholder="Marcador: Ej. 6-3, 6-2 o 7-6, 6-7, 10-8"
                   value={score}
                   onChange={(e) => setScore(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-mono"
                 />
                 <span className="text-[10px] text-lime-400 font-bold block mt-1">
-                  Impacto: {calcularFactorDominio(score).label}
+                  Factor de Dominio detectado: {calcularFactorDominio(score).label}
                 </span>
               </div>
 
@@ -1092,7 +1646,7 @@ export default function App() {
                 required
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white font-bold"
               >
-                <option value="">Ganador del partido...</option>
+                <option value="">Ganador del encuentro...</option>
                 {p1Id && <option value={p1Id}>{jugadores.find(j => j.id.toString() === p1Id)?.nombre}</option>}
                 {p2Id && <option value={p2Id}>{jugadores.find(j => j.id.toString() === p2Id)?.nombre}</option>}
               </select>
@@ -1102,30 +1656,34 @@ export default function App() {
                 disabled={calculatingMatch}
                 className="w-full bg-lime-400 text-slate-950 font-black py-3 rounded-xl text-xs"
               >
-                {calculatingMatch ? 'Calculando ELO...' : 'Confirmar Resultado'}
+                {calculatingMatch ? 'Actualizando Puntos...' : 'Confirmar y Actualizar Ranking'}
               </button>
             </form>
           </div>
         </div>
       )}
 
-      {/* MODAL TORNEO */}
-      {showTournamentModal && (
+      {/* =========================================================
+          MODAL: INSCRIPCIÓN A TORNEO ESPECÍFICO POR CATEGORÍA
+      ========================================================= */}
+      {selectedTorneoModal && (
         <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl space-y-3">
             <div className="flex justify-between items-center">
-              <h3 className="text-base font-black text-white">Inscripción Copa Apertura</h3>
-              <button onClick={() => setShowTournamentModal(false)} className="text-slate-400 hover:text-white">
+              <h3 className="text-base font-black text-white">{selectedTorneoModal.titulo}</h3>
+              <button onClick={() => setSelectedTorneoModal(null)} className="text-slate-400 hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 text-center space-y-2">
               <QrCode className="w-16 h-16 mx-auto text-lime-400" />
-              <p className="text-xs font-black text-white">Yape / Plin: 964-000000</p>
-              <p className="text-[11px] text-slate-400">Monto: S/ {precioTorneo}.00</p>
+              <p className="text-xs font-black text-white">Yape / Plin Oficial: 964-000000</p>
+              <p className="text-[11px] text-slate-400">
+                Inscripción: S/ {selectedTorneoModal.precio}.00 · Sede: {selectedTorneoModal.sede}
+              </p>
             </div>
             <a
-              href={`https://wa.me/51964000000?text=Hola,%20envío%20comprobante%20de%20S/%20${precioTorneo}`}
+              href={`https://wa.me/51964000000?text=Hola,%20envío%20mi%20comprobante%20de%20S/%20${selectedTorneoModal.precio}%20para%20inscribirme%20en%20${encodeURIComponent(selectedTorneoModal.titulo)}.`}
               target="_blank"
               rel="noreferrer"
               className="block w-full text-center bg-emerald-500 text-slate-950 font-black py-3 rounded-xl text-xs"
@@ -1136,13 +1694,15 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL ADMIN */}
+      {/* =========================================================
+          MODAL: PANEL DE CONTROL ADMIN (PIN 1234)
+      ========================================================= */}
       {showAdminModal && (
         <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-base font-black text-white flex items-center gap-1.5">
-                <Shield className="w-4 h-4 text-lime-400" /> Panel Admin
+                <Shield className="w-4 h-4 text-lime-400" /> Panel Organizador
               </h3>
               <button onClick={() => { setShowAdminModal(false); setIsAdminAuth(false); }} className="text-slate-400 hover:text-white">
                 <X className="w-5 h-5" />
@@ -1164,11 +1724,11 @@ export default function App() {
             ) : (
               <div className="space-y-3 text-xs">
                 <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800">
-                  <span className="text-[10px] font-bold uppercase text-lime-400 block">Recaudación Torneo</span>
-                  <p className="text-white font-bold mt-1">16 inscritos × S/ {precioTorneo} = <span className="text-emerald-400">S/ {16 * precioTorneo}.00</span></p>
+                  <span className="text-[10px] font-bold uppercase text-lime-400 block">Resumen de Torneos Activos</span>
+                  <p className="text-white font-bold mt-1">5 Categorías Abiertas (Mín. 8 por cuadro)</p>
                 </div>
                 <a href="https://supabase.com" target="_blank" rel="noreferrer" className="block w-full bg-slate-800 text-center py-2.5 rounded-xl font-bold text-lime-400">
-                  Abrir Supabase ↗
+                  Abrir Base de Datos Supabase ↗
                 </a>
               </div>
             )}
@@ -1176,22 +1736,53 @@ export default function App() {
         </div>
       )}
 
-      {/* NAVEGACIÓN INFERIOR (MI PERFIL PRIMERO A LA IZQUIERDA) */}
-      <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-slate-900/95 backdrop-blur-xl border-t border-slate-800 flex justify-around py-3 pb-5 px-1 z-40">
-        <button onClick={() => setTab('perfil')} className={`flex flex-col items-center text-[10px] ${tab === 'perfil' ? 'text-lime-400 font-black' : 'text-slate-400'}`}>
-          <User className="w-4 h-4 mb-1" /> Mi Perfil
+      {/* =========================================================
+          BARRA DE NAVEGACIÓN INFERIOR CON BOTÓN CENTRAL CIRCULAR
+      ========================================================= */}
+      <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-slate-900/95 backdrop-blur-xl border-t border-slate-800 flex justify-around items-center py-2.5 pb-5 px-2 z-40">
+        <button 
+          onClick={() => setTab('perfil')} 
+          className={`flex flex-col items-center text-[10px] w-14 transition ${tab === 'perfil' ? 'text-lime-400 font-black' : 'text-slate-400'}`}
+        >
+          <User className="w-5 h-5 mb-1" /> Mi Perfil
         </button>
-        <button onClick={() => setTab('ranking')} className={`flex flex-col items-center text-[10px] ${tab === 'ranking' ? 'text-lime-400 font-black' : 'text-slate-400'}`}>
-          <Trophy className="w-4 h-4 mb-1" /> Ranking
+
+        <button 
+          onClick={() => setTab('ranking')} 
+          className={`flex flex-col items-center text-[10px] w-14 transition ${tab === 'ranking' ? 'text-lime-400 font-black' : 'text-slate-400'}`}
+        >
+          <Trophy className="w-5 h-5 mb-1" /> Ranking
         </button>
-        <button onClick={() => setTab('match')} className={`flex flex-col items-center text-[10px] ${tab === 'match' ? 'text-lime-400 font-black' : 'text-slate-400'}`}>
-          <Swords className="w-4 h-4 mb-1" /> Retos
+
+        {/* BOTÓN CENTRAL DESTACADO Y CIRCULAR: RETOS */}
+        <div className="relative -top-5 flex flex-col items-center">
+          <button
+            onClick={() => setTab('match')}
+            className={`w-14 h-14 rounded-full flex items-center justify-center shadow-[0_0_25px_rgba(163,230,53,0.45)] border-4 border-slate-950 transition transform active:scale-95 ${
+              tab === 'match' 
+                ? 'bg-gradient-to-br from-lime-300 to-emerald-400 text-slate-950' 
+                : 'bg-lime-400 text-slate-950'
+            }`}
+          >
+            <Swords className="w-6 h-6" />
+          </button>
+          <span className={`text-[10px] mt-1 font-black tracking-tight ${tab === 'match' ? 'text-lime-400' : 'text-slate-300'}`}>
+            Retos
+          </span>
+        </div>
+
+        <button 
+          onClick={() => setTab('clubs')} 
+          className={`flex flex-col items-center text-[10px] w-14 transition ${tab === 'clubs' ? 'text-lime-400 font-black' : 'text-slate-400'}`}
+        >
+          <MapPin className="w-5 h-5 mb-1" /> Canchas
         </button>
-        <button onClick={() => setTab('clubs')} className={`flex flex-col items-center text-[10px] ${tab === 'clubs' ? 'text-lime-400 font-black' : 'text-slate-400'}`}>
-          <MapPin className="w-4 h-4 mb-1" /> Canchas
-        </button>
-        <button onClick={() => setTab('torneos')} className={`flex flex-col items-center text-[10px] ${tab === 'torneos' ? 'text-lime-400 font-black' : 'text-slate-400'}`}>
-          <Calendar className="w-4 h-4 mb-1" /> Torneos
+
+        <button 
+          onClick={() => setTab('torneos')} 
+          className={`flex flex-col items-center text-[10px] w-14 transition ${tab === 'torneos' ? 'text-lime-400 font-black' : 'text-slate-400'}`}
+        >
+          <Calendar className="w-5 h-5 mb-1" /> Torneos
         </button>
       </nav>
     </div>
