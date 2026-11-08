@@ -449,4 +449,629 @@ export default function App() {
                 <div className="text-center py-10 text-slate-500 text-xs">Cargando circuito...</div>
               ) : jugadores.map((j, idx) => (
                 <div 
-                  key
+                  key={j.id || idx}
+                  className="bg-slate-900 p-3.5 rounded-2xl border border-slate-800 flex items-center justify-between"
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className={`w-7 text-center font-mono font-black text-sm ${idx === 0 ? 'text-amber-400' : idx === 1 ? 'text-slate-300' : idx === 2 ? 'text-amber-600' : 'text-slate-500'}`}>
+                      #{idx + 1}
+                    </div>
+                    <div className="w-10 h-10 rounded-full bg-slate-800 overflow-hidden flex items-center justify-center border border-slate-700">
+                      {j.foto_url ? (
+                        <img src={j.foto_url} alt={j.nombre} className="w-full h-full object-cover" />
+                      ) : (
+                        <User className="w-5 h-5 text-slate-400" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-sm font-black text-white leading-tight">{j.nombre}</p>
+                      <p className="text-xs text-slate-400">
+                        {j.club || 'Independiente'} · <span className="text-lime-400 font-bold">{j.categoria || '4ª'}</span>
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-base font-mono font-black text-lime-400">{j.elo || 1200}</span>
+                    <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">ELO</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* MI PERFIL */}
+        {tab === 'perfil' && (
+          <div className="space-y-4">
+            {currentUser && myPlayer ? (
+              <div className="bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-6 text-center shadow-xl relative overflow-hidden">
+                <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-lime-400 to-emerald-500"></div>
+                
+                <div className="w-24 h-24 mx-auto rounded-full bg-slate-800 p-1 border-2 border-lime-400 mb-3 shadow-[0_0_20px_rgba(163,230,53,0.25)]">
+                  <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center bg-slate-900">
+                    {myPlayer.foto_url ? (
+                      <img src={myPlayer.foto_url} alt={myPlayer.nombre} className="w-full h-full object-cover" />
+                    ) : (
+                      <User className="w-12 h-12 text-slate-500" />
+                    )}
+                  </div>
+                </div>
+
+                <h2 className="text-xl font-black text-white">{myPlayer.nombre}</h2>
+                <p className="text-xs text-slate-400 mt-0.5">{myPlayer.club || 'Independiente'}</p>
+                <div className="inline-block mt-2 bg-lime-400/10 text-lime-400 border border-lime-400/30 text-xs font-black px-3 py-1 rounded-full uppercase">
+                  Categoría {myPlayer.categoria || '4ª'}
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 mt-6 pt-6 border-t border-slate-800/80">
+                  <div className="bg-slate-900/80 p-3 rounded-2xl border border-slate-800">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 block">Posición</span>
+                    <span className="text-lg font-black text-white font-mono">#{myRankPos}</span>
+                  </div>
+                  <div className="bg-slate-900/80 p-3 rounded-2xl border border-slate-800">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 block">ELO FNT</span>
+                    <span className="text-lg font-black text-lime-400 font-mono">{myPlayer.elo || 1200}</span>
+                  </div>
+                  <div className="bg-slate-900/80 p-3 rounded-2xl border border-slate-800">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 block">Record W/L</span>
+                    <span className="text-lg font-black text-white font-mono">
+                      {myPlayer.victorias || 0}-{myPlayer.derrotas || 0}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-6 pt-4 border-t border-slate-800/80">
+                  <button 
+                    onClick={handleLogout}
+                    className="w-full bg-slate-800 hover:bg-slate-700 text-rose-400 font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 transition"
+                  >
+                    <LogOut className="w-4 h-4" /> Cerrar Sesión
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl text-center space-y-4">
+                <User className="w-12 h-12 text-slate-600 mx-auto" />
+                <div>
+                  <h3 className="text-base font-black text-white">Accede a tu Perfil</h3>
+                  <p className="text-xs text-slate-400 mt-1">Crea una cuenta o inicia sesión para registrar partidos.</p>
+                </div>
+                <div className="flex gap-2 justify-center pt-2">
+                  <button
+                    onClick={() => { setAuthMode('login'); setShowAuthModal(true); }}
+                    className="bg-lime-400 text-slate-950 font-black px-5 py-2.5 rounded-xl text-xs"
+                  >
+                    Iniciar Sesión
+                  </button>
+                  <button
+                    onClick={() => { setAuthMode('signup'); setShowAuthModal(true); }}
+                    className="bg-slate-800 text-white font-bold px-5 py-2.5 rounded-xl text-xs border border-slate-700"
+                  >
+                    Registrarme
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* RETOS */}
+        {tab === 'match' && (
+          <div className="space-y-4">
+            <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl flex justify-between items-center">
+              <div>
+                <h3 className="text-sm font-black text-white">Desafíos Directos</h3>
+                <p className="text-xs text-slate-400">Pacta encuentros por WhatsApp</p>
+              </div>
+              <button
+                onClick={() => setShowMatchModal(true)}
+                className="bg-lime-400 hover:bg-lime-300 text-slate-950 text-xs font-black px-3 py-2 rounded-xl"
+              >
+                + Subir Score
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              {jugadores
+                .filter(j => !currentUser || j.id !== currentUser.id)
+                .map((j) => (
+                  <div key={j.id} className="bg-slate-900 p-3.5 rounded-2xl border border-slate-800 flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-9 h-9 rounded-full bg-slate-800 overflow-hidden flex items-center justify-center border border-slate-700">
+                        {j.foto_url ? (
+                          <img src={j.foto_url} alt={j.nombre} className="w-full h-full object-cover" />
+                        ) : (
+                          <User className="w-5 h-5 text-slate-400" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-sm font-black text-white">{j.nombre}</p>
+                        <p className="text-xs text-slate-400">{j.club || 'Independiente'} · <span className="text-lime-400">{j.elo || 1200} pts</span></p>
+                      </div>
+                    </div>
+                    {j.telefono ? (
+                      <a
+                        href={`https://wa.me/51${j.telefono.replace(/\D/g, '')}?text=Hola%20${encodeURIComponent(j.nombre)},%20te%20escribo%20desde%20MatchPoint.`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="bg-slate-800 hover:bg-slate-750 text-lime-400 border border-slate-700 text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition"
+                      >
+                        <Phone className="w-3.5 h-3.5" /> Retar
+                      </a>
+                    ) : null}
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+
+        {/* CANCHAS */}
+        {tab === 'clubs' && (
+          <div className="space-y-3">
+            <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800">
+              <h3 className="text-sm font-black text-white">Sedes en Huancayo</h3>
+              <p className="text-xs text-slate-400 mt-1">Monitorea el clima de la arcilla.</p>
+            </div>
+
+            {clubesHuancayo.map((c, idx) => {
+              const infoClima = climaSedes[c.nombre] || { estado: 'Seco', hora: 'Hoy' };
+              const isRain = infoClima.estado.includes('Lluvia');
+
+              return (
+                <div key={idx} className="bg-slate-900 p-4 rounded-2xl border border-slate-800 space-y-3">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h4 className="text-sm font-black text-white">{c.nombre}</h4>
+                      <span className="text-xs text-lime-400 font-bold">{c.zona} · {c.canchas}</span>
+                    </div>
+                    <button
+                      onClick={() => reportarLluvia(c.nombre)}
+                      className={`text-[10px] px-2.5 py-1 rounded-xl font-bold flex items-center gap-1 border ${isRain ? 'bg-rose-950 text-rose-300 border-rose-800' : 'bg-slate-800 text-slate-300 border-slate-700'}`}
+                    >
+                      {isRain ? <CloudRain className="w-3.5 h-3.5 text-rose-400" /> : <Sun className="w-3.5 h-3.5 text-amber-400" />}
+                      {infoClima.estado}
+                    </button>
+                  </div>
+                  <div className="pt-2 border-t border-slate-800 flex justify-between items-center text-xs">
+                    <span className="text-slate-500">Reporte: {infoClima.hora}</span>
+                    <a 
+                      href={`https://wa.me/51${c.tel}`} 
+                      target="_blank" 
+                      rel="noreferrer"
+                      className="text-emerald-400 font-black hover:underline"
+                    >
+                      Reservar ↗
+                    </a>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* TORNEOS */}
+        {tab === 'torneos' && (
+          <div className="space-y-4">
+            <div className="bg-slate-900 p-5 rounded-3xl border border-slate-800 relative overflow-hidden">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-[10px] uppercase font-black text-lime-400 bg-lime-950/60 border border-lime-800/80 px-2.5 py-0.5 rounded-md">
+                  Inscripciones Abiertas
+                </span>
+                <span className="text-xs text-slate-400">Cupos: 16 tenistas</span>
+              </div>
+              <h3 className="text-lg font-black text-white">Torneo Apertura Huancayo</h3>
+              <p className="text-xs text-slate-400 mt-1">Cuadro eliminatorio oficial ELO.</p>
+              
+              <div className="grid grid-cols-2 gap-2 mt-4 text-xs bg-slate-950 p-3.5 rounded-2xl border border-slate-800">
+                <div>
+                  <span className="text-slate-500 block font-semibold">Inscripción:</span>
+                  <span className="font-black text-lime-400 text-sm">S/ {precioTorneo}.00</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block font-semibold">Sede:</span>
+                  <span className="font-black text-white text-sm">Country Club</span>
+                </div>
+              </div>
+
+              <button 
+                onClick={() => setShowTournamentModal(true)}
+                className="w-full mt-4 bg-lime-400 hover:bg-lime-300 text-slate-950 font-black py-3 rounded-2xl text-xs transition"
+              >
+                Inscribirme vía Yape / Plin
+              </button>
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* Modal: Auth */}
+      {showAuthModal && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-base font-black text-white">
+                {authMode === 'login' ? 'Iniciar Sesión' : 'Crear Cuenta'}
+              </h3>
+              <button onClick={() => setShowAuthModal(false)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAuth} className="space-y-3">
+              <div>
+                <label className="text-xs text-slate-400 block mb-1">Correo electrónico o Celular *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="ejemplo@correo.com"
+                  value={authEmail}
+                  onChange={(e) => setAuthEmail(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-lime-400"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-slate-400 block mb-1">Contraseña *</label>
+                <input
+                  type="password"
+                  required
+                  placeholder="••••••••"
+                  value={authPassword}
+                  onChange={(e) => setAuthPassword(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-lime-400"
+                />
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={authLoading}
+                  className="w-full bg-lime-400 hover:bg-lime-300 disabled:opacity-50 text-slate-950 font-black py-3 rounded-xl text-xs transition"
+                >
+                  {authLoading ? 'Verificando...' : (authMode === 'login' ? 'Entrar a mi Cuenta' : 'Continuar al Perfil')}
+                </button>
+              </div>
+
+              <div className="text-center pt-2">
+                <button
+                  type="button"
+                  onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}
+                  className="text-xs text-lime-400 hover:underline font-semibold"
+                >
+                  {authMode === 'login' ? '¿No tienes cuenta? Regístrate aquí' : '¿Ya tienes cuenta? Inicia sesión'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Completar Perfil y Subida de Imagen Nativa */}
+      {showProfileSetup && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
+            <h3 className="text-base font-black text-white mb-1">Configura tu Ficha de Tenista</h3>
+            <p className="text-xs text-slate-400 mb-4">Esta información aparecerá en el ranking de Huancayo.</p>
+
+            <form onSubmit={handleCompleteProfile} className="space-y-3">
+              
+              {/* Carga y Compresión de Imagen */}
+              <div className="flex flex-col items-center mb-3">
+                <label className="relative cursor-pointer">
+                  <div className="w-20 h-20 rounded-full bg-slate-950 border-2 border-dashed border-lime-400 flex items-center justify-center overflow-hidden hover:border-lime-300 transition">
+                    {isCompressing ? (
+                       <Loader2 className="w-6 h-6 text-lime-400 animate-spin" />
+                    ) : fotoPreview ? (
+                      <img src={fotoPreview} alt="Preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="text-center p-2">
+                        <Camera className="w-6 h-6 text-lime-400 mx-auto" />
+                      </div>
+                    )}
+                  </div>
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    capture="user"
+                    onChange={handleFileChange} 
+                    className="hidden" 
+                  />
+                </label>
+                <span className="text-[10px] text-slate-400 mt-1.5">
+                  {isCompressing ? 'Optimizando foto...' : 'Toca el círculo para subir foto'}
+                </span>
+              </div>
+
+              <div>
+                <label className="text-xs text-slate-400 block mb-1">Nombre completo *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej. Juan Pérez"
+                  value={nombre}
+                  onChange={(e) => setNombre(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-lime-400"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-slate-400 block mb-1">Club o Cancha habitual</label>
+                <select
+                  value={club}
+                  onChange={(e) => setClub(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-lime-400"
+                >
+                  <option value="Country Club Huancayo">Country Club Huancayo</option>
+                  <option value="Club Tauro Tenis">Club Tauro Tenis</option>
+                  <option value="Academia Romina Cutipa">Academia Romina Cutipa</option>
+                  <option value="Complejo Shyam Huilca">Complejo Shyam Huilca</option>
+                  <option value="Independiente">Independiente</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Categoría</label>
+                  <select
+                    value={categoria}
+                    onChange={(e) => setCategoria(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-2 text-sm text-white focus:outline-none focus:border-lime-400"
+                  >
+                    <option value="1ª">1ª</option>
+                    <option value="2ª">2ª</option>
+                    <option value="3ª">3ª</option>
+                    <option value="4ª">4ª</option>
+                    <option value="5ª A">5ª A</option>
+                    <option value="5ª B">5ª B</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">WhatsApp</label>
+                  <input
+                    type="tel"
+                    placeholder="999..."
+                    value={telefono}
+                    onChange={(e) => setTelefono(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-2 text-sm text-white focus:outline-none focus:border-lime-400"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={savingPlayer || isCompressing}
+                  className="w-full bg-lime-400 hover:bg-lime-300 disabled:opacity-50 text-slate-950 font-black py-3 rounded-xl text-xs transition flex items-center justify-center gap-2"
+                >
+                  {savingPlayer ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> Guardando perfil...</>
+                  ) : (
+                    'Guardar y Entrar al Circuito'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Subir Score */}
+      {showMatchModal && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-base font-black text-white flex items-center gap-1.5">
+                <Swords className="w-4 h-4 text-lime-400" /> Reportar Partido
+              </h3>
+              <button onClick={() => setShowMatchModal(false)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleProcesarPartido} className="space-y-3">
+              <div>
+                <label className="text-xs text-slate-400 block mb-1">Tenista 1</label>
+                <select
+                  value={p1Id}
+                  onChange={(e) => setP1Id(e.target.value)}
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-lime-400"
+                >
+                  <option value="">Seleccionar...</option>
+                  {jugadores.map(j => (
+                    <option key={j.id} value={j.id.toString()}>{j.nombre} ({j.elo || 1200} pts)</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs text-slate-400 block mb-1">Tenista 2 (Rival)</label>
+                <select
+                  value={p2Id}
+                  onChange={(e) => setP2Id(e.target.value)}
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-lime-400"
+                >
+                  <option value="">Seleccionar...</option>
+                  {jugadores.map(j => (
+                    <option key={j.id} value={j.id.toString()}>{j.nombre} ({j.elo || 1200} pts)</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs text-slate-400 block mb-1">Marcador (Sets)</label>
+                <input
+                  type="text"
+                  placeholder="Ej. 6-4, 7-5"
+                  value={score}
+                  onChange={(e) => setScore(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-lime-400"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-slate-400 block mb-1">Ganador</label>
+                <select
+                  value={winnerId}
+                  onChange={(e) => setWinnerId(e.target.value)}
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-lime-400 font-bold"
+                >
+                  <option value="">Elegir al ganador...</option>
+                  {p1Id && <option value={p1Id}>{jugadores.find(j => j.id.toString() === p1Id)?.nombre}</option>}
+                  {p2Id && <option value={p2Id}>{jugadores.find(j => j.id.toString() === p2Id)?.nombre}</option>}
+                </select>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={calculatingMatch}
+                  className="w-full bg-lime-400 hover:bg-lime-300 disabled:opacity-50 text-slate-950 font-black py-3 rounded-xl text-xs transition"
+                >
+                  {calculatingMatch ? 'Calculando nuevo ELO...' : 'Confirmar Resultado'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Torneo Yape/Plin */}
+      {showTournamentModal && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl space-y-3">
+            <div className="flex justify-between items-center">
+              <h3 className="text-base font-black text-white">Inscripción al Torneo</h3>
+              <button onClick={() => setShowTournamentModal(false)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 text-center space-y-2">
+              <QrCode className="w-16 h-16 mx-auto text-lime-400" />
+              <p className="text-xs font-black text-white">Yape o Plin al: 964-000000</p>
+              <p className="text-[11px] text-slate-400">Monto: S/ {precioTorneo}.00 (Titular: Tenis Huancayo)</p>
+            </div>
+
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Realiza el pago y envía tu constancia por WhatsApp para validar tu cupo y asignarte el cuadro.
+            </p>
+
+            <a
+              href={`https://wa.me/51964000000?text=Hola,%20adjunto%20mi%20comprobante%20de%20S/%20${precioTorneo}%20para%20el%20Torneo`}
+              target="_blank"
+              rel="noreferrer"
+              className="block w-full text-center bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-3 rounded-xl text-xs transition"
+            >
+              Enviar Constancia al WhatsApp
+            </a>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Panel Admin */}
+      {showAdminModal && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-base font-black text-white flex items-center gap-1.5">
+                <Shield className="w-4 h-4 text-lime-400" /> Panel de Control
+              </h3>
+              <button onClick={() => { setShowAdminModal(false); setIsAdminAuth(false); }} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {!isAdminAuth ? (
+              <form onSubmit={handleVerifyAdmin} className="space-y-3">
+                <p className="text-xs text-slate-400">Clave de organizador:</p>
+                <input
+                  type="password"
+                  placeholder="PIN (1234)"
+                  value={adminPin}
+                  onChange={(e) => setAdminPin(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-center text-lg tracking-widest text-lime-400 font-mono focus:outline-none focus:border-lime-400"
+                />
+                <button
+                  type="submit"
+                  className="w-full bg-lime-400 hover:bg-lime-300 text-slate-950 font-black py-2.5 rounded-xl text-xs"
+                >
+                  Entrar
+                </button>
+              </form>
+            ) : (
+              <div className="space-y-4">
+                <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 space-y-2">
+                  <span className="text-[10px] font-bold uppercase text-lime-400">Simulador de Ingresos</span>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <span className="text-slate-500 block">Inscritos estimados:</span>
+                      <span className="font-bold text-white">16 jugadores</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block">Recaudación Bruta:</span>
+                      <span className="font-bold text-emerald-400 font-mono">S/ {16 * precioTorneo}.00</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <a
+                    href="https://supabase.com"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block w-full bg-slate-800 hover:bg-slate-750 text-slate-200 text-xs font-bold py-2.5 rounded-xl text-left px-3.5 border border-slate-700"
+                  >
+                    Base de Datos Supabase ↗
+                  </a>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Navegación Inferior */}
+      <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-slate-900/95 backdrop-blur-md border-t border-slate-800 flex justify-around py-3 px-1 z-40">
+        <button 
+          onClick={() => setTab('ranking')} 
+          className={`flex flex-col items-center text-[10px] transition ${tab === 'ranking' ? 'text-lime-400 font-black' : 'text-slate-400'}`}
+        >
+          <Trophy className="w-4 h-4 mb-1" />
+          Ranking
+        </button>
+        <button 
+          onClick={() => setTab('perfil')} 
+          className={`flex flex-col items-center text-[10px] transition ${tab === 'perfil' ? 'text-lime-400 font-black' : 'text-slate-400'}`}
+        >
+          <User className="w-4 h-4 mb-1" />
+          Mi Perfil
+        </button>
+        <button 
+          onClick={() => setTab('match')} 
+          className={`flex flex-col items-center text-[10px] transition ${tab === 'match' ? 'text-lime-400 font-black' : 'text-slate-400'}`}
+        >
+          <Swords className="w-4 h-4 mb-1" />
+          Retos
+        </button>
+        <button 
+          onClick={() => setTab('clubs')} 
+          className={`flex flex-col items-center text-[10px] transition ${tab === 'clubs' ? 'text-lime-400 font-black' : 'text-slate-400'}`}
+        >
+          <MapPin className="w-4 h-4 mb-1" />
+          Canchas
+        </button>
+        <button 
+          onClick={() => setTab('torneos')} 
+          className={`flex flex-col items-center text-[10px] transition ${tab === 'torneos' ? 'text-lime-400 font-black' : 'text-slate-400'}`}
+        >
+          <Calendar className="w-4 h-4 mb-1" />
+          Torneos
+        </button>
+      </nav>
+
+    </div>
+  );
+}
