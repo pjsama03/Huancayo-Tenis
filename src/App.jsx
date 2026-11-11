@@ -1,3 +1,7 @@
+// ============================================================================
+// MATCHPOINT — CIRCUITO OFICIAL DE TENIS (VERSIÓN PRODUCCIÓN 60-30-10)
+// PARTE 1 DE 3: IMPORTS, ACTIVOS VECTORIALES, DATOS MAESTROS Y COMPONENTES PRO
+// ============================================================================
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Trophy, Swords, MapPin, User, X, Phone, Shield, 
@@ -6,100 +10,122 @@ import {
   Clock, CheckCircle2, Users, ChevronRight, 
   Eye, EyeOff, Bell, Menu, Award, Trash2, 
   MessageSquare, Gift, ShoppingBag, 
-  Download, Check, BookOpen, Crown, GraduationCap, Edit3
+  Download, Check, BookOpen, Crown, GraduationCap, 
+  Edit3, Settings, Star, ArrowLeft
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
 // ============================================================================
-// 1. ACTIVOS VECTORIALES SVG PREMIUM (DISEÑO DETALLADO SIN RECUADROS)
+// 1. ACTIVOS VECTORIALES SVG DE ALTA PRECISIÓN (SIN RECUADROS ARTIFICIALES)
 // ============================================================================
 const SvgTennisBall = ({ className = "w-24 h-24" }) => (
   <svg viewBox="0 0 120 120" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
     <defs>
-      <radialGradient id="ballGrad" cx="35%" cy="30%" r="70%">
+      <radialGradient id="mpBallGrad" cx="35%" cy="30%" r="70%">
         <stop offset="0%" stopColor="#E9FF54" />
         <stop offset="55%" stopColor="#B8E61E" />
         <stop offset="100%" stopColor="#6E9900" />
       </radialGradient>
-      <filter id="ballGlow" x="-20%" y="-20%" width="140%" height="140%">
-        <feDropShadow dx="0" dy="10" stdDeviation="8" floodColor="#B8E61E" floodOpacity="0.35" />
+      <filter id="mpBallGlow" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="0" dy="8" stdDeviation="6" floodColor="#10B981" floodOpacity="0.22" />
       </filter>
     </defs>
-    <circle cx="60" cy="60" r="50" fill="url(#ballGrad)" filter="url(#ballGlow)" />
-    <path d="M23 30 C 48 48, 48 72, 23 90" stroke="#FFFFFF" strokeWidth="5.5" strokeLinecap="round" opacity="0.92" />
-    <path d="M97 30 C 72 48, 72 72, 97 90" stroke="#FFFFFF" strokeWidth="5.5" strokeLinecap="round" opacity="0.92" />
-    <circle cx="60" cy="60" r="50" stroke="#FFFFFF" strokeWidth="1.5" strokeOpacity="0.3" />
+    <circle cx="60" cy="60" r="50" fill="url(#mpBallGrad)" filter="url(#mpBallGlow)" />
+    <path d="M23 30 C 48 48, 48 72, 23 90" stroke="#FFFFFF" strokeWidth="5" strokeLinecap="round" opacity="0.9" />
+    <path d="M97 30 C 72 48, 72 72, 97 90" stroke="#FFFFFF" strokeWidth="5" strokeLinecap="round" opacity="0.9" />
+    <circle cx="60" cy="60" r="50" stroke="#FFFFFF" strokeWidth="1.2" strokeOpacity="0.25" />
   </svg>
 );
 
-const SvgFlame = ({ className = "w-6 h-6" }) => (
+const SvgFlame = ({ className = "w-5 h-5" }) => (
   <svg viewBox="0 0 36 36" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
     <defs>
-      <linearGradient id="flameOuter" x1="18" y1="2" x2="18" y2="34" gradientUnits="userSpaceOnUse">
-        <stop offset="0%" stopColor="#FF9F1C" />
-        <stop offset="50%" stopColor="#FF5400" />
-        <stop offset="100%" stopColor="#D90429" />
+      <linearGradient id="mpFlameOuter" x1="18" y1="2" x2="18" y2="34" gradientUnits="userSpaceOnUse">
+        <stop offset="0%" stopColor="#F59E0B" />
+        <stop offset="55%" stopColor="#EA580C" />
+        <stop offset="100%" stopColor="#DC2626" />
       </linearGradient>
-      <linearGradient id="flameInner" x1="18" y1="12" x2="18" y2="33" gradientUnits="userSpaceOnUse">
-        <stop offset="0%" stopColor="#FFF3B0" />
-        <stop offset="100%" stopColor="#FFBE0B" />
+      <linearGradient id="mpFlameInner" x1="18" y1="12" x2="18" y2="33" gradientUnits="userSpaceOnUse">
+        <stop offset="0%" stopColor="#FEF3C7" />
+        <stop offset="100%" stopColor="#FBBF24" />
       </linearGradient>
     </defs>
-    <path d="M19.5 2.5C19.5 2.5 28.5 10.2 28.5 19.5C28.5 26.8 23.6 32.5 17.5 32.5C11.2 32.5 6.5 27.1 6.5 20C6.5 14.8 9.8 10.3 12.2 8.2C12.2 8.2 11.5 13.2 14.5 14.2C13.2 9.4 16.2 4.8 19.5 2.5Z" fill="url(#flameOuter)" />
-    <path d="M17.8 13.5C17.8 13.5 23.2 18.2 23.2 23.5C23.2 27.9 20.4 31.2 16.8 31.2C13.2 31.2 10.8 28.1 10.8 24.2C10.8 20.9 13.4 18.5 14.8 17C14.8 17 14.5 20.1 16.4 20.6C15.6 17.8 16.4 15.2 17.8 13.5Z" fill="url(#flameInner)" />
+    <path d="M19.5 2.5C19.5 2.5 28.5 10.2 28.5 19.5C28.5 26.8 23.6 32.5 17.5 32.5C11.2 32.5 6.5 27.1 6.5 20C6.5 14.8 9.8 10.3 12.2 8.2C12.2 8.2 11.5 13.2 14.5 14.2C13.2 9.4 16.2 4.8 19.5 2.5Z" fill="url(#mpFlameOuter)" />
+    <path d="M17.8 13.5C17.8 13.5 23.2 18.2 23.2 23.5C23.2 27.9 20.4 31.2 16.8 31.2C13.2 31.2 10.8 28.1 10.8 24.2C10.8 20.9 13.4 18.5 14.8 17C14.8 17 14.5 20.1 16.4 20.6C15.6 17.8 16.4 15.2 17.8 13.5Z" fill="url(#mpFlameInner)" />
   </svg>
 );
 
 const SvgMedal = ({ rank = 1, className = "w-7 h-7" }) => {
-  const colors = {
-    1: { top: '#FFE066', bot: '#D97706', rim: '#FEF08A', ribbon: '#E11D48', text: '#451A03' },
-    2: { top: '#F4F4F5', bot: '#71717A', rim: '#FFFFFF', ribbon: '#2563EB', text: '#18181B' },
-    3: { top: '#FDBA74', bot: '#9A3412', rim: '#FED7AA', ribbon: '#059669', text: '#431407' }
-  }[rank] || { top: '#FFE066', bot: '#D97706', rim: '#FEF08A', ribbon: '#E11D48', text: '#451A03' };
+  const palette = {
+    1: { top: '#FDE047', bot: '#CA8A04', rim: '#FEF08A', text: '#422006' },
+    2: { top: '#E4E4E7', bot: '#71717A', rim: '#FAFAFA', text: '#18181B' },
+    3: { top: '#FDBA74', bot: '#9A3412', rim: '#FED7AA', text: '#431407' }
+  }[rank] || { top: '#FDE047', bot: '#CA8A04', rim: '#FEF08A', text: '#422006' };
 
   return (
     <svg viewBox="0 0 40 40" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M12 4L17 16H10L7 4H12Z" fill={colors.ribbon} />
-      <path d="M28 4L23 16H30L33 4H28Z" fill={colors.ribbon} />
-      <circle cx="20" cy="24" r="12" fill={colors.top} stroke={colors.rim} strokeWidth="2" />
-      <circle cx="20" cy="24" r="9" fill={colors.bot} fillOpacity="0.25" />
-      <text x="20" y="28" textAnchor="middle" fill={colors.text} fontSize="12" fontWeight="900" fontFamily="sans-serif">
+      <path d="M13 5L17.5 15H11L8.5 5H13Z" fill="#D96B43" opacity="0.85" />
+      <path d="M27 5L22.5 15H29L31.5 5H27Z" fill="#D96B43" opacity="0.85" />
+      <circle cx="20" cy="24" r="11.5" fill={palette.top} stroke={palette.rim} strokeWidth="1.5" />
+      <circle cx="20" cy="24" r="8.5" fill={palette.bot} fillOpacity="0.25" />
+      <text x="20" y="28" textAnchor="middle" fill={palette.text} fontSize="11.5" fontWeight="900" fontFamily="Outfit, sans-serif">
         {rank}
       </text>
     </svg>
   );
 };
 
-const SvgTrophy = ({ className = "w-7 h-7" }) => (
+const SvgTrophy = ({ className = "w-6 h-6" }) => (
   <svg viewBox="0 0 40 40" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
     <defs>
-      <linearGradient id="trophyGold" x1="8" y1="6" x2="32" y2="34" gradientUnits="userSpaceOnUse">
+      <linearGradient id="mpTrophyGold" x1="8" y1="6" x2="32" y2="34" gradientUnits="userSpaceOnUse">
         <stop offset="0%" stopColor="#FDE047" />
-        <stop offset="55%" stopColor="#F59E0B" />
-        <stop offset="100%" stopColor="#B45309" />
+        <stop offset="55%" stopColor="#EAB308" />
+        <stop offset="100%" stopColor="#A16207" />
       </linearGradient>
     </defs>
-    <path d="M11 8H29V17C29 22.5 25 26.5 20 26.5C15 26.5 11 22.5 11 17V8Z" fill="url(#trophyGold)" />
-    <path d="M11 10H6V15C6 18.5 8.5 20.5 11 20.5" stroke="#F59E0B" strokeWidth="2.8" strokeLinecap="round" />
-    <path d="M29 10H34V15C34 18.5 31.5 20.5 29 20.5" stroke="#F59E0B" strokeWidth="2.8" strokeLinecap="round" />
-    <rect x="17.5" y="26" width="5" height="6" rx="1" fill="#D97706" />
-    <rect x="12" y="32" width="16" height="4" rx="2" fill="url(#trophyGold)" />
+    <path d="M11 8H29V17C29 22.5 25 26.5 20 26.5C15 26.5 11 22.5 11 17V8Z" fill="url(#mpTrophyGold)" />
+    <path d="M11 10H6.5V15C6.5 18.2 8.5 20 11 20" stroke="#EAB308" strokeWidth="2.5" strokeLinecap="round" />
+    <path d="M29 10H33.5V15C33.5 18.2 31.5 20 29 20" stroke="#EAB308" strokeWidth="2.5" strokeLinecap="round" />
+    <rect x="17.5" y="26" width="5" height="6" rx="1" fill="#CA8A04" />
+    <rect x="12.5" y="32" width="15" height="3.5" rx="1.75" fill="url(#mpTrophyGold)" />
+  </svg>
+);
+
+// Trama arquitectónica de cancha de tenis para cabeceras y Carnet VIP
+const SvgCourtLinesBg = ({ className = "w-full h-full opacity-[0.04]" }) => (
+  <svg viewBox="0 0 400 200" className={className} fill="none" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+    <rect x="20" y="15" width="360" height="170" stroke="#FFFFFF" strokeWidth="2" />
+    <line x1="20" y1="38" x2="380" y2="38" stroke="#FFFFFF" strokeWidth="1.5" />
+    <line x1="20" y1="162" x2="380" y2="162" stroke="#FFFFFF" strokeWidth="1.5" />
+    <line x1="200" y1="15" x2="200" y2="185" stroke="#FFFFFF" strokeWidth="2" strokeDasharray="4 4" />
+    <line x1="110" y1="38" x2="110" y2="162" stroke="#FFFFFF" strokeWidth="1.5" />
+    <line x1="290" y1="38" x2="290" y2="162" stroke="#FFFFFF" strokeWidth="1.5" />
+    <line x1="110" y1="100" x2="290" y2="100" stroke="#FFFFFF" strokeWidth="1.5" />
   </svg>
 );
 
 // ============================================================================
-// 2. TIPS DE TENIS ROTATIVOS (ESTILO VIDEOJUEGO EN PANTALLAS Y TRANSICIONES)
+// 2. MENSAJES EMOTIVOS EN MOMENTOS CRUCIALES (SIN MARQUESINA EN EL HEADER)
 // ============================================================================
-const TIPS_DE_TENIS = [
-  "💡 Tip de Cancha: En el segundo saque, busca altura y efecto sobre la red antes que velocidad.",
-  "💡 Táctica Pro: En arcilla, inicia el deslizamiento antes de golpear la pelota, nunca después.",
-  "💡 Estrategia: Juega cruzado para construir el punto y cambia paralelo cuando entres dentro de la cancha.",
-  "💡 Mentalidad: Juega cada punto como si fuera 0-0; el punto anterior ya quedó atrás.",
-  "💡 Físico: Hidrátate en cada cambio de lado con pequeños sorbos antes de sentir sed."
-];
+const FRASES_MOMENTOS_CRUCIALES = {
+  victoria: [
+    "Gran cierre de partido. La constancia en los puntos importantes marca la diferencia en el circuito.",
+    "Victoria oficial sumada. Descansa el brazo, hidrátate bien y prepara tu próximo ascenso en la tabla.",
+    "Triunfo sólido en cancha. Mantén el enfoque y defiende tu racha en el siguiente desafío."
+  ],
+  derrota: [
+    "El tenis da revanchas cada semana. Analiza los momentos clave del set y vuelve más firme a la cancha.",
+    "Todo partido disputado suma experiencia y ritmo de competencia. Tu próximo desafío ya te espera.",
+    "Los mejores tenistas del circuito se forjan en los partidos más duros. ¡A levantar cabeza y seguir jugando!"
+  ],
+  calibracionCompleta: [
+    "¡Has completado tus 5 partidos oficiales de calibración! Tu categoría oficial ha sido desbloqueada en el circuito."
+  ]
+};
 
 // ============================================================================
-// 3. COMPRESIÓN DE IMÁGENES EN CLIENTE
+// 3. UTILIDAD DE COMPRESIÓN DE IMÁGENES EN CLIENTE (COSTO CERO)
 // ============================================================================
 const compressImage = (file) => {
   return new Promise((resolve, reject) => {
@@ -119,8 +145,8 @@ const compressImage = (file) => {
         canvas.toBlob((blob) => {
           if (!blob) return reject(new Error('Error al procesar imagen'));
           const newFile = new File([blob], `avatar_${Date.now()}.jpg`, { type: 'image/jpeg' });
-          resolve({ file: newFile, preview: canvas.toDataURL('image/jpeg', 0.8) });
-        }, 'image/jpeg', 0.8);
+          resolve({ file: newFile, preview: canvas.toDataURL('image/jpeg', 0.82) });
+        }, 'image/jpeg', 0.82);
       };
       img.onerror = reject;
     };
@@ -129,76 +155,74 @@ const compressImage = (file) => {
 };
 
 // ============================================================================
-// 4. ESCALA DE CATEGORÍAS Y 4 PREGUNTAS DIRECTAS (4 OPCIONES + NIVEL CERO)
+// 4. ESCALA DE CATEGORÍAS Y 4 PREGUNTAS DIRECTAS (SIN COLORES CHILLONES)
 // ============================================================================
 const ESCALA_CATEGORIAS = [
-  { id: '5ª P', nombre: '5ª P · Principiante', min: 0, max: 600, badge: 'Iniciación', color: 'text-amber-300 border-amber-500/40 bg-amber-500/15' },
-  { id: '5ª B', nombre: '5ª B · Inicial', min: 601, max: 1200, badge: 'Intermedio Bajo', color: 'text-orange-300 border-orange-400/40 bg-orange-400/15' },
-  { id: '5ª A', nombre: '5ª A · Consolidado', min: 1201, max: 1800, badge: 'Intermedio', color: 'text-sky-300 border-sky-400/40 bg-sky-400/15' },
-  { id: '4ª', nombre: '4ª Categoría', min: 1801, max: 2800, badge: 'Competitivo Regular', color: 'text-zinc-100 border-zinc-400/50 bg-zinc-400/15' },
-  { id: '3ª', nombre: '3ª Categoría', min: 2801, max: 3800, badge: 'Nivel Máximo Local', color: 'text-yellow-300 border-yellow-400/50 bg-yellow-400/15' },
-  { id: '2ª', nombre: '2ª Categoría', min: 3801, max: 4800, badge: 'Zafiro Nacional', color: 'text-cyan-300 border-cyan-400/50 bg-cyan-400/15' },
-  { id: '1ª', nombre: '1ª Categoría', min: 4801, max: 6000, badge: 'Corona Pro', color: 'text-emerald-300 border-emerald-400/50 bg-emerald-400/15' }
+  { id: '5ª P', nombre: '5ª P · Principiante', min: 0, max: 600, badge: 'Iniciación' },
+  { id: '5ª B', nombre: '5ª B · Inicial', min: 601, max: 1200, badge: 'Regular Inicial' },
+  { id: '5ª A', nombre: '5ª A · Consolidado', min: 1201, max: 1800, badge: 'Intermedio' },
+  { id: '4ª', nombre: '4ª Categoría', min: 1801, max: 2800, badge: 'Avanzado de Club' },
+  { id: '3ª', nombre: '3ª Categoría', min: 2801, max: 3800, badge: 'Primera Fuerza Local' },
+  { id: '2ª', nombre: '2ª Categoría', min: 3801, max: 4800, badge: 'Élite Regional' },
+  { id: '1ª', nombre: '1ª Categoría', min: 4801, max: 6000, badge: 'Máster Pro' }
 ];
 
 const getInfoCategoria = (puntos = 1000) => {
   return ESCALA_CATEGORIAS.find(c => puntos >= c.min && puntos <= c.max) || ESCALA_CATEGORIAS[6];
 };
 
-// 4 PREGUNTAS DIRECTAS, NATURALES Y CON OPCIÓN "EMPIEZO DE CERO"
 const FLASH_CARDS_4_OPCIONES = [
   {
     paso: 1,
-    titulo: 'Experiencia en el Tenis',
+    titulo: 'Experiencia en Cancha',
     pregunta: '¿Cuál es tu experiencia actual jugando al tenis?',
-    ejemplo: '💡 Si recién vas a empezar desde cero, marca la primera opción sin problema.',
+    nota: 'Si estás empezando desde cero, elige la primera opción para ubicarte con rivales de iniciación.',
     escala: [
-      { valor: 1, label: '1 · Empiezo de cero: No sé nada de tenis o recién voy a aprender' },
-      { valor: 2, label: '2 · Principiante: Peloteo suave de vez en cuando con amigos' },
-      { valor: 3, label: '3 · Intermedio: Juego seguido y mantengo peloteos largos de fondo' },
-      { valor: 4, label: '4 · Avanzado: Juego hace años, entreno fuerte y compito en torneos' }
+      { valor: 1, label: 'Empiezo de cero: No sé nada de tenis o recién voy a tomar clases' },
+      { valor: 2, label: 'Principiante: Peloteo suave de vez en cuando con amigos' },
+      { valor: 3, label: 'Intermedio: Juego seguido y mantengo peloteos largos de fondo' },
+      { valor: 4, label: 'Avanzado: Juego hace años, entreno firme y compito en torneos' }
     ]
   },
   {
     paso: 2,
     titulo: 'Al Momento de Sacar',
     pregunta: 'Al momento de sacar, ¿cómo es tu servicio?',
-    ejemplo: '💡 El saque define qué tan parejos serán tus primeros partidos.',
+    nota: 'Tu regularidad con el saque nos permite emparejarte en partidos equilibrados.',
     escala: [
-      { valor: 1, label: '1 · Aún no sé sacar: Recién estoy aprendiendo el movimiento' },
-      { valor: 2, label: '2 · Saque suave: Solo busco pasar la pelota para no hacer doble falta' },
-      { valor: 3, label: '3 · Saque seguro: Buen primer saque y segundo saque constante' },
-      { valor: 4, label: '4 · Saque de ataque: Saco fuerte, colocado a las esquinas y con efecto' }
+      { valor: 1, label: 'Aún no sé sacar: Recién estoy aprendiendo el movimiento' },
+      { valor: 2, label: 'Saque suave: Solo busco pasar la pelota para no hacer doble falta' },
+      { valor: 3, label: 'Saque seguro: Buen primer saque y segundo saque constante' },
+      { valor: 4, label: 'Saque de ataque: Saco fuerte, colocado a las esquinas y con efecto' }
     ]
   },
   {
     paso: 3,
-    titulo: 'Golpes y Efectos (Topspin y Slice)',
-    pregunta: '¿Dominas efectos como el Topspin (con giro hacia adelante) o el Slice (cortado)?',
-    ejemplo: '💡 Saber si golpeas plano o con efecto nos ayuda a ubicarte con precisión.',
+    titulo: 'Control de Golpes y Efectos',
+    pregunta: '¿Dominas efectos como el Topspin (con giro) o el Slice (cortado)?',
+    nota: 'Nos ayuda a diferenciar el juego recreativo del juego competitivo de club.',
     escala: [
-      { valor: 1, label: '1 · No sé qué son: Recién estoy aprendiendo a golpear la pelota' },
-      { valor: 2, label: '2 · Golpeo plano: Sé qué son, pero pego casi siempre plano por seguridad' },
-      { valor: 3, label: '3 · Los uso bien: Pego con topspin de fondo y uso slice para defenderme' },
-      { valor: 4, label: '4 · Dominio total: Controlo topspin pesado, slice, globos y voleas en la red' }
+      { valor: 1, label: 'No sé qué son: Recién estoy aprendiendo a impactar la pelota' },
+      { valor: 2, label: 'Golpeo plano: Sé qué son, pero pego casi siempre plano por seguridad' },
+      { valor: 3, label: 'Los uso bien: Pego con topspin de fondo y uso slice para defenderme' },
+      { valor: 4, label: 'Dominio completo: Controlo topspin pesado, slice, globos y voleas' }
     ]
   },
   {
     paso: 4,
     titulo: 'Partidos a Sets Completos',
-    pregunta: '¿Qué tanta costumbre tienes jugando partidos con puntaje oficial (15, 30, 40, Set)?',
-    ejemplo: '💡 Recuerda que tu categoría estará protegida durante tus primeros 5 partidos.',
+    pregunta: '¿Qué tanta costumbre tienes jugando sets con puntaje oficial (15, 30, 40, Set)?',
+    nota: 'Tu categoría estará protegida durante tus primeros 5 partidos mientras se calibra tu nivel.',
     escala: [
-      { valor: 1, label: '1 · Ninguna aún: Todavía no he jugado sets o estoy aprendiendo a contar' },
-      { valor: 2, label: '2 · Poca: Juego sets amistosos ocasionales sin tanta exigencia' },
-      { valor: 3, label: '3 · Frecuente: Juego partidos completos casi todas las semanas' },
-      { valor: 4, label: '4 · Nivel Torneo: He competido en campeonatos llegando a rondas finales' }
+      { valor: 1, label: 'Ninguna aún: Todavía no he jugado sets o estoy aprendiendo a contar' },
+      { valor: 2, label: 'Poca: Juego sets amistosos ocasionales sin tanta exigencia física' },
+      { valor: 3, label: 'Frecuente: Juego partidos completos casi todas las semanas' },
+      { valor: 4, label: 'Nivel Torneo: He competido en campeonatos llegando a rondas finales' }
     ]
   }
 ];
 
 const calcularPuntos4Opciones = (respuestas) => {
-  // Suma de 4 preguntas con valores de 1 a 4 -> base de 0 a 12
   const pts = respuestas.reduce((a, b) => a + (b - 1), 0);
   if (pts <= 2) return { elo: 350 + pts * 60, cat: '5ª P' };
   if (pts <= 5) return { elo: 720 + (pts - 3) * 120, cat: '5ª B' };
@@ -227,15 +251,21 @@ const calcularFactorDominio = (scoreStr) => {
     if (margen >= 0.70) return { fd: 1.8, label: 'Victoria Contundente' };
     if (margen >= 0.40) return { fd: 1.35, label: 'Victoria Clara' };
     if (margen >= 0.18) return { fd: 1.0, label: 'Resultado Estándar' };
-    return { fd: 0.5, label: 'Duelo Muy Parejo' };
+    return { fd: 0.5, label: 'Encuentro Muy Parejo' };
   } catch {
     return { fd: 1.0, label: 'Resultado Estándar' };
   }
 };
 
 // ============================================================================
-// 5. SEDES, PROFESORES, TORNEOS, SALÓN DE LA FAMA Y TIENDA OFICIAL
+// 5. DATOS DE SEDES, MARKETPLACE COACH PRO, TORNEOS EN VIVO Y PATROCINADORES
 // ============================================================================
+const PATROCINADORES_INICIALES = {
+  torneoPrincipal: 'Wilson & Gatorade Huancayo',
+  pelotaOficial: 'Wilson Roland Garros All Court',
+  clinicaAliada: 'Centro Fisioterapia ProSport'
+};
+
 const SEDES_CLUB_PRO = [
   {
     id: 'club-country',
@@ -243,9 +273,10 @@ const SEDES_CLUB_PRO = [
     canchas: '3 Canchas de Arcilla Reglamentarias',
     zona: 'El Tambo',
     tel: '964123456',
-    servicios: ['Iluminación Nocturna', 'Cafetería & Restaurante', 'Vestuarios', 'Estacionamiento'],
-    beneficioMatchpoint: '15% de descuento en alquiler de cancha en horario valle (10:00 a 15:00) presentando tu Carnet Matchpoint.',
-    sponsorBadge: 'CLUB PRO ALIADO',
+    servicios: ['Iluminación Nocturna', 'Restaurante', 'Vestuarios', 'Estacionamiento'],
+    beneficioMatchpoint: '15% de descuento en alquiler de cancha en horario valle (10:00 a 15:00) presentando tu Carnet VIP Matchpoint.',
+    sponsorBadge: 'SEDE OFICIAL',
+    pelotaSponsor: 'Canchas provistas con pelotas Wilson Roland Garros',
     img: 'https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?auto=format&fit=crop&w=900&q=80'
   },
   {
@@ -256,7 +287,8 @@ const SEDES_CLUB_PRO = [
     tel: '954987654',
     servicios: ['100% Techadas', 'Iluminación LED', 'Encordado Express', 'Tribuna'],
     beneficioMatchpoint: 'Prioridad de reserva en días de lluvia para partidos oficiales del ranking.',
-    sponsorBadge: 'CLUB PRO TECHADO',
+    sponsorBadge: 'SEDE TECHADA',
+    pelotaSponsor: 'Iluminación y mantenimiento respaldado por Babolat Perú',
     img: 'https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?auto=format&fit=crop&w=900&q=80'
   },
   {
@@ -266,8 +298,9 @@ const SEDES_CLUB_PRO = [
     zona: 'Huancayo Este',
     tel: '999555444',
     servicios: ['Academia Formativa', 'Canasto de Pelotas', 'Alquiler de Raquetas', 'Kiosco'],
-    beneficioMatchpoint: '20% de descuento en tu primera clase de evaluación técnica.',
-    sponsorBadge: 'SEDE ACADEMIA PRO',
+    beneficioMatchpoint: '20% de descuento en tu primera sesión de diagnóstico técnico.',
+    sponsorBadge: 'SEDE FORMATIVA',
+    pelotaSponsor: 'Hidratación oficial Powerade & Gatorade en sede',
     img: 'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?auto=format&fit=crop&w=900&q=80'
   },
   {
@@ -278,7 +311,8 @@ const SEDES_CLUB_PRO = [
     tel: '988333222',
     servicios: ['Doble Superficie', 'Iluminación', 'Parqueo Privado'],
     beneficioMatchpoint: 'Préstamo de tubo de pelotas sin costo al reservar 2 horas continuas para retos.',
-    sponsorBadge: 'CLUB PRO ASOCIADO',
+    sponsorBadge: 'CLUB ASOCIADO',
+    pelotaSponsor: 'Superficie mantenida junto a ProShop Huancayo',
     img: 'https://images.unsplash.com/photo-1587280501635-68a0e82cd5ff?auto=format&fit=crop&w=900&q=80'
   }
 ];
@@ -286,27 +320,66 @@ const SEDES_CLUB_PRO = [
 const PROFESORES_INICIALES = [
   {
     id: 'prof-1',
-    nombre: 'Prof. Rodrigo Quispe',
-    especialidad: 'Alta Competencia, Técnica de Saque y Estrategia',
-    niveles: 'Todos los niveles (5ª P hasta 3ª)',
-    sede: 'Country Club Huancayo / Academia Romina Cutipa',
-    tarifa: 'S/ 50 / hora individual',
+    nombre: 'Rodrigo Quispe',
+    certificacion: 'Coach Nivel ITF · Ex N°1 Regional',
+    rating: '4.9',
+    resenasCount: 34,
+    horasImpartidas: '+420h',
+    tarifaBase: 50,
+    sede: 'Country Club Huancayo · Academia Romina',
     tel: '944889900',
-    destacado: 'Coach Pro Verificado',
     activo: true,
-    foto: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80'
+    nichos: ['Adultos +40', 'Biomecánica de Saque', 'Táctica de Singles'],
+    bioCorta: 'Especialista en corrección técnica para jugadores de club y preparación táctica para torneos.',
+    fotoAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+    fotoBanner: 'https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?auto=format&fit=crop&w=900&q=80',
+    programas: [
+      { id: 'p1', titulo: 'Sesión Individual 1 a 1', detalle: '60 min · Corrección de golpes y peloteo intensivo con canasto', precio: 'S/ 50' },
+      { id: 'p2', titulo: 'Pack 4 Clases · Subida de Categoría', detalle: '4 horas al mes · Plan táctico para pasar de 5ª a 4ª categoría', precio: 'S/ 180' },
+      { id: 'p3', titulo: 'Clínica Grupal Senior +40 (Sábados)', detalle: '90 min · Máximo 4 jugadores · Juego de red, dobles y colocación', precio: 'S/ 35 / alumno' }
+    ],
+    turnosLibres: [
+      { id: 't1', dia: 'Mañana', hora: '08:00 AM', club: 'Country Club', disponible: true },
+      { id: 't2', dia: 'Mañana', hora: '10:00 AM', club: 'Country Club', disponible: true },
+      { id: 't3', dia: 'Jueves', hora: '07:00 PM', club: 'Academia Romina', disponible: true },
+      { id: 't4', dia: 'Sábado', hora: '09:00 AM', club: 'Country Club', disponible: true },
+      { id: 't5', dia: 'Sábado', hora: '04:00 PM', club: 'Country Club', disponible: true }
+    ],
+    resenas: [
+      { autor: 'Alejandro Tovar (+40)', texto: 'Corrigió mi segundo saque en dos sesiones. Muy claro para explicar.', estrellas: 5 },
+      { autor: 'Mateo Samaniego (Cat. 4ª)', texto: 'Excelentes ejercicios de ritmo de fondo y subida a la red.', estrellas: 5 }
+    ]
   },
   {
     id: 'prof-2',
-    nombre: 'Prof. Romina Cutipa',
-    especialidad: 'Iniciación para Adultos, Damas y Técnica Base',
-    niveles: 'Especialista en 5ª P, 5ª B y 5ª A',
+    nombre: 'Romina Cutipa',
+    certificacion: 'Directora de Academia · Coach FPT',
+    rating: '5.0',
+    resenasCount: 41,
+    horasImpartidas: '+650h',
+    tarifaBase: 45,
     sede: 'Academia Romina Cutipa',
-    tarifa: 'S/ 45 / hora individual · Grupal disponible',
     tel: '999555444',
-    destacado: 'Directora de Academia Aliada',
     activo: true,
-    foto: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80'
+    nichos: ['Iniciación desde Cero', 'Rama Damas', 'Grupos Formativos'],
+    bioCorta: 'Metodología paso a paso ideal para adultos que empiezan de cero y jugadoras que buscan competir.',
+    fotoAvatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80',
+    fotoBanner: 'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?auto=format&fit=crop&w=900&q=80',
+    programas: [
+      { id: 'r1', titulo: 'Clase Particular de Diagnóstico', detalle: '60 min · Incluye préstamo de raqueta y canasto de pelotas', precio: 'S/ 45' },
+      { id: 'r2', titulo: 'Programa "De Cero a tu Primer Set"', detalle: '4 sesiones · Aprende derecha, revés, saque y conteo oficial', precio: 'S/ 160' },
+      { id: 'r3', titulo: 'Grupo Oficial Damas (Mar / Jue)', detalle: 'Turnos mañana y noche · Técnica, movilidad y partidos guiados', precio: 'S/ 150 / mes' }
+    ],
+    turnosLibres: [
+      { id: 'tr1', dia: 'Hoy', hora: '05:00 PM', club: 'Academia Romina', disponible: true },
+      { id: 'tr2', dia: 'Mañana', hora: '09:00 AM', club: 'Academia Romina', disponible: true },
+      { id: 'tr3', dia: 'Viernes', hora: '06:00 PM', club: 'Academia Romina', disponible: true },
+      { id: 'tr4', dia: 'Sábado', hora: '11:00 AM', club: 'Academia Romina', disponible: true }
+    ],
+    resenas: [
+      { autor: 'Claudia Soto (Damas)', texto: 'Empecé sin saber agarrar la raqueta y hoy ya juego mis primeros torneos.', estrellas: 5 },
+      { autor: 'Ernesto Velarde (5ª P)', texto: 'Paciencia total y clases súper dinámicas.', estrellas: 5 }
+    ]
   }
 ];
 
@@ -323,113 +396,145 @@ const SALON_DE_LA_FAMA_HISTORICO = [
   }
 ];
 
+// TORNEOS DINÁMICOS CON 3 ETAPAS VIVAS Y CUADROS DE ELIMINATORIA (BRACKETS)
 const TORNEOS_INICIALES = [
   {
     id: 't-3a',
     cat: '3ª',
-    titulo: 'Copa Apertura · 3ª Categoría',
-    subtitulo: 'Nivel Máximo Local · Cuadro de Maestros',
+    titulo: 'Abierto de Huancayo · 3ª Categoría',
+    subtitulo: 'Cuadro de Maestros · Eliminatoria Directa + Consuelo',
+    sponsor: 'Wilson & Gatorade',
     sede: 'Country Club Huancayo',
     fecha: '21 y 22 de Noviembre',
     precio: 45,
     min: 8,
     maxCupos: 16,
+    estadoTorneo: 'en_juego', // 'inscripciones' | 'en_juego' | 'finalizado'
     img: 'https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?auto=format&fit=crop&w=800&q=80',
     participantes: [
-      { nombre: 'Carlos Mendoza', club: 'Country Club Huancayo', pts: 1620 },
-      { nombre: 'Renato Vilchez', club: 'Club Tauro Tenis', pts: 1580 },
-      { nombre: 'Diego Cárdenas', club: 'Academia Romina Cutipa', pts: 1490 },
-      { nombre: 'Alejandro Tovar', club: 'Country Club Huancayo', pts: 1450 },
-      { nombre: 'Gonzalo Palacios', club: 'Complejo Shyam Huilca', pts: 1380 },
-      { nombre: 'Mateo Samaniego', club: 'Independiente', pts: 1340 },
-      { nombre: 'Sebastián Romero', club: 'Club Tauro Tenis', pts: 1260 },
-      { nombre: 'Rodrigo Quispe', club: 'Country Club Huancayo', pts: 1220 }
-    ]
+      { nombre: 'Carlos Mendoza', club: 'Country Club Huancayo', pts: 3120 },
+      { nombre: 'Renato Vilchez', club: 'Club Tauro Tenis', pts: 2980 },
+      { nombre: 'Diego Cárdenas', club: 'Academia Romina Cutipa', pts: 2890 },
+      { nombre: 'Alejandro Tovar', club: 'Country Club Huancayo', pts: 2850 },
+      { nombre: 'Gonzalo Palacios', club: 'Complejo Shyam Huilca', pts: 2780 },
+      { nombre: 'Mateo Samaniego', club: 'Country Club Huancayo', pts: 2740 },
+      { nombre: 'Sebastián Romero', club: 'Club Tauro Tenis', pts: 2660 },
+      { nombre: 'Rodrigo Quispe', club: 'Country Club Huancayo', pts: 2620 }
+    ],
+    brackets: {
+      cuartos: [
+        { id: 'qf1', j1: '#1 Carlos Mendoza', j2: '#8 Rodrigo Quispe', cancha: 'Cancha 1 · Sáb 09:00', score: '6-3, 6-4', ganador: '#1 Carlos Mendoza', perdedor: '#8 Rodrigo Quispe' },
+        { id: 'qf2', j1: '#4 Alejandro Tovar', j2: '#5 Gonzalo Palacios', cancha: 'Cancha 2 · Sáb 09:00', score: '7-5, 6-4', ganador: '#4 Alejandro Tovar', perdedor: '#5 Gonzalo Palacios' },
+        { id: 'qf3', j1: '#3 Diego Cárdenas', j2: '#6 Mateo Samaniego', cancha: 'Cancha 1 · Sáb 11:00', score: 'En Cancha', ganador: null, perdedor: null },
+        { id: 'qf4', j1: '#2 Renato Vilchez', j2: '#7 Sebastián Romero', cancha: 'Cancha 2 · Sáb 11:00', score: 'Programado', ganador: null, perdedor: null }
+      ],
+      semis: [
+        { id: 'sf1', j1: '#1 Carlos Mendoza', j2: '#4 Alejandro Tovar', cancha: 'Cancha Central · Dom 09:30', score: 'Programado', ganador: null },
+        { id: 'sf2', j1: 'Ganador QF3', j2: 'Ganador QF4', cancha: 'Cancha Central · Dom 11:30', score: 'Por Definir', ganador: null }
+      ],
+      final: [
+        { id: 'f1', j1: 'Ganador Semifinal 1', j2: 'Ganador Semifinal 2', cancha: 'Cancha Central · Dom 16:00', score: 'Gran Final', ganador: null }
+      ],
+      consueloSemis: [
+        { id: 'csf1', j1: '#8 Rodrigo Quispe', j2: '#5 Gonzalo Palacios', cancha: 'Cancha 3 · Dom 09:00', score: 'Programado', ganador: null },
+        { id: 'csf2', j1: 'Perdedor QF3', j2: 'Perdedor QF4', cancha: 'Cancha 3 · Dom 10:30', score: 'Por Definir', ganador: null }
+      ],
+      consueloFinal: [
+        { id: 'cf1', j1: 'Ganador Consuelo 1', j2: 'Ganador Consuelo 2', cancha: 'Cancha 2 · Dom 15:00', score: 'Final Consuelo', ganador: null }
+      ]
+    }
   },
   {
     id: 't-4a',
     cat: '4ª',
     titulo: 'Copa Apertura · 4ª Categoría',
     subtitulo: 'Cuadro Principal + Ronda Consuelo Garantizada',
+    sponsor: 'Babolat & ProSport',
     sede: 'Country Club Huancayo',
     fecha: '21 y 22 de Noviembre',
     precio: 40,
     min: 8,
     maxCupos: 16,
+    estadoTorneo: 'inscripciones',
     img: 'https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?auto=format&fit=crop&w=800&q=80',
     participantes: [
-      { nombre: 'Gonzalo Palacios', club: 'Complejo Shyam Huilca', pts: 1380 },
-      { nombre: 'Mateo Samaniego', club: 'Independiente', pts: 1340 },
-      { nombre: 'Sebastián Romero', club: 'Club Tauro Tenis', pts: 1260 },
-      { nombre: 'Rodrigo Quispe', club: 'Country Club Huancayo', pts: 1220 },
-      { nombre: 'Franco Huamán', club: 'Academia Romina Cutipa', pts: 1180 },
-      { nombre: 'Martín Santillán', club: 'Country Club Huancayo', pts: 1920 },
-      { nombre: 'Jorge Villavicencio', club: 'Club Tauro Tenis', pts: 1890 },
-      { nombre: 'Luis Fernando Paz', club: 'Independiente', pts: 1850 }
-    ]
+      { nombre: 'Martín Santillán', club: 'Country Club Huancayo', pts: 2420 },
+      { nombre: 'Jorge Villavicencio', club: 'Club Tauro Tenis', pts: 2390 },
+      { nombre: 'Luis Fernando Paz', club: 'Independiente', pts: 2250 },
+      { nombre: 'Gonzalo Palacios', club: 'Complejo Shyam Huilca', pts: 2180 },
+      { nombre: 'Mateo Samaniego', club: 'Country Club Huancayo', pts: 2140 },
+      { nombre: 'Sebastián Romero', club: 'Club Tauro Tenis', pts: 2060 },
+      { nombre: 'Franco Huamán', club: 'Academia Romina Cutipa', pts: 1980 },
+      { nombre: 'Héctor Baldeón', club: 'Club Tauro Tenis', pts: 1910 }
+    ],
+    brackets: {
+      cuartos: [
+        { id: 'qf1', j1: '#1 Martín Santillán', j2: '#8 Héctor Baldeón', cancha: 'Sáb 10:00', score: 'Programado', ganador: null, perdedor: null },
+        { id: 'qf2', j1: '#4 Gonzalo Palacios', j2: '#5 Mateo Samaniego', cancha: 'Sáb 10:00', score: 'Programado', ganador: null, perdedor: null },
+        { id: 'qf3', j1: '#3 Luis Fernando Paz', j2: '#6 Sebastián Romero', cancha: 'Sáb 12:00', score: 'Programado', ganador: null, perdedor: null },
+        { id: 'qf4', j1: '#2 Jorge Villavicencio', j2: '#7 Franco Huamán', cancha: 'Sáb 12:00', score: 'Programado', ganador: null, perdedor: null }
+      ],
+      semis: [
+        { id: 'sf1', j1: 'Ganador QF1', j2: 'Ganador QF2', cancha: 'Dom 10:00', score: 'Por Definir', ganador: null },
+        { id: 'sf2', j1: 'Ganador QF3', j2: 'Ganador QF4', cancha: 'Dom 11:30', score: 'Por Definir', ganador: null }
+      ],
+      final: [
+        { id: 'f1', j1: 'Finalista 1', j2: 'Finalista 2', cancha: 'Dom 16:00', score: 'Gran Final', ganador: null }
+      ],
+      consueloSemis: [
+        { id: 'csf1', j1: 'Perdedor QF1', j2: 'Perdedor QF2', cancha: 'Dom 09:00', score: 'Por Definir', ganador: null },
+        { id: 'csf2', j1: 'Perdedor QF3', j2: 'Perdedor QF4', cancha: 'Dom 10:30', score: 'Por Definir', ganador: null }
+      ],
+      consueloFinal: [
+        { id: 'cf1', j1: 'Ganador Consuelo 1', j2: 'Ganador Consuelo 2', cancha: 'Dom 14:30', score: 'Final Consuelo', ganador: null }
+      ]
+    }
   },
   {
     id: 't-5a',
     cat: '5ª A',
     titulo: 'Copa Apertura · 5ª Categoría A',
-    subtitulo: 'Intermedio Consolidado · Trofeo y Puntos Oficiales',
+    subtitulo: 'Intermedio Consolidado · Puntos Oficiales de Circuito',
+    sponsor: 'Tienda ProShop Huancayo',
     sede: 'Club Tauro Tenis',
     fecha: '28 y 29 de Noviembre',
     precio: 40,
     min: 8,
     maxCupos: 16,
+    estadoTorneo: 'inscripciones',
     img: 'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?auto=format&fit=crop&w=800&q=80',
     participantes: [
-      { nombre: 'Franco Huamán', club: 'Academia Romina Cutipa', pts: 1280 },
-      { nombre: 'Joaquín Paredes', club: 'Complejo Shyam Huilca', pts: 1240 },
-      { nombre: 'Roberto Gómez', club: 'Country Club Huancayo', pts: 1310 },
-      { nombre: 'Héctor Baldeón', club: 'Club Tauro Tenis', pts: 1410 },
-      { nombre: 'César Augusto Ríos', club: 'Independiente', pts: 1350 },
-      { nombre: 'Pedro Pablo Lazo', club: 'Country Club Huancayo', pts: 1480 },
-      { nombre: 'Miguel Ángel Soto', club: 'Academia Romina Cutipa', pts: 1290 },
-      { nombre: 'Daniel Verástegui', club: 'Club Tauro Tenis', pts: 1330 }
-    ]
-  },
-  {
-    id: 't-5b',
-    cat: '5ª B',
-    titulo: 'Copa Apertura · 5ª Categoría B',
-    subtitulo: 'Intermedio Inicial · Súmate y abre el cuadro',
-    sede: 'Academia Romina Cutipa',
-    fecha: '28 y 29 de Noviembre',
-    precio: 40,
-    min: 8,
-    maxCupos: 16,
-    img: 'https://images.unsplash.com/photo-1587280501635-68a0e82cd5ff?auto=format&fit=crop&w=800&q=80',
-    participantes: [
-      { nombre: 'Joaquín Paredes', club: 'Complejo Shyam Huilca', pts: 1110 },
-      { nombre: 'Fernando Calmell', club: 'Country Club Huancayo', pts: 980 },
-      { nombre: 'Óscar Benavides', club: 'Independiente', pts: 890 },
-      { nombre: 'Raúl Ordoñez', club: 'Club Tauro Tenis', pts: 1040 },
-      { nombre: 'Víctor Hugo Meza', club: 'Academia Romina Cutipa', pts: 920 },
-      { nombre: 'Arturo Peñaloza', club: 'Country Club Huancayo', pts: 860 },
-      { nombre: 'Gabriel Salcedo', club: 'Independiente', pts: 950 }
-    ]
-  },
-  {
-    id: 't-5p',
-    cat: '5ª P',
-    titulo: 'Copa Apertura · 5ª Principiantes',
-    subtitulo: 'Ideal para debutar en torneos con rivales de tu mismo nivel',
-    sede: 'Complejo Shyam Huilca',
-    fecha: '5 y 6 de Diciembre',
-    precio: 35,
-    min: 8,
-    maxCupos: 16,
-    img: 'https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?auto=format&fit=crop&w=800&q=80',
-    participantes: [
-      { nombre: 'Ernesto Velarde', club: 'Academia Romina Cutipa', pts: 480 },
-      { nombre: 'Julio César Tapia', club: 'Independiente', pts: 520 },
-      { nombre: 'Marcelo Quintana', club: 'Country Club Huancayo', pts: 410 },
-      { nombre: 'Sergio Bustamante', club: 'Complejo Shyam Huilca', pts: 450 },
-      { nombre: 'Andrés Gutarra', club: 'Club Tauro Tenis', pts: 550 },
-      { nombre: 'Ricardo Hinojosa', club: 'Independiente', pts: 390 }
-    ]
+      { nombre: 'Pedro Pablo Lazo', club: 'Country Club Huancayo', pts: 1680 },
+      { nombre: 'Héctor Baldeón', club: 'Club Tauro Tenis', pts: 1610 },
+      { nombre: 'César Augusto Ríos', club: 'Independiente', pts: 1550 },
+      { nombre: 'Daniel Verástegui', club: 'Club Tauro Tenis', pts: 1530 },
+      { nombre: 'Roberto Gómez', club: 'Country Club Huancayo', pts: 1510 },
+      { nombre: 'Miguel Ángel Soto', club: 'Academia Romina Cutipa', pts: 1490 },
+      { nombre: 'Franco Huamán', club: 'Academia Romina Cutipa', pts: 1480 },
+      { nombre: 'Joaquín Paredes', club: 'Complejo Shyam Huilca', pts: 1440 }
+    ],
+    brackets: {
+      cuartos: [
+        { id: 'qf1', j1: '#1 Pedro Pablo Lazo', j2: '#8 Joaquín Paredes', cancha: 'Sáb 09:00', score: 'Programado', ganador: null, perdedor: null },
+        { id: 'qf2', j1: '#4 Daniel Verástegui', j2: '#5 Roberto Gómez', cancha: 'Sáb 09:00', score: 'Programado', ganador: null, perdedor: null },
+        { id: 'qf3', j1: '#3 César Augusto Ríos', j2: '#6 Miguel Ángel Soto', cancha: 'Sáb 11:00', score: 'Programado', ganador: null, perdedor: null },
+        { id: 'qf4', j1: '#2 Héctor Baldeón', j2: '#7 Franco Huamán', cancha: 'Sáb 11:00', score: 'Programado', ganador: null, perdedor: null }
+      ],
+      semis: [
+        { id: 'sf1', j1: 'Ganador QF1', j2: 'Ganador QF2', cancha: 'Dom 09:30', score: 'Por Definir', ganador: null },
+        { id: 'sf2', j1: 'Ganador QF3', j2: 'Ganador QF4', cancha: 'Dom 11:00', score: 'Por Definir', ganador: null }
+      ],
+      final: [
+        { id: 'f1', j1: 'Finalista 1', j2: 'Finalista 2', cancha: 'Dom 15:30', score: 'Gran Final', ganador: null }
+      ],
+      consueloSemis: [
+        { id: 'csf1', j1: 'Perdedor QF1', j2: 'Perdedor QF2', cancha: 'Dom 09:00', score: 'Por Definir', ganador: null },
+        { id: 'csf2', j1: 'Perdedor QF3', j2: 'Perdedor QF4', cancha: 'Dom 10:30', score: 'Por Definir', ganador: null }
+      ],
+      consueloFinal: [
+        { id: 'cf1', j1: 'Ganador Consuelo 1', j2: 'Ganador Consuelo 2', cancha: 'Dom 14:00', score: 'Final Consuelo', ganador: null }
+      ]
+    }
   }
 ];
 
@@ -437,100 +542,762 @@ const PRODUCTOS_TIENDA = [
   {
     id: 'srv-encordado',
     tipo: 'Taller Oficial',
-    nombre: 'Servicio de Encordado Profesional + Recojo en Club',
-    desc: 'Cuerdas Poliéster Control o Multifilamento Confort. Ajustamos la tensión exacta en libras según tu estilo de juego.',
+    nombre: 'Encordado Profesional + Recojo en Club',
+    desc: 'Poliéster Control o Multifilamento. Calibración electrónica exacta en libras.',
     precio: 35,
     precioRacha: 30,
-    badge: 'Beneficio Racha Activa'
+    badge: 'Servicio Oficial'
   },
   {
     id: 'prod-overgrip',
-    tipo: 'Accesorios Oficiales',
-    nombre: 'Pack x3 Overgrips Matchpoint Pro Tacky',
-    desc: 'Máxima absorción y agarre antideslizante para arcilla.',
+    tipo: 'Accesorios',
+    nombre: 'Pack x3 Overgrips Pro Tacky',
+    desc: 'Agarre antideslizante de alta absorción para arcilla.',
     precio: 25,
     precioRacha: 20,
     badge: 'Alta Rotación'
   },
   {
-    id: 'prod-antivib',
-    tipo: 'Accesorios Oficiales',
-    nombre: 'Antivibradores Oficiales Matchpoint (Par)',
-    desc: 'Protege tu codo y muñeca reduciendo la vibración del encordado.',
-    precio: 15,
-    precioRacha: 12,
-    badge: 'Edición Circuito'
+    id: 'prod-pelotas',
+    tipo: 'Material Oficial',
+    nombre: 'Tubo de Pelotas Wilson Roland Garros (x3)',
+    desc: 'Fieltro tejido para máxima durabilidad en polvo de ladrillo.',
+    precio: 32,
+    precioRacha: 28,
+    badge: 'Pelota Oficial'
   },
   {
     id: 'prod-raqueta-semi',
     tipo: 'Seminuevos Certificados',
-    nombre: 'Babolat Pure Drive 300g (Estado 9.5/10 · Certificada)',
-    desc: 'Revisada por nuestros entrenadores aliados. Encordado nuevo incluido.',
+    nombre: 'Babolat Pure Drive 300g (Estado 9.5/10)',
+    desc: 'Inspeccionada por nuestros entrenadores. Incluye encordado nuevo.',
     precio: 580,
     precioRacha: 550,
-    badge: 'Garantía Oficial'
+    badge: 'Garantía Club'
   }
 ];
 
-export default function App() {
-  // Splash Screen Cinemático + Tips de Tenis Rotativos
-  const [showSplash, setShowSplash] = useState(true);
-  const [tipIndex, setTipIndex] = useState(0);
+// ============================================================================
+// 6. COMPONENTE ÉLITE 1: CARNET DIGITAL VIP (ESTÉTICA BLACK METAL / APPLE WALLET)
+// ============================================================================
+const CarnetDigitalVIP = ({ player, catInfo, rankPos, onClose }) => {
+  if (!player) return null;
+  const codigoSocio = `MP-2026-${String(player.id || 104).padStart(4, '0')}`;
+  const totalPartidos = (player.victorias || 0) + (player.derrotas || 0);
 
-  // Navegación Principal con Transiciones Fluidas
+  return (
+    <div 
+      onClick={onClose}
+      className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4"
+    >
+      <div 
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-sm space-y-4 animate-[mpFadeSlide_0.22s_ease-out]"
+      >
+        <div className="flex justify-between items-center px-1">
+          <span className="text-[11px] font-extrabold uppercase tracking-[0.2em] text-[#8E98A8]">
+            Credencial Oficial de Socio
+          </span>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-full bg-[#14171F] border border-[#222631] flex items-center justify-center text-zinc-300 hover:text-white"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* TARJETA PROPORCIÓN METAL CARD 1.58:1 */}
+        <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-[#1A1E29] via-[#11141B] to-[#0B0D11] border border-white/15 shadow-[0_24px_48px_rgba(0,0,0,0.85)] p-6 select-none">
+          {/* Trama de cancha grabada al láser en bajo relieve */}
+          <div className="absolute inset-0 pointer-events-none">
+            <SvgCourtLinesBg className="w-full h-full opacity-[0.045]" />
+          </div>
+          {/* Luz radial sutil en esquina superior derecha */}
+          <div className="absolute -top-16 -right-16 w-44 h-44 rounded-full bg-[#EAB308]/10 blur-3xl pointer-events-none"></div>
+
+          {/* Fila Superior: Marca + Chip Metálico + Categoría */}
+          <div className="relative flex justify-between items-start">
+            <div>
+              <div className="flex items-center gap-2">
+                <span style={{ fontFamily: "'Outfit', sans-serif" }} className="text-lg font-black tracking-tight text-white">
+                  MATCHPOINT
+                </span>
+                <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-[#EAB308]/15 text-[#EAB308] border border-[#EAB308]/30">
+                  VIP PASS
+                </span>
+              </div>
+              <span className="text-[10px] uppercase tracking-[0.18em] text-[#8E98A8] block mt-0.5">
+                Circuito Oficial · Huancayo
+              </span>
+            </div>
+
+            {/* Chip de seguridad metálico simulado */}
+            <div className="w-10 h-7 rounded-md bg-gradient-to-tr from-zinc-400/30 via-zinc-200/40 to-amber-200/30 border border-white/20 flex items-center justify-center">
+              <div className="w-6 h-4 border border-black/30 rounded-sm grid grid-cols-2 gap-px p-0.5">
+                <div className="bg-black/20 rounded-xs"></div>
+                <div className="bg-black/20 rounded-xs"></div>
+              </div>
+            </div>
+          </div>
+
+          {/* Fila Central: Foto Biselada + Datos Grabados */}
+          <div className="relative flex items-center gap-4 my-6">
+            <div className="w-16 h-16 rounded-2xl bg-[#0B0D11] border border-white/20 overflow-hidden shrink-0 flex items-center justify-center shadow-inner">
+              {player.foto_url ? (
+                <img src={player.foto_url} alt={player.nombre} className="w-full h-full object-cover object-center" />
+              ) : (
+                <User className="w-8 h-8 text-zinc-500" />
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <span className="text-[10px] font-mono uppercase tracking-widest text-[#10B981] block">
+                {totalPartidos < 5 ? 'EN CALIBRACIÓN OFICIAL' : `${catInfo.nombre.toUpperCase()}`}
+              </span>
+              <h3 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-xl font-black text-white truncate tracking-tight mt-0.5">
+                {player.nombre}
+              </h3>
+              <p className="text-xs text-[#8E98A8] font-medium truncate">
+                {player.club || 'Socio Independiente'} · {player.mano || 'Diestro'}
+              </p>
+            </div>
+          </div>
+
+          {/* Fila Inferior: Métricas + Código QR Integrado */}
+          <div className="relative pt-4 border-t border-white/10 flex items-end justify-between">
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-4">
+                <div>
+                  <span className="text-[9px] uppercase tracking-wider text-[#8E98A8] block">RANKING</span>
+                  <span style={{ fontFamily: "'Outfit', sans-serif" }} className="text-sm font-black text-white">
+                    {rankPos > 0 ? `#${rankPos}` : '—'}
+                  </span>
+                </div>
+                <div className="h-6 w-px bg-white/10"></div>
+                <div>
+                  <span className="text-[9px] uppercase tracking-wider text-[#8E98A8] block">PUNTOS</span>
+                  <span style={{ fontFamily: "'Outfit', sans-serif" }} className="text-sm font-black text-[#10B981]">
+                    {player.elo || 1000}
+                  </span>
+                </div>
+                <div className="h-6 w-px bg-white/10"></div>
+                <div>
+                  <span className="text-[9px] uppercase tracking-wider text-[#8E98A8] block">TEMPORADA</span>
+                  <span className="text-xs font-bold text-zinc-200">APERTURA 26</span>
+                </div>
+              </div>
+              <p className="text-[11px] font-mono tracking-[0.22em] text-zinc-400 pt-1">
+                {codigoSocio}
+              </p>
+            </div>
+
+            <div className="p-2 rounded-xl bg-white text-zinc-950 shadow-md shrink-0">
+              <QrCode className="w-11 h-11" />
+            </div>
+          </div>
+        </div>
+
+        {/* Nota de Beneficios Reales */}
+        <div className="bg-[#14171F] border border-[#222631] rounded-2xl p-4 text-center space-y-1">
+          <p className="text-xs font-bold text-white">
+            Beneficio Activo en Sedes Aliadas y Taller de Encordado
+          </p>
+          <p className="text-[11px] text-[#8E98A8]">
+            Muestra esta credencial en recepción del club o al solicitar encordado para aplicar tu tarifa de socio.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// 7. COMPONENTE ÉLITE 2: FICHA MARKETPLACE DE ENTRENADOR (COACH PRO MODAL)
+// ============================================================================
+const CoachProProfileModal = ({ prof, onClose }) => {
+  const [selectedTurno, setSelectedTurno] = useState(prof?.turnosLibres?.[0] || null);
+  const [selectedProg, setSelectedProg] = useState(prof?.programas?.[0] || null);
+
+  if (!prof) return null;
+
+  const armarMensajeWhatsApp = () => {
+    const turnoTxt = selectedTurno ? ` en el horario de ${selectedTurno.dia} a las ${selectedTurno.hora} (${selectedTurno.club})` : '';
+    const progTxt = selectedProg ? ` para el programa "${selectedProg.titulo}" (${selectedProg.precio})` : '';
+    return `Hola Prof. ${prof.nombre}, vi tu perfil oficial en MATCHPOINT y deseo reservar cupo${progTxt}${turnoTxt}.`;
+  };
+
+  return (
+    <div 
+      onClick={onClose}
+      className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4"
+    >
+      <div 
+        onClick={(e) => e.stopPropagation()}
+        className="bg-[#14171F] border border-[#222631] w-full max-w-md rounded-3xl overflow-hidden shadow-2xl max-h-[92vh] flex flex-col animate-[mpFadeSlide_0.22s_ease-out]"
+      >
+        {/* Cabecera Multimedia 16:9 */}
+        <div className="relative h-44 w-full bg-[#0B0D11] shrink-0">
+          <img src={prof.fotoBanner || prof.fotoAvatar} alt={prof.nombre} className="w-full h-full object-cover opacity-65" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#14171F] via-[#14171F]/40 to-transparent"></div>
+
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 w-9 h-9 rounded-full bg-[#0B0D11]/80 border border-white/15 flex items-center justify-center text-zinc-200 hover:text-white"
+          >
+            <X className="w-5 h-5" />
+          </button>
+
+          <div className="absolute bottom-3 left-5 right-5 flex items-end gap-3.5">
+            <div className="w-20 h-20 rounded-2xl bg-[#0B0D11] border-2 border-[#EAB308] overflow-hidden shrink-0 shadow-xl">
+              {prof.fotoAvatar ? (
+                <img src={prof.fotoAvatar} alt={prof.nombre} className="w-full h-full object-cover object-center" />
+              ) : (
+                <GraduationCap className="w-10 h-10 text-[#EAB308] m-auto mt-4" />
+              )}
+            </div>
+            <div className="min-w-0 flex-1 pb-0.5">
+              <span className="inline-block text-[10px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-md bg-[#EAB308]/15 text-[#EAB308] border border-[#EAB308]/30 mb-1">
+                {prof.certificacion || 'Coach Pro Verificado'}
+              </span>
+              <h3 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-2xl font-black text-white leading-none truncate">
+                {prof.nombre}
+              </h3>
+              <p className="text-xs text-[#8E98A8] font-medium truncate mt-1">
+                📍 {prof.sede}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Barra de Confianza (Social Proof) */}
+        <div className="grid grid-cols-3 border-y border-[#222631] bg-[#0B0D11]/60 py-3 px-4 text-center shrink-0">
+          <div>
+            <div className="flex items-center justify-center gap-1 text-white font-black text-sm">
+              <Star className="w-3.5 h-3.5 text-[#EAB308] fill-[#EAB308]" /> {prof.rating || '4.9'}
+            </div>
+            <span className="text-[10px] text-[#8E98A8] font-semibold">{prof.resenasCount || 28} reseñas</span>
+          </div>
+          <div className="border-x border-[#222631]">
+            <span className="text-sm font-black text-white block">{prof.horasImpartidas || '+300h'}</span>
+            <span className="text-[10px] text-[#8E98A8] font-semibold">En cancha</span>
+          </div>
+          <div>
+            <span className="text-sm font-black text-[#10B981] block">S/ {prof.tarifaBase || 45}</span>
+            <span className="text-[10px] text-[#8E98A8] font-semibold">Hora base</span>
+          </div>
+        </div>
+
+        {/* Cuerpo Scrollable: Especialidades, Programas y Turnos Libres */}
+        <div className="p-5 space-y-5 overflow-y-auto flex-1">
+          {/* Píldoras de Especialidad */}
+          <div className="space-y-2">
+            <p className="text-xs text-zinc-300 leading-relaxed">{prof.bioCorta}</p>
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {(prof.nichos || ['Técnica General', 'Partidos']).map((n, i) => (
+                <span key={i} className="text-[11px] font-bold bg-[#0B0D11] text-zinc-200 border border-[#222631] px-3 py-1 rounded-lg">
+                  {n}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* 1. Selector de Programas y Paquetes */}
+          <div className="space-y-2">
+            <span className="text-[11px] font-black uppercase tracking-wider text-[#8E98A8] block">
+              1. Elige tu Modalidad o Programa
+            </span>
+            <div className="space-y-2">
+              {(prof.programas || []).map((prog) => {
+                const active = selectedProg?.id === prog.id;
+                return (
+                  <div
+                    key={prog.id}
+                    onClick={() => setSelectedProg(prog)}
+                    className={`p-3.5 rounded-2xl border cursor-pointer transition flex justify-between items-center ${
+                      active 
+                        ? 'bg-[#0B0D11] border-[#10B981] shadow-md' 
+                        : 'bg-[#0B0D11]/60 border-[#222631] hover:border-zinc-700'
+                    }`}
+                  >
+                    <div className="pr-3">
+                      <p className="text-xs font-extrabold text-white">{prog.titulo}</p>
+                      <p className="text-[11px] text-[#8E98A8] mt-0.5">{prog.detalle}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span style={{ fontFamily: "'Outfit', sans-serif" }} className="text-sm font-black text-[#10B981] block">
+                        {prog.precio}
+                      </span>
+                      {active && <span className="text-[10px] font-bold text-[#10B981]">✓ Elegido</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 2. Selector de Huecos Libres en Cancha */}
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="text-[11px] font-black uppercase tracking-wider text-[#8E98A8]">
+                2. Horarios Disponibles esta Semana
+              </span>
+              <span className="text-[10px] font-bold text-[#10B981]">Actualizado hoy</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {(prof.turnosLibres || []).filter(t => t.disponible !== false).map((t) => {
+                const isSelected = selectedTurno?.id === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setSelectedTurno(t)}
+                    className={`p-2.5 rounded-xl border text-left transition ${
+                      isSelected
+                        ? 'bg-[#10B981]/15 border-[#10B981] text-white'
+                        : 'bg-[#0B0D11] border-[#222631] text-zinc-300'
+                    }`}
+                  >
+                    <div className="flex justify-between items-center">
+                      <span className="text-[11px] font-extrabold text-white">{t.dia} · {t.hora}</span>
+                      {isSelected && <Check className="w-3.5 h-3.5 text-[#10B981]" />}
+                    </div>
+                    <span className="text-[10px] text-[#8E98A8] block mt-0.5">{t.club}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 3. Reseñas Verificadas de Alumnos */}
+          {prof.resenas && prof.resenas.length > 0 && (
+            <div className="space-y-2">
+              <span className="text-[11px] font-black uppercase tracking-wider text-[#8E98A8] block">
+                Comentarios de Jugadores del Circuito
+              </span>
+              <div className="space-y-2">
+                {prof.resenas.map((r, i) => (
+                  <div key={i} className="bg-[#0B0D11] border border-[#222631] p-3 rounded-2xl text-xs">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="font-bold text-white">{r.autor}</span>
+                      <span className="text-[#EAB308] text-[11px]">★★★★★</span>
+                    </div>
+                    <p className="text-[#8E98A8] text-[11px] leading-relaxed">"{r.texto}"</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Pie Fijo: Botón de Reserva Inteligente */}
+        <div className="p-4 border-t border-[#222631] bg-[#0B0D11] shrink-0">
+          <a
+            href={`https://wa.me/51${prof.tel.replace(/\D/g, '')}?text=${encodeURIComponent(armarMensajeWhatsApp())}`}
+            target="_blank"
+            rel="noreferrer"
+            className="w-full bg-[#10B981] hover:bg-emerald-400 text-zinc-950 font-black py-3.5 rounded-2xl text-xs flex items-center justify-center gap-2 shadow-lg"
+          >
+            <Phone className="w-4 h-4" /> 
+            {selectedTurno ? `Reservar ${selectedTurno.dia} ${selectedTurno.hora}` : 'Reservar Clase por WhatsApp'}
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// 8. COMPONENTE ÉLITE 3: MOTOR DINÁMICO DE TORNEOS (BRACKETS + CONSUELO + SIEMBRA)
+// ============================================================================
+const TorneoDinamicoModal = ({ torneo, myPlayer, onClose, onInscribir, onUpdateBracketMatch, onToggleStage }) => {
+  const [vistaInterna, setVistaInterna] = useState(
+    torneo?.estadoTorneo === 'inscripciones' ? 'inscritos' : 'principal'
+  );
+  const [rondaActiva, setRondaActiva] = useState('cuartos');
+  const [editingMatch, setEditingMatch] = useState(null);
+  const [matchScoreInput, setMatchScoreInput] = useState('6-4, 6-3');
+  const [matchWinnerSide, setMatchWinnerSide] = useState('j1');
+
+  if (!torneo) return null;
+
+  // Ordenar participantes por puntos para asignar Cabezas de Serie (Seeding) automático
+  const inscritosOrdenados = [...(torneo.participantes || [])].sort((a, b) => (b.pts || 1000) - (a.pts || 1000));
+  const inscritosCount = inscritosOrdenados.length;
+  const cuposLibres = Math.max(0, torneo.maxCupos - inscritosCount);
+
+  const handleGuardarResultadoLlave = (e) => {
+    e.preventDefault();
+    if (!editingMatch) return;
+    const ganadorNombre = matchWinnerSide === 'j1' ? editingMatch.match.j1 : editingMatch.match.j2;
+    const perdedorNombre = matchWinnerSide === 'j1' ? editingMatch.match.j2 : editingMatch.match.j1;
+    onUpdateBracketMatch(torneo.id, editingMatch.fase, editingMatch.index, matchScoreInput, ganadorNombre, perdedorNombre);
+    setEditingMatch(null);
+  };
+
+  return (
+    <div 
+      onClick={onClose}
+      className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4"
+    >
+      <div 
+        onClick={(e) => e.stopPropagation()}
+        className="bg-[#14171F] border border-[#222631] w-full max-w-md rounded-3xl overflow-hidden shadow-2xl max-h-[92vh] flex flex-col animate-[mpFadeSlide_0.22s_ease-out]"
+      >
+        {/* Cabecera del Torneo con Patrocinador Oficial */}
+        <div className="relative h-36 w-full bg-[#0B0D11] shrink-0">
+          <img src={torneo.img} alt={torneo.titulo} className="w-full h-full object-cover opacity-55" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#14171F] via-[#14171F]/50 to-transparent"></div>
+
+          <div className="absolute top-3.5 left-4 right-4 flex justify-between items-center">
+            <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-md bg-[#0B0D11]/85 text-[#D96B43] border border-[#D96B43]/40">
+              Presentado por {torneo.sponsor || 'Sponsor Oficial'}
+            </span>
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-full bg-[#0B0D11]/85 border border-white/15 flex items-center justify-center text-zinc-200 hover:text-white"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="absolute bottom-3 left-5 right-5 flex justify-between items-end">
+            <div>
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#10B981] block">
+                📍 {torneo.sede} · {torneo.fecha}
+              </span>
+              <h3 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-xl font-black text-white leading-tight mt-0.5">
+                {torneo.titulo}
+              </h3>
+            </div>
+            <button
+              type="button"
+              onClick={() => onToggleStage(torneo.id)}
+              title="Cambiar fase del torneo para demostración en vivo"
+              className="text-[10px] font-bold bg-[#0B0D11]/90 border border-[#222631] text-zinc-300 px-2.5 py-1 rounded-lg hover:border-zinc-600 shrink-0"
+            >
+              {torneo.estadoTorneo === 'inscripciones' ? '⚡ Ver Cuadro en Vivo' : '📋 Fase Inscripción'}
+            </button>
+          </div>
+        </div>
+
+        {/* Selector de las 3 Vistas del Torneo */}
+        <div className="grid grid-cols-3 gap-1.5 bg-[#0B0D11] p-2 border-b border-[#222631] shrink-0">
+          <button
+            type="button"
+            onClick={() => setVistaInterna('principal')}
+            className={`py-2 rounded-xl text-[11px] font-extrabold transition ${
+              vistaInterna === 'principal' ? 'bg-[#14171F] text-[#10B981] border border-[#222631]' : 'text-[#8E98A8]'
+            }`}
+          >
+            🏆 Cuadro Principal
+          </button>
+          <button
+            type="button"
+            onClick={() => setVistaInterna('consuelo')}
+            className={`py-2 rounded-xl text-[11px] font-extrabold transition ${
+              vistaInterna === 'consuelo' ? 'bg-[#14171F] text-[#D96B43] border border-[#222631]' : 'text-[#8E98A8]'
+            }`}
+          >
+            🛡️ Ronda Consuelo
+          </button>
+          <button
+            type="button"
+            onClick={() => setVistaInterna('inscritos')}
+            className={`py-2 rounded-xl text-[11px] font-extrabold transition ${
+              vistaInterna === 'inscritos' ? 'bg-[#14171F] text-white border border-[#222631]' : 'text-[#8E98A8]'
+            }`}
+          >
+            👥 Siembra ({inscritosCount})
+          </button>
+        </div>
+
+        {/* Contenido Dinámico según Pestaña */}
+        <div className="p-5 overflow-y-auto flex-1 space-y-4">
+          {vistaInterna === 'principal' && (
+            <div className="space-y-4">
+              {/* Sub-navegador de Rondas: Cuartos -> Semis -> Final */}
+              <div className="flex items-center justify-between bg-[#0B0D11] p-1.5 rounded-2xl border border-[#222631]">
+                {[
+                  { id: 'cuartos', label: 'Cuartos de Final' },
+                  { id: 'semis', label: 'Semifinales' },
+                  { id: 'final', label: 'Gran Final' }
+                ].map((r) => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => setRondaActiva(r.id)}
+                    className={`flex-1 py-2 rounded-xl text-xs font-extrabold transition ${
+                      rondaActiva === r.id ? 'bg-[#10B981] text-zinc-950 shadow' : 'text-[#8E98A8]'
+                    }`}
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+
+              <p className="text-[11px] text-[#8E98A8] px-1">
+                Toca cualquier llave para registrar el marcador oficial; el ganador avanza automáticamente a la siguiente ronda.
+              </p>
+
+              {/* Lista de Llaves de la Ronda Activa */}
+              <div className="space-y-2.5">
+                {(torneo.brackets?.[rondaActiva] || []).map((match, idx) => (
+                  <div
+                    key={match.id || idx}
+                    onClick={() => {
+                      setEditingMatch({ fase: rondaActiva, index: idx, match });
+                      setMatchScoreInput(match.score && match.score.includes('-') ? match.score : '6-4, 6-3');
+                      setMatchWinnerSide('j1');
+                    }}
+                    className="bg-[#0B0D11] border border-[#222631] hover:border-zinc-700 rounded-2xl p-3.5 cursor-pointer transition space-y-2"
+                  >
+                    <div className="flex justify-between items-center text-[10px] font-bold text-[#8E98A8]">
+                      <span>📍 {match.cancha}</span>
+                      <span className={`px-2 py-0.5 rounded font-black ${
+                        match.ganador ? 'bg-[#10B981]/15 text-[#10B981]' : 'bg-white/5 text-zinc-300'
+                      }`}>
+                        {match.score}
+                      </span>
+                    </div>
+
+                    <div className="space-y-1.5 pt-1">
+                      <div className="flex justify-between items-center text-xs">
+                        <span className={`font-extrabold ${match.ganador === match.j1 ? 'text-[#10B981]' : 'text-white'}`}>
+                          {match.j1}
+                        </span>
+                        {match.ganador === match.j1 && <Check className="w-4 h-4 text-[#10B981]" />}
+                      </div>
+                      <div className="h-px bg-[#222631]"></div>
+                      <div className="flex justify-between items-center text-xs">
+                        <span className={`font-extrabold ${match.ganador === match.j2 ? 'text-[#10B981]' : 'text-white'}`}>
+                          {match.j2}
+                        </span>
+                        {match.ganador === match.j2 && <Check className="w-4 h-4 text-[#10B981]" />}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {vistaInterna === 'consuelo' && (
+            <div className="space-y-3">
+              <div className="bg-[#0B0D11] border border-[#222631] p-3.5 rounded-2xl text-xs">
+                <span className="font-extrabold text-[#D96B43] block">🛡️ Garantía de Segundo Partido</span>
+                <p className="text-[#8E98A8] text-[11px] mt-0.5">
+                  Los jugadores que caen en Cuartos de Final pasan automáticamente al cuadro de Consuelo para seguir compitiendo por puntos y trofeo.
+                </p>
+              </div>
+
+              <span className="text-[11px] font-black uppercase tracking-wider text-[#8E98A8] block">
+                Semifinales de Consuelo
+              </span>
+              {(torneo.brackets?.consueloSemis || []).map((match, idx) => (
+                <div
+                  key={match.id || idx}
+                  onClick={() => {
+                    setEditingMatch({ fase: 'consueloSemis', index: idx, match });
+                    setMatchScoreInput('6-4, 6-4');
+                  }}
+                  className="bg-[#0B0D11] border border-[#222631] rounded-2xl p-3.5 cursor-pointer space-y-1.5"
+                >
+                  <div className="flex justify-between text-[10px] text-[#8E98A8] font-bold">
+                    <span>{match.cancha}</span>
+                    <span className="text-[#D96B43]">{match.score}</span>
+                  </div>
+                  <p className="text-xs font-extrabold text-white">{match.j1}</p>
+                  <div className="h-px bg-[#222631]"></div>
+                  <p className="text-xs font-extrabold text-white">{match.j2}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {vistaInterna === 'inscritos' && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-2.5 bg-[#0B0D11] p-3.5 rounded-2xl border border-[#222631] text-center">
+                <div>
+                  <span className="text-[10px] font-bold text-[#8E98A8] uppercase block">Confirmados</span>
+                  <span style={{ fontFamily: "'Outfit', sans-serif" }} className="text-xl font-black text-white">
+                    {inscritosCount} / {torneo.maxCupos}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-[#8E98A8] uppercase block">Vacantes Libres</span>
+                  <span style={{ fontFamily: "'Outfit', sans-serif" }} className="text-xl font-black text-[#10B981]">
+                    {cuposLibres} cupos
+                  </span>
+                </div>
+              </div>
+
+              <span className="text-[11px] font-black uppercase tracking-wider text-[#8E98A8] block">
+                Orden de Siembra por Ranking Oficial
+              </span>
+              <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                {inscritosOrdenados.map((p, idx) => (
+                  <div key={idx} className="bg-[#0B0D11] border border-[#222631] px-3.5 py-2.5 rounded-xl flex justify-between items-center text-xs">
+                    <div className="flex items-center gap-2.5">
+                      <span className={`font-mono font-black text-xs px-2 py-0.5 rounded ${
+                        idx < 4 ? 'bg-[#EAB308]/15 text-[#EAB308]' : 'text-[#8E98A8]'
+                      }`}>
+                        {idx < 4 ? `Siembra #${idx + 1}` : `#${idx + 1}`}
+                      </span>
+                      <div>
+                        <p className="font-extrabold text-white">{p.nombre}</p>
+                        <span className="text-[10px] text-[#8E98A8]">{p.club}</span>
+                      </div>
+                    </div>
+                    <span className="font-mono font-bold text-[#10B981]">{p.pts} Pts</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Mini-editor de Resultado de Llave en Vivo */}
+          {editingMatch && (
+            <form onSubmit={handleGuardarResultadoLlave} className="bg-[#0B0D11] border border-[#10B981] p-4 rounded-2xl space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-[11px] font-black uppercase text-[#10B981]">
+                  Actualizar Llave en Vivo
+                </span>
+                <button type="button" onClick={() => setEditingMatch(null)} className="text-zinc-400 hover:text-white">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setMatchWinnerSide('j1')}
+                  className={`p-2.5 rounded-xl border text-xs font-extrabold truncate ${
+                    matchWinnerSide === 'j1' ? 'bg-[#10B981]/20 border-[#10B981] text-white' : 'border-[#222631] text-zinc-400'
+                  }`}
+                >
+                  🏆 {editingMatch.match.j1}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMatchWinnerSide('j2')}
+                  className={`p-2.5 rounded-xl border text-xs font-extrabold truncate ${
+                    matchWinnerSide === 'j2' ? 'bg-[#10B981]/20 border-[#10B981] text-white' : 'border-[#222631] text-zinc-400'
+                  }`}
+                >
+                  🏆 {editingMatch.match.j2}
+                </button>
+              </div>
+              <input
+                type="text"
+                required
+                value={matchScoreInput}
+                onChange={(e) => setMatchScoreInput(e.target.value)}
+                placeholder="Marcador (ej. 6-4, 6-3)"
+                className="w-full bg-[#14171F] border border-[#222631] rounded-xl px-3 py-2 text-xs text-white font-mono"
+              />
+              <button type="submit" className="w-full bg-[#10B981] text-zinc-950 font-black py-2.5 rounded-xl text-xs">
+                Confirmar y Avanzar Ganador de Ronda
+              </button>
+            </form>
+          )}
+        </div>
+
+        {/* Pie del Modal de Torneo */}
+        <div className="p-4 border-t border-[#222631] bg-[#0B0D11] grid grid-cols-2 gap-2.5 shrink-0">
+          <button
+            type="button"
+            onClick={() => onInscribir(torneo)}
+            className="bg-[#14171F] hover:bg-zinc-800 text-white font-extrabold py-3 rounded-2xl text-xs border border-[#222631]"
+          >
+            + Inscribirme en Lista
+          </button>
+          <a
+            href={`https://wa.me/51964000000?text=${encodeURIComponent(`Hola MATCHPOINT, envío mi comprobante de S/ ${torneo.precio} para confirmar mi cupo en ${torneo.titulo}.`)}`}
+            target="_blank"
+            rel="noreferrer"
+            className="bg-[#10B981] hover:bg-emerald-400 text-zinc-950 font-black py-3 rounded-2xl text-xs flex items-center justify-center gap-1.5"
+          >
+            <Phone className="w-3.5 h-3.5" /> Confirmar Cupo (S/ {torneo.precio})
+          </a>
+        </div>
+      </div>
+    </div>
+  );// ============================================================================
+// PARTE 2 DE 3: COMPONENTE PRINCIPAL APP, ESTADOS, ACCESO DUAL Y LÓGICA EN VIVO
+// ============================================================================
+export default function App() {
+  // Splash Screen Cinemático
+  const [showSplash, setShowSplash] = useState(true);
+
+  // Navegación Principal y Sub-pestañas Descentralizadas
   const [tab, setTab] = useState('perfil');
+  const [rankingSubTab, setRankingSubTab] = useState('temporada'); // 'temporada' | 'salon_fama'
   const [retosSubTab, setRetosSubTab] = useState('mis_retos');
   const [canchasSubTab, setCanchasSubTab] = useState('clubes');
   const [jugadores, setJugadores] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filtroCat, setFiltroCat] = useState('General');
 
-  // Usuario y Modo Sandbox
+  // Usuario, Ajustes de Cuenta (Tuerca ⚙️) y Modo Pruebas
   const [currentUser, setCurrentUser] = useState(null);
   const [sandboxLabel, setSandboxLabel] = useState(null);
   const [keepSession, setKeepSession] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [hidePhonePublic, setHidePhonePublic] = useState(false);
 
-  // Modales Globales Nuevos
-  const [showSideDrawer, setShowSideDrawer] = useState(false);
+  // Modales Globales y Descentralizados
+  const [showSideDrawer, setShowSideDrawer] = useState(false); // Solo Institucional (Reglamento, Sedes, Comité)
+  const [showSettingsModal, setShowSettingsModal] = useState(false); // Tuerca ⚙️ en Mi Perfil
   const [showNotifModal, setShowNotifModal] = useState(false);
   const [showStoreModal, setShowStoreModal] = useState(false);
   const [showLevelsModal, setShowLevelsModal] = useState(false);
-  const [showHallOfFameModal, setShowHallOfFameModal] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [showMemberPassModal, setShowMemberPassModal] = useState(false);
   const [showCoachProModal, setShowCoachProModal] = useState(false);
+  const [selectedCoachModal, setSelectedCoachModal] = useState(null);
   const [pendingPopupAlert, setPendingPopupAlert] = useState(null);
 
-  // Portal Privado Coach Pro (Gestión de Academias y Alumnos para Profesores)
+  // Modal de Momentos Cruciales (Felicitación al ganador / Ánimo al perdedor / Calibración)
+  const [crucialMomentAlert, setCrucialMomentAlert] = useState(null);
+
+  // Patrocinadores Administrables (Visibilidad Comercial B2B)
+  const [sponsorsData, setSponsorsData] = useState(() => {
+    const saved = localStorage.getItem('mp_sponsors_v6');
+    if (saved) { try { return JSON.parse(saved); } catch { /* ignore */ } }
+    return PATROCINADORES_INICIALES;
+  });
+
+  // Portal Privado Coach Pro (Autogestión de Turnos Libres y Alumnos con PIN 7777)
   const [coachPinInput, setCoachPinInput] = useState('');
   const [isCoachProUnlocked, setIsCoachProUnlocked] = useState(false);
   const [coachAlumnos, setCoachAlumnos] = useState(() => {
-    const saved = localStorage.getItem('mp_coach_alumnos');
+    const saved = localStorage.getItem('mp_coach_alumnos_v6');
     if (saved) { try { return JSON.parse(saved); } catch { /* ignore */ } }
     return [
-      { id: 1, nombre: 'Marcelo Quintana', grupo: 'Adultos Iniciación · Mar/Jue 19:00', asistencias: '7/8 clases', estadoPago: 'Pagado', monto: 'S/ 180' },
-      { id: 2, nombre: 'Ernesto Velarde', grupo: 'Adultos Iniciación · Mar/Jue 19:00', asistencias: '6/8 clases', estadoPago: 'Pendiente', monto: 'S/ 180' },
-      { id: 3, nombre: 'Claudia Soto', grupo: 'Damas Intermedio · Sáb 10:00', asistencias: '4/4 clases', estadoPago: 'Pagado', monto: 'S/ 140' }
+      { id: 1, nombre: 'Marcelo Quintana', grupo: 'Adultos Iniciación · Mar/Jue 19:00', asistencias: '7/8 sesiones', nivel: '5ª P' },
+      { id: 2, nombre: 'Ernesto Velarde', grupo: 'Adultos Iniciación · Mar/Jue 19:00', asistencias: '6/8 sesiones', nivel: '5ª P' },
+      { id: 3, nombre: 'Claudia Soto', grupo: 'Damas Intermedio · Sáb 10:00', asistencias: '4/4 sesiones', nivel: '5ª B' }
     ];
   });
   const [newAlumnoNombre, setNewAlumnoNombre] = useState('');
   const [newAlumnoGrupo, setNewAlumnoGrupo] = useState('Adultos Iniciación · Mar/Jue 19:00');
-  const [newAlumnoMonto, setNewAlumnoMonto] = useState('S/ 180');
+  const [newTurnoDia, setNewTurnoDia] = useState('Viernes');
+  const [newTurnoHora, setNewTurnoHora] = useState('04:00 PM');
+  const [newTurnoClub, setNewTurnoClub] = useState('Country Club');
 
-  // Auth y Registro con Edad (+40), Género (Damas/Varones) y Mano Hábil
-  const [authMode, setAuthMode] = useState('login');
+  // Autenticación Dual: Celular (WhatsApp 9 dígitos) o Correo Electrónico
+  const [authMode, setAuthMode] = useState('login'); // 'login' | 'signup'
+  const [authMethod, setAuthMethod] = useState('celular'); // 'celular' | 'correo'
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showProfileSetup, setShowProfileSetup] = useState(false);
   const [quizStep, setQuizStep] = useState(0);
 
+  const [authPhoneInput, setAuthPhoneInput] = useState('');
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
 
+  // Datos de Ficha Deportiva (+40 Senior, Damas, Mano Hábil, Horario)
   const [nombre, setNombre] = useState('');
-  const [edad, setEdad] = useState('34');
+  const [edad, setEdad] = useState('36');
   const [genero, setGenero] = useState('Varones');
   const [mano, setMano] = useState('Diestro');
   const [horarioPref, setHorarioPref] = useState('Fines de Semana');
@@ -556,33 +1323,32 @@ export default function App() {
   const [activeChatReto, setActiveChatReto] = useState(null);
   const [chatMessageInput, setChatMessageInput] = useState('');
 
-  // Modal Técnico de Clima
+  // Modal de Estado de Canchas
   const [weatherModalClub, setWeatherModalClub] = useState(null);
   const [weatherEstadoInput, setWeatherEstadoInput] = useState('Cancha Seca · Óptima');
   const [weatherDetalleInput, setWeatherDetalleInput] = useState('19°C · Sin viento');
 
-  // Torneos
+  // Torneos Dinámicos con Brackets en Vivo
   const [torneosData, setTorneosData] = useState(() => {
-    const saved = localStorage.getItem('mp_torneos_v5');
+    const saved = localStorage.getItem('mp_torneos_v6');
     if (saved) { try { return JSON.parse(saved); } catch { /* ignore */ } }
     return TORNEOS_INICIALES;
   });
   const [selectedTorneoModal, setSelectedTorneoModal] = useState(null);
 
-  // Admin Suite, Disputas y Feature Toggles
+  // Suite de Administración y Disputas (PIN 1234)
   const [showAdminModal, setShowAdminModal] = useState(false);
   const [showMatchModal, setShowMatchModal] = useState(false);
-  const [showAllianceModal, setShowAllianceModal] = useState(false);
   const [adminPin, setAdminPin] = useState('');
   const [isAdminAuth, setIsAdminAuth] = useState(false);
   const [adminSearch, setAdminSearch] = useState('');
   const [newProfNombre, setNewProfNombre] = useState('');
   const [newProfEsp, setNewProfEsp] = useState('');
-  const [newProfTarifa, setNewProfTarifa] = useState('S/ 50 / hora');
+  const [newProfTarifa, setNewProfTarifa] = useState('50');
   const [newProfTel, setNewProfTel] = useState('');
 
   const [featureToggles, setFeatureToggles] = useState(() => {
-    const saved = localStorage.getItem('mp_feature_toggles_v5');
+    const saved = localStorage.getItem('mp_feature_toggles_v6');
     if (saved) { try { return JSON.parse(saved); } catch { /* ignore */ } }
     return {
       tiendaActiva: true,
@@ -595,7 +1361,7 @@ export default function App() {
     };
   });
 
-  // Subir Score
+  // Registro Oficial de Marcador
   const [activeRetoId, setActiveRetoId] = useState(null);
   const [p1Id, setP1Id] = useState('');
   const [p2Id, setP2Id] = useState('');
@@ -603,16 +1369,16 @@ export default function App() {
   const [winnerId, setWinnerId] = useState('');
   const [calculatingMatch, setCalculatingMatch] = useState(false);
 
-  // Profesores
+  // Directorio de Profesores (Marketplace Coach Pro)
   const [profesores, setProfesores] = useState(() => {
-    const saved = localStorage.getItem('mp_profesores_v5');
+    const saved = localStorage.getItem('mp_profesores_v6');
     if (saved) { try { return JSON.parse(saved); } catch { /* ignore */ } }
     return PROFESORES_INICIALES;
   });
 
-  // Retos en Vivo (Sincronizados con Supabase retos_activos + fallback local)
+  // Retos en Vivo (Sincronizados con Supabase retos_activos)
   const [retosProgramados, setRetosProgramados] = useState(() => {
-    const saved = localStorage.getItem('mp_retos_v5');
+    const saved = localStorage.getItem('mp_retos_v6');
     if (saved) { try { return JSON.parse(saved); } catch { /* ignore */ } }
     return [
       { 
@@ -630,9 +1396,9 @@ export default function App() {
     ];
   });
 
-  // Historial Compacto de Partidos (Para Cara a Cara y Respaldo CSV)
+  // Historial de Partidos para Cara a Cara (H2H) y Exportación CSV
   const [historialPartidosCSV, setHistorialPartidosCSV] = useState(() => {
-    const saved = localStorage.getItem('mp_historial_csv_v5');
+    const saved = localStorage.getItem('mp_historial_csv_v6');
     if (saved) { try { return JSON.parse(saved); } catch { /* ignore */ } }
     return [
       { fecha: '2026-11-05', ganador: 'Carlos Mendoza', perdedor: 'Renato Vilchez', marcador: '6-4, 6-4', delta: '+42 Pts' },
@@ -640,28 +1406,28 @@ export default function App() {
     ];
   });
 
-  // Validaciones y Disputas para el Panel Admin
+  // Validaciones y Disputas para el Comité Deportivo
   const [validacionesPendientes, setValidacionesPendientes] = useState(() => {
-    const saved = localStorage.getItem('mp_validaciones_v5');
+    const saved = localStorage.getItem('mp_validaciones_v6');
     if (saved) { try { return JSON.parse(saved); } catch { /* ignore */ } }
     return [];
   });
 
   const [historialCruces, setHistorialCruces] = useState(() => {
-    const saved = localStorage.getItem('mp_cruces_v5');
+    const saved = localStorage.getItem('mp_cruces_v6');
     if (saved) { try { return JSON.parse(saved); } catch { /* ignore */ } }
     return {};
   });
 
-  // Rachas (Solo tienen racha quienes realmente han ganado partidos consecutivos)
+  // Rachas Activas (Solo para jugadores con victorias reales)
   const [rachasUsuarios, setRachasUsuarios] = useState(() => {
-    const saved = localStorage.getItem('mp_rachas_v5');
+    const saved = localStorage.getItem('mp_rachas_v6');
     if (saved) { try { return JSON.parse(saved); } catch { /* ignore */ } }
     return { 'Carlos Mendoza': 4, 'Rodrigo Quispe': 5, 'Gonzalo Palacios': 3 };
   });
 
   const [climaSedes, setClimaSedes] = useState(() => {
-    const saved = localStorage.getItem('mp_clima_v5');
+    const saved = localStorage.getItem('mp_clima_v6');
     if (saved) { try { return JSON.parse(saved); } catch { /* ignore */ } }
     return {
       'Country Club Huancayo': { estado: 'Cancha Seca · Óptima', detalle: '20°C · Soleado', hora: '15:10', reportadoPor: 'Rodrigo Quispe' },
@@ -672,7 +1438,7 @@ export default function App() {
   });
 
   // ============================================================================
-  // 6. INICIALIZACIÓN, ANIMACIONES CSS Y SINCRONIZACIÓN SUPABASE REALTIME
+  // INICIALIZACIÓN, DESBLOQUEO UNIVERSAL CON TECLA ESCAPE Y SUPABASE REALTIME
   // ============================================================================
   useEffect(() => {
     if (!document.getElementById('mp-google-fonts')) {
@@ -683,32 +1449,56 @@ export default function App() {
       document.head.appendChild(link);
     }
 
-    // Inyectar animaciones suaves de transición entre pestañas y botones interactivos
     if (!document.getElementById('mp-animations-css')) {
       const style = document.createElement('style');
       style.id = 'mp-animations-css';
       style.innerHTML = `
         @keyframes mpFadeSlide {
-          0% { opacity: 0; transform: translateY(8px) scale(0.995); }
-          100% { opacity: 1; transform: translateY(0) scale(1); }
+          0% { opacity: 0; transform: translateY(6px); }
+          100% { opacity: 1; transform: translateY(0); }
         }
         .mp-page-transition {
-          animation: mpFadeSlide 0.26s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+          animation: mpFadeSlide 0.22s cubic-bezier(0.22, 1, 0.36, 1) forwards;
         }
         button, a {
-          transition: transform 0.14s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.18s ease, box-shadow 0.18s ease;
+          transition: transform 0.14s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.18s ease, border-color 0.18s ease;
         }
         button:active, a:active {
-          transform: scale(0.96);
+          transform: scale(0.97);
         }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `;
       document.head.appendChild(style);
     }
 
-    const timer = setTimeout(() => setShowSplash(false), 1450);
-    const tipTimer = setInterval(() => {
-      setTipIndex(prev => (prev + 1) % TIPS_DE_TENIS.length);
-    }, 6000);
+    // Listener Universal de Tecla Escape (Evita quedarse atrapado en Laptop / Desktop)
+    const handleKeyDownEscape = (e) => {
+      if (e.key === 'Escape') {
+        setShowAuthModal(false);
+        setShowProfileSetup(false);
+        setSelectedPlayerModal(null);
+        setChallengeTargetModal(null);
+        setSelectedTorneoModal(null);
+        setSelectedCoachModal(null);
+        setShowMemberPassModal(false);
+        setShowSettingsModal(false);
+        setShowSideDrawer(false);
+        setShowStoreModal(false);
+        setShowLevelsModal(false);
+        setShowRulesModal(false);
+        setShowCoachProModal(false);
+        setShowAdminModal(false);
+        setShowMatchModal(false);
+        setShowNotifModal(false);
+        setWeatherModalClub(null);
+        setActiveChatReto(null);
+        setCrucialMomentAlert(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDownEscape);
+
+    const timer = setTimeout(() => setShowSplash(false), 1250);
 
     fetchData();
     fetchRetosFromSupabase();
@@ -719,7 +1509,7 @@ export default function App() {
     }
 
     const channel = supabase
-      .channel('matchpoint_v5_sync')
+      .channel('matchpoint_v6_sync')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'jugadores' }, () => {
         fetchData();
       })
@@ -729,38 +1519,29 @@ export default function App() {
       .on('broadcast', { event: 'sync_state' }, ({ payload }) => {
         if (payload?.retos) {
           setRetosProgramados(payload.retos);
-          localStorage.setItem('mp_retos_v5', JSON.stringify(payload.retos));
+          localStorage.setItem('mp_retos_v6', JSON.stringify(payload.retos));
         }
         if (payload?.clima) {
           setClimaSedes(payload.clima);
-          localStorage.setItem('mp_clima_v5', JSON.stringify(payload.clima));
+          localStorage.setItem('mp_clima_v6', JSON.stringify(payload.clima));
         }
         if (payload?.validaciones) {
           setValidacionesPendientes(payload.validaciones);
-          localStorage.setItem('mp_validaciones_v5', JSON.stringify(payload.validaciones));
+          localStorage.setItem('mp_validaciones_v6', JSON.stringify(payload.validaciones));
         }
       })
       .subscribe();
 
     realtimeChannelRef.current = channel;
 
-    const handleStorageSync = (e) => {
-      if (e.key === 'mp_retos_v5' && e.newValue) setRetosProgramados(JSON.parse(e.newValue));
-      if (e.key === 'mp_validaciones_v5' && e.newValue) setValidacionesPendientes(JSON.parse(e.newValue));
-    };
-    window.addEventListener('storage', handleStorageSync);
-
     return () => {
       clearTimeout(timer);
-      clearInterval(tipTimer);
-      window.removeEventListener('storage', handleStorageSync);
+      window.removeEventListener('keydown', handleKeyDownEscape);
       supabase.removeChannel(channel);
     };
   }, []);
 
-  // Rotar tip de tenis cada vez que cambia de pestaña
   const handleTabChange = (newTab) => {
-    setTipIndex(prev => (prev + 1) % TIPS_DE_TENIS.length);
     setTab(newTab);
   };
 
@@ -772,11 +1553,9 @@ export default function App() {
         .order('created_at', { ascending: false });
       if (!error && data && data.length > 0) {
         setRetosProgramados(data);
-        localStorage.setItem('mp_retos_v5', JSON.stringify(data));
+        localStorage.setItem('mp_retos_v6', JSON.stringify(data));
       }
-    } catch {
-      // Si la tabla retos_activos aún no fue creada en SQL, usa localStorage + Broadcast sin fallar
-    }
+    } catch { /* fallback local */ }
   }
 
   const broadcastLiveUpdate = (newRetos, newClima, newValidaciones) => {
@@ -793,8 +1572,8 @@ export default function App() {
     }
   };
 
-  // DETECTOR EXACTO POR ID O NOMBRE NORMALIZADO PARA RETOS ENTRANTES EN CELULARES REALES
-  const normalizeText = (str = '') => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+  // Detector Exacto por ID Único o Nombre Normalizado
+  const normalizeText = (str = '') => String(str).normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
 
   const isPlayerInReto = (reto, player) => {
     if (!player || !reto) return false;
@@ -848,7 +1627,7 @@ export default function App() {
     }
   }
 
-  // Datos y Métricas del Usuario Actual
+  // Métricas Calculadas del Jugador Activo
   const myPlayer = currentUser ? (jugadores.find(j => j.id === currentUser.id) || currentUser) : null;
   const myRankPos = myPlayer ? jugadores.findIndex(j => j.id === myPlayer.id) + 1 : 0;
   const myWins = myPlayer?.victorias || 0;
@@ -858,7 +1637,7 @@ export default function App() {
   const myWinRate = myTotalMatches > 0 ? Math.round((myWins / myTotalMatches) * 100) : 0;
   const myCatInfo = getInfoCategoria(myPlayer?.elo || 1000);
 
-  // REGLA ESTRICTA DE RACHA CERO: Si victorias === 0, la racha es 0 y NO se muestra en ningún lado
+  // Regla Estricta: Si victorias === 0, la racha es 0 y permanece invisible
   const getPlayerStreak = (playerObj) => {
     if (!playerObj) return 0;
     const wins = playerObj.victorias || 0;
@@ -870,7 +1649,7 @@ export default function App() {
 
   const myStreak = getPlayerStreak(myPlayer);
 
-  // Jugador justo arriba ("Rival a Tiro")
+  // Jugador Inmediatamente Superior ("Objetivo de Ascenso")
   const playerAboveMe = myRankPos > 1 ? jugadores[myRankPos - 2] : null;
   const ptsToOvertake = playerAboveMe && myPlayer ? Math.max(1, (playerAboveMe.elo || 1000) - (myPlayer.elo || 1000) + 1) : 0;
 
@@ -882,18 +1661,19 @@ export default function App() {
   const disputasActivas = validacionesPendientes.filter(v => v.estado === 'En Disputa');
   const misNotificacionesCount = misRetos.length + validacionesPendientes.filter(v => v.estado === 'Pendiente').length;
 
+  // Halos Sobrios 60-30-10
   const getAvatarHaloClass = (playerObj, rankIndex) => {
     const racha = getPlayerStreak(playerObj);
-    if (rankIndex === 0) return 'ring-4 ring-amber-400 shadow-[0_0_20px_rgba(251,191,36,0.55)]';
-    if (rankIndex === 1) return 'ring-4 ring-zinc-300 shadow-[0_0_16px_rgba(212,212,216,0.4)]';
-    if (rankIndex === 2) return 'ring-4 ring-amber-600 shadow-[0_0_16px_rgba(217,119,6,0.45)]';
-    if (racha >= 3) return 'ring-4 ring-orange-500 shadow-[0_0_20px_rgba(249,115,22,0.6)]';
-    return 'ring-2 ring-emerald-500/60';
+    if (rankIndex === 0) return 'ring-2 ring-[#EAB308] shadow-[0_0_18px_rgba(234,179,8,0.35)]';
+    if (rankIndex === 1) return 'ring-2 ring-zinc-300';
+    if (rankIndex === 2) return 'ring-2 ring-[#D96B43]';
+    if (racha >= 3) return 'ring-2 ring-[#D96B43]';
+    return 'ring-1 ring-white/15';
   };
 
-  // Calcular Cara a Cara (Head-to-Head) entre el usuario y cualquier jugador seleccionado
+  // Historial Cara a Cara (Head-to-Head)
   const getHeadToHead = (targetPlayer) => {
-    if (!myPlayer || !targetPlayer) return { myWinsH2H: 0, rivalWinsH2H: 0 };
+    if (!myPlayer || !targetPlayer) return { myWinsH2H: 0, rivalWinsH2H: 0, totalH2H: 0 };
     const mName = normalizeText(myPlayer.nombre);
     const tName = normalizeText(targetPlayer.nombre);
     let myWinsH2H = 0, rivalWinsH2H = 0;
@@ -903,11 +1683,11 @@ export default function App() {
       if (g === mName && p === tName) myWinsH2H++;
       if (g === tName && p === mName) rivalWinsH2H++;
     });
-    return { myWinsH2H, rivalWinsH2H };
+    return { myWinsH2H, rivalWinsH2H, totalH2H: myWinsH2H + rivalWinsH2H };
   };
 
   // ============================================================================
-  // 7. FOTOS, REGISTRO CON EDAD/GÉNERO Y MODO SANDBOX
+  // GESTIÓN DE IMÁGENES, ACCESO DUAL (CELULAR / CORREO) Y FICHA DEL TENISTA
   // ============================================================================
   async function handleFileChange(e) {
     const file = e.target.files?.[0];
@@ -918,7 +1698,7 @@ export default function App() {
       setFotoFile(compressed.file);
       setFotoPreview(compressed.preview);
     } catch {
-      alert('No se pudo procesar la imagen.');
+      alert('No se pudo procesar la fotografía.');
     } finally {
       setIsCompressing(false);
     }
@@ -948,33 +1728,71 @@ export default function App() {
     }
   }
 
+  // AUTENTICACIÓN DUAL: PERMITE ENTRAR CON NÚMERO DE CELULAR O CON CORREO
   async function handleAuth(e) {
     e.preventDefault();
-    if (!authEmail.trim() || !authPassword.trim()) return;
+    const cleanPhone = authPhoneInput.replace(/\D/g, '').trim();
+    const effectiveEmail = authMethod === 'celular' 
+      ? `${cleanPhone}@matchpoint.pe` 
+      : authEmail.trim().toLowerCase();
+
+    if (authMethod === 'celular' && cleanPhone.length < 9) {
+      return alert('Ingresa un número de celular válido de 9 dígitos.');
+    }
+    if (authMethod === 'correo' && !authEmail.trim()) {
+      return alert('Ingresa tu correo electrónico.');
+    }
+    if (!authPassword.trim()) {
+      return alert('Ingresa tu contraseña.');
+    }
+
     try {
       setAuthLoading(true);
       if (authMode === 'signup') {
-        const { data: existing } = await supabase
-          .from('jugadores')
-          .select('id')
-          .eq('email', authEmail.trim())
-          .maybeSingle();
+        // Verificar si ya existe por correo o por teléfono
+        let query = supabase.from('jugadores').select('id, email, telefono');
+        if (authMethod === 'celular') {
+          query = query.or(`telefono.eq.${cleanPhone},email.eq.${effectiveEmail}`);
+        } else {
+          query = query.eq('email', effectiveEmail);
+        }
+        const { data: existing } = await query.maybeSingle();
         if (existing) {
-          alert('Este correo ya está registrado. Inicia sesión.');
+          alert('Este número o correo ya tiene una cuenta registrada. Inicia sesión.');
           setAuthMode('login');
           return;
+        }
+        if (authMethod === 'celular') {
+          setTelefono(cleanPhone);
         }
         setShowAuthModal(false);
         setQuizStep(0);
         setShowProfileSetup(true);
       } else {
-        const { data, error } = await supabase
-          .from('jugadores')
-          .select('*')
-          .eq('email', authEmail.trim())
-          .eq('password', authPassword.trim())
-          .maybeSingle();
-        if (error || !data) return alert('Correo o contraseña incorrectos.');
+        // Login por Celular o por Correo
+        let data = null;
+        if (authMethod === 'celular') {
+          const resPhone = await supabase
+            .from('jugadores')
+            .select('*')
+            .or(`telefono.eq.${cleanPhone},email.eq.${effectiveEmail}`)
+            .eq('password', authPassword.trim())
+            .maybeSingle();
+          data = resPhone.data;
+        } else {
+          const resMail = await supabase
+            .from('jugadores')
+            .select('*')
+            .eq('email', effectiveEmail)
+            .eq('password', authPassword.trim())
+            .maybeSingle();
+          data = resMail.data;
+        }
+
+        if (!data) {
+          return alert('Datos de acceso incorrectos. Verifica tu número/correo y contraseña.');
+        }
+
         setCurrentUser(data);
         setSandboxLabel(null);
         if (keepSession) {
@@ -984,11 +1802,12 @@ export default function App() {
         }
         setShowAuthModal(false);
         setAuthEmail('');
+        setAuthPhoneInput('');
         setAuthPassword('');
         handleTabChange('perfil');
       }
     } catch (err) {
-      alert('Error: ' + err.message);
+      alert('Error de conexión: ' + err.message);
     } finally {
       setAuthLoading(false);
     }
@@ -996,7 +1815,15 @@ export default function App() {
 
   async function handleCompleteProfile() {
     if (!nombre.trim()) return alert('Ingresa tu nombre y apellido.');
-    const edadNum = parseInt(edad, 10) || 30;
+    const cleanPhone = (telefono || authPhoneInput).replace(/\D/g, '').trim();
+    if (!cleanPhone) return alert('Ingresa tu número de WhatsApp para coordinar tus partidos.');
+
+    const effectiveEmail = authMethod === 'celular' && !authEmail.trim()
+      ? `${cleanPhone}@matchpoint.pe`
+      : authEmail.trim().toLowerCase();
+
+    const edadNum = parseInt(edad, 10) || 34;
+
     try {
       setSavingPlayer(true);
       let publicFotoUrl = null;
@@ -1011,14 +1838,13 @@ export default function App() {
 
       const calib = calcularPuntos4Opciones(respuestasLikert);
 
-      // Intento principal con las nuevas columnas SQL (edad, genero, mano, horario)
       let { data, error } = await supabase.from('jugadores').insert([{
-        email: authEmail.trim(),
+        email: effectiveEmail,
         password: authPassword.trim(),
         nombre: nombre.trim(),
         club: club.trim(),
         categoria: calib.cat,
-        telefono: telefono.trim(),
+        telefono: cleanPhone,
         foto_url: publicFotoUrl,
         elo: calib.elo,
         victorias: 0,
@@ -1029,15 +1855,14 @@ export default function App() {
         horario: horarioPref
       }]).select();
 
-      // Respaldo automático si el usuario aún no ejecutó el ALTER TABLE en SQL
       if (error) {
         const fallbackRes = await supabase.from('jugadores').insert([{
-          email: authEmail.trim(),
+          email: effectiveEmail,
           password: authPassword.trim(),
           nombre: nombre.trim(),
           club: club.trim(),
           categoria: calib.cat,
-          telefono: telefono.trim(),
+          telefono: cleanPhone,
           foto_url: publicFotoUrl,
           elo: calib.elo,
           victorias: 0,
@@ -1054,13 +1879,22 @@ export default function App() {
       }
       setShowProfileSetup(false);
       setNombre('');
-      setTelefono('');
       setFotoFile(null);
       setFotoPreview(null);
       await fetchData();
+
+      // Si empieza desde cero (5ª P), ofrecerle conexión directa con entrenadores oficiales
+      if (calib.cat === '5ª P') {
+        setCrucialMomentAlert({
+          tipo: 'bienvenida_5p',
+          titulo: '¡Bienvenido al Circuito Oficial!',
+          subtitulo: 'Has sido ubicado en 5ª Principiante (5ª P)',
+          mensaje: 'Tu categoría estará protegida durante tus primeros 5 partidos. Si deseas tomar clases o perfeccionar tu saque, visita la pestaña de Entrenadores Oficiales.'
+        });
+      }
       handleTabChange('perfil');
     } catch (err) {
-      alert('Error guardando ficha: ' + err.message);
+      alert('Error registrando ficha: ' + err.message);
     } finally {
       setSavingPlayer(false);
     }
@@ -1071,6 +1905,7 @@ export default function App() {
     sessionStorage.removeItem('tennis_user_session');
     setCurrentUser(null);
     setSandboxLabel(null);
+    setShowSettingsModal(false);
     setShowSideDrawer(false);
     handleTabChange('perfil');
   }
@@ -1081,7 +1916,7 @@ export default function App() {
     setSandboxLabel(label);
     localStorage.setItem('tennis_user_session', JSON.stringify(targetPlayer));
     setShowAdminModal(false);
-    setShowSideDrawer(false);
+    setShowSettingsModal(false);
   }
 
   async function handleSimulateIncomingChallenge() {
@@ -1105,7 +1940,7 @@ export default function App() {
     try { await supabase.from('retos_activos').insert([retoTest]); } catch { /* fallback */ }
     const actualizados = [retoTest, ...retosProgramados];
     setRetosProgramados(actualizados);
-    localStorage.setItem('mp_retos_v5', JSON.stringify(actualizados));
+    localStorage.setItem('mp_retos_v6', JSON.stringify(actualizados));
     broadcastLiveUpdate(actualizados, null, null);
     setCurrentUser(receptor);
     setSandboxLabel(`Vista: ${receptor.nombre}`);
@@ -1113,7 +1948,6 @@ export default function App() {
     setPendingPopupAlert({ tipo: 'reto', data: retoTest });
   }
 
-  // Simular un Partido en Disputa para probar la Bandeja de Disputas en el Panel Admin
   function handleSimulateDisputeForAdmin() {
     const pA = jugadores[0]?.nombre || 'Carlos Mendoza';
     const pB = jugadores[1]?.nombre || 'Renato Vilchez';
@@ -1129,19 +1963,18 @@ export default function App() {
     };
     const nuevas = [disputaTest, ...validacionesPendientes];
     setValidacionesPendientes(nuevas);
-    localStorage.setItem('mp_validaciones_v5', JSON.stringify(nuevas));
+    localStorage.setItem('mp_validaciones_v6', JSON.stringify(nuevas));
     broadcastLiveUpdate(null, null, nuevas);
-    alert('✅ Se ha generado un partido "En Disputa" en la Bandeja de Resolución de Disputas de abajo.');
   }
 
   // ============================================================================
-  // 8. CREACIÓN DE RETOS (CON SEDE PERSONALIZADA Y MATCHING POR ID EN SUPABASE)
+  // RETOS OFICIALES, MARCADORES CON MOMENTOS CRUCIALES Y AVANCE DE TORNEOS
   // ============================================================================
   async function handleConfirmarNuevoReto(e) {
     e.preventDefault();
     if (!challengeTargetModal) return;
     if (challengeSede === 'OTRA_SEDE' && !customSedeText.trim()) {
-      return alert('Por favor escribe el nombre o dirección de la cancha donde jugarán.');
+      return alert('Escribe el nombre o dirección de la cancha donde jugarán.');
     }
 
     const sedeFinal = challengeSede === 'OTRA_SEDE' ? customSedeText.trim() : challengeSede;
@@ -1162,13 +1995,11 @@ export default function App() {
       ]
     };
 
-    try {
-      await supabase.from('retos_activos').insert([nuevoReto]);
-    } catch { /* fallback local */ }
+    try { await supabase.from('retos_activos').insert([nuevoReto]); } catch { /* fallback */ }
 
     const actualizados = [nuevoReto, ...retosProgramados];
     setRetosProgramados(actualizados);
-    localStorage.setItem('mp_retos_v5', JSON.stringify(actualizados));
+    localStorage.setItem('mp_retos_v6', JSON.stringify(actualizados));
     broadcastLiveUpdate(actualizados, null, null);
 
     const rivalTel = challengeTargetModal.telefono || '';
@@ -1178,22 +2009,17 @@ export default function App() {
     handleTabChange('match');
     setRetosSubTab('mis_retos');
 
-    if (rivalTel && window.confirm(`✅ Desafío registrado contra ${rivalNombre}.\n\n¿Deseas enviarle también el aviso por WhatsApp?`)) {
-      const msg = `🎾 *MATCHPOINT OFICIAL*: Hola ${rivalNombre.split(' ')[0]}, te he lanzado un desafío oficial en *${sedeFinal}* (${challengeFecha}). Entra a la app para aceptar el partido: https://huancayo-tenis.vercel.app`;
+    if (rivalTel && window.confirm(`Desafío registrado contra ${rivalNombre}.\n\n¿Deseas enviarle el aviso directo por WhatsApp?`)) {
+      const msg = `🎾 *MATCHPOINT OFICIAL*: Hola ${rivalNombre.split(' ')[0]}, te he lanzado un desafío oficial en *${sedeFinal}* (${challengeFecha}). Entra a la app para confirmar el partido: https://huancayo-tenis.vercel.app`;
       window.open(`https://wa.me/51${rivalTel.replace(/\D/g, '')}?text=${encodeURIComponent(msg)}`, '_blank');
     }
   }
 
   async function handleAceptarRetoEntrante(retoId) {
-    try {
-      await supabase.from('retos_activos').update({ estado: 'Programado' }).eq('id', retoId);
-    } catch { /* ignore */ }
-
-    const actualizados = retosProgramados.map(r => 
-      r.id === retoId ? { ...r, estado: 'Programado' } : r
-    );
+    try { await supabase.from('retos_activos').update({ estado: 'Programado' }).eq('id', retoId); } catch { /* ignore */ }
+    const actualizados = retosProgramados.map(r => r.id === retoId ? { ...r, estado: 'Programado' } : r);
     setRetosProgramados(actualizados);
-    localStorage.setItem('mp_retos_v5', JSON.stringify(actualizados));
+    localStorage.setItem('mp_retos_v6', JSON.stringify(actualizados));
     broadcastLiveUpdate(actualizados, null, null);
     setPendingPopupAlert(null);
     handleTabChange('match');
@@ -1208,27 +2034,20 @@ export default function App() {
     const nuevoMsg = { autor, texto: chatMessageInput.trim(), hora: horaActual };
     const nuevosMensajes = [...(activeChatReto.mensajes || []), nuevoMsg];
 
-    try {
-      await supabase.from('retos_activos').update({ mensajes: nuevosMensajes }).eq('id', activeChatReto.id);
-    } catch { /* ignore */ }
+    try { await supabase.from('retos_activos').update({ mensajes: nuevosMensajes }).eq('id', activeChatReto.id); } catch { /* ignore */ }
 
-    const actualizados = retosProgramados.map(r => {
-      if (r.id === activeChatReto.id) {
-        return { ...r, mensajes: nuevosMensajes };
-      }
-      return r;
-    });
+    const actualizados = retosProgramados.map(r => r.id === activeChatReto.id ? { ...r, mensajes: nuevosMensajes } : r);
     setRetosProgramados(actualizados);
-    localStorage.setItem('mp_retos_v5', JSON.stringify(actualizados));
+    localStorage.setItem('mp_retos_v6', JSON.stringify(actualizados));
     broadcastLiveUpdate(actualizados, null, null);
     setActiveChatReto(actualizados.find(r => r.id === activeChatReto.id));
     setChatMessageInput('');
   }
 
-  // PROCESAR PARTIDO (LENGUAJE 100% DEPORTIVO, CERO MENCIÓN A MEMORIA O ALGORITMOS)
+  // PROCESAR MARCADOR OFICIAL + DISPARAR MENSAJE EMOTIVO CRUCIAL
   async function handleProcesarPartido(e) {
     e.preventDefault();
-    if (!p1Id || !p2Id || !winnerId) return alert('Selecciona quién ganó el partido.');
+    if (!p1Id || !p2Id || !winnerId) return alert('Selecciona al ganador del encuentro.');
     if (p1Id === p2Id) return alert('Los competidores deben ser distintos.');
 
     const player1 = jugadores.find(j => j.id.toString() === p1Id);
@@ -1240,8 +2059,7 @@ export default function App() {
     if (enfrentamientosPrevios >= 2) {
       return alert(
         'Reglamento del Circuito:\n\n' +
-        `${player1.nombre} y ${player2.nombre} ya disputaron ${enfrentamientosPrevios} partidos puntuables entre sí esta semana.\n` +
-        'Debes enfrentar a otros oponentes del ranking.'
+        `${player1.nombre} y ${player2.nombre} ya disputaron ${enfrentamientosPrevios} partidos oficiales esta semana.`
       );
     }
 
@@ -1277,7 +2095,7 @@ export default function App() {
         [perdedorObj.nombre]: 0
       };
       setRachasUsuarios(nuevasRachas);
-      localStorage.setItem('mp_rachas_v5', JSON.stringify(nuevasRachas));
+      localStorage.setItem('mp_rachas_v6', JSON.stringify(nuevasRachas));
 
       const delta1 = Math.round(K1 * (S1 - E1) * fd + bonoAsistencia + bonoRacha1);
       const delta2 = Math.round(K2 * (S2 - E2) * fd + bonoAsistencia + bonoRacha2);
@@ -1306,18 +2124,21 @@ export default function App() {
 
       const nuevoCruces = { ...historialCruces, [pairKey]: enfrentamientosPrevios + 1 };
       setHistorialCruces(nuevoCruces);
-      localStorage.setItem('mp_cruces_v5', JSON.stringify(nuevoCruces));
+      localStorage.setItem('mp_cruces_v6', JSON.stringify(nuevoCruces));
+
+      const deltaGanador = S1 === 1 ? delta1 : delta2;
+      const deltaPerdedor = S1 === 1 ? delta2 : delta1;
 
       const lineaHistorica = {
         fecha: new Date().toISOString().split('T')[0],
         ganador: ganadorObj.nombre,
         perdedor: perdedorObj.nombre,
         marcador: score,
-        delta: `+${S1 === 1 ? delta1 : delta2} Pts`
+        delta: `+${deltaGanador} Pts`
       };
       const nuevoHistCSV = [lineaHistorica, ...historialPartidosCSV];
       setHistorialPartidosCSV(nuevoHistCSV);
-      localStorage.setItem('mp_historial_csv_v5', JSON.stringify(nuevoHistCSV));
+      localStorage.setItem('mp_historial_csv_v6', JSON.stringify(nuevoHistCSV));
 
       const registroAuditoria = {
         id: Date.now(),
@@ -1331,28 +2152,33 @@ export default function App() {
       };
       const nuevasVal = [registroAuditoria, ...validacionesPendientes];
       setValidacionesPendientes(nuevasVal);
-      localStorage.setItem('mp_validaciones_v5', JSON.stringify(nuevasVal));
+      localStorage.setItem('mp_validaciones_v6', JSON.stringify(nuevasVal));
 
-      // Silenciosamente retira el partido finalizado de retos activos (Opacidad Técnica Total)
       let restantes = retosProgramados;
       if (activeRetoId) {
         try { await supabase.from('retos_activos').delete().eq('id', activeRetoId); } catch { /* ignore */ }
         restantes = retosProgramados.filter(r => r.id !== activeRetoId);
         setRetosProgramados(restantes);
-        localStorage.setItem('mp_retos_v5', JSON.stringify(restantes));
+        localStorage.setItem('mp_retos_v6', JSON.stringify(restantes));
         setActiveRetoId(null);
       }
 
       broadcastLiveUpdate(restantes, null, nuevasVal);
-
-      alert(
-        `🎾 Marcador Oficial Registrado (${fdLabel})\n\n` +
-        `• ${player1.nombre}: ${newElo1} Puntos (${delta1 >= 0 ? '+' : ''}${delta1})\n` +
-        `• ${player2.nombre}: ${newElo2} Puntos (${delta2 >= 0 ? '+' : ''}${delta2})`
-      );
-
       setShowMatchModal(false);
       await fetchData();
+
+      // DISPARADOR DE MOMENTO CRUCIAL PERSONALIZADO (GANADOR VS PERDEDOR)
+      const soyElPerdedor = myPlayer && String(myPlayer.id) === String(perdedorObj.id);
+      const fraseVictoria = FRASES_MOMENTOS_CRUCIALES.victoria[Math.floor(Math.random() * FRASES_MOMENTOS_CRUCIALES.victoria.length)];
+      const fraseDerrota = FRASES_MOMENTOS_CRUCIALES.derrota[Math.floor(Math.random() * FRASES_MOMENTOS_CRUCIALES.derrota.length)];
+
+      setCrucialMomentAlert({
+        tipo: soyElPerdedor ? 'derrota' : 'victoria',
+        titulo: soyElPerdedor ? 'Partido Oficial Completado' : `¡Victoria Oficial Registrada! (${fdLabel})`,
+        subtitulo: `${ganadorObj.nombre} venció a ${perdedorObj.nombre} por ${score}`,
+        detallePuntos: `${ganadorObj.nombre}: +${deltaGanador} Pts  ·  ${perdedorObj.nombre}: ${deltaPerdedor >= 0 ? '+' : ''}${deltaPerdedor} Pts`,
+        mensaje: soyElPerdedor ? fraseDerrota : fraseVictoria
+      });
     } catch (err) {
       alert('Error al registrar el marcador: ' + err.message);
     } finally {
@@ -1360,7 +2186,65 @@ export default function App() {
     }
   }
 
-  // Exportación para el Administrador (Exclusivo en Panel Admin con PIN)
+  // MOTOR DINÁMICO DE AVANCE EN CUADROS DE TORNEOS (QF -> SEMIS -> FINAL + CONSUELO)
+  function handleUpdateBracketMatch(torneoId, fase, matchIndex, nuevoScore, ganadorNombre, perdedorNombre) {
+    const actualizados = torneosData.map((t) => {
+      if (t.id !== torneoId) return t;
+      const copiaBrackets = JSON.parse(JSON.stringify(t.brackets));
+
+      if (copiaBrackets[fase] && copiaBrackets[fase][matchIndex]) {
+        copiaBrackets[fase][matchIndex].score = nuevoScore;
+        copiaBrackets[fase][matchIndex].ganador = ganadorNombre;
+        copiaBrackets[fase][matchIndex].perdedor = perdedorNombre;
+      }
+
+      // Si es Cuartos de Final: el ganador avanza a Semifinales y el perdedor va a Ronda Consuelo
+      if (fase === 'cuartos') {
+        const semiIndex = Math.floor(matchIndex / 2);
+        const side = matchIndex % 2 === 0 ? 'j1' : 'j2';
+        if (copiaBrackets.semis?.[semiIndex]) {
+          copiaBrackets.semis[semiIndex][side] = ganadorNombre;
+          if (copiaBrackets.semis[semiIndex].score === 'Por Definir') {
+            copiaBrackets.semis[semiIndex].score = 'Programado';
+          }
+        }
+        if (copiaBrackets.consueloSemis?.[semiIndex]) {
+          copiaBrackets.consueloSemis[semiIndex][side] = perdedorNombre;
+          if (copiaBrackets.consueloSemis[semiIndex].score === 'Por Definir') {
+            copiaBrackets.consueloSemis[semiIndex].score = 'Programado';
+          }
+        }
+      }
+
+      // Si es Semifinales: el ganador avanza a la Gran Final
+      if (fase === 'semis') {
+        const side = matchIndex === 0 ? 'j1' : 'j2';
+        if (copiaBrackets.final?.[0]) {
+          copiaBrackets.final[0][side] = ganadorNombre;
+        }
+      }
+
+      return { ...t, brackets: copiaBrackets };
+    });
+
+    setTorneosData(actualizados);
+    localStorage.setItem('mp_torneos_v6', JSON.stringify(actualizados));
+    setSelectedTorneoModal(actualizados.find(t => t.id === torneoId));
+  }
+
+  function handleToggleTorneoStage(torneoId) {
+    const actualizados = torneosData.map(t => {
+      if (t.id !== torneoId) return t;
+      return {
+        ...t,
+        estadoTorneo: t.estadoTorneo === 'inscripciones' ? 'en_juego' : 'inscripciones'
+      };
+    });
+    setTorneosData(actualizados);
+    localStorage.setItem('mp_torneos_v6', JSON.stringify(actualizados));
+    setSelectedTorneoModal(actualizados.find(t => t.id === torneoId));
+  }
+
   function handleExportAndPurgeHistory() {
     const headers = ['Fecha,Ganador,Perdedor,Marcador,Variacion_Puntos'];
     const rows = historialPartidosCSV.map(
@@ -1374,38 +2258,26 @@ export default function App() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-
-    setHistorialPartidosCSV([]);
-    setValidacionesPendientes([]);
-    setHistorialCruces({});
-    localStorage.setItem('mp_historial_csv_v5', JSON.stringify([]));
-    localStorage.setItem('mp_validaciones_v5', JSON.stringify([]));
-    localStorage.setItem('mp_cruces_v5', JSON.stringify({}));
-    alert('✅ Archivo CSV descargado para tu Google Drive.');
   }
 
-  // Acciones del Administrador sobre Partidos en Disputa
   function handleAdminResolveDispute(disputa, accion) {
     if (accion === 'aprobar') {
       const nuevas = validacionesPendientes.map(v => v.id === disputa.id ? { ...v, estado: 'Confirmado por Comité' } : v);
       setValidacionesPendientes(nuevas);
-      localStorage.setItem('mp_validaciones_v5', JSON.stringify(nuevas));
+      localStorage.setItem('mp_validaciones_v6', JSON.stringify(nuevas));
       broadcastLiveUpdate(null, null, nuevas);
-      alert(`✔ Marcador (${disputa.score}) ratificado oficialmente.`);
     } else if (accion === 'editar') {
       const nuevoScore = window.prompt('Ingresa el marcador corregido por el Comité:', disputa.score);
       if (!nuevoScore) return;
       const nuevas = validacionesPendientes.map(v => v.id === disputa.id ? { ...v, score: nuevoScore, estado: 'Corregido por Comité' } : v);
       setValidacionesPendientes(nuevas);
-      localStorage.setItem('mp_validaciones_v5', JSON.stringify(nuevas));
+      localStorage.setItem('mp_validaciones_v6', JSON.stringify(nuevas));
       broadcastLiveUpdate(null, null, nuevas);
-      alert(`✏️ Marcador actualizado a ${nuevoScore}.`);
     } else if (accion === 'anular') {
       const nuevas = validacionesPendientes.filter(v => v.id !== disputa.id);
       setValidacionesPendientes(nuevas);
-      localStorage.setItem('mp_validaciones_v5', JSON.stringify(nuevas));
+      localStorage.setItem('mp_validaciones_v6', JSON.stringify(nuevas));
       broadcastLiveUpdate(null, null, nuevas);
-      alert('🗑️ Encuentro anulado del registro.');
     }
   }
 
@@ -1424,7 +2296,7 @@ export default function App() {
       }
     };
     setClimaSedes(nuevoMapa);
-    localStorage.setItem('mp_clima_v5', JSON.stringify(nuevoMapa));
+    localStorage.setItem('mp_clima_v6', JSON.stringify(nuevoMapa));
     broadcastLiveUpdate(null, nuevoMapa, null);
     setWeatherModalClub(null);
   }
@@ -1446,13 +2318,13 @@ export default function App() {
         return t;
       });
       setTorneosData(actualizados);
-      localStorage.setItem('mp_torneos_v5', JSON.stringify(actualizados));
+      localStorage.setItem('mp_torneos_v6', JSON.stringify(actualizados));
       setSelectedTorneoModal(actualizados.find(t => t.id === torneo.id));
     }
   }
 
   async function handleAdminDeletePlayer(player) {
-    if (!window.confirm(`¿Seguro que deseas eliminar la cuenta de "${player.nombre}"?`)) return;
+    if (!window.confirm(`¿Eliminar la ficha de "${player.nombre}"?`)) return;
     try {
       const { error } = await supabase.from('jugadores').delete().eq('id', player.id);
       if (error) throw error;
@@ -1468,22 +2340,52 @@ export default function App() {
     const nuevo = {
       id: `prof-${Date.now()}`,
       nombre: newProfNombre.trim(),
-      especialidad: newProfEsp.trim() || 'Entrenamiento Integral de Tenis',
-      niveles: 'Todas las categorías',
+      certificacion: 'Coach Pro Verificado',
+      rating: '5.0',
+      resenasCount: 12,
+      horasImpartidas: '+150h',
+      tarifaBase: parseInt(newProfTarifa, 10) || 50,
       sede: 'Sede Oficial Asociada',
-      tarifa: newProfTarifa.trim(),
       tel: newProfTel.trim(),
-      destacado: 'Coach Pro Verificado',
       activo: true,
-      foto: null
+      nichos: [newProfEsp.trim() || 'Técnica & Táctica', 'Todos los niveles'],
+      bioCorta: newProfEsp.trim() || 'Entrenamiento personalizado y formación competitiva en cancha.',
+      fotoAvatar: null,
+      fotoBanner: 'https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?auto=format&fit=crop&w=900&q=80',
+      programas: [
+        { id: 'prog-1', titulo: 'Clase Individual 1 a 1', detalle: '60 min · Corrección técnica personalizada', precio: `S/ ${parseInt(newProfTarifa, 10) || 50}` }
+      ],
+      turnosLibres: [
+        { id: 't-new-1', dia: 'Sábado', hora: '10:00 AM', club: 'Country Club', disponible: true }
+      ],
+      resenas: []
     };
     const lista = [nuevo, ...profesores];
     setProfesores(lista);
-    localStorage.setItem('mp_profesores_v5', JSON.stringify(lista));
+    localStorage.setItem('mp_profesores_v6', JSON.stringify(lista));
     setNewProfNombre('');
     setNewProfEsp('');
     setNewProfTel('');
-    alert('✅ Entrenador publicado en el directorio.');
+  }
+
+  function handleAddCoachFreeSlot(e) {
+    e.preventDefault();
+    if (!profesores.length) return;
+    const nuevoSlot = {
+      id: `slot-${Date.now()}`,
+      dia: newTurnoDia,
+      hora: newTurnoHora,
+      club: newTurnoClub,
+      disponible: true
+    };
+    const actualizados = profesores.map((p, idx) => {
+      if (idx === 0) {
+        return { ...p, turnosLibres: [nuevoSlot, ...(p.turnosLibres || [])] };
+      }
+      return p;
+    });
+    setProfesores(actualizados);
+    localStorage.setItem('mp_profesores_v6', JSON.stringify(actualizados));
   }
 
   function toggleClubVisibility(clubNombre) {
@@ -1495,13 +2397,13 @@ export default function App() {
       }
     };
     setFeatureToggles(updated);
-    localStorage.setItem('mp_feature_toggles_v5', JSON.stringify(updated));
+    localStorage.setItem('mp_feature_toggles_v6', JSON.stringify(updated));
   }
 
   function toggleProfesorVisibility(profId) {
     const updated = profesores.map(p => p.id === profId ? { ...p, activo: p.activo === false ? true : false } : p);
     setProfesores(updated);
-    localStorage.setItem('mp_profesores_v5', JSON.stringify(updated));
+    localStorage.setItem('mp_profesores_v6', JSON.stringify(updated));
   }
 
   const sedesVisibles = SEDES_CLUB_PRO.filter(c => featureToggles.clubesActivos?.[c.nombre] !== false);
@@ -1513,39 +2415,34 @@ export default function App() {
     return { ...c, sociosCount: socios.length, totalPuntos };
   }).sort((a, b) => b.totalPuntos - a.totalPuntos);
 
-  // Filtrado de Jugadores para General, Damas, +40 Senior y Categorías
   const jugadoresFiltrados = jugadores.filter(j => {
     if (filtroCat === 'General') return true;
     if (filtroCat === 'Damas') return j.genero === 'Damas' || ['romina', 'claudia', 'maria', 'lucia', 'ana', 'sofia'].some(n => normalizeText(j.nombre).includes(n));
     if (filtroCat === '+40 Senior') return (j.edad && Number(j.edad) >= 40) || (!j.edad && (j.elo || 1000) >= 1350);
     return getInfoCategoria(j.elo || 1000).id === filtroCat;
-  });
+  });// ============================================================================
+// PARTE 3 DE 3: VISTAS 60-30-10, MODALES DESBLOQUEADOS Y BARRA INFERIOR 76PX
+// ============================================================================
 
-  // ============================================================================
-  // 9. PANTALLA SPLASH CINEMÁTICA CON TIPS DE TENIS
-  // ============================================================================
+  // PANTALLA DE CARGA INICIAL SOBRIA
   if (showSplash) {
     return (
       <div 
         style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
-        className="min-h-screen bg-[#111318] text-[#F4F4F6] flex flex-col items-center justify-center p-6 max-w-md mx-auto select-none relative overflow-hidden"
+        className="min-h-screen bg-[#0B0D11] text-white flex flex-col items-center justify-center p-6 max-w-md mx-auto select-none relative overflow-hidden"
       >
-        <div className="absolute w-72 h-72 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none"></div>
-        <div className="animate-bounce mb-6">
-          <SvgTennisBall className="w-28 h-28" />
+        <div className="mb-6">
+          <SvgTennisBall className="w-24 h-24" />
         </div>
-        <h1 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-4xl font-black tracking-tight text-white">
+        <h1 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-3xl font-black tracking-tight text-white">
           MATCHPOINT
         </h1>
-        <p className="text-xs uppercase tracking-[0.25em] text-[#E06D44] font-extrabold mt-2">
+        <p className="text-[11px] uppercase tracking-[0.28em] text-[#D96B43] font-extrabold mt-1.5">
           Circuito Oficial de Tenis
         </p>
-        <div className="w-48 h-1.5 bg-zinc-800/90 rounded-full overflow-hidden mt-7">
-          <div className="h-full bg-gradient-to-r from-emerald-400 to-[#E06D44] rounded-full animate-pulse w-full"></div>
+        <div className="w-40 h-1 bg-[#14171F] rounded-full overflow-hidden mt-7 border border-[#222631]">
+          <div className="h-full bg-[#10B981] rounded-full animate-pulse w-full"></div>
         </div>
-        <p className="text-xs text-zinc-300 text-center max-w-xs mt-6 bg-[#181B22] border border-zinc-800 px-4 py-2.5 rounded-2xl">
-          {TIPS_DE_TENIS[0]}
-        </p>
       </div>
     );
   }
@@ -1553,25 +2450,25 @@ export default function App() {
   return (
     <div 
       style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
-      className="min-h-screen bg-[#111318] text-[#F5F5F7] flex flex-col max-w-md mx-auto shadow-2xl pb-32 border-x border-zinc-800/80 relative"
+      className="min-h-screen bg-[#0B0D11] text-white flex flex-col max-w-md mx-auto shadow-2xl pb-32 border-x border-[#222631] relative"
     >
-      {/* BARRA DE PRUEBA RÁPIDA SI EL MODO SANDBOX ESTÁ ACTIVO */}
+      {/* BARRA SUPERIOR DE PRUEBAS (SOLO CUANDO EL MODO SANDBOX ESTÁ ACTIVO) */}
       {sandboxLabel && (
-        <div className="bg-amber-500 text-zinc-950 px-3 py-1.5 text-xs font-black flex items-center justify-between sticky top-0 z-50">
-          <span>🧪 {sandboxLabel} ({myPlayer?.nombre})</span>
-          <div className="flex items-center gap-1.5">
+        <div className="bg-[#14171F] border-b border-[#EAB308]/40 text-white px-3.5 py-2 text-xs font-bold flex items-center justify-between sticky top-0 z-50">
+          <span className="text-[#EAB308] truncate">🧪 {sandboxLabel} ({myPlayer?.nombre})</span>
+          <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={() => {
                 const otro = jugadores.find(j => j.id !== myPlayer?.id) || jugadores[0];
                 if (otro) handleActivateSandboxUser(otro, `Vista: ${otro.nombre.split(' ')[0]}`);
               }}
-              className="bg-zinc-950 text-amber-400 px-2 py-0.5 rounded-md text-[11px] font-black"
+              className="bg-[#0B0D11] border border-[#222631] text-zinc-200 px-2.5 py-1 rounded-lg text-[11px] font-extrabold"
             >
-              ⇄ Cambiar Cuenta
+              ⇄ Cambiar Jugador
             </button>
             <button
               onClick={() => setSandboxLabel(null)}
-              className="bg-zinc-900/20 px-1.5 py-0.5 rounded text-[11px]"
+              className="text-zinc-400 hover:text-white px-1"
             >
               ✕
             </button>
@@ -1580,22 +2477,22 @@ export default function App() {
       )}
 
       {/* ========================================================================
-          HEADER PREMIUM CENTRADO
+          HEADER INSTITUCIONAL LIMPIO (SIN MARQUESINA DE TEXTO)
       ======================================================================== */}
-      <header className="pt-12 pb-3.5 px-4 bg-[#161920]/95 backdrop-blur-md border-b border-zinc-800/90 grid grid-cols-3 items-center sticky top-0 z-30">
+      <header className="pt-11 pb-3.5 px-4 bg-[#0B0D11]/95 backdrop-blur-md border-b border-[#222631] grid grid-cols-3 items-center sticky top-0 z-30">
         <div className="flex items-center space-x-2">
           <button
             onClick={() => setShowSideDrawer(true)}
-            className="p-2.5 bg-[#1F232D] hover:bg-zinc-800 border border-zinc-700/80 rounded-xl text-zinc-100"
-            title="Menú y Opciones"
+            className="w-10 h-10 bg-[#14171F] hover:border-zinc-700 border border-[#222631] rounded-xl flex items-center justify-center text-zinc-200"
+            title="Información del Circuito"
           >
-            <Menu className="w-5 h-5 text-emerald-400" />
+            <Menu className="w-5 h-5" />
           </button>
           {featureToggles.tiendaActiva && (
             <button
               onClick={() => setShowStoreModal(true)}
-              className="p-2.5 bg-[#1F232D] hover:bg-zinc-800 border border-[#E06D44]/40 rounded-xl text-[#E06D44]"
-              title="Tienda & Encordado"
+              className="w-10 h-10 bg-[#14171F] hover:border-zinc-700 border border-[#222631] rounded-xl flex items-center justify-center text-[#D96B43]"
+              title="Pro-Shop & Encordado"
             >
               <ShoppingBag className="w-4 h-4" />
             </button>
@@ -1606,20 +2503,20 @@ export default function App() {
           <h1 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-xl font-black tracking-tight text-white leading-none">
             MATCHPOINT
           </h1>
-          <span className="text-[10px] tracking-[0.18em] uppercase font-extrabold text-[#E06D44] block mt-1">
-            Circuito Oficial
+          <span className="text-[9px] tracking-[0.22em] uppercase font-bold text-[#8E98A8] block mt-1">
+            Huancayo · Oficial
           </span>
         </div>
 
         <div className="flex items-center justify-end space-x-2">
           <button
             onClick={() => setShowNotifModal(true)}
-            className="relative p-2.5 bg-[#1F232D] hover:bg-zinc-800 border border-zinc-700/80 rounded-xl text-zinc-100"
+            className="relative w-10 h-10 bg-[#14171F] hover:border-zinc-700 border border-[#222631] rounded-xl flex items-center justify-center text-zinc-200"
             title="Avisos"
           >
-            <Bell className="w-4 h-4 text-emerald-400" />
+            <Bell className="w-4 h-4" />
             {misNotificacionesCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#E06D44] text-white text-[10px] font-black flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#D96B43] text-white text-[10px] font-black flex items-center justify-center">
                 {misNotificacionesCount}
               </span>
             )}
@@ -1628,14 +2525,14 @@ export default function App() {
           {myPlayer ? (
             <button 
               onClick={() => handleTabChange('perfil')}
-              className="bg-[#1F232D] border border-emerald-500/40 px-2.5 py-2 rounded-xl text-xs font-extrabold text-emerald-400 truncate max-w-[78px]"
+              className="bg-[#14171F] border border-[#222631] px-3 py-2 rounded-xl text-xs font-extrabold text-white truncate max-w-[82px]"
             >
               {myPlayer.nombre.split(' ')[0]}
             </button>
           ) : (
             <button
               onClick={() => { setAuthMode('login'); setShowAuthModal(true); }}
-              className="bg-emerald-500 hover:bg-emerald-400 text-zinc-950 px-3 py-2 rounded-xl text-xs font-black"
+              className="bg-[#10B981] hover:bg-emerald-400 text-zinc-950 px-3.5 py-2 rounded-xl text-xs font-black"
             >
               Entrar
             </button>
@@ -1643,66 +2540,65 @@ export default function App() {
         </div>
       </header>
 
-      {/* BARRA SUTIL DE TIPS DE TENIS ROTATIVOS */}
-      <div className="bg-[#151821] border-b border-zinc-800/80 px-4 py-2 text-[11px] text-zinc-300 font-semibold text-center truncate">
-        {TIPS_DE_TENIS[tipIndex]}
-      </div>
-
       <main key={tab} className="p-4 flex-1 space-y-4 mp-page-transition">
 
         {/* ======================================================================
-            1. PESTAÑA: MI PERFIL (RACHA OCULTA SI ES 0 + CARNET DIGITAL)
+            1. PESTAÑA: MI PERFIL (ARQUITECTURA SOBRIA 60-30-10 + TUERCA ⚙️ + CARNET VIP)
         ====================================================================== */}
         {tab === 'perfil' && (
           <div className="space-y-4">
             {myPlayer ? (
-              <div className="bg-[#181B22] border border-zinc-800 rounded-3xl overflow-hidden shadow-2xl">
-                <div className="relative h-28 bg-gradient-to-r from-[#2A1812] via-[#1B222C] to-[#122620] p-4 flex justify-between items-start">
-                  <span className={`text-xs font-extrabold px-3 py-1 rounded-full border backdrop-blur-md ${
-                    !isCalibrated 
-                      ? 'bg-amber-500/20 text-amber-300 border-amber-400/40' 
-                      : 'bg-emerald-500/20 text-emerald-300 border-emerald-400/40'
-                  }`}>
-                    {!isCalibrated ? `🔒 Calibrando (${myTotalMatches}/5)` : `✔ Oficial · Puesto #${myRankPos}`}
+              <div className="bg-[#14171F] border border-[#222631] rounded-3xl overflow-hidden shadow-2xl">
+                {/* Cabecera Arquitectónica con Trama de Pista en Bajo Relieve (Sin degradado tricolor) */}
+                <div className="relative h-28 bg-[#0B0D11] border-b border-[#222631] p-4 flex justify-between items-start overflow-hidden">
+                  <div className="absolute inset-0 pointer-events-none">
+                    <SvgCourtLinesBg className="w-full h-full opacity-[0.05]" />
+                  </div>
+
+                  {/* Estado de Calibración o Puesto Oficial */}
+                  <span className="relative z-10 text-[11px] font-extrabold px-3 py-1.5 rounded-xl bg-[#14171F] border border-[#222631] text-zinc-200">
+                    {!isCalibrated ? `Calibración (${myTotalMatches}/5)` : `Ranking Oficial · #${myRankPos}`}
                   </span>
 
-                  <div className="flex items-center gap-2">
-                    {/* SOLO SE MUESTRA LA RACHA SI EL JUGADOR TIENE VICTORIAS ACTIVAS (myStreak >= 1) */}
-                    {myStreak >= 1 && (
-                      <div className="inline-flex items-center gap-1.5 bg-zinc-950/80 border border-orange-500/50 px-3 py-1 rounded-full shadow-lg">
-                        <SvgFlame className="w-5 h-5" />
-                        <span className="text-xs font-black text-orange-300">{myStreak} en racha</span>
-                      </div>
-                    )}
+                  {/* Acciones de Cabecera: Carnet VIP + Tuerca de Ajustes ⚙️ */}
+                  <div className="relative z-10 flex items-center gap-2">
                     <button
                       onClick={() => setShowMemberPassModal(true)}
-                      className="bg-zinc-950/80 border border-emerald-500/40 text-emerald-300 px-2.5 py-1 rounded-full text-[11px] font-black flex items-center gap-1"
+                      className="bg-[#14171F] hover:border-zinc-600 border border-[#222631] text-white px-3 py-1.5 rounded-xl text-[11px] font-extrabold flex items-center gap-1.5"
                     >
-                      <QrCode className="w-3.5 h-3.5" /> Carnet
+                      <QrCode className="w-3.5 h-3.5 text-[#EAB308]" /> Carnet VIP
+                    </button>
+                    <button
+                      onClick={() => setShowSettingsModal(true)}
+                      className="w-8 h-8 rounded-xl bg-[#14171F] hover:border-zinc-600 border border-[#222631] flex items-center justify-center text-zinc-300 hover:text-white"
+                      title="Ajustes de Cuenta"
+                    >
+                      <Settings className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
 
-                <div className="px-6 pb-6 text-center -mt-14 relative">
+                {/* Bloque Central de Identidad del Jugador */}
+                <div className="px-6 pb-6 text-center -mt-14 relative z-10">
                   <div className="relative w-28 h-28 mx-auto mb-3">
                     <div 
                       onClick={() => profileAvatarInputRef.current?.click()}
-                      className={`w-28 h-28 rounded-full bg-zinc-800 p-1 cursor-pointer overflow-hidden flex items-center justify-center transition ${getAvatarHaloClass(myPlayer, myRankPos - 1)}`}
+                      className={`w-28 h-28 rounded-full bg-[#0B0D11] p-1 cursor-pointer overflow-hidden flex items-center justify-center transition ${getAvatarHaloClass(myPlayer, myRankPos - 1)}`}
                     >
                       {updatingAvatar ? (
-                        <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />
+                        <Loader2 className="w-8 h-8 text-[#10B981] animate-spin" />
                       ) : myPlayer.foto_url ? (
-                        <img src={myPlayer.foto_url} alt={myPlayer.nombre} className="w-full h-full rounded-full object-cover" />
+                        <img src={myPlayer.foto_url} alt={myPlayer.nombre} className="w-full h-full rounded-full object-cover object-center" />
                       ) : (
-                        <User className="w-14 h-14 text-zinc-400" />
+                        <User className="w-12 h-12 text-zinc-500" />
                       )}
                     </div>
                     <button
                       onClick={() => profileAvatarInputRef.current?.click()}
-                      className="absolute bottom-0 right-0 bg-emerald-500 text-zinc-950 p-2 rounded-full shadow-lg border-2 border-[#181B22]"
-                      title="Cambiar foto"
+                      className="absolute bottom-0 right-0 bg-[#14171F] text-white p-2 rounded-full shadow-lg border border-[#222631] hover:border-zinc-500"
+                      title="Actualizar fotografía"
                     >
-                      <Camera className="w-4 h-4" />
+                      <Camera className="w-4 h-4 text-[#10B981]" />
                     </button>
                     <input 
                       type="file" 
@@ -1713,158 +2609,161 @@ export default function App() {
                     />
                   </div>
 
-                  {/* Insignia de Campeón Vigente si es #1 y cumple el mérito de >= 5 partidos */}
+                  {/* Insignia de Campeón Vigente si es #1 y tiene >= 5 partidos */}
                   {myRankPos === 1 && isCalibrated && (
-                    <div className="mb-1.5 inline-flex items-center gap-1.5 bg-amber-500/20 border border-amber-400/50 text-amber-300 px-3 py-0.5 rounded-full text-[11px] font-black uppercase">
+                    <div className="mb-1.5 inline-flex items-center gap-1.5 bg-[#EAB308]/15 border border-[#EAB308]/40 text-[#EAB308] px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider">
                       <Crown className="w-3.5 h-3.5" /> Campeón Vigente del Circuito
                     </div>
                   )}
 
-                  <h2 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-2xl font-black text-white">
+                  <h2 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-2xl font-black text-white tracking-tight">
                     {myPlayer.nombre}
                   </h2>
-                  <p className="text-sm text-zinc-300 font-semibold mt-0.5">
-                    {myPlayer.club || 'Independiente'} · {myPlayer.mano || 'Diestro'}
+                  <p className="text-xs text-[#8E98A8] font-semibold mt-0.5">
+                    {myPlayer.club || 'Socio Independiente'} · {myPlayer.mano || 'Diestro'}
                     {myPlayer.edad && Number(myPlayer.edad) >= 40 ? ' · Senior +40' : ''}
                   </p>
 
-                  {!isCalibrated ? (
-                    <div className="mt-3 inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-extrabold bg-zinc-900 text-amber-300 border border-amber-500/40">
-                      <Lock className="w-3.5 h-3.5" /> Nivel Oculto hasta jugar 5 partidos
-                    </div>
-                  ) : (
-                    <div className={`inline-flex items-center gap-2 mt-3 px-4 py-1.5 rounded-full text-xs font-extrabold border ${myCatInfo.color}`}>
-                      <SvgTrophy className="w-4 h-4" /> {myCatInfo.nombre}
-                    </div>
-                  )}
-
-                  {/* TARJETAS DE ESTADÍSTICAS GRANDES */}
-                  <div className={`grid ${myStreak >= 1 ? 'grid-cols-3' : 'grid-cols-2'} gap-2.5 mt-5`}>
-                    <div className="bg-[#12141A] p-3.5 rounded-2xl border border-zinc-800 flex flex-col items-center">
-                      <SvgTrophy className="w-6 h-6 mb-1" />
-                      <span style={{ fontFamily: "'Outfit', sans-serif" }} className="text-xl font-black text-emerald-400">
-                        {myPlayer.elo || 1000}
+                  {/* Píldora Sobria de Categoría o Estado Oculto */}
+                  <div className="mt-3 flex items-center justify-center gap-2 flex-wrap">
+                    {!isCalibrated ? (
+                      <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-[11px] font-bold bg-[#0B0D11] text-[#8E98A8] border border-[#222631]">
+                        <Lock className="w-3 h-3 text-[#EAB308]" /> Categoría protegida hasta cumplir 5 partidos
                       </span>
-                      <span className="text-[11px] font-bold text-zinc-400">Puntos Oficiales</span>
-                    </div>
-
-                    {myStreak >= 1 && (
-                      <div className="bg-[#12141A] p-3.5 rounded-2xl border border-orange-500/30 flex flex-col items-center">
-                        <SvgFlame className="w-6 h-6 mb-1" />
-                        <span style={{ fontFamily: "'Outfit', sans-serif" }} className="text-xl font-black text-orange-400">
-                          {myStreak}
-                        </span>
-                        <span className="text-[11px] font-bold text-zinc-400">Racha Activa</span>
-                      </div>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-4 py-1 rounded-full text-xs font-extrabold bg-[#0B0D11] text-white border border-[#222631]">
+                        <SvgTrophy className="w-4 h-4" /> {myCatInfo.nombre}
+                      </span>
                     )}
 
-                    <div className="bg-[#12141A] p-3.5 rounded-2xl border border-zinc-800 flex flex-col items-center">
-                      <Award className="w-6 h-6 text-sky-400 mb-1" />
-                      <span style={{ fontFamily: "'Outfit', sans-serif" }} className="text-xl font-black text-sky-300">
-                        {myWinRate}%
+                    {/* Racha solo visible cuando victorias >= 1 */}
+                    {myStreak >= 1 && (
+                      <span className="inline-flex items-center gap-1 bg-[#0B0D11] border border-[#222631] px-3 py-1 rounded-full text-xs font-extrabold text-white">
+                        <SvgFlame className="w-4 h-4" /> {myStreak} en racha
                       </span>
-                      <span className="text-[11px] font-bold text-zinc-400">Efectividad</span>
+                    )}
+                  </div>
+
+                  {/* Métricas Principales en Superficie Homogénea Carbón Mate */}
+                  <div className="grid grid-cols-3 gap-2.5 mt-5">
+                    <div className="bg-[#0B0D11] p-3.5 rounded-2xl border border-[#222631] flex flex-col items-center">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#8E98A8]">Puntos</span>
+                      <span style={{ fontFamily: "'Outfit', sans-serif" }} className="text-2xl font-black text-white mt-0.5">
+                        {myPlayer.elo || 1000}
+                      </span>
+                    </div>
+
+                    <div className="bg-[#0B0D11] p-3.5 rounded-2xl border border-[#222631] flex flex-col items-center">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#8E98A8]">Puesto</span>
+                      <span style={{ fontFamily: "'Outfit', sans-serif" }} className="text-2xl font-black text-[#10B981] mt-0.5">
+                        {myRankPos > 0 ? `#${myRankPos}` : '—'}
+                      </span>
+                    </div>
+
+                    <div className="bg-[#0B0D11] p-3.5 rounded-2xl border border-[#222631] flex flex-col items-center">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#8E98A8]">Efectividad</span>
+                      <span style={{ fontFamily: "'Outfit', sans-serif" }} className="text-2xl font-black text-white mt-0.5">
+                        {myTotalMatches > 0 ? `${myWinRate}%` : '—'}
+                      </span>
                     </div>
                   </div>
 
-                  {/* BARRA DE RÉCORD */}
-                  <div className="mt-4 bg-[#12141A] p-4 rounded-2xl border border-zinc-800 text-left space-y-2.5">
-                    <div className="flex justify-between items-center text-sm font-extrabold">
-                      <span className="text-emerald-400">✔ {myWins} Ganados</span>
-                      <span className="text-zinc-400 text-xs">{myTotalMatches} Jugados</span>
-                      <span className="text-rose-400">{myLosses} Perdidos ✕</span>
-                    </div>
-                    <div className="w-full h-3 bg-rose-950 rounded-full overflow-hidden flex">
-                      <div 
-                        className="h-full bg-emerald-400 transition-all"
-                        style={{ width: `${myTotalMatches > 0 ? myWinRate : 50}%` }}
-                      ></div>
-                    </div>
-                  </div>
-
-                  {!isCalibrated ? (
-                    <div className="mt-3 bg-[#12141A] p-4 rounded-2xl border border-amber-500/30 text-left">
-                      <div className="flex justify-between text-xs font-extrabold mb-1.5">
-                        <span className="text-amber-300">Partidos de Calibración</span>
-                        <span className="text-white">{myTotalMatches} / 5 completados</span>
-                      </div>
-                      <div className="w-full h-2.5 bg-zinc-800 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-amber-400 rounded-full"
-                          style={{ width: `${Math.max(12, (myTotalMatches / 5) * 100)}%` }}
-                        ></div>
-                      </div>
-                      <p className="text-xs text-zinc-300 mt-2">
-                        Completa <strong>{5 - myTotalMatches} partido(s) más</strong> para revelar tu categoría y competir por los trofeos de temporada.
+                  {/* Récord de Partidos: Estado Neutro si tiene 0 partidos (Sin barra verde/roja falsa) */}
+                  {myTotalMatches === 0 ? (
+                    <div className="mt-3 bg-[#0B0D11] p-4 rounded-2xl border border-[#222631] text-center space-y-1">
+                      <p className="text-xs font-bold text-white">
+                        Temporada Inaugural · Sin partidos registrados
+                      </p>
+                      <p className="text-[11px] text-[#8E98A8]">
+                        Completa tus primeros 5 desafíos oficiales para desbloquear tu historial y categoría.
                       </p>
                     </div>
                   ) : (
-                    <div className="mt-3 bg-[#12141A] p-4 rounded-2xl border border-zinc-800 text-left">
-                      <div className="flex justify-between text-xs font-extrabold mb-1.5">
-                        <span className="text-zinc-300">Camino al Ascenso</span>
-                        <span className="text-emerald-400">A {faltanParaSubir} Pts</span>
+                    <div className="mt-3 bg-[#0B0D11] p-4 rounded-2xl border border-[#222631] text-left space-y-2">
+                      <div className="flex justify-between items-center text-xs font-extrabold">
+                        <span className="text-[#10B981]">{myWins} Ganados</span>
+                        <span className="text-[#8E98A8]">{myTotalMatches} Jugados</span>
+                        <span className="text-zinc-400">{myLosses} Perdidos</span>
                       </div>
-                      <div className="w-full h-2.5 bg-zinc-800 rounded-full overflow-hidden">
+                      <div className="w-full h-2 bg-[#14171F] rounded-full overflow-hidden flex">
                         <div 
-                          className="h-full bg-emerald-400 rounded-full"
-                          style={{ width: `${Math.min(100, Math.max(10, Math.round((puntosEnCat / totalRangoCat) * 100)))}%` }}
+                          className="h-full bg-[#10B981] transition-all"
+                          style={{ width: `${myWinRate}%` }}
                         ></div>
                       </div>
                     </div>
                   )}
 
+                  {/* Barra de Progreso al Siguiente Nivel */}
+                  {isCalibrated && (
+                    <div className="mt-3 bg-[#0B0D11] p-4 rounded-2xl border border-[#222631] text-left">
+                      <div className="flex justify-between text-xs font-bold mb-1.5">
+                        <span className="text-[#8E98A8]">Progreso de Categoría</span>
+                        <span className="text-white">A {faltanParaSubir} Pts del ascenso</span>
+                      </div>
+                      <div className="w-full h-2 bg-[#14171F] rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-[#10B981] rounded-full"
+                          style={{ width: `${Math.min(100, Math.max(8, Math.round((puntosEnCat / totalRangoCat) * 100)))}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Botones de Acción Principal */}
                   <div className="grid grid-cols-2 gap-3 mt-5">
                     <button 
                       onClick={() => { handleTabChange('match'); setRetosSubTab('nuevo'); }}
-                      className="bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black py-3.5 rounded-2xl text-sm flex items-center justify-center gap-2 shadow-lg"
+                      className="bg-[#10B981] hover:bg-emerald-400 text-zinc-950 font-black py-3.5 rounded-2xl text-xs flex items-center justify-center gap-2 shadow-lg"
                     >
                       <Swords className="w-4 h-4" /> Lanzar Reto
                     </button>
                     <button 
-                      onClick={() => setShowStoreModal(true)}
-                      className="bg-[#231915] hover:bg-[#2F211B] text-[#F79D65] font-extrabold py-3.5 rounded-2xl text-sm flex items-center justify-center gap-2 border border-[#E06D44]/40"
+                      onClick={() => setShowMemberPassModal(true)}
+                      className="bg-[#0B0D11] hover:border-zinc-600 text-white font-extrabold py-3.5 rounded-2xl text-xs flex items-center justify-center gap-2 border border-[#222631]"
                     >
-                      <ShoppingBag className="w-4 h-4" /> Tienda & Grips
+                      <QrCode className="w-4 h-4 text-[#EAB308]" /> Ver Carnet VIP
                     </button>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="bg-[#181B22] border border-zinc-800 rounded-3xl overflow-hidden shadow-2xl">
-                <div className="relative h-44 w-full">
+              /* Vista de Invitado (No bloqueante) */
+              <div className="bg-[#14171F] border border-[#222631] rounded-3xl overflow-hidden shadow-2xl">
+                <div className="relative h-44 w-full bg-[#0B0D11]">
                   <img 
                     src="https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?auto=format&fit=crop&w=900&q=80" 
-                    alt="Tenis" 
-                    className="w-full h-full object-cover"
+                    alt="Circuito Matchpoint" 
+                    className="w-full h-full object-cover opacity-65"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#181B22] via-[#181B22]/50 to-transparent"></div>
-                  <div className="absolute bottom-3 left-5 right-5 flex items-center gap-3">
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#14171F] via-[#14171F]/40 to-transparent"></div>
+                  <div className="absolute bottom-3 left-5 right-5 flex items-center gap-3.5">
                     <SvgTennisBall className="w-12 h-12 shrink-0" />
                     <div>
-                      <span className="text-[11px] font-black uppercase tracking-widest text-[#E06D44] block">
-                        Comunidad Oficial
+                      <span className="text-[10px] font-black uppercase tracking-widest text-[#D96B43] block">
+                        Circuito Oficial · Huancayo
                       </span>
                       <h2 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-2xl font-black text-white">
-                        Juega, Reta y Sube de Nivel
+                        Compite en tu Categoría
                       </h2>
                     </div>
                   </div>
                 </div>
 
                 <div className="p-6 space-y-4 text-center">
-                  <p className="text-sm text-zinc-300 leading-relaxed">
-                    Encuentra rivales de tu mismo nivel, lleva tu récord oficial y participa en las divisiones General, Damas y Senior +40.
+                  <p className="text-xs text-[#8E98A8] leading-relaxed">
+                    Ingresa con tu número de WhatsApp o correo para registrar tus partidos, obtener tu Carnet VIP y competir en las divisiones General, Damas y Senior +40.
                   </p>
                   <div className="grid grid-cols-2 gap-3 pt-1">
                     <button
                       onClick={() => { setAuthMode('login'); setShowAuthModal(true); }}
-                      className="bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black py-3.5 rounded-2xl text-sm shadow-lg"
+                      className="bg-[#10B981] hover:bg-emerald-400 text-zinc-950 font-black py-3.5 rounded-2xl text-xs shadow-lg"
                     >
                       Iniciar Sesión
                     </button>
                     <button
                       onClick={() => { setAuthMode('signup'); setShowAuthModal(true); }}
-                      className="bg-zinc-800 hover:bg-zinc-700 text-white font-extrabold py-3.5 rounded-2xl text-sm border border-zinc-700"
+                      className="bg-[#0B0D11] hover:border-zinc-600 text-white font-extrabold py-3.5 rounded-2xl text-xs border border-[#222631]"
                     >
                       Crear Cuenta
                     </button>
@@ -1876,104 +2775,150 @@ export default function App() {
         )}
 
         {/* ======================================================================
-            2. PESTAÑA: RANKING (DAMAS, +40 SENIOR, SALÓN DE LA FAMA Y PERFIL COMPLETO)
+            2. PESTAÑA: RANKING (CON SALÓN DE LA FAMA INTEGRADO Y CERO LINKS SUBRAYADOS)
         ====================================================================== */}
         {tab === 'ranking' && (
           <div className="space-y-4">
-            <div className="bg-[#181B22] border border-zinc-800 rounded-3xl overflow-hidden shadow-2xl">
-              <div className="bg-gradient-to-r from-[#2D1810] via-[#1B222C] to-[#122620] p-4 flex justify-between items-center border-b border-zinc-800">
-                <div className="flex items-center gap-2.5">
-                  <Clock className="w-5 h-5 text-[#E06D44]" />
-                  <div>
-                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#E06D44] block">
-                      Temporada Apertura 2026
-                    </span>
-                    <p className="text-xs font-black text-white">
-                      Cierra en: <span className="text-amber-300 font-mono">19 días · 08 hrs</span>
-                    </p>
+            <div className="bg-[#14171F] border border-[#222631] rounded-3xl overflow-hidden shadow-2xl">
+              {/* Conmutador Superior: Temporada Actual vs Salón de la Fama */}
+              <div className="p-3 bg-[#0B0D11] border-b border-[#222631] flex items-center justify-between gap-2">
+                <div className="grid grid-cols-2 gap-1.5 bg-[#14171F] p-1 rounded-2xl border border-[#222631] flex-1">
+                  <button
+                    onClick={() => setRankingSubTab('temporada')}
+                    className={`py-2 rounded-xl text-xs font-extrabold transition ${
+                      rankingSubTab === 'temporada' ? 'bg-[#10B981] text-zinc-950 shadow' : 'text-[#8E98A8]'
+                    }`}
+                  >
+                    Clasificación Actual
+                  </button>
+                  <button
+                    onClick={() => setRankingSubTab('salon_fama')}
+                    className={`py-2 rounded-xl text-xs font-extrabold transition flex items-center justify-center gap-1 ${
+                      rankingSubTab === 'salon_fama' ? 'bg-[#EAB308] text-zinc-950 shadow' : 'text-[#8E98A8]'
+                    }`}
+                  >
+                    <Crown className="w-3.5 h-3.5" /> Salón de la Fama
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => setShowLevelsModal(true)}
+                  className="bg-[#14171F] hover:border-zinc-600 text-[11px] font-extrabold text-zinc-200 px-3 py-2.5 rounded-xl border border-[#222631] shrink-0"
+                >
+                  Niveles
+                </button>
+              </div>
+
+              {rankingSubTab === 'temporada' && (
+                <>
+                  {/* WIDGET DE COMPETICIÓN "OBJETIVO DE ASCENSO" (SIN LINKS SUBRAYADOS) */}
+                  {playerAboveMe && (
+                    <div className="bg-[#0B0D11]/60 px-4 py-3 border-b border-[#222631] flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#8E98A8] block">
+                          Objetivo Inmediato · Puesto #{myRankPos - 1}
+                        </span>
+                        <p className="text-xs font-bold text-white truncate mt-0.5">
+                          {playerAboveMe.nombre} <span className="text-[#10B981] font-extrabold">· A {ptsToOvertake} Pts</span>
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setChallengeTargetModal(playerAboveMe)}
+                        className="bg-[#14171F] hover:border-[#10B981] border border-[#222631] text-white text-[11px] font-extrabold px-3.5 py-2 rounded-xl flex items-center gap-1.5 shrink-0 shadow-sm"
+                      >
+                        <Swords className="w-3.5 h-3.5 text-[#10B981]" /> Retar
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Filtros de División */}
+                  <div className="p-3.5">
+                    <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
+                      {['General', 'Damas', '+40 Senior', '3ª', '4ª', '5ª A', '5ª B', '5ª P', 'Clubes'].map(cat => (
+                        <button
+                          key={cat}
+                          onClick={() => setFiltroCat(cat)}
+                          className={`px-3.5 py-2 rounded-xl text-xs font-extrabold shrink-0 border transition ${
+                            filtroCat === cat 
+                              ? 'bg-[#10B981] text-zinc-950 border-[#10B981]' 
+                              : 'bg-[#0B0D11] text-[#8E98A8] border-[#222631]'
+                          }`}
+                        >
+                          {cat === 'General' ? 'General' : cat === 'Damas' ? 'Damas' : cat === '+40 Senior' ? '+40 Senior' : cat === 'Clubes' ? 'Clubes' : `Cat. ${cat}`}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
-                <div className="flex gap-1.5">
-                  <button
-                    onClick={() => setShowHallOfFameModal(true)}
-                    className="bg-amber-500/20 hover:bg-amber-500/30 text-xs font-extrabold text-amber-300 px-3 py-2 rounded-xl border border-amber-500/40 flex items-center gap-1"
-                  >
-                    <Crown className="w-3.5 h-3.5" /> Campeones
-                  </button>
-                  <button
-                    onClick={() => setShowLevelsModal(true)}
-                    className="bg-emerald-500/15 hover:bg-emerald-500/25 text-xs font-extrabold text-emerald-300 px-3 py-2 rounded-xl border border-emerald-500/30"
-                  >
-                    Niveles
-                  </button>
-                </div>
-              </div>
-
-              {playerAboveMe && (
-                <div className="bg-[#14171E] px-4 py-2.5 border-b border-zinc-800/80 flex justify-between items-center text-xs">
-                  <span className="text-zinc-300">
-                    🎯 Estás a <strong className="text-emerald-400">{ptsToOvertake} Pts</strong> de superar a <strong>{playerAboveMe.nombre}</strong>
-                  </span>
-                  <button
-                    onClick={() => setChallengeTargetModal(playerAboveMe)}
-                    className="text-emerald-400 font-black underline ml-2 shrink-0"
-                  >
-                    Retarlo
-                  </button>
-                </div>
+                </>
               )}
-
-              {/* PÍLDORAS DE FILTRO CON DAMAS Y +40 SENIOR */}
-              <div className="p-4">
-                <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-                  {['General', 'Damas', '+40 Senior', '3ª', '4ª', '5ª A', '5ª B', '5ª P', 'Clubes'].map(cat => (
-                    <button
-                      key={cat}
-                      onClick={() => setFiltroCat(cat)}
-                      className={`px-3.5 py-2 rounded-xl text-xs font-black shrink-0 border transition ${
-                        filtroCat === cat 
-                          ? 'bg-emerald-500 text-zinc-950 border-emerald-400 shadow' 
-                          : 'bg-[#111318] text-zinc-300 border-zinc-800'
-                      }`}
-                    >
-                      {cat === 'General' ? 'General' : cat === 'Damas' ? '👩 Damas' : cat === '+40 Senior' ? '🏅 +40 Senior' : cat === 'Clubes' ? '🏟️ Clubes' : `Cat. ${cat}`}
-                    </button>
-                  ))}
-                </div>
-              </div>
             </div>
 
-            {filtroCat === 'Clubes' ? (
+            {rankingSubTab === 'salon_fama' ? (
+              /* Vista Integrada del Salón de la Fama y Regla de Mérito */
               <div className="space-y-3">
+                <div className="bg-[#14171F] border border-[#222631] p-4 rounded-3xl space-y-1.5">
+                  <div className="flex items-center gap-2 text-[#EAB308] text-xs font-black uppercase tracking-wider">
+                    <Crown className="w-4 h-4" /> Regla Oficial de Coronación y Premios
+                  </div>
+                  <p className="text-xs text-[#8E98A8] leading-relaxed">
+                    Para proclamarse <strong className="text-white">Campeón Vigente</strong> y adjudicarse el trofeo físico al cierre de temporada, el jugador debe liderar su división habiendo disputado un <strong className="text-white">mínimo reglamentario de 5 partidos oficiales</strong>.
+                  </p>
+                </div>
+
+                {SALON_DE_LA_FAMA_HISTORICO.map((item, idx) => (
+                  <div key={idx} className="bg-[#14171F] border border-[#222631] p-4 rounded-3xl space-y-3">
+                    <span className="text-[11px] font-black uppercase tracking-wider text-[#8E98A8] block">
+                      {item.temporada} · Cuadro de Honor
+                    </span>
+                    <div className="space-y-2">
+                      {item.campeones.map((c, cIdx) => (
+                        <div key={cIdx} className="bg-[#0B0D11] border border-[#222631] px-4 py-3 rounded-2xl flex justify-between items-center text-xs">
+                          <div className="flex items-center gap-3">
+                            <SvgMedal rank={1} className="w-7 h-7 shrink-0" />
+                            <div>
+                              <span className="text-[10px] font-extrabold uppercase text-[#EAB308] block">{c.division}</span>
+                              <p className="font-black text-white text-sm">{c.nombre}</p>
+                              <span className="text-[11px] text-[#8E98A8]">{c.club}</span>
+                            </div>
+                          </div>
+                          <span className="font-mono font-bold text-[#10B981]">{c.record}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : filtroCat === 'Clubes' ? (
+              <div className="space-y-2.5">
                 {clubStats.map((c, i) => (
-                  <div key={i} className="bg-[#181B22] border border-zinc-800 p-4 rounded-2xl flex justify-between items-center">
+                  <div key={i} className="bg-[#14171F] border border-[#222631] p-4 rounded-2xl flex justify-between items-center">
                     <div className="flex items-center gap-3.5">
-                      {i < 3 ? <SvgMedal rank={i + 1} className="w-9 h-9 shrink-0" /> : (
-                        <div className="w-9 h-9 rounded-xl bg-zinc-800 flex items-center justify-center font-black text-sm text-zinc-400">
+                      {i < 3 ? <SvgMedal rank={i + 1} className="w-8 h-8 shrink-0" /> : (
+                        <div className="w-8 h-8 rounded-xl bg-[#0B0D11] border border-[#222631] flex items-center justify-center font-black text-xs text-[#8E98A8]">
                           #{i + 1}
                         </div>
                       )}
                       <div>
-                        <h4 className="text-base font-black text-white">{c.nombre}</h4>
-                        <p className="text-xs text-zinc-400 font-semibold">{c.sociosCount} tenistas activos sumando puntos</p>
+                        <h4 className="text-sm font-black text-white">{c.nombre}</h4>
+                        <p className="text-xs text-[#8E98A8]">{c.sociosCount} tenistas activos</p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <span style={{ fontFamily: "'Outfit', sans-serif" }} className="text-lg font-black text-emerald-400">
+                      <span style={{ fontFamily: "'Outfit', sans-serif" }} className="text-lg font-black text-[#10B981]">
                         {c.totalPuntos}
                       </span>
-                      <span className="text-[10px] text-zinc-400 block uppercase font-bold">Puntos</span>
+                      <span className="text-[10px] text-[#8E98A8] block uppercase font-bold">Puntos</span>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="space-y-2.5">
+              <div className="space-y-2">
                 {loading ? (
-                  <div className="text-center py-12 text-zinc-400 text-sm font-bold">Cargando clasificación oficial...</div>
+                  <div className="text-center py-12 text-[#8E98A8] text-xs font-bold">Actualizando clasificación oficial...</div>
                 ) : jugadoresFiltrados.length === 0 ? (
-                  <div className="bg-[#181B22] border border-zinc-800 p-6 rounded-3xl text-center text-xs text-zinc-400">
-                    Aún no hay jugadores registrados en la división <strong>{filtroCat}</strong>.
+                  <div className="bg-[#14171F] border border-[#222631] p-6 rounded-3xl text-center text-xs text-[#8E98A8]">
+                    Aún no hay tenistas registrados en la división <strong className="text-white">{filtroCat}</strong>.
                   </div>
                 ) : (
                   jugadoresFiltrados.map((j, idx) => {
@@ -1985,70 +2930,64 @@ export default function App() {
                       <div 
                         key={j.id || idx}
                         onClick={() => setSelectedPlayerModal(j)}
-                        className={`p-4 rounded-2xl border flex items-center justify-between cursor-pointer transition ${
-                          idx === 0 
-                            ? 'bg-gradient-to-r from-amber-950/35 via-[#1C2029] to-[#181B22] border-amber-400/50 shadow-lg' 
-                            : idx === 1 
-                            ? 'bg-gradient-to-r from-zinc-800/40 via-[#1A1E26] to-[#181B22] border-zinc-300/40'
-                            : idx === 2
-                            ? 'bg-gradient-to-r from-orange-950/30 via-[#1A1E26] to-[#181B22] border-amber-600/40'
-                            : 'bg-[#181B22] border-zinc-800/90'
+                        className={`p-3.5 rounded-2xl border flex items-center justify-between cursor-pointer transition bg-[#14171F] hover:border-zinc-700 ${
+                          idx === 0 ? 'border-[#EAB308]/50' : 'border-[#222631]'
                         }`}
                       >
-                        <div className="flex items-center space-x-3.5">
-                          <div className="w-8 flex justify-center shrink-0">
+                        <div className="flex items-center space-x-3 min-w-0">
+                          <div className="w-7 flex justify-center shrink-0">
                             {idx < 3 ? (
-                              <SvgMedal rank={idx + 1} className="w-8 h-8" />
+                              <SvgMedal rank={idx + 1} className="w-7 h-7" />
                             ) : (
-                              <span style={{ fontFamily: "'Outfit', sans-serif" }} className="font-black text-base text-zinc-400">
+                              <span style={{ fontFamily: "'Outfit', sans-serif" }} className="font-black text-sm text-[#8E98A8]">
                                 #{idx + 1}
                               </span>
                             )}
                           </div>
 
-                          <div className={`w-12 h-12 rounded-full bg-zinc-800 overflow-hidden flex items-center justify-center shrink-0 ${getAvatarHaloClass(j, idx)}`}>
+                          <div className={`w-12 h-12 rounded-full bg-[#0B0D11] overflow-hidden flex items-center justify-center shrink-0 ${getAvatarHaloClass(j, idx)}`}>
                             {j.foto_url ? (
-                              <img src={j.foto_url} alt={j.nombre} className="w-full h-full object-cover" />
+                              <img src={j.foto_url} alt={j.nombre} className="w-full h-full object-cover object-center" />
                             ) : (
-                              <User className="w-6 h-6 text-zinc-400" />
+                              <User className="w-6 h-6 text-zinc-500" />
                             )}
                           </div>
 
-                          <div>
+                          <div className="min-w-0">
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <p className="text-base font-extrabold text-white leading-tight">{j.nombre}</p>
+                              <p className="text-sm font-extrabold text-white truncate">{j.nombre}</p>
                               {idx === 0 && totalJ >= 5 && (
-                                <span className="text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-400/40 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-                                  <Crown className="w-3 h-3" /> Campeón Vigente
+                                <span className="text-[9px] font-black uppercase bg-[#EAB308]/15 text-[#EAB308] border border-[#EAB308]/30 px-2 py-0.5 rounded-md">
+                                  Campeón
                                 </span>
                               )}
                               {rachaJ >= 3 && (
-                                <span className="text-[11px] font-black bg-orange-500/20 text-orange-300 border border-orange-500/40 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-                                  <SvgFlame className="w-3.5 h-3.5" /> {rachaJ}
+                                <span className="text-[10px] font-black bg-[#0B0D11] text-white border border-[#222631] px-2 py-0.5 rounded-md inline-flex items-center gap-1">
+                                  <SvgFlame className="w-3 h-3" /> {rachaJ}
                                 </span>
                               )}
                             </div>
-                            <p className="text-xs text-zinc-300 font-medium mt-0.5">
+                            <p className="text-xs text-[#8E98A8] truncate mt-0.5">
                               {j.club || 'Independiente'} ·{' '}
                               {totalJ < 5 ? (
-                                <span className="text-amber-300 font-bold">Calibrando ({totalJ}/5)</span>
+                                <span className="text-zinc-300 font-semibold">Calibrando ({totalJ}/5)</span>
                               ) : (
-                                <span className="text-emerald-400 font-extrabold">Cat. {catInfo.id}</span>
+                                <span className="text-white font-bold">Cat. {catInfo.id}</span>
                               )}
                             </p>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 shrink-0 pl-2">
                           <div className="text-right">
-                            <span style={{ fontFamily: "'Outfit', sans-serif" }} className="text-lg font-black text-emerald-400">
+                            <span style={{ fontFamily: "'Outfit', sans-serif" }} className="text-base font-black text-white">
                               {j.elo || 1000}
                             </span>
-                            <p className="text-[11px] text-zinc-400 font-bold">
-                              {j.victorias || 0}G - {j.derrotas || 0}P
+                            <p className="text-[10px] text-[#8E98A8] font-bold">
+                              {j.victorias || 0}G · {j.derrotas || 0}P
                             </p>
                           </div>
-                          <ChevronRight className="w-4 h-4 text-zinc-500" />
+                          <ChevronRight className="w-4 h-4 text-zinc-600" />
                         </div>
                       </div>
                     );
@@ -2060,42 +2999,42 @@ export default function App() {
         )}
 
         {/* ======================================================================
-            3. PESTAÑA CENTRAL: RETOS (DETECCIÓN POR ID + SEDE PERSONALIZADA)
+            3. PESTAÑA CENTRAL: RETOS (DETECCIÓN POR ID Y SEDE PERSONALIZADA)
         ====================================================================== */}
         {tab === 'match' && (
           <div className="space-y-4">
-            <div className="bg-[#181B22] border border-zinc-800 p-5 rounded-3xl shadow-xl text-center space-y-3">
-              <span className="text-[11px] font-extrabold uppercase tracking-widest text-[#E06D44] block">
-                Partidos Oficiales
+            <div className="bg-[#14171F] border border-[#222631] p-5 rounded-3xl shadow-xl text-center space-y-3">
+              <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#D96B43] block">
+                Competición Oficial
               </span>
               <h2 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-2xl font-black text-white">
                 Central de Desafíos
               </h2>
 
-              <div className="grid grid-cols-3 gap-1.5 bg-[#111318] p-1.5 rounded-2xl border border-zinc-800">
+              <div className="grid grid-cols-3 gap-1.5 bg-[#0B0D11] p-1.5 rounded-2xl border border-[#222631]">
                 <button
                   onClick={() => setRetosSubTab('mis_retos')}
-                  className={`py-2.5 rounded-xl text-xs font-black transition ${
-                    retosSubTab === 'mis_retos' ? 'bg-emerald-500 text-zinc-950 shadow' : 'text-zinc-300'
+                  className={`py-2.5 rounded-xl text-xs font-extrabold transition ${
+                    retosSubTab === 'mis_retos' ? 'bg-[#10B981] text-zinc-950 shadow' : 'text-[#8E98A8]'
                   }`}
                 >
                   Tus Retos ({misRetos.length})
                 </button>
                 <button
                   onClick={() => setRetosSubTab('cartelera')}
-                  className={`py-2.5 rounded-xl text-xs font-black transition ${
-                    retosSubTab === 'cartelera' ? 'bg-emerald-500 text-zinc-950 shadow' : 'text-zinc-300'
+                  className={`py-2.5 rounded-xl text-xs font-extrabold transition ${
+                    retosSubTab === 'cartelera' ? 'bg-[#10B981] text-zinc-950 shadow' : 'text-[#8E98A8]'
                   }`}
                 >
                   Cartelera ({retosProgramados.length})
                 </button>
                 <button
                   onClick={() => setRetosSubTab('nuevo')}
-                  className={`py-2.5 rounded-xl text-xs font-black transition ${
-                    retosSubTab === 'nuevo' ? 'bg-emerald-500 text-zinc-950 shadow' : 'text-zinc-300'
+                  className={`py-2.5 rounded-xl text-xs font-extrabold transition ${
+                    retosSubTab === 'nuevo' ? 'bg-[#10B981] text-zinc-950 shadow' : 'text-[#8E98A8]'
                   }`}
                 >
-                  + Retar
+                  + Lanzar Reto
                 </button>
               </div>
             </div>
@@ -2103,17 +3042,17 @@ export default function App() {
             {retosSubTab === 'mis_retos' && (
               <div className="space-y-3">
                 {misRetos.length === 0 ? (
-                  <div className="bg-[#181B22] border border-zinc-800 p-7 rounded-3xl text-center space-y-3">
-                    <Swords className="w-11 h-11 text-emerald-400 mx-auto" />
-                    <h4 className="text-lg font-black text-white">No tienes partidos agendados hoy</h4>
-                    <p className="text-xs text-zinc-300 leading-relaxed">
-                      Cuando tengas un desafío aceptado con un rival, aquí podrás coordinar por chat y registrar el marcador oficial.
+                  <div className="bg-[#14171F] border border-[#222631] p-7 rounded-3xl text-center space-y-3">
+                    <Swords className="w-10 h-10 text-[#10B981] mx-auto" />
+                    <h4 className="text-base font-black text-white">Sin partidos pendientes hoy</h4>
+                    <p className="text-xs text-[#8E98A8] leading-relaxed">
+                      Elige a un rival dentro de tu rango competitivo para acordar sede, fecha y disputar puntos oficiales.
                     </p>
                     <button
                       onClick={() => setRetosSubTab('nuevo')}
-                      className="bg-emerald-500 text-zinc-950 font-black px-5 py-3 rounded-2xl text-xs shadow-lg"
+                      className="bg-[#10B981] text-zinc-950 font-black px-5 py-3 rounded-2xl text-xs shadow-lg"
                     >
-                      Buscar Rival para Retar
+                      Explorar Rivales Disponibles
                     </button>
                   </div>
                 ) : (
@@ -2124,13 +3063,13 @@ export default function App() {
                     const rivalTel = rivalObj?.telefono || '964123456';
 
                     return (
-                      <div key={r.id} className="bg-[#181B22] border-2 border-emerald-500/40 p-5 rounded-3xl space-y-3.5 shadow-xl">
+                      <div key={r.id} className="bg-[#14171F] border border-[#222631] p-5 rounded-3xl space-y-3.5 shadow-xl">
                         <div className="flex justify-between items-center">
-                          <span className="text-[11px] font-black uppercase bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-3 py-1 rounded-full">
+                          <span className="text-[10px] font-black uppercase bg-[#0B0D11] text-zinc-200 border border-[#222631] px-3 py-1 rounded-lg">
                             {r.cat}
                           </span>
                           <span className={`text-xs font-extrabold flex items-center gap-1 ${
-                            r.estado === 'Programado' ? 'text-emerald-400' : 'text-amber-300'
+                            r.estado === 'Programado' ? 'text-[#10B981]' : 'text-[#EAB308]'
                           }`}>
                             <Clock className="w-3.5 h-3.5" /> {r.estado}
                           </span>
@@ -2138,9 +3077,9 @@ export default function App() {
 
                         <div>
                           <p style={{ fontFamily: "'Outfit', sans-serif" }} className="text-lg font-black text-white">
-                            {r.jugador1} <span className="text-[#E06D44] px-1">vs</span> {r.jugador2}
+                            {r.jugador1} <span className="text-[#D96B43] px-1">vs</span> {r.jugador2}
                           </p>
-                          <p className="text-xs text-zinc-300 font-semibold mt-1">
+                          <p className="text-xs text-[#8E98A8] font-medium mt-1">
                             📍 {r.sede} · 📅 {r.fecha}
                           </p>
                         </div>
@@ -2148,16 +3087,16 @@ export default function App() {
                         <div className="grid grid-cols-2 gap-2 pt-1">
                           <button
                             onClick={() => setActiveChatReto(r)}
-                            className="bg-[#111318] hover:bg-zinc-800 text-zinc-100 font-extrabold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 border border-zinc-700"
+                            className="bg-[#0B0D11] hover:border-zinc-600 text-white font-extrabold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 border border-[#222631]"
                           >
-                            <MessageSquare className="w-4 h-4 text-emerald-400" /> Chat ({(r.mensajes || []).length})
+                            <MessageSquare className="w-4 h-4 text-[#10B981]" /> Mensajes ({(r.mensajes || []).length})
                           </button>
 
                           <a
                             href={`https://wa.me/51${rivalTel.replace(/\D/g, '')}?text=${encodeURIComponent(`Hola ${otroNombre.split(' ')[0]}, coordinemos nuestro partido oficial de MATCHPOINT en ${r.sede} (${r.fecha}).`)}`}
                             target="_blank"
                             rel="noreferrer"
-                            className="bg-[#111318] hover:bg-zinc-800 text-emerald-400 font-extrabold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 border border-emerald-500/30"
+                            className="bg-[#0B0D11] hover:border-zinc-600 text-[#10B981] font-extrabold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 border border-[#222631]"
                           >
                             <Phone className="w-4 h-4" /> WhatsApp
                           </a>
@@ -2166,7 +3105,7 @@ export default function App() {
                         {r.estado === 'Pendiente de Aceptación' ? (
                           <button
                             onClick={() => handleAceptarRetoEntrante(r.id)}
-                            className="w-full bg-amber-400 hover:bg-amber-300 text-zinc-950 font-black py-3 rounded-2xl text-xs flex items-center justify-center gap-1.5 shadow-md"
+                            className="w-full bg-[#EAB308] hover:bg-amber-400 text-zinc-950 font-black py-3 rounded-2xl text-xs flex items-center justify-center gap-1.5 shadow-md"
                           >
                             <Check className="w-4 h-4" /> Confirmar y Aceptar Partido
                           </button>
@@ -2180,9 +3119,9 @@ export default function App() {
                               setActiveRetoId(r.id);
                               setShowMatchModal(true);
                             }}
-                            className="w-full bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black py-3 rounded-2xl text-xs flex items-center justify-center gap-1.5 shadow-md"
+                            className="w-full bg-[#10B981] hover:bg-emerald-400 text-zinc-950 font-black py-3 rounded-2xl text-xs flex items-center justify-center gap-1.5 shadow-md"
                           >
-                            <CheckCircle2 className="w-4 h-4" /> Subir Score de este Partido
+                            <CheckCircle2 className="w-4 h-4" /> Registrar Marcador Oficial
                           </button>
                         )}
                       </div>
@@ -2193,22 +3132,19 @@ export default function App() {
             )}
 
             {retosSubTab === 'cartelera' && (
-              <div className="space-y-3">
-                <p className="text-xs text-zinc-300 font-semibold px-1">
-                  Encuentros oficiales pactados en el circuito:
-                </p>
+              <div className="space-y-2.5">
                 {retosProgramados.map(r => (
-                  <div key={r.id} className="bg-[#181B22] border border-zinc-800 p-4 rounded-2xl space-y-2">
+                  <div key={r.id} className="bg-[#14171F] border border-[#222631] p-4 rounded-2xl space-y-2">
                     <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-black text-emerald-400 uppercase bg-emerald-950/60 border border-emerald-800/60 px-2.5 py-0.5 rounded-md">
+                      <span className="text-[10px] font-bold text-[#8E98A8] uppercase bg-[#0B0D11] border border-[#222631] px-2.5 py-0.5 rounded-md">
                         {r.cat}
                       </span>
-                      <span className="text-xs text-amber-300 font-bold">● {r.estado}</span>
+                      <span className="text-xs text-[#10B981] font-bold">● {r.estado}</span>
                     </div>
                     <p style={{ fontFamily: "'Outfit', sans-serif" }} className="text-base font-black text-white">
-                      {r.jugador1} <span className="text-[#E06D44] px-1">vs</span> {r.jugador2}
+                      {r.jugador1} <span className="text-[#D96B43] px-1">vs</span> {r.jugador2}
                     </p>
-                    <div className="flex justify-between items-center pt-2 border-t border-zinc-800 text-xs text-zinc-300 font-medium">
+                    <div className="flex justify-between items-center pt-2 border-t border-[#222631] text-xs text-[#8E98A8]">
                       <span>📍 {r.sede}</span>
                       <span>📅 {r.fecha}</span>
                     </div>
@@ -2219,8 +3155,8 @@ export default function App() {
 
             {retosSubTab === 'nuevo' && (
               <div className="space-y-2.5">
-                <div className="bg-[#181B22] border border-zinc-800 p-3.5 rounded-2xl text-xs text-zinc-300">
-                  <span className="font-black text-emerald-400">Rango Reglamentario (±1,200 Puntos):</span> Elige a tu rival para proponer sede y horario.
+                <div className="bg-[#14171F] border border-[#222631] p-3.5 rounded-2xl text-xs text-[#8E98A8]">
+                  <strong className="text-white">Rango Competitivo (±1,200 Puntos):</strong> Selecciona a un rival habilitado para proponer cancha y turno.
                 </div>
 
                 {jugadores
@@ -2232,21 +3168,21 @@ export default function App() {
                     const catJ = getInfoCategoria(j.elo || 1000);
 
                     return (
-                      <div key={j.id} className={`p-4 rounded-2xl border flex items-center justify-between ${
-                        dentroVentana ? 'bg-[#181B22] border-zinc-800' : 'bg-[#14161C] border-zinc-900 opacity-50'
+                      <div key={j.id} className={`p-3.5 rounded-2xl border flex items-center justify-between bg-[#14171F] ${
+                        dentroVentana ? 'border-[#222631]' : 'border-[#222631]/50 opacity-45'
                       }`}>
-                        <div className="flex items-center space-x-3">
-                          <div className="w-12 h-12 rounded-full bg-zinc-800 overflow-hidden flex items-center justify-center border border-zinc-700 shrink-0">
+                        <div className="flex items-center space-x-3 min-w-0">
+                          <div className="w-11 h-11 rounded-full bg-[#0B0D11] overflow-hidden flex items-center justify-center border border-[#222631] shrink-0">
                             {j.foto_url ? (
-                              <img src={j.foto_url} alt={j.nombre} className="w-full h-full object-cover" />
+                              <img src={j.foto_url} alt={j.nombre} className="w-full h-full object-cover object-center" />
                             ) : (
-                              <User className="w-6 h-6 text-zinc-400" />
+                              <User className="w-5 h-5 text-zinc-500" />
                             )}
                           </div>
-                          <div>
-                            <p className="text-base font-extrabold text-white">{j.nombre}</p>
-                            <p className="text-xs text-zinc-300 font-medium">
-                              {totalJ < 5 ? 'Calibrando' : `Cat. ${catJ.id}`} · <span className="text-emerald-400 font-black">{j.elo || 1000} Pts</span>
+                          <div className="min-w-0">
+                            <p className="text-sm font-extrabold text-white truncate">{j.nombre}</p>
+                            <p className="text-xs text-[#8E98A8]">
+                              {totalJ < 5 ? 'Calibrando' : `Cat. ${catJ.id}`} · <span className="text-white font-bold">{j.elo || 1000} Pts</span>
                             </p>
                           </div>
                         </div>
@@ -2254,12 +3190,12 @@ export default function App() {
                         {dentroVentana ? (
                           <button
                             onClick={() => setChallengeTargetModal(j)}
-                            className="bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs font-black px-4 py-2.5 rounded-xl flex items-center gap-1.5 shadow-md"
+                            className="bg-[#10B981] hover:bg-emerald-400 text-zinc-950 text-xs font-black px-4 py-2.5 rounded-xl flex items-center gap-1.5 shrink-0"
                           >
-                            <Swords className="w-4 h-4" /> Retar
+                            <Swords className="w-3.5 h-3.5" /> Retar
                           </button>
                         ) : (
-                          <span className="text-xs font-bold text-zinc-500 bg-zinc-900 px-3 py-1.5 rounded-xl border border-zinc-800">
+                          <span className="text-[11px] font-bold text-[#8E98A8] bg-[#0B0D11] px-3 py-1.5 rounded-xl border border-[#222631]">
                             Fuera de rango
                           </span>
                         )}
@@ -2272,34 +3208,34 @@ export default function App() {
         )}
 
         {/* ======================================================================
-            4. PESTAÑA: DIRECTORIO UNIFICADO ("CLUBES & ENTRENADORES")
+            4. PESTAÑA: DIRECTORIO (CLUBES ALIADOS + MARKETPLACE DE ENTRENADORES)
         ====================================================================== */}
         {tab === 'clubs' && (
           <div className="space-y-4">
-            <div className="bg-[#181B22] p-5 rounded-3xl border border-zinc-800 text-center space-y-3 shadow-xl">
-              <span className="text-[11px] font-extrabold uppercase tracking-widest text-[#E06D44] block">
-                Directorio Oficial
+            <div className="bg-[#14171F] p-5 rounded-3xl border border-[#222631] text-center space-y-3 shadow-xl">
+              <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#D96B43] block">
+                Ecosistema Oficial
               </span>
               <h2 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-2xl font-black text-white">
-                Clubes & Entrenadores
+                Sedes & Entrenadores
               </h2>
 
-              <div className="grid grid-cols-2 gap-2 bg-[#111318] p-1.5 rounded-2xl border border-zinc-800">
+              <div className="grid grid-cols-2 gap-2 bg-[#0B0D11] p-1.5 rounded-2xl border border-[#222631]">
                 <button
                   onClick={() => setCanchasSubTab('clubes')}
-                  className={`py-2.5 rounded-xl text-xs font-black transition ${
-                    canchasSubTab === 'clubes' ? 'bg-emerald-500 text-zinc-950 shadow' : 'text-zinc-300'
+                  className={`py-2.5 rounded-xl text-xs font-extrabold transition ${
+                    canchasSubTab === 'clubes' ? 'bg-[#10B981] text-zinc-950 shadow' : 'text-[#8E98A8]'
                   }`}
                 >
-                  🏟️ Canchas & Clubes ({sedesVisibles.length})
+                  Canchas & Clubes ({sedesVisibles.length})
                 </button>
                 <button
                   onClick={() => setCanchasSubTab('profesores')}
-                  className={`py-2.5 rounded-xl text-xs font-black transition ${
-                    canchasSubTab === 'profesores' ? 'bg-emerald-500 text-zinc-950 shadow' : 'text-zinc-300'
+                  className={`py-2.5 rounded-xl text-xs font-extrabold transition ${
+                    canchasSubTab === 'profesores' ? 'bg-[#10B981] text-zinc-950 shadow' : 'text-[#8E98A8]'
                   }`}
                 >
-                  🎓 Profesores ({profesoresVisibles.length})
+                  Coach Pro ({profesoresVisibles.length})
                 </button>
               </div>
             </div>
@@ -2311,48 +3247,46 @@ export default function App() {
                   const isRain = infoClima.estado.includes('Lluvia') || infoClima.estado.includes('Pesada');
 
                   return (
-                    <div key={idx} className="bg-[#181B22] rounded-3xl border border-zinc-800 overflow-hidden shadow-2xl">
-                      <div className="relative h-44 w-full bg-zinc-900">
-                        <img src={c.img} alt={c.nombre} className="w-full h-full object-cover" />
-                        <div className="absolute inset-0 bg-gradient-to-t from-[#181B22] via-black/30 to-transparent"></div>
-                        <span className="absolute top-3 left-3 bg-zinc-950/90 text-emerald-400 border border-emerald-500/40 text-[10px] font-black uppercase px-3 py-1 rounded-full">
-                          ★ {c.sponsorBadge}
+                    <div key={idx} className="bg-[#14171F] rounded-3xl border border-[#222631] overflow-hidden shadow-2xl">
+                      <div className="relative h-40 w-full bg-[#0B0D11]">
+                        <img src={c.img} alt={c.nombre} className="w-full h-full object-cover opacity-70" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#14171F] via-black/30 to-transparent"></div>
+                        <span className="absolute top-3 left-3 bg-[#0B0D11]/90 text-white border border-white/15 text-[10px] font-black uppercase px-3 py-1 rounded-lg">
+                          {c.sponsorBadge}
                         </span>
                         <div className="absolute bottom-3 left-4 right-4">
                           <h4 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-xl font-black text-white">
                             {c.nombre}
                           </h4>
-                          <span className="text-xs text-emerald-400 font-extrabold">{c.zona} · {c.canchas}</span>
+                          <span className="text-xs text-[#8E98A8] font-semibold">{c.zona} · {c.canchas}</span>
                         </div>
                       </div>
 
                       <div className="p-5 space-y-3.5">
-                        <div className="flex flex-wrap gap-1.5">
-                          {c.servicios.map((srv, sIdx) => (
-                            <span key={sIdx} className="text-xs font-semibold bg-[#111318] text-zinc-200 border border-zinc-800 px-2.5 py-1 rounded-lg">
-                              {srv}
-                            </span>
-                          ))}
+                        {/* Cintillo de Marca Patrocinadora en Sede */}
+                        <div className="flex items-center justify-between text-[11px] bg-[#0B0D11] border border-[#222631] px-3 py-2 rounded-xl">
+                          <span className="text-[#8E98A8]">{c.pelotaSponsor || sponsorsData.pelotaOficial}</span>
+                          <span className="text-[#D96B43] font-extrabold uppercase text-[9px] tracking-wider">Partner</span>
                         </div>
 
-                        <div className="bg-emerald-500/10 border border-emerald-500/30 p-3.5 rounded-2xl text-xs">
-                          <span className="font-black text-emerald-400 block uppercase text-[10px]">
-                            🎁 Beneficio Socio Matchpoint:
+                        <div className="bg-[#0B0D11] border border-[#222631] p-3.5 rounded-2xl text-xs">
+                          <span className="font-extrabold text-[#10B981] block uppercase text-[10px] tracking-wider">
+                            Beneficio con Carnet VIP Matchpoint
                           </span>
-                          <p className="text-zinc-200 font-medium mt-0.5">{c.beneficioMatchpoint}</p>
+                          <p className="text-zinc-200 mt-1">{c.beneficioMatchpoint}</p>
                         </div>
 
-                        <div className="bg-[#111318] p-3.5 rounded-2xl border border-zinc-800 flex justify-between items-center">
+                        <div className="bg-[#0B0D11] p-3.5 rounded-2xl border border-[#222631] flex justify-between items-center">
                           <div>
-                            <span className="text-[11px] uppercase font-bold text-zinc-400 block">
-                              Estado de Pista · {infoClima.hora} hrs
+                            <span className="text-[10px] uppercase font-bold text-[#8E98A8] block">
+                              Reporte de Superficie · {infoClima.hora}
                             </span>
-                            <p className="text-sm font-black text-white mt-0.5 flex items-center gap-1.5">
-                              {isRain ? <CloudRain className="w-4 h-4 text-rose-400" /> : <Sun className="w-4 h-4 text-amber-400" />}
+                            <p className="text-xs font-black text-white mt-0.5 flex items-center gap-1.5">
+                              {isRain ? <CloudRain className="w-4 h-4 text-[#D96B43]" /> : <Sun className="w-4 h-4 text-[#EAB308]" />}
                               {infoClima.estado}
                             </p>
-                            <span className="text-xs text-zinc-300 block mt-0.5">
-                              {infoClima.detalle} · <strong className="text-emerald-400">Por: {infoClima.reportadoPor}</strong>
+                            <span className="text-[11px] text-[#8E98A8] block mt-0.5">
+                              {infoClima.detalle} · Por {infoClima.reportadoPor}
                             </span>
                           </div>
                           <button
@@ -2361,19 +3295,19 @@ export default function App() {
                               setWeatherEstadoInput(infoClima.estado);
                               setWeatherDetalleInput(infoClima.detalle || '19°C · Sin viento');
                             }}
-                            className="bg-zinc-800 hover:bg-zinc-700 text-xs font-extrabold text-emerald-400 px-3 py-2.5 rounded-xl border border-zinc-700 shrink-0"
+                            className="bg-[#14171F] hover:border-zinc-600 text-xs font-extrabold text-white px-3 py-2 rounded-xl border border-[#222631] shrink-0"
                           >
-                            Actualizar
+                            Reportar
                           </button>
                         </div>
 
                         <a
-                          href={`https://wa.me/51${c.tel}?text=Hola,%20soy%20jugador%20de%20MATCHPOINT%20y%20deseo%20consultar%20disponibilidad%20de%20cancha%20en%20${encodeURIComponent(c.nombre)}.`}
+                          href={`https://wa.me/51${c.tel}?text=Hola,%20soy%20socio%20de%20MATCHPOINT%20y%20deseo%20consultar%20disponibilidad%20de%20cancha%20en%20${encodeURIComponent(c.nombre)}.`}
                           target="_blank"
                           rel="noreferrer"
-                          className="w-full bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black py-3.5 rounded-2xl text-xs flex items-center justify-center gap-2 shadow-lg"
+                          className="w-full bg-[#10B981] hover:bg-emerald-400 text-zinc-950 font-black py-3.5 rounded-2xl text-xs flex items-center justify-center gap-2 shadow-lg"
                         >
-                          <Phone className="w-4 h-4" /> Consultar Disponibilidad (WhatsApp)
+                          <Phone className="w-4 h-4" /> Reservar Cancha por WhatsApp
                         </a>
                       </div>
                     </div>
@@ -2381,69 +3315,121 @@ export default function App() {
                 })}
               </div>
             ) : (
-              <div className="space-y-3.5">
-                {profesoresVisibles.map((prof) => (
-                  <div key={prof.id} className="bg-[#181B22] border border-zinc-800 rounded-3xl p-5 space-y-3.5 shadow-xl">
-                    <div className="flex items-center space-x-3.5">
-                      <div className="w-16 h-16 rounded-2xl bg-zinc-800 border-2 border-emerald-400 overflow-hidden flex items-center justify-center shrink-0">
-                        {prof.foto ? (
-                          <img src={prof.foto} alt={prof.nombre} className="w-full h-full object-cover" />
-                        ) : (
-                          <Award className="w-8 h-8 text-emerald-400" />
-                        )}
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-black uppercase bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2.5 py-0.5 rounded-md">
-                          ★ {prof.destacado}
-                        </span>
-                        <h4 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-lg font-black text-white mt-1">
-                          {prof.nombre}
-                        </h4>
-                        <p className="text-xs text-zinc-300 font-medium">{prof.especialidad}</p>
-                      </div>
-                    </div>
-
-                    <div className="bg-[#111318] p-3.5 rounded-2xl border border-zinc-800 space-y-1 text-xs">
-                      <p className="text-zinc-200"><strong className="text-zinc-400">Niveles:</strong> {prof.niveles}</p>
-                      <p className="text-zinc-200"><strong className="text-zinc-400">Sedes:</strong> {prof.sede}</p>
-                      <p className="text-emerald-400 font-black text-sm pt-1">Tarifa: {prof.tarifa}</p>
-                    </div>
-
-                    <a
-                      href={`https://wa.me/51${prof.tel.replace(/\D/g, '')}?text=Hola%20${encodeURIComponent(prof.nombre)},%20vi%20tu%20ficha%20oficial%20en%20MATCHPOINT%20y%20quisiera%20reservar%20una%20clase%20de%20tenis.`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="w-full bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black py-3.5 rounded-2xl text-xs flex items-center justify-center gap-2 shadow-md"
+              /* MARKETPLACE VISUAL DE ENTRENADORES (CERO MURO DE TEXTO) */
+              <div className="space-y-4">
+                {profesoresVisibles.map((prof) => {
+                  const turnosCount = (prof.turnosLibres || []).filter(t => t.disponible !== false).length;
+                  return (
+                    <div 
+                      key={prof.id} 
+                      onClick={() => setSelectedCoachModal(prof)}
+                      className="bg-[#14171F] border border-[#222631] hover:border-zinc-700 rounded-3xl overflow-hidden shadow-2xl cursor-pointer transition"
                     >
-                      <Phone className="w-4 h-4" /> Reservar Clase por WhatsApp
-                    </a>
+                      {/* Cabecera Visual 16:9 */}
+                      <div className="relative h-32 w-full bg-[#0B0D11]">
+                        <img src={prof.fotoBanner || prof.fotoAvatar} alt={prof.nombre} className="w-full h-full object-cover opacity-55" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#14171F] via-[#14171F]/40 to-transparent"></div>
+                        <span className="absolute top-3 left-3 bg-[#0B0D11]/90 text-[#EAB308] border border-[#EAB308]/30 text-[10px] font-black uppercase px-2.5 py-1 rounded-lg">
+                          {prof.certificacion || 'Coach Pro'}
+                        </span>
+                        <span className="absolute top-3 right-3 bg-[#0B0D11]/90 text-[#10B981] border border-[#222631] text-[10px] font-extrabold px-2.5 py-1 rounded-lg">
+                          {turnosCount} turnos libres
+                        </span>
+                      </div>
+
+                      <div className="px-5 pb-5 -mt-8 relative z-10 space-y-3.5">
+                        <div className="flex items-end justify-between gap-3">
+                          <div className="flex items-end gap-3">
+                            <div className="w-16 h-16 rounded-2xl bg-[#0B0D11] border-2 border-[#EAB308] overflow-hidden shrink-0 shadow-lg flex items-center justify-center">
+                              {prof.fotoAvatar ? (
+                                <img src={prof.fotoAvatar} alt={prof.nombre} className="w-full h-full object-cover object-center" />
+                              ) : (
+                                <GraduationCap className="w-8 h-8 text-[#EAB308]" />
+                              )}
+                            </div>
+                            <div>
+                              <h4 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-lg font-black text-white leading-tight">
+                                {prof.nombre}
+                              </h4>
+                              <p className="text-[11px] text-[#8E98A8] font-medium">{prof.sede}</p>
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span className="text-[10px] text-[#8E98A8] uppercase font-bold block">Desde</span>
+                            <span style={{ fontFamily: "'Outfit', sans-serif" }} className="text-base font-black text-[#10B981]">
+                              S/ {prof.tarifaBase || 45}/h
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Píldoras Limpias de Especialidad */}
+                        <div className="flex flex-wrap gap-1.5">
+                          {(prof.nichos || []).map((n, i) => (
+                            <span key={i} className="text-[11px] font-bold bg-[#0B0D11] text-zinc-200 border border-[#222631] px-2.5 py-1 rounded-lg">
+                              {n}
+                            </span>
+                          ))}
+                        </div>
+
+                        {/* Fila de Métricas + Botón de Apertura de Ficha Completa */}
+                        <div className="pt-2 border-t border-[#222631] flex items-center justify-between">
+                          <div className="flex items-center gap-3 text-xs">
+                            <span className="font-extrabold text-white flex items-center gap-1">
+                              <Star className="w-3.5 h-3.5 text-[#EAB308] fill-[#EAB308]" /> {prof.rating || '4.9'}
+                            </span>
+                            <span className="text-[#8E98A8] text-[11px]">{prof.horasImpartidas || '+300h'} en cancha</span>
+                          </div>
+                          <span className="text-xs font-extrabold text-[#10B981] flex items-center gap-1">
+                            Ver Horarios & Packs <ChevronRight className="w-4 h-4" />
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Acceso Contextual Discreto para Entrenadores (Descentralizado del menú principal) */}
+                <div className="bg-[#14171F] border border-[#222631] p-4 rounded-3xl flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-[#8E98A8] block">
+                      Suite para Entrenadores
+                    </span>
+                    <p className="text-xs font-bold text-white mt-0.5">
+                      ¿Eres profesor afiliado? Actualiza tus horas libres
+                    </p>
                   </div>
-                ))}
+                  <button
+                    onClick={() => setShowCoachProModal(true)}
+                    className="bg-[#0B0D11] hover:border-zinc-600 border border-[#222631] text-white text-xs font-extrabold px-3.5 py-2.5 rounded-xl shrink-0"
+                  >
+                    Coach Pro
+                  </button>
+                </div>
               </div>
             )}
           </div>
         )}
 
         {/* ======================================================================
-            5. PESTAÑA: TORNEOS (CLIC PARA VER INSCRITOS Y CUPOS DISPONIBLES)
+            5. PESTAÑA: TORNEOS DINÁMICOS (CUADROS EN VIVO, SIEMBRA Y CONSUELO)
         ====================================================================== */}
         {tab === 'torneos' && (
           <div className="space-y-4">
-            <div className="bg-[#181B22] p-5 rounded-3xl border border-zinc-800 text-center space-y-1 shadow-xl">
-              <span className="text-[11px] font-extrabold uppercase tracking-widest text-[#E06D44] block">
-                Calendario Oficial Bimestral
+            <div className="bg-[#14171F] p-5 rounded-3xl border border-[#222631] text-center space-y-1 shadow-xl">
+              <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#D96B43] block">
+                Presentado por {sponsorsData.torneoPrincipal}
               </span>
               <h2 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-2xl font-black text-white">
-                Torneos por Categoría
+                Torneos & Cuadros en Vivo
               </h2>
-              <p className="text-xs text-zinc-300 font-medium">
-                Toca cualquier cuadro para ver la <strong>lista de inscritos</strong> y los cupos disponibles.
+              <p className="text-xs text-[#8E98A8]">
+                Consulta las llaves de eliminación directa, ronda consuelo y cabezas de serie.
               </p>
             </div>
 
             {torneosData.map((t) => {
               const inscritosCount = t.participantes.length;
-              const cumpleMinimo = inscritosCount >= t.min;
+              const enJuego = t.estadoTorneo === 'en_juego';
               const cuposLibres = Math.max(0, t.maxCupos - inscritosCount);
               const porcentajeCupo = Math.min(100, Math.round((inscritosCount / t.maxCupos) * 100));
 
@@ -2451,62 +3437,57 @@ export default function App() {
                 <div 
                   key={t.id} 
                   onClick={() => setSelectedTorneoModal(t)}
-                  className="bg-[#181B22] rounded-3xl border border-zinc-800 overflow-hidden shadow-2xl cursor-pointer transition"
+                  className="bg-[#14171F] rounded-3xl border border-[#222631] hover:border-zinc-700 overflow-hidden shadow-2xl cursor-pointer transition"
                 >
-                  <div className="relative h-36 w-full bg-zinc-900">
-                    <img src={t.img} alt={t.titulo} className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#181B22] via-[#181B22]/40 to-transparent"></div>
+                  <div className="relative h-36 w-full bg-[#0B0D11]">
+                    <img src={t.img} alt={t.titulo} className="w-full h-full object-cover opacity-60" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#14171F] via-[#14171F]/40 to-transparent"></div>
                     <div className="absolute top-3 left-3 right-3 flex justify-between items-center">
-                      <span className={`text-[11px] uppercase font-black px-3 py-1 rounded-full border backdrop-blur-md ${
-                        cumpleMinimo 
-                          ? 'text-emerald-300 bg-emerald-950/80 border-emerald-500/50' 
-                          : 'text-amber-300 bg-amber-950/80 border-amber-500/50'
+                      <span className={`text-[10px] uppercase font-black px-3 py-1 rounded-lg border ${
+                        enJuego 
+                          ? 'text-[#10B981] bg-[#0B0D11]/90 border-[#10B981]/40' 
+                          : 'text-[#EAB308] bg-[#0B0D11]/90 border-[#EAB308]/40'
                       }`}>
-                        {cumpleMinimo ? '✔ Cuadro Confirmado (+8)' : `⏳ Faltan ${t.min - inscritosCount} para abrir`}
+                        {enJuego ? '● Cuadro en Juego (Ver Llaves)' : `Inscripciones Abiertas (${cuposLibres} libres)`}
                       </span>
-                      <span className="bg-zinc-950/85 text-white font-black text-xs px-3 py-1 rounded-full border border-zinc-700">
+                      <span className="bg-[#0B0D11]/90 text-white font-black text-xs px-3 py-1 rounded-lg border border-[#222631]">
                         Cat. {t.cat}
                       </span>
                     </div>
-                    <div className="absolute bottom-2 left-4 right-4 flex items-center gap-2.5">
-                      <SvgTrophy className="w-8 h-8 shrink-0" />
+                    <div className="absolute bottom-2.5 left-4 right-4 flex items-center gap-2.5">
+                      <SvgTrophy className="w-7 h-7 shrink-0" />
                       <div>
                         <h4 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-lg font-black text-white leading-tight">
                           {t.titulo}
                         </h4>
-                        <p className="text-xs text-zinc-300 font-medium">{t.subtitulo}</p>
+                        <p className="text-[11px] text-[#8E98A8] font-medium">
+                          Sponsor: {t.sponsor || sponsorsData.torneoPrincipal}
+                        </p>
                       </div>
                     </div>
                   </div>
 
                   <div className="p-5 space-y-3.5">
-                    <div className="bg-[#111318] p-3.5 rounded-2xl border border-zinc-800">
+                    <div className="bg-[#0B0D11] p-3.5 rounded-2xl border border-[#222631]">
                       <div className="flex justify-between text-xs font-extrabold mb-1.5">
                         <span className="text-white flex items-center gap-1.5">
-                          <Users className="w-4 h-4 text-emerald-400" /> {inscritosCount} de {t.maxCupos} inscritos
+                          <Users className="w-4 h-4 text-[#10B981]" /> {inscritosCount} de {t.maxCupos} tenistas
                         </span>
-                        <span className="text-[#E06D44]">Quedan {cuposLibres} cupos libres</span>
+                        <span className="text-[#8E98A8]">{t.fecha}</span>
                       </div>
-                      <div className="w-full h-2.5 bg-zinc-800 rounded-full overflow-hidden">
+                      <div className="w-full h-2 bg-[#14171F] rounded-full overflow-hidden">
                         <div 
-                          className={`h-full rounded-full ${cumpleMinimo ? 'bg-emerald-400' : 'bg-amber-400'}`}
+                          className="h-full rounded-full bg-[#10B981]"
                           style={{ width: `${porcentajeCupo}%` }}
                         ></div>
                       </div>
                     </div>
 
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-zinc-300 font-semibold">
-                        📍 {t.sede} · {t.fecha}
-                      </span>
-                      <span className="text-emerald-400 font-black">S/ {t.precio}.00</span>
-                    </div>
-
                     <button 
                       type="button"
-                      className="w-full bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black py-3 rounded-2xl text-xs flex items-center justify-center gap-1.5 shadow-md"
+                      className="w-full bg-[#0B0D11] hover:border-zinc-600 text-white font-extrabold py-3 rounded-2xl text-xs flex items-center justify-center gap-2 border border-[#222631]"
                     >
-                      <Users className="w-4 h-4" /> Ver los {inscritosCount} Inscritos e Inscribirme
+                      {enJuego ? '🏆 Abrir Cuadro Eliminatorio y Resultados' : '👥 Ver Cabezas de Serie e Inscribirme'}
                     </button>
                   </div>
                 </div>
@@ -2517,7 +3498,37 @@ export default function App() {
       </main>
 
       {/* ========================================================================
-          MODAL: PERFIL COMPLETO DE JUGADOR AL TOCAR EN EL RANKING (IDÉNTICO A MI PERFIL)
+          RENDERIZADO DE LOS 3 COMPONENTES ÉLITE (DEFINIDOS EN EL BLOQUE 1)
+      ======================================================================== */}
+      {showMemberPassModal && (
+        <CarnetDigitalVIP
+          player={myPlayer}
+          catInfo={myCatInfo}
+          rankPos={myRankPos}
+          onClose={() => setShowMemberPassModal(false)}
+        />
+      )}
+
+      {selectedCoachModal && (
+        <CoachProProfileModal
+          prof={selectedCoachModal}
+          onClose={() => setSelectedCoachModal(null)}
+        />
+      )}
+
+      {selectedTorneoModal && (
+        <TorneoDinamicoModal
+          torneo={selectedTorneoModal}
+          myPlayer={myPlayer}
+          onClose={() => setSelectedTorneoModal(null)}
+          onInscribir={handleInscribirEnTorneo}
+          onUpdateBracketMatch={handleUpdateBracketMatch}
+          onToggleStage={handleToggleTorneoStage}
+        />
+      )}
+
+      {/* ========================================================================
+          MODAL: FICHA DE JUGADOR DESDE EL RANKING (SOBRIA 60-30-10 + H2H REAL)
       ======================================================================== */}
       {selectedPlayerModal && (() => {
         const pRankIdx = jugadores.findIndex(j => j.id === selectedPlayerModal.id);
@@ -2528,121 +3539,108 @@ export default function App() {
         const pWinRate = pTotal > 0 ? Math.round((pWins / pTotal) * 100) : 0;
         const pCatInfo = getInfoCategoria(selectedPlayerModal.elo || 1000);
         const pStreak = getPlayerStreak(selectedPlayerModal);
-        const { myWinsH2H, rivalWinsH2H } = getHeadToHead(selectedPlayerModal);
+        const { myWinsH2H, rivalWinsH2H, totalH2H } = getHeadToHead(selectedPlayerModal);
 
         return (
-          <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-[#181B22] border border-zinc-800 w-full max-w-md rounded-3xl overflow-hidden shadow-2xl relative max-h-[92vh] overflow-y-auto">
-              {/* Banner idéntico a Mi Perfil */}
-              <div className="relative h-28 bg-gradient-to-r from-[#2A1812] via-[#1B222C] to-[#122620] p-4 flex justify-between items-start">
-                <span className={`text-xs font-extrabold px-3 py-1 rounded-full border backdrop-blur-md ${
-                  !pCalibrated 
-                    ? 'bg-amber-500/20 text-amber-300 border-amber-400/40' 
-                    : 'bg-emerald-500/20 text-emerald-300 border-emerald-400/40'
-                }`}>
-                  {!pCalibrated ? `🔒 Calibrando (${pTotal}/5)` : `✔ Oficial · Puesto #${pRankIdx + 1}`}
-                </span>
-
-                <div className="flex items-center gap-2">
-                  {pStreak >= 1 && (
-                    <div className="inline-flex items-center gap-1.5 bg-zinc-950/80 border border-orange-500/50 px-3 py-1 rounded-full">
-                      <SvgFlame className="w-4 h-4" />
-                      <span className="text-xs font-black text-orange-300">{pStreak} en racha</span>
-                    </div>
-                  )}
-                  <button
-                    onClick={() => setSelectedPlayerModal(null)}
-                    className="bg-zinc-950/80 text-zinc-300 hover:text-white p-1.5 rounded-full"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
+          <div 
+            onClick={() => setSelectedPlayerModal(null)}
+            className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4"
+          >
+            <div 
+              onClick={(e) => e.stopPropagation()}
+              className="bg-[#14171F] border border-[#222631] w-full max-w-md rounded-3xl overflow-hidden shadow-2xl relative max-h-[92vh] overflow-y-auto animate-[mpFadeSlide_0.2s_ease-out]"
+            >
+              <div className="relative h-24 bg-[#0B0D11] border-b border-[#222631] p-4 flex justify-between items-start overflow-hidden">
+                <div className="absolute inset-0 pointer-events-none">
+                  <SvgCourtLinesBg className="w-full h-full opacity-[0.05]" />
                 </div>
+                <span className="relative z-10 text-[11px] font-extrabold px-3 py-1 rounded-xl bg-[#14171F] border border-[#222631] text-zinc-200">
+                  {!pCalibrated ? `Calibrando (${pTotal}/5)` : `Puesto Oficial #${pRankIdx + 1}`}
+                </span>
+                <button
+                  onClick={() => setSelectedPlayerModal(null)}
+                  className="relative z-10 w-8 h-8 rounded-full bg-[#14171F] border border-[#222631] flex items-center justify-center text-zinc-300 hover:text-white"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
 
-              <div className="px-6 pb-6 text-center -mt-14 relative">
-                <div className={`w-28 h-28 mx-auto rounded-full bg-zinc-800 p-1 mb-3 overflow-hidden flex items-center justify-center ${getAvatarHaloClass(selectedPlayerModal, pRankIdx)}`}>
+              <div className="px-6 pb-6 text-center -mt-12 relative z-10">
+                <div className={`w-24 h-24 mx-auto rounded-full bg-[#0B0D11] p-1 mb-3 overflow-hidden flex items-center justify-center ${getAvatarHaloClass(selectedPlayerModal, pRankIdx)}`}>
                   {selectedPlayerModal.foto_url ? (
-                    <img src={selectedPlayerModal.foto_url} alt={selectedPlayerModal.nombre} className="w-full h-full rounded-full object-cover" />
+                    <img src={selectedPlayerModal.foto_url} alt={selectedPlayerModal.nombre} className="w-full h-full rounded-full object-cover object-center" />
                   ) : (
-                    <User className="w-14 h-14 text-zinc-400" />
+                    <User className="w-12 h-12 text-zinc-500" />
                   )}
                 </div>
-
-                {pRankIdx === 0 && pCalibrated && (
-                  <div className="mb-1.5 inline-flex items-center gap-1.5 bg-amber-500/20 border border-amber-400/50 text-amber-300 px-3 py-0.5 rounded-full text-[11px] font-black uppercase">
-                    <Crown className="w-3.5 h-3.5" /> Campeón Vigente
-                  </div>
-                )}
 
                 <h3 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-2xl font-black text-white">
                   {selectedPlayerModal.nombre}
                 </h3>
-                <p className="text-sm text-zinc-300 font-semibold mt-0.5">
+                <p className="text-xs text-[#8E98A8] font-semibold mt-0.5">
                   {selectedPlayerModal.club || 'Independiente'} · {selectedPlayerModal.mano || 'Diestro'}
                 </p>
 
-                {!pCalibrated ? (
-                  <div className="mt-3 inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-extrabold bg-zinc-900 text-amber-300 border border-amber-500/40">
-                    <Lock className="w-3.5 h-3.5" /> Nivel Oculto hasta jugar 5 partidos
-                  </div>
-                ) : (
-                  <div className={`inline-flex items-center gap-2 mt-3 px-4 py-1.5 rounded-full text-xs font-extrabold border ${pCatInfo.color}`}>
-                    <SvgTrophy className="w-4 h-4" /> {pCatInfo.nombre}
-                  </div>
-                )}
+                <div className="mt-2.5 flex items-center justify-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-extrabold bg-[#0B0D11] text-white border border-[#222631]">
+                    {!pCalibrated ? 'Nivel en Calibración' : pCatInfo.nombre}
+                  </span>
+                  {pStreak >= 1 && (
+                    <span className="inline-flex items-center gap-1 bg-[#0B0D11] border border-[#222631] px-3 py-1 rounded-full text-xs font-extrabold text-white">
+                      <SvgFlame className="w-3.5 h-3.5" /> {pStreak}
+                    </span>
+                  )}
+                </div>
 
-                {/* BARRA CARA A CARA (HEAD-TO-HEAD) */}
+                {/* Historial Cara a Cara (Sin mostrar 0 - 0 cuando no han jugado) */}
                 {myPlayer && myPlayer.id !== selectedPlayerModal.id && (
-                  <div className="mt-4 bg-[#12141A] border border-zinc-800 px-4 py-2.5 rounded-2xl flex justify-between items-center text-xs">
-                    <span className="font-black text-emerald-400">TÚ: {myWinsH2H}</span>
-                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-zinc-400">Historial Cara a Cara</span>
-                    <span className="font-black text-[#E06D44]">{selectedPlayerModal.nombre.split(' ')[0].toUpperCase()}: {rivalWinsH2H}</span>
+                  <div className="mt-4 bg-[#0B0D11] border border-[#222631] px-4 py-2.5 rounded-2xl flex justify-between items-center text-xs">
+                    {totalH2H === 0 ? (
+                      <span className="w-full text-center text-[#8E98A8] font-bold">
+                        Primer enfrentamiento directo en el circuito
+                      </span>
+                    ) : (
+                      <>
+                        <span className="font-black text-[#10B981]">TÚ: {myWinsH2H}</span>
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#8E98A8]">Frente a Frente</span>
+                        <span className="font-black text-white">{selectedPlayerModal.nombre.split(' ')[0].toUpperCase()}: {rivalWinsH2H}</span>
+                      </>
+                    )}
                   </div>
                 )}
 
-                {/* TARJETAS GRANDES IDÉNTICAS A MI PERFIL */}
-                <div className={`grid ${pStreak >= 1 ? 'grid-cols-3' : 'grid-cols-2'} gap-2.5 mt-4`}>
-                  <div className="bg-[#12141A] p-3.5 rounded-2xl border border-zinc-800 flex flex-col items-center">
-                    <SvgTrophy className="w-6 h-6 mb-1" />
-                    <span style={{ fontFamily: "'Outfit', sans-serif" }} className="text-xl font-black text-emerald-400">
+                <div className="grid grid-cols-2 gap-2.5 mt-3">
+                  <div className="bg-[#0B0D11] p-3.5 rounded-2xl border border-[#222631] flex flex-col items-center">
+                    <span className="text-[10px] font-bold uppercase text-[#8E98A8]">Puntos Oficiales</span>
+                    <span style={{ fontFamily: "'Outfit', sans-serif" }} className="text-xl font-black text-white mt-0.5">
                       {selectedPlayerModal.elo || 1000}
                     </span>
-                    <span className="text-[11px] font-bold text-zinc-400">Puntos Oficiales</span>
                   </div>
-
-                  {pStreak >= 1 && (
-                    <div className="bg-[#12141A] p-3.5 rounded-2xl border border-orange-500/30 flex flex-col items-center">
-                      <SvgFlame className="w-6 h-6 mb-1" />
-                      <span style={{ fontFamily: "'Outfit', sans-serif" }} className="text-xl font-black text-orange-400">
-                        {pStreak}
-                      </span>
-                      <span className="text-[11px] font-bold text-zinc-400">Racha Activa</span>
-                    </div>
-                  )}
-
-                  <div className="bg-[#12141A] p-3.5 rounded-2xl border border-zinc-800 flex flex-col items-center">
-                    <Award className="w-6 h-6 text-sky-400 mb-1" />
-                    <span style={{ fontFamily: "'Outfit', sans-serif" }} className="text-xl font-black text-sky-300">
-                      {pWinRate}%
+                  <div className="bg-[#0B0D11] p-3.5 rounded-2xl border border-[#222631] flex flex-col items-center">
+                    <span className="text-[10px] font-bold uppercase text-[#8E98A8]">Efectividad</span>
+                    <span style={{ fontFamily: "'Outfit', sans-serif" }} className="text-xl font-black text-white mt-0.5">
+                      {pTotal > 0 ? `${pWinRate}%` : '—'}
                     </span>
-                    <span className="text-[11px] font-bold text-zinc-400">Efectividad</span>
                   </div>
                 </div>
 
-                {/* BARRA DE RÉCORD COMPLETA */}
-                <div className="mt-4 bg-[#12141A] p-4 rounded-2xl border border-zinc-800 text-left space-y-2">
-                  <div className="flex justify-between items-center text-sm font-extrabold">
-                    <span className="text-emerald-400">✔ {pWins} Ganados</span>
-                    <span className="text-zinc-400 text-xs">{pTotal} Jugados</span>
-                    <span className="text-rose-400">{pLosses} Perdidos ✕</span>
+                {/* Barra de Récord: Estado Neutro si pTotal === 0 */}
+                {pTotal === 0 ? (
+                  <div className="mt-3 bg-[#0B0D11] p-3.5 rounded-2xl border border-[#222631] text-xs text-[#8E98A8] font-semibold">
+                    Aún sin partidos registrados en la temporada
                   </div>
-                  <div className="w-full h-3 bg-rose-950 rounded-full overflow-hidden flex">
-                    <div 
-                      className="h-full bg-emerald-400"
-                      style={{ width: `${pTotal > 0 ? pWinRate : 50}%` }}
-                    ></div>
+                ) : (
+                  <div className="mt-3 bg-[#0B0D11] p-4 rounded-2xl border border-[#222631] text-left space-y-2">
+                    <div className="flex justify-between items-center text-xs font-extrabold">
+                      <span className="text-[#10B981]">{pWins} Ganados</span>
+                      <span className="text-[#8E98A8]">{pTotal} Jugados</span>
+                      <span className="text-zinc-400">{pLosses} Perdidos</span>
+                    </div>
+                    <div className="w-full h-2 bg-[#14171F] rounded-full overflow-hidden flex">
+                      <div className="h-full bg-[#10B981]" style={{ width: `${pWinRate}%` }}></div>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {(!myPlayer || myPlayer.id !== selectedPlayerModal.id) && (
                   <div className="mt-5">
@@ -2653,13 +3651,13 @@ export default function App() {
                           setSelectedPlayerModal(null);
                           setChallengeTargetModal(target);
                         }}
-                        className="w-full bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black py-3.5 rounded-2xl text-sm flex items-center justify-center gap-2 shadow-lg"
+                        className="w-full bg-[#10B981] hover:bg-emerald-400 text-zinc-950 font-black py-3.5 rounded-2xl text-xs flex items-center justify-center gap-2 shadow-lg"
                       >
                         <Swords className="w-4 h-4" /> Lanzar Desafío Oficial
                       </button>
                     ) : (
-                      <div className="bg-[#111318] border border-zinc-800 text-zinc-400 text-xs font-bold py-3.5 rounded-2xl">
-                        Fuera de tu rango reglamentario de reto (±1,200 Puntos)
+                      <div className="bg-[#0B0D11] border border-[#222631] text-[#8E98A8] text-xs font-bold py-3.5 rounded-2xl">
+                        Fuera del rango reglamentario de desafío (±1,200 Puntos)
                       </div>
                     )}
                   </div>
@@ -2671,50 +3669,247 @@ export default function App() {
       })()}
 
       {/* ========================================================================
-          MODAL: LANZAR DESAFÍO CON SEDE PERSONALIZADA ("OTRA CANCHA")
+          MODAL: MOMENTOS CRUCIALES (FELICITACIÓN AL GANADOR / ÁNIMO AL PERDEDOR)
+      ======================================================================== */}
+      {crucialMomentAlert && (
+        <div 
+          onClick={() => setCrucialMomentAlert(null)}
+          className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#14171F] border border-[#222631] w-full max-w-sm rounded-3xl p-6 shadow-2xl text-center space-y-4 animate-[mpFadeSlide_0.22s_ease-out]"
+          >
+            <div className="w-14 h-14 rounded-2xl bg-[#0B0D11] border border-[#222631] flex items-center justify-center mx-auto">
+              {crucialMomentAlert.tipo === 'victoria' ? (
+                <SvgTrophy className="w-8 h-8" />
+              ) : (
+                <Sparkles className="w-7 h-7 text-[#10B981]" />
+              )}
+            </div>
+            <div className="space-y-1">
+              <span className="text-[10px] font-black uppercase tracking-widest text-[#10B981] block">
+                Comité Deportivo Matchpoint
+              </span>
+              <h3 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-xl font-black text-white">
+                {crucialMomentAlert.titulo}
+              </h3>
+              <p className="text-xs font-bold text-zinc-300">{crucialMomentAlert.subtitulo}</p>
+            </div>
+
+            {crucialMomentAlert.detallePuntos && (
+              <div className="bg-[#0B0D11] border border-[#222631] py-2.5 px-3 rounded-xl text-xs font-mono text-[#10B981] font-bold">
+                {crucialMomentAlert.detallePuntos}
+              </div>
+            )}
+
+            <p className="text-xs text-[#8E98A8] leading-relaxed bg-[#0B0D11] p-3.5 rounded-2xl border border-[#222631]">
+              "{crucialMomentAlert.mensaje}"
+            </p>
+
+            <button
+              onClick={() => setCrucialMomentAlert(null)}
+              className="w-full bg-[#10B981] text-zinc-950 font-black py-3 rounded-2xl text-xs"
+            >
+              Continuar en el Circuito
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================
+          MODAL: TUERCA DE AJUSTES DE CUENTA (⚙️ EN MI PERFIL - DESCENTRALIZADO)
+      ======================================================================== */}
+      {showSettingsModal && (
+        <div 
+          onClick={() => setShowSettingsModal(false)}
+          className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#14171F] border border-[#222631] w-full max-w-sm rounded-3xl p-6 shadow-2xl space-y-4"
+          >
+            <div className="flex justify-between items-center">
+              <h3 className="text-base font-black text-white flex items-center gap-2">
+                <Settings className="w-4 h-4 text-[#10B981]" /> Ajustes de Mi Perfil
+              </h3>
+              <button onClick={() => setShowSettingsModal(false)} className="text-zinc-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-2.5 text-xs">
+              <button
+                onClick={() => setHidePhonePublic(!hidePhonePublic)}
+                className="w-full bg-[#0B0D11] border border-[#222631] p-3.5 rounded-2xl flex justify-between items-center"
+              >
+                <span className="text-zinc-200 font-bold">Visibilidad de mi WhatsApp</span>
+                <span className="text-[#10B981] font-extrabold">{hidePhonePublic ? 'Solo Rivales' : 'Público'}</span>
+              </button>
+
+              <div className="bg-[#0B0D11] border border-[#222631] p-3.5 rounded-2xl flex justify-between items-center">
+                <span className="text-zinc-200 font-bold">Mano de Juego</span>
+                <span className="text-[#8E98A8] font-bold">{myPlayer?.mano || 'Diestro'}</span>
+              </div>
+
+              <div className="bg-[#0B0D11] border border-[#222631] p-3.5 rounded-2xl flex justify-between items-center">
+                <span className="text-zinc-200 font-bold">Disponibilidad Preferida</span>
+                <span className="text-[#8E98A8] font-bold">{myPlayer?.horario || 'Fines de Semana'}</span>
+              </div>
+
+              {myPlayer && (
+                <button
+                  onClick={handleLogout}
+                  className="w-full bg-[#0B0D11] hover:border-rose-800 border border-[#222631] text-rose-400 font-extrabold py-3.5 rounded-2xl flex items-center justify-center gap-2 mt-2"
+                >
+                  <LogOut className="w-4 h-4" /> Cerrar Sesión
+                </button>
+              )}
+
+              <div className="pt-3 border-t border-[#222631] text-center">
+                <button
+                  onClick={() => { setShowSettingsModal(false); setShowAdminModal(true); }}
+                  className="text-[11px] text-[#8E98A8] hover:text-white font-semibold"
+                >
+                  Acceso Técnico del Comité (Admin)
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================
+          MENÚ LATERAL DE 3 RAYITAS (DEPURADO: SOLO INSTITUCIONAL Y REGLAMENTO)
+      ======================================================================== */}
+      {showSideDrawer && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex">
+          <div className="bg-[#14171F] border-r border-[#222631] w-80 max-w-[85vw] h-full p-5 flex flex-col justify-between overflow-y-auto">
+            <div className="space-y-5">
+              <div className="flex justify-between items-center pb-3 border-b border-[#222631]">
+                <div className="flex items-center gap-2.5">
+                  <SvgTennisBall className="w-7 h-7" />
+                  <div>
+                    <h3 className="text-sm font-black text-white leading-none">MATCHPOINT</h3>
+                    <span className="text-[10px] text-[#8E98A8] font-bold uppercase">Información Oficial</span>
+                  </div>
+                </div>
+                <button onClick={() => setShowSideDrawer(false)} className="text-zinc-400 hover:text-white p-1">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="bg-[#0B0D11] border border-[#222631] p-4 rounded-2xl space-y-1.5">
+                <div className="flex items-center gap-2 text-[#EAB308] font-extrabold text-xs">
+                  <Gift className="w-4 h-4" /> Incentivo Mensual de Cancha
+                </div>
+                <p className="text-xs text-[#8E98A8] leading-relaxed">
+                  Todo socio con <strong className="text-white">4 partidos oficiales al mes</strong> entra al sorteo de tubos de pelotas y horas de cancha.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <button
+                  onClick={() => { setShowSideDrawer(false); setShowRulesModal(true); }}
+                  className="w-full bg-[#0B0D11] border border-[#222631] p-3.5 rounded-2xl flex justify-between items-center text-xs font-bold text-white"
+                >
+                  <span className="flex items-center gap-2.5"><BookOpen className="w-4 h-4 text-[#10B981]" /> Reglamento y Sistema de Puntos</span>
+                  <ChevronRight className="w-4 h-4 text-zinc-600" />
+                </button>
+
+                <button
+                  onClick={() => { setShowSideDrawer(false); handleTabChange('clubs'); setCanchasSubTab('clubes'); }}
+                  className="w-full bg-[#0B0D11] border border-[#222631] p-3.5 rounded-2xl flex justify-between items-center text-xs font-bold text-white"
+                >
+                  <span className="flex items-center gap-2.5"><MapPin className="w-4 h-4 text-[#D96B43]" /> Sedes y Beneficios de Clubes</span>
+                  <ChevronRight className="w-4 h-4 text-zinc-600" />
+                </button>
+
+                <button
+                  onClick={() => { setShowSideDrawer(false); setShowStoreModal(true); }}
+                  className="w-full bg-[#0B0D11] border border-[#222631] p-3.5 rounded-2xl flex justify-between items-center text-xs font-bold text-white"
+                >
+                  <span className="flex items-center gap-2.5"><ShoppingBag className="w-4 h-4 text-[#EAB308]" /> Taller de Encordado & Pro-Shop</span>
+                  <ChevronRight className="w-4 h-4 text-zinc-600" />
+                </button>
+
+                <a
+                  href="https://wa.me/51964000000?text=Hola%20Comité%20MATCHPOINT,%20tengo%20una%20consulta%20sobre%20el%20circuito."
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full bg-[#0B0D11] border border-[#222631] p-3.5 rounded-2xl flex justify-between items-center text-xs font-bold text-white"
+                >
+                  <span className="flex items-center gap-2.5"><Phone className="w-4 h-4 text-[#10B981]" /> Contacto con el Comité</span>
+                  <ChevronRight className="w-4 h-4 text-zinc-600" />
+                </a>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-[#222631] flex justify-between items-center text-[11px] text-[#8E98A8]">
+              <span>Temporada Apertura 2026</span>
+              <button
+                onClick={() => { setShowSideDrawer(false); setShowAdminModal(true); }}
+                className="text-zinc-500 hover:text-zinc-300 font-semibold"
+              >
+                Comité {disputasActivas.length > 0 ? `(${disputasActivas.length})` : ''}
+              </button>
+            </div>
+          </div>
+          <div className="flex-1" onClick={() => setShowSideDrawer(false)}></div>
+        </div>
+      )}
+
+      {/* ========================================================================
+          MODAL: LANZAR DESAFÍO CON SEDE PERSONALIZADA
       ======================================================================== */}
       {challengeTargetModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#181B22] border border-zinc-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl">
+        <div 
+          onClick={() => setChallengeTargetModal(null)}
+          className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#14171F] border border-[#222631] w-full max-w-sm rounded-3xl p-6 shadow-2xl"
+          >
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-base font-black text-white flex items-center gap-1.5">
-                <Swords className="w-4 h-4 text-emerald-400" /> Lanzar Desafío Oficial
+                <Swords className="w-4 h-4 text-[#10B981]" /> Lanzar Desafío Oficial
               </h3>
               <button onClick={() => setChallengeTargetModal(null)} className="text-zinc-400 hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <form onSubmit={handleConfirmarNuevoReto} className="space-y-3.5">
-              <div className="bg-[#111318] p-3.5 rounded-2xl border border-zinc-800">
-                <span className="text-[10px] uppercase font-bold text-emerald-400 block">Rival Seleccionado</span>
+              <div className="bg-[#0B0D11] p-3.5 rounded-2xl border border-[#222631]">
+                <span className="text-[10px] uppercase font-bold text-[#10B981] block">Rival Seleccionado</span>
                 <p className="text-base font-black text-white">{challengeTargetModal.nombre}</p>
-                <span className="text-xs text-zinc-400">{challengeTargetModal.elo || 1000} Puntos Oficiales</span>
+                <span className="text-xs text-[#8E98A8]">{challengeTargetModal.elo || 1000} Puntos Oficiales</span>
               </div>
 
               <div>
-                <label className="text-xs font-bold text-zinc-300 block mb-1">Cancha o Sede del Partido</label>
+                <label className="text-xs font-bold text-zinc-300 block mb-1">Sede del Encuentro</label>
                 <select
                   value={challengeSede}
                   onChange={(e) => setChallengeSede(e.target.value)}
-                  className="w-full bg-[#111318] border border-zinc-800 rounded-xl px-3 py-3 text-xs text-white font-semibold"
+                  className="w-full bg-[#0B0D11] border border-[#222631] rounded-xl px-3 py-3 text-xs text-white font-semibold"
                 >
                   {sedesVisibles.map((s, i) => (
                     <option key={i} value={s.nombre}>{s.nombre}</option>
                   ))}
-                  <option value="OTRA_SEDE">📍 Otra cancha / Sede personalizada (Escribir...)</option>
+                  <option value="OTRA_SEDE">📍 Otra cancha / Sede particular (Escribir...)</option>
                 </select>
               </div>
 
               {challengeSede === 'OTRA_SEDE' && (
                 <div>
-                  <label className="text-xs font-bold text-amber-300 block mb-1">Escribe el nombre o lugar de la cancha *</label>
+                  <label className="text-xs font-bold text-zinc-300 block mb-1">Nombre o ubicación de la cancha *</label>
                   <input
                     type="text"
                     required
-                    placeholder="Ej. Cancha Municipal / Condominio Los Sauces"
+                    placeholder="Ej. Cancha Privada / Condominio"
                     value={customSedeText}
                     onChange={(e) => setCustomSedeText(e.target.value)}
-                    className="w-full bg-[#111318] border border-amber-500/50 rounded-xl px-3 py-3 text-xs text-white"
+                    className="w-full bg-[#0B0D11] border border-[#10B981] rounded-xl px-3 py-3 text-xs text-white"
                   />
                 </div>
               )}
@@ -2726,12 +3921,12 @@ export default function App() {
                   required
                   value={challengeFecha}
                   onChange={(e) => setChallengeFecha(e.target.value)}
-                  className="w-full bg-[#111318] border border-zinc-800 rounded-xl px-3 py-3 text-xs text-white"
+                  className="w-full bg-[#0B0D11] border border-[#222631] rounded-xl px-3 py-3 text-xs text-white"
                 />
               </div>
 
-              <button type="submit" className="w-full bg-emerald-500 text-zinc-950 font-black py-3.5 rounded-2xl text-xs shadow-lg">
-                Enviar Invitación de Partido
+              <button type="submit" className="w-full bg-[#10B981] text-zinc-950 font-black py-3.5 rounded-2xl text-xs shadow-lg">
+                Enviar Invitación Oficial
               </button>
             </form>
           </div>
@@ -2739,107 +3934,24 @@ export default function App() {
       )}
 
       {/* ========================================================================
-          MODAL: SALÓN DE LA FAMA E INSIGNIA CAMPEÓN VIGENTE (CANDADO 5 PARTIDOS)
-      ======================================================================== */}
-      {showHallOfFameModal && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#181B22] border border-zinc-800 w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-4 overflow-y-auto max-h-[90vh]">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <Crown className="w-5 h-5 text-amber-400" />
-                <h3 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-xl font-black text-white">
-                  Salón de la Fama
-                </h3>
-              </div>
-              <button onClick={() => setShowHallOfFameModal(false)} className="text-zinc-400 hover:text-white">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Regla de Mérito para Trofeos y Premios de Temporada */}
-            <div className="bg-amber-500/10 border border-amber-500/30 p-3.5 rounded-2xl text-xs space-y-1">
-              <span className="font-black text-amber-300 uppercase block">🏆 Regla de Mérito para Premios de Temporada</span>
-              <p className="text-zinc-200 leading-relaxed">
-                Para coronarse <strong>Campeón Vigente</strong> y recibir el trofeo oficial al cierre de temporada, el jugador debe ocupar el puesto #1 de su categoría habiendo completado un <strong>mínimo de 5 partidos oficiales</strong>. Si una división tiene menos partidos, se define mediante un Playoff presencial.
-              </p>
-            </div>
-
-            {SALON_DE_LA_FAMA_HISTORICO.map((item, idx) => (
-              <div key={idx} className="space-y-2">
-                <span className="text-xs font-black uppercase tracking-wider text-emerald-400 block">
-                  {item.temporada} (Registro Oficial Cerrado)
-                </span>
-                <div className="space-y-2">
-                  {item.campeones.map((c, cIdx) => (
-                    <div key={cIdx} className="bg-[#111318] border border-zinc-800 px-3.5 py-2.5 rounded-2xl flex justify-between items-center text-xs">
-                      <div className="flex items-center gap-2.5">
-                        <SvgMedal rank={1} className="w-7 h-7 shrink-0" />
-                        <div>
-                          <span className="text-[10px] font-black uppercase text-amber-400 block">{c.division}</span>
-                          <p className="font-extrabold text-white text-sm">{c.nombre}</p>
-                          <span className="text-[11px] text-zinc-400">{c.club}</span>
-                        </div>
-                      </div>
-                      <span className="font-mono font-black text-emerald-400">{c.record}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================================
-          MODAL: REGLAMENTO OFICIAL Y TÉRMINOS (SIN REVELAR FÓRMULAS INTERNAS)
-      ======================================================================== */}
-      {showRulesModal && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#181B22] border border-zinc-800 w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-4 overflow-y-auto max-h-[88vh]">
-            <div className="flex justify-between items-center">
-              <h3 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-lg font-black text-white flex items-center gap-2">
-                <BookOpen className="w-5 h-5 text-emerald-400" /> Reglamento y Sistema del Circuito
-              </h3>
-              <button onClick={() => setShowRulesModal(false)} className="text-zinc-400 hover:text-white">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-3 text-xs text-zinc-300 leading-relaxed">
-              <div className="bg-[#111318] p-3.5 rounded-2xl border border-zinc-800">
-                <span className="font-black text-emerald-400 block uppercase mb-1">1. Cómo Subes o Bajas de Nivel</span>
-                Vencer a un jugador con mayor puntaje te otorga una bonificación mayor de puntos. Además, ganar con un marcador contundente en sets suma un mérito adicional frente a un marcador ajustado.
-              </div>
-              <div className="bg-[#111318] p-3.5 rounded-2xl border border-zinc-800">
-                <span className="font-black text-amber-300 block uppercase mb-1">2. Fase de Calibración (Primeros 5 Partidos)</span>
-                Todo nuevo jugador mantiene su categoría protegida durante sus primeros 5 partidos oficiales mientras el sistema ajusta su nivel real en cancha.
-              </div>
-              <div className="bg-[#111318] p-3.5 rounded-2xl border border-zinc-800">
-                <span className="font-black text-orange-400 block uppercase mb-1">3. Premio a la Constancia y Racha</span>
-                Ambos jugadores reciben puntos fijos de asistencia por cada partido completado. Encadenar 3 o más victorias seguidas activa el bono de racha y descuentos en la Tienda Oficial.
-              </div>
-              <div className="bg-[#111318] p-3.5 rounded-2xl border border-zinc-800">
-                <span className="font-black text-sky-400 block uppercase mb-1">4. Juego Limpio y Divisiones (+40 / Damas)</span>
-                Solo se computan hasta 2 partidos por semana contra un mismo rival. La división Senior +40 es exclusiva para mayores de 40 años verificados.
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================================
-          MODAL: PORTAL PRIVADO "COACH PRO" (GESTIÓN DE ACADEMIAS Y ALUMNOS B2B)
+          MODAL: PORTAL PRIVADO COACH PRO (AUTOGESTIÓN DE TURNOS LIBRES Y ALUMNOS)
       ======================================================================== */}
       {showCoachProModal && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#181B22] border border-zinc-800 w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-4 overflow-y-auto max-h-[90vh]">
+        <div 
+          onClick={() => setShowCoachProModal(false)}
+          className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#14171F] border border-[#222631] w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-4 overflow-y-auto max-h-[90vh]"
+          >
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-2">
-                <GraduationCap className="w-5 h-5 text-emerald-400" />
+                <GraduationCap className="w-5 h-5 text-[#EAB308]" />
                 <div>
-                  <span className="text-[10px] font-black uppercase text-emerald-400 block">Herramienta Exclusiva Entrenadores</span>
+                  <span className="text-[10px] font-black uppercase text-[#8E98A8] block">Autogestión de Academia</span>
                   <h3 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-lg font-black text-white">
-                    Portal Privado Coach Pro
+                    Portal Coach Pro
                   </h3>
                 </div>
               </div>
@@ -2855,69 +3967,78 @@ export default function App() {
                   if (coachPinInput === '7777' || coachPinInput === '1234') {
                     setIsCoachProUnlocked(true);
                   } else {
-                    alert('Código de Entrenador incorrecto (Usa 7777 o 1234 para demostración).');
+                    alert('Código incorrecto (Usa 7777).');
                   }
                 }}
                 className="space-y-3"
               >
-                <p className="text-xs text-zinc-300">
-                  Acceso exclusivo para profesores afiliados a MATCHPOINT para controlar sus grupos, horarios, asistencias y mensualidades:
+                <p className="text-xs text-[#8E98A8]">
+                  Ingresa tu clave de entrenador para publicar tus horas libres de cancha de esta semana y gestionar tus grupos:
                 </p>
                 <input
                   type="password"
-                  placeholder="Código Coach Pro (7777)"
+                  placeholder="PIN Entrenador (7777)"
                   value={coachPinInput}
                   onChange={(e) => setCoachPinInput(e.target.value)}
-                  className="w-full bg-[#111318] border border-zinc-800 rounded-xl px-3 py-3 text-center text-lg tracking-widest text-emerald-400 font-mono"
+                  className="w-full bg-[#0B0D11] border border-[#222631] rounded-xl px-3 py-3 text-center text-lg tracking-widest text-white font-mono"
                 />
-                <button type="submit" className="w-full bg-emerald-500 text-zinc-950 font-black py-3.5 rounded-xl text-xs">
-                  Abrir Mi Academia (Código: 7777)
+                <button type="submit" className="w-full bg-[#10B981] text-zinc-950 font-black py-3.5 rounded-xl text-xs">
+                  Ingresar a Mi Academia
                 </button>
               </form>
             ) : (
               <div className="space-y-4 text-xs">
-                <div className="grid grid-cols-2 gap-2.5 bg-[#111318] p-3.5 rounded-2xl border border-zinc-800 text-center">
-                  <div>
-                    <span className="text-[10px] font-bold text-zinc-400 uppercase block">Alumnos Activos</span>
-                    <span className="text-xl font-black text-emerald-400">{coachAlumnos.length}</span>
+                {/* 1. Publicar Nuevo Hueco Libre en Cancha */}
+                <form onSubmit={handleAddCoachFreeSlot} className="bg-[#0B0D11] p-4 rounded-2xl border border-[#222631] space-y-2.5">
+                  <span className="text-[10px] font-black uppercase text-[#10B981] block">
+                    1. Publicar Turno Libre en mi Perfil Público
+                  </span>
+                  <div className="grid grid-cols-3 gap-2">
+                    <input
+                      type="text"
+                      value={newTurnoDia}
+                      onChange={(e) => setNewTurnoDia(e.target.value)}
+                      placeholder="Día"
+                      className="bg-[#14171F] border border-[#222631] rounded-xl px-2.5 py-2 text-xs text-white"
+                    />
+                    <input
+                      type="text"
+                      value={newTurnoHora}
+                      onChange={(e) => setNewTurnoHora(e.target.value)}
+                      placeholder="Hora"
+                      className="bg-[#14171F] border border-[#222631] rounded-xl px-2.5 py-2 text-xs text-white"
+                    />
+                    <input
+                      type="text"
+                      value={newTurnoClub}
+                      onChange={(e) => setNewTurnoClub(e.target.value)}
+                      placeholder="Sede"
+                      className="bg-[#14171F] border border-[#222631] rounded-xl px-2.5 py-2 text-xs text-white"
+                    />
                   </div>
-                  <div>
-                    <span className="text-[10px] font-bold text-zinc-400 uppercase block">Pagos al Día</span>
-                    <span className="text-xl font-black text-amber-300">
-                      {coachAlumnos.filter(a => a.estadoPago === 'Pagado').length} / {coachAlumnos.length}
-                    </span>
-                  </div>
-                </div>
+                  <button type="submit" className="w-full bg-[#10B981] text-zinc-950 font-black py-2.5 rounded-xl text-xs">
+                    + Habilitar Turno Disponible
+                  </button>
+                </form>
 
-                {/* Lista de Alumnos y Control de Mensualidades / Asistencia */}
-                <div className="space-y-2 max-h-56 overflow-y-auto">
+                {/* 2. Padrón de Alumnos Activos en el Circuito */}
+                <div className="space-y-2">
+                  <span className="text-[10px] font-black uppercase text-[#8E98A8] block">
+                    2. Alumnos de mi Academia ({coachAlumnos.length})
+                  </span>
                   {coachAlumnos.map(al => (
-                    <div key={al.id} className="bg-[#111318] border border-zinc-800 p-3.5 rounded-2xl flex justify-between items-center">
+                    <div key={al.id} className="bg-[#0B0D11] border border-[#222631] p-3.5 rounded-2xl flex justify-between items-center">
                       <div>
-                        <p className="font-black text-white text-sm">{al.nombre}</p>
-                        <p className="text-[11px] text-zinc-400">{al.grupo}</p>
-                        <span className="text-[11px] text-emerald-400 font-bold">Asistencia: {al.asistencias} · {al.monto}</span>
+                        <p className="font-extrabold text-white text-sm">{al.nombre}</p>
+                        <p className="text-[11px] text-[#8E98A8]">{al.grupo}</p>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const nuevos = coachAlumnos.map(x => x.id === al.id ? { ...x, estadoPago: x.estadoPago === 'Pagado' ? 'Pendiente' : 'Pagado' } : x);
-                          setCoachAlumnos(nuevos);
-                          localStorage.setItem('mp_coach_alumnos', JSON.stringify(nuevos));
-                        }}
-                        className={`px-3 py-1.5 rounded-xl font-black text-[11px] ${
-                          al.estadoPago === 'Pagado'
-                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                            : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
-                        }`}
-                      >
-                        {al.estadoPago}
-                      </button>
+                      <span className="text-[11px] font-bold text-[#10B981] bg-[#14171F] px-2.5 py-1 rounded-lg border border-[#222631]">
+                        {al.asistencias}
+                      </span>
                     </div>
                   ))}
                 </div>
 
-                {/* Agregar Nuevo Alumno a la Academia */}
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
@@ -2926,42 +4047,27 @@ export default function App() {
                       id: Date.now(),
                       nombre: newAlumnoNombre.trim(),
                       grupo: newAlumnoGrupo,
-                      asistencias: '1/8 clases',
-                      estadoPago: 'Pagado',
-                      monto: newAlumnoMonto
+                      asistencias: '1/8 sesiones',
+                      nivel: '5ª P'
                     };
                     const lista = [nuevo, ...coachAlumnos];
                     setCoachAlumnos(lista);
-                    localStorage.setItem('mp_coach_alumnos', JSON.stringify(lista));
+                    localStorage.setItem('mp_coach_alumnos_v6', JSON.stringify(lista));
                     setNewAlumnoNombre('');
                   }}
-                  className="bg-[#111318] p-3.5 rounded-2xl border border-zinc-800 space-y-2"
+                  className="bg-[#0B0D11] p-3.5 rounded-2xl border border-[#222631] space-y-2"
                 >
-                  <span className="text-[10px] font-black uppercase text-emerald-400 block">+ Inscribir Alumno en mi Academia</span>
+                  <span className="text-[10px] font-black uppercase text-[#8E98A8] block">+ Agregar Alumno al Grupo</span>
                   <input
                     type="text"
                     required
                     placeholder="Nombre del Alumno"
                     value={newAlumnoNombre}
                     onChange={(e) => setNewAlumnoNombre(e.target.value)}
-                    className="w-full bg-[#181B22] border border-zinc-700 rounded-xl px-3 py-2 text-xs text-white"
+                    className="w-full bg-[#14171F] border border-[#222631] rounded-xl px-3 py-2 text-xs text-white"
                   />
-                  <div className="grid grid-cols-2 gap-2">
-                    <input
-                      type="text"
-                      value={newAlumnoGrupo}
-                      onChange={(e) => setNewAlumnoGrupo(e.target.value)}
-                      className="w-full bg-[#181B22] border border-zinc-700 rounded-xl px-3 py-2 text-xs text-white"
-                    />
-                    <input
-                      type="text"
-                      value={newAlumnoMonto}
-                      onChange={(e) => setNewAlumnoMonto(e.target.value)}
-                      className="w-full bg-[#181B22] border border-zinc-700 rounded-xl px-3 py-2 text-xs text-white"
-                    />
-                  </div>
-                  <button type="submit" className="w-full bg-emerald-500 text-zinc-950 font-black py-2.5 rounded-xl text-xs">
-                    Guardar Alumno en mi Padrón
+                  <button type="submit" className="w-full bg-[#14171F] border border-[#222631] text-white font-extrabold py-2.5 rounded-xl text-xs">
+                    Guardar en Padrón
                   </button>
                 </form>
               </div>
@@ -2971,126 +4077,263 @@ export default function App() {
       )}
 
       {/* ========================================================================
-          MODAL: CARNET DIGITAL DE SOCIO OFICIAL MATCHPOINT
+          MODAL: REGLAMENTO OFICIAL Y TÉRMINOS
       ======================================================================== */}
-      {showMemberPassModal && myPlayer && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-gradient-to-b from-[#1E2430] to-[#12151C] border-2 border-emerald-500/60 w-full max-w-xs rounded-3xl p-6 shadow-2xl text-center space-y-4 relative">
-            <button onClick={() => setShowMemberPassModal(false)} className="absolute top-4 right-4 text-zinc-400 hover:text-white">
-              <X className="w-5 h-5" />
-            </button>
-            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400 block">
-              Pase Oficial Verificado
-            </span>
-            <div className="w-20 h-20 mx-auto rounded-full bg-zinc-800 border-2 border-emerald-400 overflow-hidden flex items-center justify-center">
-              {myPlayer.foto_url ? (
-                <img src={myPlayer.foto_url} alt={myPlayer.nombre} className="w-full h-full object-cover" />
-              ) : (
-                <User className="w-10 h-10 text-zinc-400" />
-              )}
-            </div>
-            <div>
-              <h3 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-xl font-black text-white">{myPlayer.nombre}</h3>
-              <p className="text-xs text-emerald-400 font-bold">{myPlayer.club || 'Socio Oficial'}</p>
-            </div>
-            <div className="bg-[#111318] p-4 rounded-2xl border border-zinc-800">
-              <QrCode className="w-20 h-20 mx-auto text-white" />
-              <span className="text-[11px] font-mono text-zinc-400 block mt-2">ID SOCIO #{myPlayer.id || '001'}</span>
-            </div>
-            <p className="text-[11px] text-zinc-300">
-              Presenta este carnet en los Clubes Aliados y en el Taller de Encordado para aplicar tus beneficios activos.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================================
-          MODAL: LISTA DE INSCRITOS EN TORNEO Y CUPOS DISPONIBLES
-      ======================================================================== */}
-      {selectedTorneoModal && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#181B22] border border-zinc-800 w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-4 overflow-y-auto max-h-[90vh]">
-            <div className="flex justify-between items-start">
-              <div>
-                <span className="text-[10px] font-black uppercase text-emerald-400 tracking-widest">
-                  Categoría {selectedTorneoModal.cat} · Quórum Mínimo {selectedTorneoModal.min}
-                </span>
-                <h3 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-xl font-black text-white">
-                  {selectedTorneoModal.titulo}
-                </h3>
-              </div>
-              <button onClick={() => setSelectedTorneoModal(null)} className="text-zinc-400 hover:text-white p-1">
+      {showRulesModal && (
+        <div 
+          onClick={() => setShowRulesModal(false)}
+          className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#14171F] border border-[#222631] w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-4 overflow-y-auto max-h-[88vh]"
+          >
+            <div className="flex justify-between items-center">
+              <h3 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-lg font-black text-white flex items-center gap-2">
+                <BookOpen className="w-5 h-5 text-[#10B981]" /> Reglamento del Circuito
+              </h3>
+              <button onClick={() => setShowRulesModal(false)} className="text-zinc-400 hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-2.5 bg-[#111318] p-3.5 rounded-2xl border border-zinc-800 text-center">
-              <div>
-                <span className="text-[11px] font-bold text-zinc-400 block">Jugadores Inscritos</span>
-                <span className="text-xl font-black text-emerald-400">{selectedTorneoModal.participantes.length}</span>
+            <div className="space-y-3 text-xs text-[#8E98A8] leading-relaxed">
+              <div className="bg-[#0B0D11] p-3.5 rounded-2xl border border-[#222631]">
+                <span className="font-extrabold text-white block uppercase mb-1">1. Puntuación por Mérito y Rival</span>
+                Vencer a un oponente con mayor puntaje otorga un salto mayor en la clasificación. Los marcadores amplios en sets bonifican el dominio en cancha.
               </div>
-              <div>
-                <span className="text-[11px] font-bold text-zinc-400 block">Cupos Disponibles</span>
-                <span className="text-xl font-black text-amber-400">
-                  {Math.max(0, selectedTorneoModal.maxCupos - selectedTorneoModal.participantes.length)}
-                </span>
+              <div className="bg-[#0B0D11] p-3.5 rounded-2xl border border-[#222631]">
+                <span className="font-extrabold text-white block uppercase mb-1">2. Calibración Inicial (5 Partidos)</span>
+                Todo jugador nuevo protege su categoría durante sus primeros 5 encuentros mientras el sistema consolida su nivel real.
               </div>
-            </div>
-
-            <div>
-              <span className="text-xs font-extrabold uppercase tracking-wider text-zinc-300 block mb-2">
-                Lista Oficial de Inscritos ({selectedTorneoModal.participantes.length})
-              </span>
-              <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
-                {selectedTorneoModal.participantes.map((p, idx) => (
-                  <div key={idx} className="bg-[#111318] border border-zinc-800 px-3.5 py-2.5 rounded-xl flex justify-between items-center text-xs">
-                    <div className="flex items-center gap-2.5">
-                      <span className="font-mono font-black text-emerald-400">#{idx + 1}</span>
-                      <div>
-                        <p className="font-extrabold text-white">{p.nombre}</p>
-                        <span className="text-[11px] text-zinc-400">{p.club}</span>
-                      </div>
-                    </div>
-                    <span className="font-mono font-bold text-zinc-300">{p.pts} Pts</span>
-                  </div>
-                ))}
+              <div className="bg-[#0B0D11] p-3.5 rounded-2xl border border-[#222631]">
+                <span className="font-extrabold text-white block uppercase mb-1">3. Elegibilidad de Campeón Vigente</span>
+                Para recibir premios físicos al cierre de temporada es obligatorio haber completado al menos 5 partidos oficiales en la división.
               </div>
-            </div>
-
-            <div className="bg-[#111318] p-4 rounded-2xl border border-zinc-800 text-center space-y-2">
-              <QrCode className="w-12 h-12 mx-auto text-emerald-400" />
-              <p className="text-xs font-black text-white">Inscripción Oficial: S/ {selectedTorneoModal.precio}.00 (Yape/Plin: 964-000000)</p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2.5">
-              <button
-                onClick={() => handleInscribirEnTorneo(selectedTorneoModal)}
-                className="bg-zinc-800 hover:bg-zinc-700 text-amber-300 font-extrabold py-3 rounded-2xl text-xs border border-amber-500/30"
-              >
-                + Pre-inscribirme
-              </button>
-              <a
-                href={`https://wa.me/51964000000?text=Hola,%20envío%20mi%20comprobante%20de%20S/%20${selectedTorneoModal.precio}%20para%20inscribirme%20en%20${encodeURIComponent(selectedTorneoModal.titulo)}.`}
-                target="_blank"
-                rel="noreferrer"
-                className="bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black py-3 rounded-2xl text-xs flex items-center justify-center gap-1"
-              >
-                <Phone className="w-3.5 h-3.5" /> Enviar Comprobante
-              </a>
             </div>
           </div>
         </div>
       )}
 
       {/* ========================================================================
-          MODAL TÉCNICO DE CLIMA
+          MODAL: SUITE DE ADMINISTRACIÓN (DISPUTAS, PATROCINADORES Y SANDBOX)
+      ======================================================================== */}
+      {showAdminModal && (
+        <div 
+          onClick={() => { setShowAdminModal(false); setIsAdminAuth(false); }}
+          className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#14171F] border border-[#222631] w-full max-w-md rounded-3xl p-6 shadow-2xl overflow-y-auto max-h-[92vh]"
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-base font-black text-white flex items-center gap-1.5">
+                <Shield className="w-5 h-5 text-[#10B981]" /> Suite del Comité Deportivo
+              </h3>
+              <button onClick={() => { setShowAdminModal(false); setIsAdminAuth(false); }} className="text-zinc-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {!isAdminAuth ? (
+              <form onSubmit={(e) => { e.preventDefault(); adminPin === '1234' ? setIsAdminAuth(true) : alert('PIN Incorrecto (1234)'); }} className="space-y-3">
+                <input
+                  type="password"
+                  placeholder="PIN Comité (1234)"
+                  value={adminPin}
+                  onChange={(e) => setAdminPin(e.target.value)}
+                  className="w-full bg-[#0B0D11] border border-[#222631] rounded-xl px-3 py-3 text-center text-lg tracking-widest text-white font-mono"
+                />
+                <button type="submit" className="w-full bg-[#10B981] text-zinc-950 font-black py-3.5 rounded-xl text-xs">
+                  Desbloquear Panel
+                </button>
+              </form>
+            ) : (
+              <div className="space-y-4 text-xs">
+                {/* 1. Bandeja de Disputas */}
+                <div className="bg-[#0B0D11] p-4 rounded-2xl border border-[#222631] space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[11px] font-black uppercase text-[#D96B43]">
+                      1. Partidos en Disputa ({disputasActivas.length})
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleSimulateDisputeForAdmin}
+                      className="text-[10px] bg-[#14171F] text-zinc-300 border border-[#222631] px-2.5 py-1 rounded-lg font-bold"
+                    >
+                      + Simular Caso
+                    </button>
+                  </div>
+
+                  {disputasActivas.length === 0 ? (
+                    <p className="text-[#8E98A8] text-center py-1">Sin marcadores observados.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {disputasActivas.map(d => (
+                        <div key={d.id} className="bg-[#14171F] border border-[#222631] p-3 rounded-xl space-y-2">
+                          <div className="flex justify-between">
+                            <span className="font-black text-white">{d.ganadorNombre} vs {d.perdedorNombre}</span>
+                            <span className="font-mono text-[#EAB308] font-bold">{d.score}</span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleAdminResolveDispute(d, 'aprobar')}
+                              className="bg-[#10B981] text-zinc-950 font-black py-1.5 rounded-lg text-[11px]"
+                            >
+                              Aprobar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleAdminResolveDispute(d, 'editar')}
+                              className="bg-[#EAB308] text-zinc-950 font-black py-1.5 rounded-lg text-[11px]"
+                            >
+                              Editar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleAdminResolveDispute(d, 'anular')}
+                              className="bg-[#0B0D11] text-rose-400 border border-[#222631] font-bold py-1.5 rounded-lg text-[11px]"
+                            >
+                              Anular
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. Gestor Comercial de Patrocinadores */}
+                <div className="bg-[#0B0D11] p-4 rounded-2xl border border-[#222631] space-y-2">
+                  <span className="text-[11px] font-black uppercase text-[#EAB308] block">
+                    2. Patrocinador Principal de Torneos
+                  </span>
+                  <input
+                    type="text"
+                    value={sponsorsData.torneoPrincipal}
+                    onChange={(e) => {
+                      const nuevo = { ...sponsorsData, torneoPrincipal: e.target.value };
+                      setSponsorsData(nuevo);
+                      localStorage.setItem('mp_sponsors_v6', JSON.stringify(nuevo));
+                    }}
+                    className="w-full bg-[#14171F] border border-[#222631] rounded-xl px-3 py-2 text-xs text-white"
+                  />
+                </div>
+
+                {/* 3. Modo Sandbox */}
+                <div className="bg-[#0B0D11] p-4 rounded-2xl border border-[#222631] space-y-2.5">
+                  <span className="text-[11px] font-black uppercase text-white block">
+                    3. Simulación de Cuentas (Sandbox)
+                  </span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const pA = jugadores[0] || { id: 901, nombre: 'Mateo Samaniego', elo: 1340, victorias: 6, derrotas: 2 };
+                        handleActivateSandboxUser(pA, `Vista: ${pA.nombre.split(' ')[0]}`);
+                      }}
+                      className="bg-[#14171F] border border-[#222631] text-white font-bold py-2.5 px-2 rounded-xl"
+                    >
+                      👤 Jugador 1
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const pB = jugadores[1] || { id: 902, nombre: 'Alejandro Tovar', elo: 1450, victorias: 7, derrotas: 3 };
+                        handleActivateSandboxUser(pB, `Vista: ${pB.nombre.split(' ')[0]}`);
+                      }}
+                      className="bg-[#14171F] border border-[#222631] text-white font-bold py-2.5 px-2 rounded-xl"
+                    >
+                      👤 Jugador 2
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleSimulateIncomingChallenge}
+                    className="w-full bg-[#10B981] text-zinc-950 font-black py-2.5 rounded-xl"
+                  >
+                    ⚡ Simular Reto Entrante
+                  </button>
+                </div>
+
+                {/* 4. Respaldo CSV */}
+                <div className="bg-[#0B0D11] p-4 rounded-2xl border border-[#222631] space-y-2">
+                  <span className="text-[11px] font-black uppercase text-[#10B981] block">
+                    4. Respaldo de Partidos ({historialPartidosCSV.length})
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleExportAndPurgeHistory}
+                    className="w-full bg-[#14171F] border border-[#222631] text-white font-extrabold py-2.5 rounded-xl flex items-center justify-center gap-1.5"
+                  >
+                    <Download className="w-4 h-4 text-[#10B981]" /> Exportar Historial (.CSV)
+                  </button>
+                </div>
+
+                {/* 5. Cuentas Registradas */}
+                <div className="bg-[#0B0D11] p-4 rounded-2xl border border-[#222631] space-y-2.5">
+                  <span className="text-[11px] font-black uppercase text-[#8E98A8] block">
+                    5. Padrón de Jugadores ({jugadores.length})
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="Buscar tenista..."
+                    value={adminSearch}
+                    onChange={(e) => setAdminSearch(e.target.value)}
+                    className="w-full bg-[#14171F] border border-[#222631] rounded-xl px-3 py-2 text-xs text-white"
+                  />
+                  <div className="max-h-36 overflow-y-auto space-y-1.5">
+                    {jugadores
+                      .filter(j => normalizeText(j.nombre).includes(normalizeText(adminSearch)))
+                      .map(j => (
+                        <div key={j.id} className="bg-[#14171F] px-3 py-2 rounded-xl flex justify-between items-center border border-[#222631]">
+                          <div>
+                            <p className="font-bold text-white">{j.nombre}</p>
+                            <span className="text-[10px] text-[#8E98A8]">{j.elo} Pts · {j.telefono || 'Sin tel'}</span>
+                          </div>
+                          <div className="flex gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleActivateSandboxUser(j, `Vista: ${j.nombre.split(' ')[0]}`)}
+                              className="px-2 py-1 bg-[#0B0D11] border border-[#222631] text-zinc-200 rounded-lg text-[10px] font-bold"
+                            >
+                              Ver
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleAdminDeletePlayer(j)}
+                              className="p-1.5 bg-[#0B0D11] text-rose-400 rounded-lg border border-[#222631]"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================
+          MODALES DE CLIMA, TIENDA, NIVELES, POP-UP DE RETO, CHAT Y SCORE
       ======================================================================== */}
       {weatherModalClub && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#181B22] border border-zinc-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl space-y-4">
+        <div 
+          onClick={() => setWeatherModalClub(null)}
+          className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#14171F] border border-[#222631] w-full max-w-sm rounded-3xl p-6 shadow-2xl space-y-4"
+          >
             <div className="flex justify-between items-center">
               <div>
-                <span className="text-[10px] font-black uppercase text-emerald-400">Estado de las Canchas</span>
+                <span className="text-[10px] font-black uppercase text-[#10B981]">Estado de Cancha</span>
                 <h3 className="text-lg font-black text-white">{weatherModalClub}</h3>
               </div>
               <button onClick={() => setWeatherModalClub(null)} className="text-zinc-400 hover:text-white">
@@ -3098,63 +4341,58 @@ export default function App() {
               </button>
             </div>
 
-            <form onSubmit={handleGuardarClimaModal} className="space-y-3.5">
-              <div>
-                <label className="text-xs font-extrabold text-zinc-300 block mb-2">Selecciona la Condición Actual:</label>
-                <div className="space-y-2">
-                  {[
-                    'Cancha Seca · Óptima',
-                    'Humedad Leve · Jugable',
-                    'Llovizna · Precaución',
-                    'Lluvia · Cancha Pesada (No Jugable)'
-                  ].map(est => (
-                    <button
-                      key={est}
-                      type="button"
-                      onClick={() => setWeatherEstadoInput(est)}
-                      className={`w-full text-left px-3.5 py-3 rounded-xl border text-xs font-extrabold flex justify-between items-center ${
-                        weatherEstadoInput === est 
-                          ? 'bg-emerald-500/20 border-emerald-400 text-white' 
-                          : 'bg-[#111318] border-zinc-800 text-zinc-300'
-                      }`}
-                    >
-                      <span>{est}</span>
-                      {weatherEstadoInput === est && <Check className="w-4 h-4 text-emerald-400" />}
-                    </button>
-                  ))}
-                </div>
+            <form onSubmit={handleGuardarClimaModal} className="space-y-3">
+              <div className="space-y-2">
+                {[
+                  'Cancha Seca · Óptima',
+                  'Humedad Leve · Jugable',
+                  'Llovizna · Precaución',
+                  'Lluvia · Cancha Pesada (No Jugable)'
+                ].map(est => (
+                  <button
+                    key={est}
+                    type="button"
+                    onClick={() => setWeatherEstadoInput(est)}
+                    className={`w-full text-left px-3.5 py-3 rounded-xl border text-xs font-extrabold flex justify-between items-center ${
+                      weatherEstadoInput === est 
+                        ? 'bg-[#0B0D11] border-[#10B981] text-white' 
+                        : 'bg-[#0B0D11]/60 border-[#222631] text-[#8E98A8]'
+                    }`}
+                  >
+                    <span>{est}</span>
+                    {weatherEstadoInput === est && <Check className="w-4 h-4 text-[#10B981]" />}
+                  </button>
+                ))}
               </div>
-
-              <div>
-                <label className="text-xs font-extrabold text-zinc-300 block mb-1">Temperatura / Detalle:</label>
-                <input
-                  type="text"
-                  value={weatherDetalleInput}
-                  onChange={(e) => setWeatherDetalleInput(e.target.value)}
-                  placeholder="Ej. 19°C · Soleado sin viento"
-                  className="w-full bg-[#111318] border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-white"
-                />
-              </div>
-
-              <button type="submit" className="w-full bg-emerald-500 text-zinc-950 font-black py-3.5 rounded-2xl text-xs">
-                Publicar Reporte de Cancha
+              <input
+                type="text"
+                value={weatherDetalleInput}
+                onChange={(e) => setWeatherDetalleInput(e.target.value)}
+                placeholder="Ej. 19°C · Sin viento"
+                className="w-full bg-[#0B0D11] border border-[#222631] rounded-xl px-3.5 py-2.5 text-xs text-white"
+              />
+              <button type="submit" className="w-full bg-[#10B981] text-zinc-950 font-black py-3.5 rounded-2xl text-xs">
+                Publicar Estado
               </button>
             </form>
           </div>
         </div>
       )}
 
-      {/* ========================================================================
-          MODAL: TIENDA OFICIAL & TALLER DE ENCORDADO
-      ======================================================================== */}
       {showStoreModal && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#181B22] border border-zinc-800 w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-4 overflow-y-auto max-h-[90vh]">
+        <div 
+          onClick={() => setShowStoreModal(false)}
+          className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#14171F] border border-[#222631] w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-4 overflow-y-auto max-h-[90vh]"
+          >
             <div className="flex justify-between items-center">
               <div>
-                <span className="text-[10px] font-black uppercase text-[#E06D44] tracking-widest">Matchpoint Pro-Shop</span>
+                <span className="text-[10px] font-black uppercase text-[#D96B43] tracking-widest">Matchpoint Pro-Shop</span>
                 <h3 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-xl font-black text-white">
-                  Tienda & Taller de Encordado
+                  Taller de Encordado & Tienda
                 </h3>
               </div>
               <button onClick={() => setShowStoreModal(false)} className="text-zinc-400 hover:text-white">
@@ -3162,36 +4400,24 @@ export default function App() {
               </button>
             </div>
 
-            <div className="bg-gradient-to-r from-orange-950/60 to-[#12141A] border border-orange-500/40 p-3.5 rounded-2xl flex items-center gap-3">
-              <SvgFlame className="w-8 h-8 shrink-0" />
-              <div className="text-xs">
-                <span className="font-black text-orange-300 block">
-                  {myStreak >= 3 ? `¡Descuento Especial Activo por tu Racha de ${myStreak}!` : 'Beneficio por Racha de Victorias'}
-                </span>
-                <span className="text-zinc-300">
-                  Al alcanzar 3 triunfos seguidos accedes al precio preferencial en encordados y accesorios.
-                </span>
-              </div>
-            </div>
-
             <div className="space-y-3">
               {PRODUCTOS_TIENDA.map(prod => (
-                <div key={prod.id} className="bg-[#111318] border border-zinc-800 rounded-2xl p-4 space-y-2.5">
+                <div key={prod.id} className="bg-[#0B0D11] border border-[#222631] rounded-2xl p-4 space-y-2.5">
                   <div>
-                    <span className="text-[10px] font-black uppercase text-emerald-400">{prod.tipo} · {prod.badge}</span>
+                    <span className="text-[10px] font-black uppercase text-[#10B981]">{prod.tipo} · {prod.badge}</span>
                     <h4 className="text-sm font-black text-white mt-0.5">{prod.nombre}</h4>
-                    <p className="text-xs text-zinc-400 mt-1">{prod.desc}</p>
+                    <p className="text-xs text-[#8E98A8] mt-1">{prod.desc}</p>
                   </div>
-                  <div className="flex justify-between items-center pt-2 border-t border-zinc-800/80">
+                  <div className="flex justify-between items-center pt-2 border-t border-[#222631]">
                     <div>
-                      <span className="text-xs text-zinc-400 line-through mr-2">S/ {prod.precio}.00</span>
-                      <span className="text-sm font-black text-emerald-400">Precio Racha: S/ {prod.precioRacha}.00</span>
+                      <span className="text-xs text-[#8E98A8] line-through mr-2">S/ {prod.precio}.00</span>
+                      <span className="text-sm font-black text-white">Socio / Racha: S/ {prod.precioRacha}.00</span>
                     </div>
                     <a
                       href={`https://wa.me/51964000000?text=${encodeURIComponent(`Hola MATCHPOINT, quiero solicitar: ${prod.nombre} (S/ ${myStreak >= 3 ? prod.precioRacha : prod.precio}).`)}`}
                       target="_blank"
                       rel="noreferrer"
-                      className="bg-emerald-500 text-zinc-950 font-black px-3.5 py-2 rounded-xl text-xs"
+                      className="bg-[#10B981] text-zinc-950 font-black px-3.5 py-2 rounded-xl text-xs"
                     >
                       Solicitar
                     </a>
@@ -3203,12 +4429,15 @@ export default function App() {
         </div>
       )}
 
-      {/* ========================================================================
-          MODAL: TABLA DE NIVELES (EN RANKING)
-      ======================================================================== */}
       {showLevelsModal && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#181B22] border border-zinc-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl space-y-4">
+        <div 
+          onClick={() => setShowLevelsModal(false)}
+          className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#14171F] border border-[#222631] w-full max-w-sm rounded-3xl p-6 shadow-2xl space-y-4"
+          >
             <div className="flex justify-between items-center">
               <h3 className="text-base font-black text-white">Escala Oficial de Categorías</h3>
               <button onClick={() => setShowLevelsModal(false)} className="text-zinc-400 hover:text-white">
@@ -3217,9 +4446,9 @@ export default function App() {
             </div>
             <div className="space-y-2">
               {ESCALA_CATEGORIAS.map(c => (
-                <div key={c.id} className="bg-[#111318] border border-zinc-800 px-3.5 py-2.5 rounded-xl flex justify-between items-center text-xs">
+                <div key={c.id} className="bg-[#0B0D11] border border-[#222631] px-3.5 py-2.5 rounded-xl flex justify-between items-center text-xs">
                   <span className="font-extrabold text-white">{c.nombre}</span>
-                  <span className="font-mono font-bold text-emerald-400">{c.min} – {c.max} Pts</span>
+                  <span className="font-mono font-bold text-[#10B981]">{c.min} – {c.max} Pts</span>
                 </div>
               ))}
             </div>
@@ -3227,78 +4456,74 @@ export default function App() {
         </div>
       )}
 
-      {/* ========================================================================
-          POP-UP AUTOMÁTICO DE RETO O VALIDACIÓN DE MARCADOR
-      ======================================================================== */}
       {pendingPopupAlert && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#181B22] border-2 border-emerald-500 w-full max-w-sm rounded-3xl p-6 shadow-2xl space-y-4 text-center">
-            <div className="w-14 h-14 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-center mx-auto text-emerald-400">
-              <Bell className="w-7 h-7 animate-bounce" />
+          <div className="bg-[#14171F] border border-[#10B981] w-full max-w-sm rounded-3xl p-6 shadow-2xl space-y-4 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-[#0B0D11] border border-[#222631] flex items-center justify-center mx-auto text-[#10B981]">
+              <Bell className="w-6 h-6" />
             </div>
             {pendingPopupAlert.tipo === 'reto' ? (
               <>
-                <span className="text-[10px] font-black uppercase text-emerald-400 tracking-widest">
-                  ¡Invitación de Partido Recibida!
+                <span className="text-[10px] font-black uppercase text-[#10B981] tracking-widest">
+                  Invitación Oficial de Partido
                 </span>
                 <h3 className="text-xl font-black text-white">
-                  {pendingPopupAlert.data.jugador1} te ha retado
+                  {pendingPopupAlert.data.jugador1} te ha desafiado
                 </h3>
-                <p className="text-xs text-zinc-300">
-                  📍 Cancha propuesta: <strong>{pendingPopupAlert.data.sede}</strong><br />
-                  📅 Horario: <strong>{pendingPopupAlert.data.fecha}</strong>
+                <p className="text-xs text-[#8E98A8]">
+                  📍 Sede: <strong className="text-white">{pendingPopupAlert.data.sede}</strong><br />
+                  📅 Turno: <strong className="text-white">{pendingPopupAlert.data.fecha}</strong>
                 </p>
                 <div className="grid grid-cols-2 gap-2.5 pt-2">
                   <button
                     onClick={() => handleAceptarRetoEntrante(pendingPopupAlert.data.id)}
-                    className="bg-emerald-500 text-zinc-950 font-black py-3 rounded-xl text-xs"
+                    className="bg-[#10B981] text-zinc-950 font-black py-3 rounded-xl text-xs"
                   >
-                    ✔ Aceptar Partido
+                    Aceptar Partido
                   </button>
                   <button
                     onClick={() => setPendingPopupAlert(null)}
-                    className="bg-zinc-800 text-zinc-300 font-bold py-3 rounded-xl text-xs"
+                    className="bg-[#0B0D11] border border-[#222631] text-zinc-300 font-bold py-3 rounded-xl text-xs"
                   >
-                    Ver luego
+                    Ver después
                   </button>
                 </div>
               </>
             ) : (
               <>
-                <span className="text-[10px] font-black uppercase text-amber-400 tracking-widest">
-                  Confirmación Oficial de Resultado
+                <span className="text-[10px] font-black uppercase text-[#EAB308] tracking-widest">
+                  Confirmación de Marcador
                 </span>
                 <h3 className="text-lg font-black text-white">
-                  Verificar Marcador del Partido
+                  Verificar Resultado Oficial
                 </h3>
-                <p className="text-xs text-zinc-300">
-                  <strong>{pendingPopupAlert.data.ganadorNombre}</strong> registró victoria frente a <strong>{pendingPopupAlert.data.perdedorNombre}</strong> por <strong>{pendingPopupAlert.data.score}</strong>.
+                <p className="text-xs text-[#8E98A8]">
+                  <strong className="text-white">{pendingPopupAlert.data.ganadorNombre}</strong> registró victoria ante <strong className="text-white">{pendingPopupAlert.data.perdedorNombre}</strong> por <strong className="text-white">{pendingPopupAlert.data.score}</strong>.
                 </p>
                 <div className="grid grid-cols-2 gap-2.5 pt-2">
                   <button
                     onClick={() => {
                       const nuevas = validacionesPendientes.map(v => v.id === pendingPopupAlert.data.id ? { ...v, estado: 'Confirmado' } : v);
                       setValidacionesPendientes(nuevas);
-                      localStorage.setItem('mp_validaciones_v5', JSON.stringify(nuevas));
+                      localStorage.setItem('mp_validaciones_v6', JSON.stringify(nuevas));
                       broadcastLiveUpdate(null, null, nuevas);
                       setPendingPopupAlert(null);
                     }}
-                    className="bg-emerald-500 text-zinc-950 font-black py-3 rounded-xl text-xs"
+                    className="bg-[#10B981] text-zinc-950 font-black py-3 rounded-xl text-xs"
                   >
-                    ✔ Es Correcto
+                    Confirmar Score
                   </button>
                   <button
                     onClick={() => {
                       const nuevas = validacionesPendientes.map(v => v.id === pendingPopupAlert.data.id ? { ...v, estado: 'En Disputa' } : v);
                       setValidacionesPendientes(nuevas);
-                      localStorage.setItem('mp_validaciones_v5', JSON.stringify(nuevas));
+                      localStorage.setItem('mp_validaciones_v6', JSON.stringify(nuevas));
                       broadcastLiveUpdate(null, null, nuevas);
                       setPendingPopupAlert(null);
-                      alert('⚠️ El marcador fue enviado al Comité Deportivo para su revisión.');
                     }}
-                    className="bg-rose-950 text-rose-300 border border-rose-800 font-bold py-3 rounded-xl text-xs"
+                    className="bg-[#0B0D11] text-rose-400 border border-[#222631] font-bold py-3 rounded-xl text-xs"
                   >
-                    Observación / Disputa
+                    Observar Score
                   </button>
                 </div>
               </>
@@ -3307,379 +4532,18 @@ export default function App() {
         </div>
       )}
 
-      {/* ========================================================================
-          MENÚ DESPLEGABLE DE 3 RAYITAS (REGLAMENTO, COACH PRO, TIENDA Y ADMIN)
-      ======================================================================== */}
-      {showSideDrawer && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex">
-          <div className="bg-[#161920] border-r border-zinc-800 w-80 max-w-[85vw] h-full p-5 flex flex-col justify-between overflow-y-auto">
-            <div className="space-y-4">
-              <div className="flex justify-between items-center pb-3 border-b border-zinc-800">
-                <div className="flex items-center gap-2.5">
-                  <SvgTennisBall className="w-8 h-8" />
-                  <div>
-                    <h3 className="text-base font-black text-white leading-none">MATCHPOINT</h3>
-                    <span className="text-[10px] text-emerald-400 font-bold uppercase">Menú Oficial</span>
-                  </div>
-                </div>
-                <button onClick={() => setShowSideDrawer(false)} className="text-zinc-400 hover:text-white p-1">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="bg-[#1E222B] border border-amber-500/30 p-4 rounded-2xl space-y-1.5">
-                <div className="flex items-center gap-2 text-amber-400 font-black text-xs uppercase">
-                  <Gift className="w-4 h-4" /> Sorteo Mensual por Actividad
-                </div>
-                <p className="text-xs text-zinc-300 leading-relaxed">
-                  Disputa <strong>4 partidos al mes</strong> para participar en el sorteo de tubos de pelotas y horas de cancha.
-                </p>
-                <span className="text-xs font-extrabold text-emerald-400 block pt-1">
-                  Tu avance mensual: {myTotalMatches} / 4 partidos
-                </span>
-              </div>
-
-              <div className="space-y-2">
-                <button
-                  onClick={() => { setShowSideDrawer(false); setShowStoreModal(true); }}
-                  className="w-full bg-[#111318] border border-[#E06D44]/40 p-3.5 rounded-2xl flex justify-between items-center text-xs font-extrabold text-[#F79D65]"
-                >
-                  <span className="flex items-center gap-2"><ShoppingBag className="w-4 h-4" /> Tienda & Taller de Encordado</span>
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-
-                <button
-                  onClick={() => { setShowSideDrawer(false); setShowHallOfFameModal(true); }}
-                  className="w-full bg-[#111318] border border-zinc-800 p-3.5 rounded-2xl flex justify-between items-center text-xs font-bold text-amber-300"
-                >
-                  <span className="flex items-center gap-2"><Crown className="w-4 h-4" /> Salón de la Fama y Campeones</span>
-                  <ChevronRight className="w-4 h-4 text-zinc-500" />
-                </button>
-
-                <button
-                  onClick={() => { setShowSideDrawer(false); setShowRulesModal(true); }}
-                  className="w-full bg-[#111318] border border-zinc-800 p-3.5 rounded-2xl flex justify-between items-center text-xs font-bold text-zinc-200"
-                >
-                  <span className="flex items-center gap-2"><BookOpen className="w-4 h-4 text-emerald-400" /> Reglamento y Términos</span>
-                  <ChevronRight className="w-4 h-4 text-zinc-500" />
-                </button>
-
-                <button
-                  onClick={() => setHidePhonePublic(!hidePhonePublic)}
-                  className="w-full bg-[#111318] border border-zinc-800 p-3.5 rounded-2xl flex justify-between items-center text-xs"
-                >
-                  <span className="text-zinc-200 font-bold">Privacidad de mi WhatsApp</span>
-                  <span className="text-emerald-400 font-black">{hidePhonePublic ? 'Solo Rivales' : 'Público'}</span>
-                </button>
-
-                <button
-                  onClick={() => { setShowSideDrawer(false); setShowCoachProModal(true); }}
-                  className="w-full bg-[#111318] border border-emerald-500/30 p-3.5 rounded-2xl flex justify-between items-center text-xs font-bold text-emerald-300"
-                >
-                  <span className="flex items-center gap-2"><GraduationCap className="w-4 h-4" /> Portal Privado Coach Pro</span>
-                  <ChevronRight className="w-4 h-4 text-emerald-400" />
-                </button>
-
-                <button
-                  onClick={() => { setShowSideDrawer(false); setShowAdminModal(true); }}
-                  className="w-full bg-amber-500/15 border border-amber-500/40 p-3.5 rounded-2xl flex justify-between items-center text-xs"
-                >
-                  <span className="text-amber-300 font-black flex items-center gap-2">
-                    <Shield className="w-4 h-4" /> Panel Administrador {disputasActivas.length > 0 && `(${disputasActivas.length} Disputas)`}
-                  </span>
-                  <ChevronRight className="w-4 h-4 text-amber-400" />
-                </button>
-              </div>
-            </div>
-
-            {myPlayer && (
-              <button
-                onClick={handleLogout}
-                className="w-full bg-rose-950/60 border border-rose-800/60 text-rose-300 font-bold py-3 rounded-2xl text-xs flex items-center justify-center gap-2 mt-6"
-              >
-                <LogOut className="w-4 h-4" /> Cerrar Sesión
-              </button>
-            )}
-          </div>
-          <div className="flex-1" onClick={() => setShowSideDrawer(false)}></div>
-        </div>
-      )}
-
-      {/* ========================================================================
-          MODAL: SUITE DE ADMINISTRACIÓN (INCLUYE BANDEJA DE DISPUTAS ACTIVA)
-      ======================================================================== */}
-      {showAdminModal && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#181B22] border border-zinc-800 w-full max-w-md rounded-3xl p-6 shadow-2xl overflow-y-auto max-h-[92vh]">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-base font-black text-white flex items-center gap-1.5">
-                <Shield className="w-5 h-5 text-emerald-400" /> Suite de Administración
-              </h3>
-              <button onClick={() => { setShowAdminModal(false); setIsAdminAuth(false); }} className="text-zinc-400 hover:text-white">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {!isAdminAuth ? (
-              <form onSubmit={(e) => { e.preventDefault(); adminPin === '1234' ? setIsAdminAuth(true) : alert('PIN Incorrecto (1234)'); }} className="space-y-3">
-                <input
-                  type="password"
-                  placeholder="PIN Administrador (1234)"
-                  value={adminPin}
-                  onChange={(e) => setAdminPin(e.target.value)}
-                  className="w-full bg-[#111318] border border-zinc-800 rounded-xl px-3 py-3 text-center text-lg tracking-widest text-emerald-400 font-mono"
-                />
-                <button type="submit" className="w-full bg-emerald-500 text-zinc-950 font-black py-3.5 rounded-xl text-xs">
-                  Ingresar al Panel Admin
-                </button>
-              </form>
-            ) : (
-              <div className="space-y-5 text-xs">
-                {/* 1. BANDEJA DE PARTIDOS EN DISPUTA (SOLUCIÓN AL BUG DETECTADO) */}
-                <div className="bg-[#111318] p-4 rounded-2xl border border-rose-500/40 space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[11px] font-black uppercase text-rose-400">
-                      ⚖️ 1. Bandeja de Partidos en Disputa ({disputasActivas.length})
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleSimulateDisputeForAdmin}
-                      className="text-[10px] bg-rose-500/20 text-rose-300 border border-rose-500/40 px-2 py-1 rounded-lg font-bold"
-                    >
-                      + Simular Disputa
-                    </button>
-                  </div>
-
-                  {disputasActivas.length === 0 ? (
-                    <p className="text-zinc-400 text-center py-2">
-                      No hay marcadores impugnados en este momento.
-                    </p>
-                  ) : (
-                    <div className="space-y-2.5">
-                      {disputasActivas.map(d => (
-                        <div key={d.id} className="bg-[#181B22] border border-rose-500/40 p-3 rounded-xl space-y-2">
-                          <div className="flex justify-between">
-                            <span className="font-black text-white">{d.ganadorNombre} vs {d.perdedorNombre}</span>
-                            <span className="font-mono text-amber-300 font-bold">{d.score}</span>
-                          </div>
-                          <p className="text-[11px] text-zinc-400">
-                            Observado a las {d.fecha}. Elige una resolución oficial:
-                          </p>
-                          <div className="grid grid-cols-3 gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => handleAdminResolveDispute(d, 'aprobar')}
-                              className="bg-emerald-500 text-zinc-950 font-black py-1.5 rounded-lg text-[11px]"
-                            >
-                              ✔ Aprobar
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleAdminResolveDispute(d, 'editar')}
-                              className="bg-amber-400 text-zinc-950 font-black py-1.5 rounded-lg text-[11px] flex items-center justify-center gap-1"
-                            >
-                              <Edit3 className="w-3 h-3" /> Editar
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleAdminResolveDispute(d, 'anular')}
-                              className="bg-rose-950 text-rose-300 border border-rose-800 font-bold py-1.5 rounded-lg text-[11px]"
-                            >
-                              ✕ Anular
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* 2. MODO SANDBOX DE PRUEBAS */}
-                <div className="bg-[#111318] p-4 rounded-2xl border border-amber-500/40 space-y-2.5">
-                  <span className="text-[11px] font-black uppercase text-amber-400 block">
-                    🧪 2. Modo Sandbox (Cambiar de Jugador en 1 Clic)
-                  </span>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const pA = jugadores[0] || { id: 901, nombre: 'Mateo Samaniego', elo: 1340, victorias: 6, derrotas: 2 };
-                        handleActivateSandboxUser(pA, `Vista: ${pA.nombre.split(' ')[0]}`);
-                      }}
-                      className="bg-amber-500/20 border border-amber-500/40 text-amber-200 font-black py-2.5 px-2 rounded-xl"
-                    >
-                      👤 Jugador 1 ({jugadores[0]?.nombre.split(' ')[0] || 'Test A'})
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const pB = jugadores[1] || { id: 902, nombre: 'Alejandro Tovar', elo: 1450, victorias: 7, derrotas: 3 };
-                        handleActivateSandboxUser(pB, `Vista: ${pB.nombre.split(' ')[0]}`);
-                      }}
-                      className="bg-emerald-500/20 border border-emerald-500/40 text-emerald-200 font-black py-2.5 px-2 rounded-xl"
-                    >
-                      👤 Jugador 2 ({jugadores[1]?.nombre.split(' ')[0] || 'Test B'})
-                    </button>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleSimulateIncomingChallenge}
-                    className="w-full bg-emerald-500 text-zinc-950 font-black py-2.5 rounded-xl"
-                  >
-                    ⚡ Simular Reto Entrante
-                  </button>
-                </div>
-
-                {/* 3. RESPALDO HISTÓRICO EN GOOGLE DRIVE */}
-                <div className="bg-[#111318] p-4 rounded-2xl border border-zinc-800 space-y-2.5">
-                  <span className="text-[11px] font-black uppercase text-emerald-400 block">
-                    💾 3. Respaldo de Partidos ({historialPartidosCSV.length} registrados)
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleExportAndPurgeHistory}
-                    className="w-full bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black py-2.5 rounded-xl flex items-center justify-center gap-1.5"
-                  >
-                    <Download className="w-4 h-4" /> Descargar Historial (.CSV para Google Drive)
-                  </button>
-                </div>
-
-                {/* 4. INTERRUPTORES DE PATROCINADORES Y SEDES */}
-                <div className="bg-[#111318] p-4 rounded-2xl border border-zinc-800 space-y-2">
-                  <span className="text-[11px] font-black uppercase text-sky-400 block">
-                    🎛️ 4. Activar / Ocultar Clubes y Profesores
-                  </span>
-                  {SEDES_CLUB_PRO.map(c => {
-                    const activo = featureToggles.clubesActivos?.[c.nombre] !== false;
-                    return (
-                      <div key={c.id} className="flex justify-between items-center py-1 border-b border-zinc-800/60">
-                        <span className="text-zinc-200 font-semibold">{c.nombre}</span>
-                        <button
-                          type="button"
-                          onClick={() => toggleClubVisibility(c.nombre)}
-                          className={`px-3 py-1 rounded-lg font-black text-[11px] ${
-                            activo ? 'bg-emerald-500 text-zinc-950' : 'bg-zinc-800 text-zinc-400'
-                          }`}
-                        >
-                          {activo ? 'VISIBLE' : 'OCULTO'}
-                        </button>
-                      </div>
-                    );
-                  })}
-                  {profesores.map(p => (
-                    <div key={p.id} className="flex justify-between items-center py-1 border-b border-zinc-800/60">
-                      <span className="text-zinc-200 font-semibold">{p.nombre}</span>
-                      <button
-                        type="button"
-                        onClick={() => toggleProfesorVisibility(p.id)}
-                        className={`px-3 py-1 rounded-lg font-black text-[11px] ${
-                          p.activo !== false ? 'bg-emerald-500 text-zinc-950' : 'bg-zinc-800 text-zinc-400'
-                        }`}
-                      >
-                        {p.activo !== false ? 'VISIBLE' : 'OCULTO'}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-
-                {/* 5. CONTROL DE CUENTAS */}
-                <div className="bg-[#111318] p-4 rounded-2xl border border-zinc-800 space-y-2.5">
-                  <span className="text-[11px] font-black uppercase text-emerald-400 block">
-                    👥 5. Cuentas Registradas ({jugadores.length})
-                  </span>
-                  <input
-                    type="text"
-                    placeholder="Buscar jugador..."
-                    value={adminSearch}
-                    onChange={(e) => setAdminSearch(e.target.value)}
-                    className="w-full bg-[#181B22] border border-zinc-700 rounded-xl px-3 py-2 text-xs text-white"
-                  />
-                  <div className="max-h-40 overflow-y-auto space-y-1.5">
-                    {jugadores
-                      .filter(j => normalizeText(j.nombre).includes(normalizeText(adminSearch)))
-                      .map(j => (
-                        <div key={j.id} className="bg-[#181B22] px-3 py-2 rounded-xl flex justify-between items-center border border-zinc-800">
-                          <div>
-                            <p className="font-bold text-white">{j.nombre}</p>
-                            <span className="text-[10px] text-zinc-400">{j.elo} Pts · {j.club}</span>
-                          </div>
-                          <div className="flex gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => handleActivateSandboxUser(j, `Vista: ${j.nombre.split(' ')[0]}`)}
-                              className="px-2 py-1 bg-amber-500/20 text-amber-300 rounded-lg text-[10px] font-black"
-                            >
-                              Probar
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleAdminDeletePlayer(j)}
-                              className="p-1.5 bg-rose-950 text-rose-400 rounded-lg border border-rose-800"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-
-                {/* 6. ALTA DE PROFESORES */}
-                <form onSubmit={handleAdminAddProfesor} className="bg-[#111318] p-4 rounded-2xl border border-zinc-800 space-y-2">
-                  <span className="text-[11px] font-black uppercase text-amber-400 block">
-                    🎓 6. Agregar Profesor Oficial
-                  </span>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Nombre del Profesor"
-                    value={newProfNombre}
-                    onChange={(e) => setNewProfNombre(e.target.value)}
-                    className="w-full bg-[#181B22] border border-zinc-700 rounded-xl px-3 py-2 text-xs text-white"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Especialidad"
-                    value={newProfEsp}
-                    onChange={(e) => setNewProfEsp(e.target.value)}
-                    className="w-full bg-[#181B22] border border-zinc-700 rounded-xl px-3 py-2 text-xs text-white"
-                  />
-                  <div className="grid grid-cols-2 gap-2">
-                    <input
-                      type="text"
-                      placeholder="Tarifa (S/ 50 / h)"
-                      value={newProfTarifa}
-                      onChange={(e) => setNewProfTarifa(e.target.value)}
-                      className="w-full bg-[#181B22] border border-zinc-700 rounded-xl px-3 py-2 text-xs text-white"
-                    />
-                    <input
-                      type="tel"
-                      required
-                      placeholder="WhatsApp *"
-                      value={newProfTel}
-                      onChange={(e) => setNewProfTel(e.target.value)}
-                      className="w-full bg-[#181B22] border border-zinc-700 rounded-xl px-3 py-2 text-xs text-white"
-                    />
-                  </div>
-                  <button type="submit" className="w-full bg-emerald-500 text-zinc-950 font-black py-2.5 rounded-xl text-xs">
-                    + Publicar Profesor
-                  </button>
-                </form>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================================
-          MODALES DE AVISOS, CHAT, MARCADOR, LOGIN Y REGISTRO (CON EDAD Y RAMA)
-      ======================================================================== */}
       {showNotifModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#181B22] border border-zinc-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl space-y-4">
+        <div 
+          onClick={() => setShowNotifModal(false)}
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#14171F] border border-[#222631] w-full max-w-sm rounded-3xl p-6 shadow-2xl space-y-4"
+          >
             <div className="flex justify-between items-center">
               <h3 className="text-base font-black text-white flex items-center gap-2">
-                <Bell className="w-4 h-4 text-emerald-400" /> Avisos del Circuito
+                <Bell className="w-4 h-4 text-[#10B981]" /> Avisos del Circuito
               </h3>
               <button onClick={() => setShowNotifModal(false)} className="text-zinc-400 hover:text-white">
                 <X className="w-5 h-5" />
@@ -3687,20 +4551,14 @@ export default function App() {
             </div>
             <div className="space-y-2.5 max-h-80 overflow-y-auto">
               {misRetos.map(r => (
-                <div key={r.id} className="bg-[#111318] border border-zinc-800 p-3.5 rounded-2xl text-xs space-y-1">
-                  <span className="text-[10px] font-black text-emerald-400 uppercase">{r.estado}</span>
+                <div key={r.id} className="bg-[#0B0D11] border border-[#222631] p-3.5 rounded-2xl text-xs space-y-1">
+                  <span className="text-[10px] font-black text-[#10B981] uppercase">{r.estado}</span>
                   <p className="font-bold text-white">{r.jugador1} vs {r.jugador2}</p>
-                  <p className="text-zinc-400">📍 {r.sede} · {r.fecha}</p>
+                  <p className="text-[#8E98A8]">📍 {r.sede} · {r.fecha}</p>
                 </div>
               ))}
-              {validacionesPendientes.map(v => (
-                <div key={v.id} className="bg-[#111318] border border-zinc-800 p-3.5 rounded-2xl text-xs space-y-1">
-                  <span className="text-[10px] font-black text-amber-400 uppercase">Marcador · {v.estado}</span>
-                  <p className="font-bold text-white">{v.ganadorNombre} venció a {v.perdedorNombre} ({v.score})</p>
-                </div>
-              ))}
-              {misRetos.length === 0 && validacionesPendientes.length === 0 && (
-                <p className="text-xs text-zinc-400 text-center py-6">No tienes avisos pendientes.</p>
+              {misRetos.length === 0 && (
+                <p className="text-xs text-[#8E98A8] text-center py-6">Sin avisos pendientes.</p>
               )}
             </div>
           </div>
@@ -3708,23 +4566,29 @@ export default function App() {
       )}
 
       {activeChatReto && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#181B22] border border-zinc-800 w-full max-w-sm rounded-3xl p-5 shadow-2xl space-y-3">
-            <div className="flex justify-between items-center pb-2 border-b border-zinc-800">
+        <div 
+          onClick={() => setActiveChatReto(null)}
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#14171F] border border-[#222631] w-full max-w-sm rounded-3xl p-5 shadow-2xl space-y-3"
+          >
+            <div className="flex justify-between items-center pb-2 border-b border-[#222631]">
               <div>
                 <h3 className="text-sm font-black text-white">Coordinación del Partido</h3>
-                <p className="text-[11px] text-emerald-400">{activeChatReto.jugador1} vs {activeChatReto.jugador2}</p>
+                <p className="text-[11px] text-[#10B981]">{activeChatReto.jugador1} vs {activeChatReto.jugador2}</p>
               </div>
               <button onClick={() => setActiveChatReto(null)} className="text-zinc-400 hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="bg-[#111318] p-3 rounded-2xl border border-zinc-800 h-52 overflow-y-auto space-y-2">
+            <div className="bg-[#0B0D11] p-3 rounded-2xl border border-[#222631] h-52 overflow-y-auto space-y-2">
               {(activeChatReto.mensajes || []).map((m, i) => (
-                <div key={i} className="bg-[#1E222B] p-2.5 rounded-xl text-xs">
-                  <div className="flex justify-between text-[10px] text-emerald-400 font-bold">
+                <div key={i} className="bg-[#14171F] border border-[#222631] p-2.5 rounded-xl text-xs">
+                  <div className="flex justify-between text-[10px] text-[#10B981] font-bold">
                     <span>{m.autor}</span>
-                    <span className="text-zinc-400">{m.hora}</span>
+                    <span className="text-[#8E98A8]">{m.hora}</span>
                   </div>
                   <p className="text-zinc-100 mt-0.5">{m.texto}</p>
                 </div>
@@ -3736,9 +4600,9 @@ export default function App() {
                 placeholder="Acordar cancha, pelotas o turno..."
                 value={chatMessageInput}
                 onChange={(e) => setChatMessageInput(e.target.value)}
-                className="flex-1 bg-[#111318] border border-zinc-800 rounded-xl px-3 py-2.5 text-xs text-white"
+                className="flex-1 bg-[#0B0D11] border border-[#222631] rounded-xl px-3 py-2.5 text-xs text-white"
               />
-              <button type="submit" className="bg-emerald-500 text-zinc-950 font-black px-4 rounded-xl text-xs">
+              <button type="submit" className="bg-[#10B981] text-zinc-950 font-black px-4 rounded-xl text-xs">
                 Enviar
               </button>
             </form>
@@ -3746,13 +4610,18 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL SUBIR SCORE (LENGUAJE 100% DEPORTIVO: "CONFIRMAR MARCADOR OFICIAL") */}
       {showMatchModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#181B22] border border-zinc-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl">
+        <div 
+          onClick={() => setShowMatchModal(false)}
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#14171F] border border-[#222631] w-full max-w-sm rounded-3xl p-6 shadow-2xl"
+          >
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-base font-black text-white flex items-center gap-1.5">
-                <Swords className="w-4 h-4 text-emerald-400" /> Registrar Marcador Oficial
+                <Swords className="w-4 h-4 text-[#10B981]" /> Registrar Marcador Oficial
               </h3>
               <button onClick={() => setShowMatchModal(false)} className="text-zinc-400 hover:text-white">
                 <X className="w-5 h-5" />
@@ -3767,9 +4636,9 @@ export default function App() {
                   placeholder="Ej. 6-4, 6-3"
                   value={score}
                   onChange={(e) => setScore(e.target.value)}
-                  className="w-full bg-[#111318] border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white font-mono"
+                  className="w-full bg-[#0B0D11] border border-[#222631] rounded-xl px-3 py-2.5 text-sm text-white font-mono"
                 />
-                <span className="text-[11px] text-emerald-400 font-bold block mt-1">
+                <span className="text-[11px] text-[#10B981] font-bold block mt-1">
                   {calcularFactorDominio(score).label}
                 </span>
               </div>
@@ -3778,7 +4647,7 @@ export default function App() {
                 value={winnerId}
                 onChange={(e) => setWinnerId(e.target.value)}
                 required
-                className="w-full bg-[#111318] border border-zinc-800 rounded-xl px-3 py-3 text-xs text-white font-bold"
+                className="w-full bg-[#0B0D11] border border-[#222631] rounded-xl px-3 py-3 text-xs text-white font-bold"
               >
                 <option value="">¿Quién ganó el encuentro?</option>
                 {p1Id && <option value={p1Id}>{jugadores.find(j => j.id.toString() === p1Id)?.nombre}</option>}
@@ -3788,38 +4657,88 @@ export default function App() {
               <button
                 type="submit"
                 disabled={calculatingMatch}
-                className="w-full bg-emerald-500 text-zinc-950 font-black py-3.5 rounded-2xl text-xs shadow-lg"
+                className="w-full bg-[#10B981] text-zinc-950 font-black py-3.5 rounded-2xl text-xs shadow-lg"
               >
-                {calculatingMatch ? 'Registrando Resultado...' : 'Confirmar Marcador Oficial'}
+                {calculatingMatch ? 'Validando Resultado...' : 'Confirmar Marcador Oficial'}
               </button>
             </form>
           </div>
         </div>
       )}
 
+      {/* ========================================================================
+          MODAL DE ACCESO DUAL: CELULAR (WHATSAPP) O CORREO + SALIDA EN LAPTOP
+      ======================================================================== */}
       {showAuthModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#181B22] border border-zinc-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-black text-white">
-                {authMode === 'login' ? 'Acceso a tu Cuenta' : 'Registro Oficial'}
+        <div 
+          onClick={() => setShowAuthModal(false)}
+          className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#14171F] border border-[#222631] w-full max-w-sm rounded-3xl p-6 shadow-2xl space-y-4"
+          >
+            <div className="flex justify-between items-center">
+              <h3 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-xl font-black text-white">
+                {authMode === 'login' ? 'Ingresar a Matchpoint' : 'Crear Cuenta Oficial'}
               </h3>
-              <button onClick={() => setShowAuthModal(false)} className="text-zinc-400 hover:text-white">
-                <X className="w-5 h-5" />
+              <button 
+                onClick={() => setShowAuthModal(false)} 
+                className="w-8 h-8 rounded-full bg-[#0B0D11] border border-[#222631] flex items-center justify-center text-zinc-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
               </button>
             </div>
+
+            {/* Selector Dual: Con mi Celular vs Con mi Correo */}
+            <div className="grid grid-cols-2 gap-1.5 bg-[#0B0D11] p-1 rounded-2xl border border-[#222631]">
+              <button
+                type="button"
+                onClick={() => setAuthMethod('celular')}
+                className={`py-2 rounded-xl text-xs font-extrabold transition ${
+                  authMethod === 'celular' ? 'bg-[#14171F] text-[#10B981] border border-[#222631]' : 'text-[#8E98A8]'
+                }`}
+              >
+                📱 Con mi Celular
+              </button>
+              <button
+                type="button"
+                onClick={() => setAuthMethod('correo')}
+                className={`py-2 rounded-xl text-xs font-extrabold transition ${
+                  authMethod === 'correo' ? 'bg-[#14171F] text-[#10B981] border border-[#222631]' : 'text-[#8E98A8]'
+                }`}
+              >
+                ✉️ Con mi Correo
+              </button>
+            </div>
+
             <form onSubmit={handleAuth} className="space-y-3.5">
-              <div>
-                <label className="text-xs font-bold text-zinc-300 block mb-1">Correo Electrónico *</label>
-                <input
-                  type="email"
-                  required
-                  placeholder="tucorreo@ejemplo.com"
-                  value={authEmail}
-                  onChange={(e) => setAuthEmail(e.target.value)}
-                  className="w-full bg-[#111318] border border-zinc-800 rounded-xl px-3.5 py-3 text-sm text-white"
-                />
-              </div>
+              {authMethod === 'celular' ? (
+                <div>
+                  <label className="text-xs font-bold text-zinc-300 block mb-1">Número de Celular / WhatsApp (9 dígitos) *</label>
+                  <input
+                    type="tel"
+                    required
+                    placeholder="Ej. 964123456"
+                    value={authPhoneInput}
+                    onChange={(e) => setAuthPhoneInput(e.target.value)}
+                    className="w-full bg-[#0B0D11] border border-[#222631] rounded-xl px-3.5 py-3 text-sm text-white font-mono"
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label className="text-xs font-bold text-zinc-300 block mb-1">Correo Electrónico *</label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="tucorreo@ejemplo.com"
+                    value={authEmail}
+                    onChange={(e) => setAuthEmail(e.target.value)}
+                    className="w-full bg-[#0B0D11] border border-[#222631] rounded-xl px-3.5 py-3 text-sm text-white"
+                  />
+                </div>
+              )}
+
               <div>
                 <label className="text-xs font-bold text-zinc-300 block mb-1">Contraseña *</label>
                 <div className="relative">
@@ -3829,39 +4748,50 @@ export default function App() {
                     placeholder="Escribe tu contraseña"
                     value={authPassword}
                     onChange={(e) => setAuthPassword(e.target.value)}
-                    className="w-full bg-[#111318] border border-zinc-800 rounded-xl px-3.5 py-3 pr-11 text-sm text-white"
+                    className="w-full bg-[#0B0D11] border border-[#222631] rounded-xl px-3.5 py-3 pr-11 text-sm text-white"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white p-1"
                   >
-                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
               </div>
-              <label className="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer pt-1">
+
+              <label className="flex items-center gap-2 text-xs text-[#8E98A8] cursor-pointer pt-1">
                 <input
                   type="checkbox"
                   checked={keepSession}
                   onChange={(e) => setKeepSession(e.target.checked)}
-                  className="rounded accent-emerald-500 w-4 h-4"
+                  className="rounded accent-[#10B981] w-4 h-4"
                 />
-                Mantener mi sesión abierta
+                Mantener mi sesión iniciada
               </label>
+
               <button
                 type="submit"
                 disabled={authLoading}
-                className="w-full bg-emerald-500 text-zinc-950 font-black py-3.5 rounded-2xl text-sm"
+                className="w-full bg-[#10B981] text-zinc-950 font-black py-3.5 rounded-2xl text-xs shadow-lg"
               >
-                {authLoading ? 'Verificando...' : (authMode === 'login' ? 'Entrar a MATCHPOINT' : 'Continuar al Perfil Deportivo')}
+                {authLoading ? 'Verificando...' : (authMode === 'login' ? 'Entrar al Circuito' : 'Continuar al Paso 2')}
               </button>
+
               <button
                 type="button"
                 onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}
-                className="w-full text-center text-xs text-emerald-400 font-bold pt-2"
+                className="w-full text-center text-xs text-[#10B981] font-bold pt-1"
               >
-                {authMode === 'login' ? '¿Eres nuevo? Crea tu cuenta aquí' : '¿Ya tienes cuenta? Inicia sesión'}
+                {authMode === 'login' ? '¿Nuevo tenista? Crea tu cuenta aquí' : '¿Ya tienes cuenta? Inicia sesión'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowAuthModal(false)}
+                className="w-full text-center text-[11px] text-[#8E98A8] hover:text-white font-semibold pt-1 border-t border-[#222631]"
+              >
+                Explorar el Circuito como Invitado
               </button>
             </form>
           </div>
@@ -3869,31 +4799,59 @@ export default function App() {
       )}
 
       {/* ========================================================================
-          MODAL REGISTRO: DATOS DE PERFILADO (+40 / DAMAS / MANO) + 4 PREGUNTAS DIRECTAS
+          MODAL CREACIÓN DE PERFIL: DESBLOQUEADO EN LAPTOP/WEB CON BOTÓN SALIR
       ======================================================================== */}
       {showProfileSetup && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-[#181B22] border border-zinc-800 w-full max-w-md rounded-3xl p-6 shadow-2xl overflow-y-auto max-h-[92vh]">
+        <div 
+          onClick={() => setShowProfileSetup(false)}
+          className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#14171F] border border-[#222631] w-full max-w-md rounded-3xl p-6 shadow-2xl overflow-y-auto max-h-[92vh]"
+          >
+            {/* Barra Superior con Botón de Retroceso y Cierre Visible (Fin al bloqueo en Desktop) */}
+            <div className="flex justify-between items-center pb-3 mb-3 border-b border-[#222631]">
+              <button
+                type="button"
+                onClick={() => {
+                  if (quizStep > 0) setQuizStep(quizStep - 1);
+                  else setShowProfileSetup(false);
+                }}
+                className="text-xs font-bold text-[#8E98A8] hover:text-white flex items-center gap-1"
+              >
+                <ArrowLeft className="w-4 h-4" /> {quizStep > 0 ? 'Paso anterior' : 'Volver al inicio'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowProfileSetup(false)}
+                className="w-8 h-8 rounded-full bg-[#0B0D11] border border-[#222631] flex items-center justify-center text-zinc-400 hover:text-white"
+                title="Cerrar y explorar como invitado"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
             {quizStep === 0 ? (
               <div className="space-y-3.5">
-                <span className="text-[11px] font-black uppercase text-emerald-400">Paso 1 de 5 · Ficha del Tenista</span>
-                <h3 className="text-xl font-black text-white">Completa tus Datos</h3>
+                <span className="text-[10px] font-black uppercase tracking-wider text-[#10B981]">Paso 1 de 5 · Datos Oficiales</span>
+                <h3 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-xl font-black text-white">Ficha del Tenista</h3>
 
                 <div className="flex flex-col items-center py-1">
                   <div 
                     onClick={() => fileInputRef.current?.click()}
-                    className="w-20 h-20 rounded-full bg-[#111318] border-2 border-dashed border-emerald-400 flex items-center justify-center overflow-hidden cursor-pointer"
+                    className="w-20 h-20 rounded-full bg-[#0B0D11] border border-dashed border-[#10B981] flex items-center justify-center overflow-hidden cursor-pointer"
                   >
                     {isCompressing ? (
-                      <Loader2 className="w-6 h-6 text-emerald-400 animate-spin" />
+                      <Loader2 className="w-6 h-6 text-[#10B981] animate-spin" />
                     ) : fotoPreview ? (
-                      <img src={fotoPreview} alt="Preview" className="w-full h-full object-cover" />
+                      <img src={fotoPreview} alt="Preview" className="w-full h-full object-cover object-center" />
                     ) : (
-                      <Camera className="w-7 h-7 text-emerald-400" />
+                      <Camera className="w-6 h-6 text-[#10B981]" />
                     )}
                   </div>
                   <input type="file" accept="image/*" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
-                  <span className="text-[11px] text-zinc-400 mt-1">Foto de Perfil (Opcional)</span>
+                  <span className="text-[11px] text-[#8E98A8] mt-1">Subir fotografía (Opcional)</span>
                 </div>
 
                 <input
@@ -3902,13 +4860,12 @@ export default function App() {
                   placeholder="Nombre y Apellido *"
                   value={nombre}
                   onChange={(e) => setNombre(e.target.value)}
-                  className="w-full bg-[#111318] border border-zinc-800 rounded-xl px-3.5 py-2.5 text-sm text-white"
+                  className="w-full bg-[#0B0D11] border border-[#222631] rounded-xl px-3.5 py-2.5 text-sm text-white"
                 />
 
-                {/* EDAD Y GÉNERO PARA VALIDAR +40 SENIOR Y DAMAS */}
                 <div className="grid grid-cols-2 gap-2.5">
                   <div>
-                    <label className="text-[11px] font-bold text-zinc-400 block mb-1">Edad (Habilita +40) *</label>
+                    <label className="text-[11px] font-bold text-[#8E98A8] block mb-1">Edad (Habilita +40) *</label>
                     <input
                       type="number"
                       min="12"
@@ -3916,15 +4873,15 @@ export default function App() {
                       required
                       value={edad}
                       onChange={(e) => setEdad(e.target.value)}
-                      className="w-full bg-[#111318] border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white"
+                      className="w-full bg-[#0B0D11] border border-[#222631] rounded-xl px-3 py-2.5 text-sm text-white"
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] font-bold text-zinc-400 block mb-1">Rama / División *</label>
+                    <label className="text-[11px] font-bold text-[#8E98A8] block mb-1">Rama / División *</label>
                     <select
                       value={genero}
                       onChange={(e) => setGenero(e.target.value)}
-                      className="w-full bg-[#111318] border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white"
+                      className="w-full bg-[#0B0D11] border border-[#222631] rounded-xl px-3 py-2.5 text-sm text-white"
                     >
                       <option value="Varones">Varones</option>
                       <option value="Damas">Damas</option>
@@ -3932,25 +4889,24 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* MANO HÁBIL Y DISPONIBILIDAD */}
                 <div className="grid grid-cols-2 gap-2.5">
                   <div>
-                    <label className="text-[11px] font-bold text-zinc-400 block mb-1">Mano Hábil</label>
+                    <label className="text-[11px] font-bold text-[#8E98A8] block mb-1">Mano Hábil</label>
                     <select
                       value={mano}
                       onChange={(e) => setMano(e.target.value)}
-                      className="w-full bg-[#111318] border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white"
+                      className="w-full bg-[#0B0D11] border border-[#222631] rounded-xl px-3 py-2.5 text-sm text-white"
                     >
-                      <option value="Diestro">Diestro (Derecha)</option>
-                      <option value="Zurdo">Zurdo (Izquierda)</option>
+                      <option value="Diestro">Diestro</option>
+                      <option value="Zurdo">Zurdo</option>
                     </select>
                   </div>
                   <div>
-                    <label className="text-[11px] font-bold text-zinc-400 block mb-1">Horario Preferido</label>
+                    <label className="text-[11px] font-bold text-[#8E98A8] block mb-1">Horario Preferido</label>
                     <select
                       value={horarioPref}
                       onChange={(e) => setHorarioPref(e.target.value)}
-                      className="w-full bg-[#111318] border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white"
+                      className="w-full bg-[#0B0D11] border border-[#222631] rounded-xl px-3 py-2.5 text-sm text-white"
                     >
                       <option value="Fines de Semana">Fines de Semana</option>
                       <option value="Noches (Lun-Vie)">Noches (Lun-Vie)</option>
@@ -3962,16 +4918,16 @@ export default function App() {
                 <input
                   type="tel"
                   required
-                  placeholder="Celular / WhatsApp *"
+                  placeholder="Celular / WhatsApp (9 dígitos) *"
                   value={telefono}
                   onChange={(e) => setTelefono(e.target.value)}
-                  className="w-full bg-[#111318] border border-zinc-800 rounded-xl px-3.5 py-2.5 text-sm text-white"
+                  className="w-full bg-[#0B0D11] border border-[#222631] rounded-xl px-3.5 py-2.5 text-sm text-white"
                 />
 
                 <select
                   value={club}
                   onChange={(e) => setClub(e.target.value)}
-                  className="w-full bg-[#111318] border border-zinc-800 rounded-xl px-3.5 py-2.5 text-sm text-white"
+                  className="w-full bg-[#0B0D11] border border-[#222631] rounded-xl px-3.5 py-2.5 text-sm text-white"
                 >
                   {SEDES_CLUB_PRO.map((s, i) => (
                     <option key={i} value={s.nombre}>{s.nombre}</option>
@@ -3982,12 +4938,14 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => {
-                    if (!nombre.trim() || !telefono.trim()) return alert('Completa tu nombre y WhatsApp.');
+                    if (!nombre.trim() || !(telefono.trim() || authPhoneInput.trim())) {
+                      return alert('Completa tu nombre y número de WhatsApp.');
+                    }
                     setQuizStep(1);
                   }}
-                  className="w-full bg-emerald-500 text-zinc-950 font-black py-3.5 rounded-2xl text-sm"
+                  className="w-full bg-[#10B981] text-zinc-950 font-black py-3.5 rounded-2xl text-xs"
                 >
-                  Siguiente: 4 Preguntas Rápidas ➔
+                  Continuar a Calibración (4 Preguntas) ➔
                 </button>
               </div>
             ) : (
@@ -3997,11 +4955,15 @@ export default function App() {
                   const valorActual = respuestasLikert[quizStep - 1];
                   return (
                     <>
-                      <span className="text-xs font-black uppercase text-emerald-400">Pregunta {quizStep} de 4</span>
-                      <h3 className="text-xl font-black text-white">{card.titulo}</h3>
-                      <p className="text-sm text-zinc-100 font-semibold">{card.pregunta}</p>
-                      <div className="bg-[#111318] border border-zinc-800 p-3 rounded-2xl text-xs text-zinc-300">
-                        {card.ejemplo}
+                      <span className="text-[10px] font-black uppercase tracking-wider text-[#10B981]">
+                        Calibración Inicial · Pregunta {quizStep} de 4
+                      </span>
+                      <h3 style={{ fontFamily: "'Outfit', sans-serif" }} className="text-xl font-black text-white">
+                        {card.titulo}
+                      </h3>
+                      <p className="text-xs text-zinc-200 font-semibold">{card.pregunta}</p>
+                      <div className="bg-[#0B0D11] border border-[#222631] p-3 rounded-2xl text-[11px] text-[#8E98A8]">
+                        {card.nota}
                       </div>
                       <div className="space-y-2">
                         {card.escala.map((item) => (
@@ -4015,12 +4977,12 @@ export default function App() {
                             }}
                             className={`w-full text-left p-3.5 rounded-2xl border text-xs font-bold flex justify-between items-center ${
                               valorActual === item.valor
-                                ? 'bg-emerald-500/20 border-emerald-400 text-white'
-                                : 'bg-[#111318] border-zinc-800 text-zinc-300'
+                                ? 'bg-[#0B0D11] border-[#10B981] text-white'
+                                : 'bg-[#0B0D11]/60 border-[#222631] text-[#8E98A8]'
                             }`}
                           >
                             <span>{item.label}</span>
-                            {valorActual === item.valor && <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 ml-2" />}
+                            {valorActual === item.valor && <CheckCircle2 className="w-4 h-4 text-[#10B981] shrink-0 ml-2" />}
                           </button>
                         ))}
                       </div>
@@ -4028,7 +4990,7 @@ export default function App() {
                         <button
                           type="button"
                           onClick={() => setQuizStep(quizStep - 1)}
-                          className="w-1/3 bg-zinc-800 text-zinc-300 font-bold py-3.5 rounded-2xl text-xs"
+                          className="w-1/3 bg-[#0B0D11] border border-[#222631] text-zinc-300 font-bold py-3.5 rounded-2xl text-xs"
                         >
                           Atrás
                         </button>
@@ -4036,7 +4998,7 @@ export default function App() {
                           <button
                             type="button"
                             onClick={() => setQuizStep(quizStep + 1)}
-                            className="w-2/3 bg-emerald-500 text-zinc-950 font-black py-3.5 rounded-2xl text-xs"
+                            className="w-2/3 bg-[#10B981] text-zinc-950 font-black py-3.5 rounded-2xl text-xs"
                           >
                             Siguiente ➔
                           </button>
@@ -4045,9 +5007,9 @@ export default function App() {
                             type="button"
                             disabled={savingPlayer}
                             onClick={handleCompleteProfile}
-                            className="w-2/3 bg-emerald-500 text-zinc-950 font-black py-3.5 rounded-2xl text-xs"
+                            className="w-2/3 bg-[#10B981] text-zinc-950 font-black py-3.5 rounded-2xl text-xs"
                           >
-                            {savingPlayer ? 'Guardando...' : 'Finalizar Registro Oficial'}
+                            {savingPlayer ? 'Activando Cuenta...' : 'Finalizar y Crear Cuenta'}
                           </button>
                         )}
                       </div>
@@ -4061,59 +5023,79 @@ export default function App() {
       )}
 
       {/* ========================================================================
-          BARRA DE NAVEGACIÓN INFERIOR CON CÁPSULA FLUIDA ESTILO LIQUID
+          BARRA DE NAVEGACIÓN INFERIOR ERGONÓMICA DE 76PX (SIN CAJAS TIPO WORD)
       ======================================================================== */}
-      <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-[#161920]/95 backdrop-blur-xl border-t border-zinc-800 flex justify-around items-center py-2 pb-5 px-2 z-40">
+      <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto h-[76px] bg-[#0B0D11]/95 backdrop-blur-xl border-t border-white/[0.08] flex justify-around items-center px-2 z-40 select-none">
         <button 
           onClick={() => handleTabChange('perfil')} 
-          className={`flex flex-col items-center text-xs w-16 py-1 rounded-2xl transition-all ${
-            tab === 'perfil' ? 'bg-emerald-500/15 text-emerald-400 font-black' : 'text-zinc-400 font-semibold'
+          className={`flex flex-col items-center justify-center w-16 h-14 transition-colors ${
+            tab === 'perfil' ? 'text-[#10B981]' : 'text-[#8E98A8] hover:text-zinc-200'
           }`}
         >
-          <User className="w-5 h-5 mb-0.5" /> Mi Perfil
+          <User className="w-6 h-6" strokeWidth={tab === 'perfil' ? 2.5 : 2} />
+          <span className={`text-[11px] mt-1 ${tab === 'perfil' ? 'font-extrabold text-white' : 'font-medium'}`}>
+            Mi Perfil
+          </span>
+          <span className={`w-1 h-1 rounded-full mt-0.5 transition-all ${tab === 'perfil' ? 'bg-[#10B981]' : 'bg-transparent'}`} />
         </button>
 
         <button 
           onClick={() => handleTabChange('ranking')} 
-          className={`flex flex-col items-center text-xs w-16 py-1 rounded-2xl transition-all ${
-            tab === 'ranking' ? 'bg-emerald-500/15 text-emerald-400 font-black' : 'text-zinc-400 font-semibold'
+          className={`flex flex-col items-center justify-center w-16 h-14 transition-colors ${
+            tab === 'ranking' ? 'text-[#10B981]' : 'text-[#8E98A8] hover:text-zinc-200'
           }`}
         >
-          <Trophy className="w-5 h-5 mb-0.5" /> Ranking
+          <Trophy className="w-6 h-6" strokeWidth={tab === 'ranking' ? 2.5 : 2} />
+          <span className={`text-[11px] mt-1 ${tab === 'ranking' ? 'font-extrabold text-white' : 'font-medium'}`}>
+            Ranking
+          </span>
+          <span className={`w-1 h-1 rounded-full mt-0.5 transition-all ${tab === 'ranking' ? 'bg-[#10B981]' : 'bg-transparent'}`} />
         </button>
 
-        <div className="relative -top-5 flex flex-col items-center">
+        {/* Botón Central Flotante "Retos" con Elevación Física */}
+        <div className="relative -top-4 flex flex-col items-center">
           <button
             onClick={() => handleTabChange('match')}
-            className={`w-14 h-14 rounded-full flex items-center justify-center shadow-2xl border-4 border-[#111318] transition-all ${
-              tab === 'match' ? 'bg-emerald-400 text-zinc-950 scale-105' : 'bg-emerald-500 text-zinc-950'
+            className={`w-14 h-14 rounded-full flex items-center justify-center border-4 border-[#0B0D11] transition-all ${
+              tab === 'match' 
+                ? 'bg-[#10B981] text-zinc-950 shadow-[0_8px_24px_rgba(16,185,129,0.45)] scale-105' 
+                : 'bg-[#14171F] text-[#10B981] border-[#222631] shadow-[0_8px_20px_rgba(0,0,0,0.6)]'
             }`}
           >
-            <Swords className="w-6 h-6" />
+            <Swords className="w-6 h-6" strokeWidth={2.4} />
           </button>
-          <span className={`text-xs mt-1 font-black ${tab === 'match' ? 'text-emerald-400' : 'text-zinc-200'}`}>
+          <span className={`text-[11px] mt-1 ${tab === 'match' ? 'font-extrabold text-[#10B981]' : 'font-semibold text-[#8E98A8]'}`}>
             Retos
           </span>
         </div>
 
         <button 
           onClick={() => handleTabChange('clubs')} 
-          className={`flex flex-col items-center text-xs w-16 py-1 rounded-2xl transition-all ${
-            tab === 'clubs' ? 'bg-emerald-500/15 text-emerald-400 font-black' : 'text-zinc-400 font-semibold'
+          className={`flex flex-col items-center justify-center w-16 h-14 transition-colors ${
+            tab === 'clubs' ? 'text-[#10B981]' : 'text-[#8E98A8] hover:text-zinc-200'
           }`}
         >
-          <MapPin className="w-5 h-5 mb-0.5" /> Directorio
+          <MapPin className="w-6 h-6" strokeWidth={tab === 'clubs' ? 2.5 : 2} />
+          <span className={`text-[11px] mt-1 ${tab === 'clubs' ? 'font-extrabold text-white' : 'font-medium'}`}>
+            Directorio
+          </span>
+          <span className={`w-1 h-1 rounded-full mt-0.5 transition-all ${tab === 'clubs' ? 'bg-[#10B981]' : 'bg-transparent'}`} />
         </button>
 
         <button 
           onClick={() => handleTabChange('torneos')} 
-          className={`flex flex-col items-center text-xs w-16 py-1 rounded-2xl transition-all ${
-            tab === 'torneos' ? 'bg-emerald-500/15 text-emerald-400 font-black' : 'text-zinc-400 font-semibold'
+          className={`flex flex-col items-center justify-center w-16 h-14 transition-colors ${
+            tab === 'torneos' ? 'text-[#10B981]' : 'text-[#8E98A8] hover:text-zinc-200'
           }`}
         >
-          <Calendar className="w-5 h-5 mb-0.5" /> Torneos
+          <Calendar className="w-6 h-6" strokeWidth={tab === 'torneos' ? 2.5 : 2} />
+          <span className={`text-[11px] mt-1 ${tab === 'torneos' ? 'font-extrabold text-white' : 'font-medium'}`}>
+            Torneos
+          </span>
+          <span className={`w-1 h-1 rounded-full mt-0.5 transition-all ${tab === 'torneos' ? 'bg-[#10B981]' : 'bg-transparent'}`} />
         </button>
       </nav>
     </div>
   );
 }
+};
