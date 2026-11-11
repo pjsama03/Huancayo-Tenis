@@ -1220,6 +1220,9 @@ const TorneoDinamicoModal = ({ torneo, myPlayer, onClose, onInscribir, onUpdateB
         </div>
       </div>
     </div>
+  );
+};
+
 // ============================================================================
 // PARTE 2 DE 3: COMPONENTE PRINCIPAL APP, ESTADOS, ACCESO DUAL Y LÓGICA EN VIVO
 // ============================================================================
@@ -2420,6 +2423,8 @@ export default function App() {
     if (filtroCat === 'Damas') return j.genero === 'Damas' || ['romina', 'claudia', 'maria', 'lucia', 'ana', 'sofia'].some(n => normalizeText(j.nombre).includes(n));
     if (filtroCat === '+40 Senior') return (j.edad && Number(j.edad) >= 40) || (!j.edad && (j.elo || 1000) >= 1350);
     return getInfoCategoria(j.elo || 1000).id === filtroCat;
+});
+  
 // ============================================================================
 // PARTE 3 DE 3: VISTAS 60-30-10, MODALES DESBLOQUEADOS Y BARRA INFERIOR 76PX
 // ============================================================================
