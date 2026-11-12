@@ -3597,9 +3597,8 @@ export const TournamentsAndBracketsView = ({
 // === FIN DEL BLOQUE 4 DE 5 ===
 
 // ============================================================================
-// BLOQUE 5 DE 5 (FINAL): MODALES INTERACTIVOS (DESAFÍO, CLIMA 3D, COACH PRO
-//                        CON RESEÑAS REALES, BRACKETS DE TORNEO, LOGIN +
-//                        RECUPERACIÓN DE CLAVE, MENÚ LATERAL) Y COMPONENTE APP
+// BLOQUE 5 DE 5 (FINAL CORREGIDO): MODALES INTERACTIVOS Y COMPONENTE APP
+//                                  100% LIBRE DE FLECHAS EN PROPS DE ETIQUETAS
 // ============================================================================
 
 // ----------------------------------------------------------------------------
@@ -3689,13 +3688,17 @@ export const LaunchChallengeAndScoreModal = ({
           onClick={onClose}
           className="mp-icon-btn absolute top-4 right-4 w-9 h-9 rounded-full bg-white/10 flex items-center justify-center"
         >
-          <X className="w-4 h-4"/>
+          <X
+            className="w-4 h-4"
+          />
         </button>
 
-        {/* Cabecera Simétrica Centrada */}
         <div className="text-center mb-4">
           <div className="inline-flex items-center justify-center mb-1.5">
-            <CanvaIcon3D size="{52}" type="raquetas_duelo"/>
+            <CanvaIcon3D
+              type="raquetas_duelo"
+              size={52}
+            />
           </div>
           <span className="block font-display font-black text-[10px] tracking-[0.22em] uppercase text-[#D6FF00]">
             {esModoScore ? 'VALIDACIÓN OFICIAL DE PUNTOS ELO' : 'CONTRATO DEPORTIVO · MATCH CENTER'}
@@ -3705,10 +3708,13 @@ export const LaunchChallengeAndScoreModal = ({
           </h2>
         </div>
 
-        {/* Rostros Frente a Frente con Escudos de Club */}
         <div className="p-3.5 rounded-2xl bg-gradient-to-r from-[#00A3FF]/15 via-black/40 to-[#D6FF00]/15 border border-white/10 grid grid-cols-7 items-center gap-2 mb-4">
           <div className="col-span-3 flex flex-col items-center text-center">
-            <PlayerAvatarWithClub jugador="{jugIzq}" ringColor="border-[#00A3FF]" size="{56}"/>
+            <PlayerAvatarWithClub
+              jugador={jugIzq}
+              size={56}
+              ringColor="border-[#00A3FF]"
+            />
             <span className="font-display font-black text-xs mt-1.5 truncate w-full">
               {jugIzq?.nombre}
             </span>
@@ -3724,7 +3730,11 @@ export const LaunchChallengeAndScoreModal = ({
           </div>
 
           <div className="col-span-3 flex flex-col items-center text-center">
-            <PlayerAvatarWithClub jugador="{jugDer}" ringColor="border-[#D6FF00]" size="{56}"/>
+            <PlayerAvatarWithClub
+              jugador={jugDer}
+              size={56}
+              ringColor="border-[#D6FF00]"
+            />
             <span className="font-display font-black text-xs mt-1.5 truncate w-full">
               {jugDer?.nombre}
             </span>
@@ -3935,12 +3945,17 @@ export const WeatherReportModal = ({
           onClick={onClose}
           className="mp-icon-btn absolute top-4 right-4 w-9 h-9 rounded-full bg-white/10 flex items-center justify-center"
         >
-          <X className="w-4 h-4"/>
+          <X
+            className="w-4 h-4"
+          />
         </button>
 
         <div className="text-center mb-4">
           <div className="inline-flex items-center justify-center mb-1">
-            <ClubBadge clubName="{club.nombre}" size="{44}"/>
+            <ClubBadge
+              clubName={club.nombre}
+              size={44}
+            />
           </div>
           <span className="block font-display font-black text-[10px] tracking-[0.22em] uppercase text-[#00A3FF]">
             REPORTE EN TIEMPO REAL DE SUPERFICIE
@@ -3965,13 +3980,20 @@ export const WeatherReportModal = ({
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <CanvaIcon3D size="{42}" type="{op.icono}"/>
+                  <CanvaIcon3D
+                    type={op.icono}
+                    size={42}
+                  />
                   <div>
                     <h4 className="font-display font-black text-sm">{op.texto}</h4>
                     <p className="text-[11px] opacity-70">{op.sub}</p>
                   </div>
                 </div>
-                {activo && <Check className="w-5 h-5 text-[#D6FF00] shrink-0"/>}
+                {activo && (
+                  <Check
+                    className="w-5 h-5 text-[#D6FF00] shrink-0"
+                  />
+                )}
               </button>
             );
           })}
@@ -4090,10 +4112,11 @@ export const CoachProDetailModal = ({
           onClick={onClose}
           className="mp-icon-btn absolute top-3 right-3 z-20 w-9 h-9 rounded-full bg-black/60 text-white flex items-center justify-center"
         >
-          <X className="w-4 h-4"/>
+          <X
+            className="w-4 h-4"
+          />
         </button>
 
-        {/* Cabecera Hero del Entrenador */}
         <div className="relative h-40 w-full overflow-hidden">
           <img
             src={coach.banner_url}
@@ -4102,13 +4125,20 @@ export const CoachProDetailModal = ({
           />
           <div className="absolute inset-0 bg-gradient-to-t from-[#0D121C] via-[#0D121C]/60 to-transparent" />
           <div className="absolute top-3 left-3">
-            <CanvaIcon3D size="{42}" type="escudo_coach"/>
+            <CanvaIcon3D
+              type="escudo_coach"
+              size={42}
+            />
           </div>
         </div>
 
         <div className="p-4 sm:p-5 -mt-12 relative space-y-4">
           <div className="flex items-end gap-3.5">
-            <PlayerAvatarWithClub jugador="{avatarCoach}" ringColor="border-[#D6FF00] ring-4 ring-[#0D121C]" size="{78}"/>
+            <PlayerAvatarWithClub
+              jugador={avatarCoach}
+              size={78}
+              ringColor="border-[#D6FF00] ring-4 ring-[#0D121C]"
+            />
             <div className="pb-1 min-w-0 flex-1">
               <span className="px-2 py-0.5 rounded bg-amber-400 text-[#0B0E14] font-display font-black text-[9px] uppercase">
                 {coach.credencial}
@@ -4122,7 +4152,6 @@ export const CoachProDetailModal = ({
             </div>
           </div>
 
-          {/* Barra de Autoridad Verificada */}
           <div className="grid grid-cols-3 gap-2 p-3 rounded-2xl bg-[#141B28] text-white border border-white/10 text-center">
             <div>
               <span className="font-display font-black text-base text-amber-400 block">
@@ -4150,7 +4179,6 @@ export const CoachProDetailModal = ({
             </div>
           </div>
 
-          {/* 1. Selección de Modalidad o Pack */}
           <div>
             <h3 className="font-display font-black text-xs uppercase tracking-wider text-[#00A3FF] mb-2">
               1. Elige tu Programa o Pack de Entrenamiento
@@ -4191,7 +4219,6 @@ export const CoachProDetailModal = ({
             </div>
           </div>
 
-          {/* 2. Parrilla de Horarios Libres en Cancha */}
           <div>
             <h3 className="font-display font-black text-xs uppercase tracking-wider text-[#00A3FF] mb-2">
               2. Horarios Disponibles esta Semana
@@ -4218,7 +4245,6 @@ export const CoachProDetailModal = ({
             </div>
           </div>
 
-          {/* 3. Muro de Reseñas Reales Verificadas + Botón para Calificar */}
           <div className="pt-2 border-t border-white/10">
             <div className="flex items-center justify-between mb-2.5">
               <h3 className="font-display font-black text-xs uppercase tracking-wider">
@@ -4291,13 +4317,15 @@ export const CoachProDetailModal = ({
           </div>
 
           <a
-            href={`[https://wa.me/$](https://wa.me/$){coach.whatsapp}?text=${encodeURIComponent(msgReservaCoach)}`}
+            href={`https://wa.me/${coach.whatsapp}?text=${encodeURIComponent(msgReservaCoach)}`}
             target="_blank"
             rel="noreferrer"
             onClick={() => triggerHaptic('medium')}
             className="mp-hero-btn w-full py-3.5 rounded-2xl bg-gradient-to-r from-[#D6FF00] to-[#00A3FF] text-[#0B0E14] font-display font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg"
           >
-            <Phone className="w-4 h-4"/>
+            <Phone
+              className="w-4 h-4"
+            />
             <span>Reservar {horarioElegido} por WhatsApp ⚡</span>
           </a>
         </div>
@@ -4360,10 +4388,11 @@ export const TournamentBracketModal = ({
           onClick={onClose}
           className="mp-icon-btn absolute top-4 right-4 w-9 h-9 rounded-full bg-white/10 flex items-center justify-center"
         >
-          <X className="w-4 h-4"/>
+          <X
+            className="w-4 h-4"
+          />
         </button>
 
-        {/* Cabecera Centrada del Torneo */}
         <div className="text-center mb-4">
           <span className="px-2.5 py-0.5 rounded-full bg-[#D6FF00] text-[#0B0E14] font-display font-black text-[10px] uppercase">
             {torneo.sponsor}
@@ -4376,7 +4405,6 @@ export const TournamentBracketModal = ({
           </p>
         </div>
 
-        {/* 3 Pestañas Sin "Siembra": Cuadro Principal | Ronda Consuelo | Participantes */}
         <div className="grid grid-cols-3 gap-1.5 p-1.5 rounded-2xl bg-black/30 border border-white/10 mb-3">
           <button
             type="button"
@@ -4470,7 +4498,10 @@ export const TournamentBracketModal = ({
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between py-1 border-b border-white/10">
                     <div className="flex items-center gap-2">
-                      <ClubBadge clubName="{m.j1Club}" size="{18}"/>
+                      <ClubBadge
+                        clubName={m.j1Club}
+                        size={18}
+                      />
                       <span
                         className={`font-display font-bold text-xs ${
                           m.ganador === m.j1 ? 'text-[#D6FF00]' : 'text-white'
@@ -4479,12 +4510,19 @@ export const TournamentBracketModal = ({
                         {m.j1}
                       </span>
                     </div>
-                    {m.ganador === m.j1 && <Check className="w-4 h-4 text-[#D6FF00]"/>}
+                    {m.ganador === m.j1 && (
+                      <Check
+                        className="w-4 h-4 text-[#D6FF00]"
+                      />
+                    )}
                   </div>
 
                   <div className="flex items-center justify-between py-1">
                     <div className="flex items-center gap-2">
-                      <ClubBadge clubName="{m.j2Club}" size="{18}"/>
+                      <ClubBadge
+                        clubName={m.j2Club}
+                        size={18}
+                      />
                       <span
                         className={`font-display font-bold text-xs ${
                           m.ganador === m.j2 ? 'text-[#D6FF00]' : 'text-white'
@@ -4493,11 +4531,14 @@ export const TournamentBracketModal = ({
                         {m.j2}
                       </span>
                     </div>
-                    {m.ganador === m.j2 && <Check className="w-4 h-4 text-[#D6FF00]"/>}
+                    {m.ganador === m.j2 && (
+                      <Check
+                        className="w-4 h-4 text-[#D6FF00]"
+                      />
+                    )}
                   </div>
                 </div>
 
-                {/* Botón de Carga Oficial Exclusivo del Administrador */}
                 <div className="mt-2.5 pt-2 border-t border-white/10 flex justify-end">
                   {esAdmin ? (
                     <button
@@ -4516,7 +4557,9 @@ export const TournamentBracketModal = ({
                       onClick={onSolicitarAccesoAdmin}
                       className="text-[10px] font-display font-bold text-slate-400 hover:text-white flex items-center gap-1"
                     >
-                      <Lock className="w-3 h-3"/>
+                      <Lock
+                        className="w-3 h-3"
+                      />
                       <span>Validación exclusiva del Comité</span>
                     </button>
                   )}
@@ -4604,7 +4647,6 @@ export const AuthAndRecoveryModal = ({
   const [nombreNuevo, setNombreNuevo] = useState('');
   const [clubNuevo, setClubNuevo] = useState('Country Club Los Huancas');
   const [nivelInicialElo, setNivelInicialElo] = useState(1300);
-  const [dniRescate, setDniRescate] = useState('');
   const [nuevaClaveRescate, setNuevaClaveRescate] = useState('');
   const [mensajeError, setMensajeError] = useState('');
 
@@ -4656,7 +4698,7 @@ export const AuthAndRecoveryModal = ({
       telefono: identificador.trim() || '964000999',
       email: identificador.includes('@') ? identificador.trim() : `${Date.now()}@matchpoint.pe`,
       password: password || '123',
-      dni: dniRescate || '70000000',
+      dni: '70000000',
       ultimoPartidoTs: Date.now(),
       foto_url: ''
     };
@@ -4700,11 +4742,15 @@ export const AuthAndRecoveryModal = ({
           onClick={onClose}
           className="mp-icon-btn absolute top-4 right-4 w-9 h-9 rounded-full bg-white/10 flex items-center justify-center"
         >
-          <X className="w-4 h-4"/>
+          <X
+            className="w-4 h-4"
+          />
         </button>
 
         <div className="text-center mb-4">
-          <MatchpointOfficialLogo size="{48}"/>
+          <MatchpointOfficialLogo
+            size={48}
+          />
           <h2 className="font-display font-black text-xl tracking-tight mt-2">
             {modoAuth === 'login'
               ? 'Ingresar a MATCHPOINT'
@@ -4932,12 +4978,14 @@ export const AuthAndRecoveryModal = ({
                 ¿Necesitas asistencia directa del Comité Oficial?
               </span>
               <a
-                href={`[https://wa.me/$](https://wa.me/$){ADMIN_CONFIG.WHATSAPP_ADMIN}?text=${encodeURIComponent(msgSoporteWa)}`}
+                href={`https://wa.me/${ADMIN_CONFIG.WHATSAPP_ADMIN}?text=${encodeURIComponent(msgSoporteWa)}`}
                 target="_blank"
                 rel="noreferrer"
                 className="w-full py-2.5 rounded-xl bg-emerald-500/20 border border-emerald-400/50 text-emerald-300 font-display font-black text-xs uppercase flex items-center justify-center gap-2"
               >
-                <Phone className="w-3.5 h-3.5"/>
+                <Phone
+                  className="w-3.5 h-3.5"
+                />
                 <span>Solicitar Reset por WhatsApp al Admin</span>
               </a>
               <button
@@ -4956,7 +5004,7 @@ export const AuthAndRecoveryModal = ({
 };
 
 // ----------------------------------------------------------------------------
-// 23. COMPONENTE PRINCIPAL APP (CONECTA NAVEGACIÓN, MENÚ LATERAL Y MODALES)
+// 23. COMPONENTE PRINCIPAL APP (CON HANDLERS PRE-DECLARADOS LIMPIOS)
 // ----------------------------------------------------------------------------
 export default function App() {
   const [activeTab, setActiveTab] = useState('ranking');
@@ -4973,7 +5021,6 @@ export default function App() {
   const [usuarioActivo, setUsuarioActivo] = useState(INITIAL_PLAYERS[0]);
   const [esAdmin, setEsAdmin] = useState(false);
 
-  // Estados de Modales
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [reglamentoAbierto, setReglamentoAbierto] = useState(false);
   const [nivelesModalAbierto, setNivelesModalAbierto] = useState(false);
@@ -4992,7 +5039,6 @@ export default function App() {
   });
   const [bannerCelebracion, setBannerCelebracion] = useState(null);
 
-  // Cerrar cualquier ventana con tecla Escape (Evita bloqueo en Web/Laptop)
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
@@ -5013,7 +5059,6 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Handlers Funcionales Reales
   const handleCambiarClubUsuario = (nuevoClub) => {
     if (!usuarioActivo) return;
     const actualizado = { ...usuarioActivo, club: nuevoClub };
@@ -5195,6 +5240,75 @@ export default function App() {
     }
   };
 
+  // Variables y Handlers limpios para pasar a los componentes sin usar "=>" en JSX
+  const cantidadPartidosEnVivo = partidos.filter((m) => m.enVivo).length;
+  const abrirMenu = () => setMenuAbierto(true);
+  const abrirProShop = () => setProShopAbierto(true);
+  const irARetos = () => setActiveTab('retos');
+  const abrirAuth = () => setAuthModalAbierto(true);
+  const abrirMiPerfil = () => setJugadorFichaSel(usuarioActivo || jugadores[0]);
+  const abrirModalNiveles = () => setNivelesModalAbierto(true);
+  const cerrarModalNiveles = () => setNivelesModalAbierto(false);
+  const cerrarFichaJugador = () => setJugadorFichaSel(null);
+  const cerrarVipCard = () => setVipCardAbierto(false);
+  const cerrarProShop = () => setProShopAbierto(false);
+  const cerrarModalReto = () => setModalRetoConfig((prev) => ({ ...prev, abierto: false }));
+  const cerrarModalClima = () => setClubClimaSel(null);
+  const cerrarModalCoach = () => setCoachSel(null);
+  const cerrarModalTorneo = () => setTorneoSel(null);
+  const cerrarModalAuth = () => setAuthModalAbierto(false);
+
+  const handleNewsCtaClick = (item) => {
+    if (item.categoria.includes('PRO SHOP')) setProShopAbierto(true);
+    else setActiveTab('sedes');
+  };
+
+  const abrirModalLanzarReto = (rival) => {
+    setModalRetoConfig({ abierto: true, modo: 'retar', rival, partido: null });
+  };
+
+  const abrirModalConfirmarScore = (partido) => {
+    setModalRetoConfig({ abierto: true, modo: 'score', rival: null, partido });
+  };
+
+  const abrirVipDesdePerfil = () => {
+    setJugadorFichaSel(null);
+    setVipCardAbierto(true);
+  };
+
+  const handleSolicitarVipWhatsApp = () => {
+    const url = `https://wa.me/${ADMIN_CONFIG.WHATSAPP_ADMIN}?text=${encodeURIComponent(
+      `Hola MATCHPOINT, soy ${usuarioActivo?.nombre} y deseo activar mi Carnet Digital VIP.`
+    )}`;
+    window.open(url, '_blank');
+  };
+
+  const handleInscribirTorneoWhatsApp = (t) => {
+    const url = `https://wa.me/${ADMIN_CONFIG.WHATSAPP_ADMIN}?text=${encodeURIComponent(
+      `Hola Comité MATCHPOINT, soy ${usuarioActivo?.nombre || 'Socio'} y deseo confirmar mi inscripción al torneo ${t.titulo} (S/ ${t.precioInscripcion}).`
+    )}`;
+    window.open(url, '_blank');
+  };
+
+  const handleRegistrarSocioState = (nuevo) => {
+    setJugadores((prev) => [...prev, nuevo]);
+    setUsuarioActivo(nuevo);
+  };
+
+  const handleResetPasswordState = (id, nuevaClave) => {
+    setJugadores((prev) =>
+      prev.map((j) => (j.id === id ? { ...j, password: nuevaClave } : j))
+    );
+    setBannerCelebracion('🔐 Contraseña actualizada correctamente.');
+    setTimeout(() => setBannerCelebracion(null), 4000);
+  };
+
+  const fichaAbiertaBool = Boolean(jugadorFichaSel);
+  const climaAbiertoBool = Boolean(clubClimaSel);
+  const coachAbiertoBool = Boolean(coachSel);
+  const torneoAbiertoBool = Boolean(torneoSel);
+  const miJugadorActual = usuarioActivo || jugadores[0];
+
   return (
     <div
       className={`min-h-screen flex flex-col max-w-md mx-auto relative shadow-2xl border-x pb-24 transition-colors ${
@@ -5203,14 +5317,19 @@ export default function App() {
           : 'bg-[#0B0E14] text-white border-white/10'
       }`}
     >
-      <GlobalMatchpointStyles isLightMode="{isLightMode}"/>
+      <GlobalMatchpointStyles
+        isLightMode={isLightMode}
+      />
 
-      <HeaderInstitucional isLightMode="{isLightMode}" notificacionesCount="{partidos.filter((m)" usuarioActivo="{usuarioActivo}"> m.enVivo).length}
-        onOpenMenu={() => setMenuAbierto(true)}
-        onOpenProShop={() => setProShopAbierto(true)}
-        onOpenNotificaciones={() => setActiveTab('retos')}
-        onOpenAuth={() => setAuthModalAbierto(true)}
-        onOpenPerfil={() => setJugadorFichaSel(usuarioActivo || jugadores[0])}
+      <HeaderInstitucional
+        isLightMode={isLightMode}
+        usuarioActivo={usuarioActivo}
+        notificacionesCount={cantidadPartidosEnVivo}
+        onOpenMenu={abrirMenu}
+        onOpenProShop={abrirProShop}
+        onOpenNotificaciones={irARetos}
+        onOpenAuth={abrirAuth}
+        onOpenPerfil={abrirMiPerfil}
       />
 
       {bannerCelebracion && (
@@ -5221,46 +5340,50 @@ export default function App() {
 
       <main className="p-3.5 flex-1">
         {activeTab === 'ranking' && (
-          <RankingAndHallOfFameView hallOfFame="{hallOfFame}" isLightMode="{isLightMode}" jugadores="{jugadores}" noticias="{noticias}" onSelectJugador="{(j)"> setJugadorFichaSel(j)}
-            onOpenLevelsModal={() => setNivelesModalAbierto(true)}
-            onNewsCta={(item) => {
-              if (item.categoria.includes('PRO SHOP')) setProShopAbierto(true);
-              else setActiveTab('sedes');
-            }}
+          <RankingAndHallOfFameView
+            jugadores={jugadores}
+            hallOfFame={hallOfFame}
+            noticias={noticias}
+            isLightMode={isLightMode}
+            onSelectJugador={setJugadorFichaSel}
+            onOpenLevelsModal={abrirModalNiveles}
+            onNewsCta={handleNewsCtaClick}
           />
         )}
 
         {activeTab === 'retos' && (
-          <ChallengesCenterView isLightMode="{isLightMode}" jugadores="{jugadores}" onSelectJugador="{(j)" partidos="{partidos}" usuarioActivo="{usuarioActivo}"> setJugadorFichaSel(j)}
-            onOpenLaunchChallengeModal={(rival) =>
-              setModalRetoConfig({ abierto: true, modo: 'retar', rival, partido: null })
-            }
+          <ChallengesCenterView
+            jugadores={jugadores}
+            partidos={partidos}
+            usuarioActivo={usuarioActivo}
+            isLightMode={isLightMode}
+            onSelectJugador={setJugadorFichaSel}
+            onOpenLaunchChallengeModal={abrirModalLanzarReto}
             onActualizarGameEnVivo={handleActualizarGameEnVivo}
-            onConfirmarActaFinal={(partido) =>
-              setModalRetoConfig({ abierto: true, modo: 'score', rival: null, partido })
-            }
+            onConfirmarActaFinal={abrirModalConfirmarScore}
           />
         )}
 
         {activeTab === 'sedes' && (
-          <VenuesAndCoachesView clubes="{clubes}" coaches="{coaches}" isLightMode="{isLightMode}" onOpenReportWeatherModal="{(c)"> setClubClimaSel(c)}
-            onSelectCoach={(c) => setCoachSel(c)}
+          <VenuesAndCoachesView
+            clubes={clubes}
+            coaches={coaches}
+            isLightMode={isLightMode}
+            onOpenReportWeatherModal={setClubClimaSel}
+            onSelectCoach={setCoachSel}
           />
         )}
 
         {activeTab === 'torneos' && (
-          <TournamentsAndBracketsView isLightMode="{isLightMode}" onOpenTournamentModal="{(t)" torneos="{torneos}"> setTorneoSel(t)}
-            onInscribirTorneo={(t) => {
-              const url = `[https://wa.me/$](https://wa.me/$){ADMIN_CONFIG.WHATSAPP_ADMIN}?text=${encodeURIComponent(
-                `Hola Comité MATCHPOINT, soy ${usuarioActivo?.nombre || 'Socio'} y deseo confirmar mi inscripción al torneo ${t.titulo} (S/ ${t.precioInscripcion}).`
-              )}`;
-              window.open(url, '_blank');
-            }}
+          <TournamentsAndBracketsView
+            torneos={torneos}
+            isLightMode={isLightMode}
+            onOpenTournamentModal={setTorneoSel}
+            onInscribirTorneo={handleInscribirTorneoWhatsApp}
           />
         )}
       </main>
 
-      {/* BARRA INFERIOR ERGONÓMICA DE 76PX CON BOTÓN CENTRAL ELEVADO DE RETOS */}
       <nav
         className={`fixed bottom-0 left-0 right-0 max-w-md mx-auto h-[76px] px-2 border-t backdrop-blur-2xl z-40 flex items-center justify-around ${
           isLightMode
@@ -5272,11 +5395,13 @@ export default function App() {
           type="button"
           onClick={() => {
             triggerHaptic('selection');
-            setJugadorFichaSel(usuarioActivo || jugadores[0]);
+            abrirMiPerfil();
           }}
           className="mp-tab-pill flex flex-col items-center justify-center gap-1 w-16"
         >
-          <User className="w-5 h-5"/>
+          <User
+            className="w-5 h-5"
+          />
           <span className="font-display font-bold text-[10px]">Mi Perfil</span>
         </button>
 
@@ -5289,18 +5414,22 @@ export default function App() {
               : ''
           }`}
         >
-          <Trophy className="w-5 h-5"/>
+          <Trophy
+            className="w-5 h-5"
+          />
           <span className="font-display font-bold text-[10px]">Ranking</span>
         </button>
 
-        {/* Botón Central Flotante de Retos con Activo 3D de Raquetas Cruzadas */}
         <div className="relative -top-4 flex flex-col items-center">
           <button
             type="button"
             onClick={() => { triggerHaptic('medium'); setActiveTab('retos'); }}
             className="mp-hero-btn mp-ripple-ring w-14 h-14 rounded-full bg-gradient-to-br from-[#D6FF00] via-[#A3E635] to-[#00A3FF] flex items-center justify-center shadow-[0_6px_22px_rgba(214,255,0,0.45)] border-2 border-[#0B0E14]"
           >
-            <CanvaIcon3D size="{34}" type="raquetas_duelo"/>
+            <CanvaIcon3D
+              type="raquetas_duelo"
+              size={34}
+            />
           </button>
           <span
             className={`font-display font-black text-[10px] mt-1 ${
@@ -5322,7 +5451,9 @@ export default function App() {
               : ''
           }`}
         >
-          <MapPin className="w-5 h-5"/>
+          <MapPin
+            className="w-5 h-5"
+          />
           <span className="font-display font-bold text-[10px]">Sedes</span>
         </button>
 
@@ -5335,12 +5466,13 @@ export default function App() {
               : ''
           }`}
         >
-          <Calendar className="w-5 h-5"/>
+          <Calendar
+            className="w-5 h-5"
+          />
           <span className="font-display font-bold text-[10px]">Torneos</span>
         </button>
       </nav>
 
-      {/* MENÚ LATERAL CON SWITCH DE TEMA CLARO/OSCURO Y PIE INSTITUCIONAL */}
       {menuAbierto && (
         <div
           onClick={() => setMenuAbierto(false)}
@@ -5355,7 +5487,9 @@ export default function App() {
             <div className="space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-white/10">
                 <div className="flex items-center gap-2">
-                  <MatchpointOfficialLogo size="{32}"/>
+                  <MatchpointOfficialLogo
+                    size={32}
+                  />
                   <span className="font-display font-black text-sm uppercase tracking-wider">
                     Información Oficial
                   </span>
@@ -5365,11 +5499,12 @@ export default function App() {
                   onClick={() => setMenuAbierto(false)}
                   className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center"
                 >
-                  <X className="w-4 h-4"/>
+                  <X
+                    className="w-4 h-4"
+                  />
                 </button>
               </div>
 
-              {/* Conmutador Deslizante Modo Claro vs Modo Oscuro */}
               <div
                 className={`p-3.5 rounded-2xl border flex items-center justify-between ${
                   isLightMode ? 'bg-slate-100 border-slate-200' : 'bg-[#151C28] border-white/10'
@@ -5377,9 +5512,13 @@ export default function App() {
               >
                 <div className="flex items-center gap-2.5">
                   {isLightMode ? (
-                    <Sun className="w-5 h-5 text-amber-500"/>
+                    <Sun
+                      className="w-5 h-5 text-amber-500"
+                    />
                   ) : (
-                    <Moon className="w-5 h-5 text-[#00A3FF]"/>
+                    <Moon
+                      className="w-5 h-5 text-[#00A3FF]"
+                    />
                   )}
                   <div>
                     <span className="font-display font-black text-xs block">
@@ -5423,7 +5562,9 @@ export default function App() {
                       Cómo se calculan los puntos, sets y categorías
                     </span>
                   </div>
-                  <ChevronRight className="w-4 h-4 opacity-60"/>
+                  <ChevronRight
+                    className="w-4 h-4 opacity-60"
+                  />
                 </button>
 
                 <button
@@ -5442,7 +5583,9 @@ export default function App() {
                       Descuentos con Carnet VIP y clima en vivo
                     </span>
                   </div>
-                  <ChevronRight className="w-4 h-4 opacity-60"/>
+                  <ChevronRight
+                    className="w-4 h-4 opacity-60"
+                  />
                 </button>
 
                 <button
@@ -5461,7 +5604,9 @@ export default function App() {
                       Cuerdas, pelotas Wilson y accesorios
                     </span>
                   </div>
-                  <ChevronRight className="w-4 h-4 opacity-60"/>
+                  <ChevronRight
+                    className="w-4 h-4 opacity-60"
+                  />
                 </button>
 
                 <button
@@ -5480,12 +5625,13 @@ export default function App() {
                       {esAdmin ? 'Sesión Admin Activa ✓' : 'Validación de llaves y resultados'}
                     </span>
                   </div>
-                  <Lock className="w-4 h-4 opacity-60"/>
+                  <Lock
+                    className="w-4 h-4 opacity-60"
+                  />
                 </button>
               </div>
             </div>
 
-            {/* Pie Institucional Formal */}
             <div className="pt-4 border-t border-white/10 text-center space-y-1">
               <p className="font-display font-black text-[11px] tracking-wider">
                 © 2026 MATCHPOINT™ · Circuito Oficial de Tenis
@@ -5498,7 +5644,6 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL DE REGLAMENTO OFICIAL Y TRANSPARENCIA MATEMÁTICA ELO */}
       {reglamentoAbierto && (
         <div
           onClick={() => setReglamentoAbierto(false)}
@@ -5515,10 +5660,15 @@ export default function App() {
               onClick={() => setReglamentoAbierto(false)}
               className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/10 flex items-center justify-center"
             >
-              <X className="w-4 h-4"/>
+              <X
+                className="w-4 h-4"
+              />
             </button>
             <div className="text-center mb-4">
-              <CanvaIcon3D size="{48}" type="trofeo_laurel"/>
+              <CanvaIcon3D
+                type="trofeo_laurel"
+                size={48}
+              />
               <h2 className="font-display font-black text-xl mt-1">
                 Reglamento y Sistema ELO Oficial
               </h2>
@@ -5547,47 +5697,46 @@ export default function App() {
         </div>
       )}
 
-      {/* MODALES GLOBALES CONECTADOS */}
-      <LevelsProgressionModal isOpen="{nivelesModalAbierto}" onClose="{()"> setNivelesModalAbierto(false)}
+      <LevelsProgressionModal
+        isOpen={nivelesModalAbierto}
+        onClose={cerrarModalNiveles}
         usuarioActivo={usuarioActivo}
         isLightMode={isLightMode}
       />
 
-      <PlayerProfileAndH2HModal isOpen="{Boolean(jugadorFichaSel)}" onClose="{()"> setJugadorFichaSel(null)}
+      <PlayerProfileAndH2HModal
+        isOpen={fichaAbiertaBool}
+        onClose={cerrarFichaJugador}
         jugadorSeleccionado={jugadorFichaSel}
         usuarioActivo={usuarioActivo}
         todosJugadores={jugadores}
         partidos={partidos}
         isLightMode={isLightMode}
-        onRetarJugador={(rival) =>
-          setModalRetoConfig({ abierto: true, modo: 'retar', rival, partido: null })
-        }
-        onOpenVipCard={() => {
-          setJugadorFichaSel(null);
-          setVipCardAbierto(true);
-        }}
+        onRetarJugador={abrirModalLanzarReto}
+        onOpenVipCard={abrirVipDesdePerfil}
         onCambiarClubUsuario={handleCambiarClubUsuario}
       />
 
-      <VipDigitalCardModal isOpen="{vipCardAbierto}" onClose="{()"> setVipCardAbierto(false)}
+      <VipDigitalCardModal
+        isOpen={vipCardAbierto}
+        onClose={cerrarVipCard}
         usuario={usuarioActivo}
-        onSolicitarVip={() => {
-          const url = `[https://wa.me/$](https://wa.me/$){ADMIN_CONFIG.WHATSAPP_ADMIN}?text=${encodeURIComponent(
-            `Hola MATCHPOINT, soy ${usuarioActivo?.nombre} y deseo activar mi Carnet Digital VIP.`
-          )}`;
-          window.open(url, '_blank');
-        }}
+        onSolicitarVip={handleSolicitarVipWhatsApp}
       />
 
-      <ProShopModal isOpen="{proShopAbierto}" onClose="{()"> setProShopAbierto(false)}
+      <ProShopModal
+        isOpen={proShopAbierto}
+        onClose={cerrarProShop}
         items={INITIAL_PROSHOP_ITEMS}
         usuarioActivo={usuarioActivo}
         isLightMode={isLightMode}
       />
 
-      <LaunchChallengeAndScoreModal isOpen="{modalRetoConfig.abierto}" onClose="{()"> setModalRetoConfig((prev) => ({ ...prev, abierto: false }))}
+      <LaunchChallengeAndScoreModal
+        isOpen={modalRetoConfig.abierto}
+        onClose={cerrarModalReto}
         modo={modalRetoConfig.modo}
-        miJugador={usuarioActivo || jugadores[0]}
+        miJugador={miJugadorActual}
         rivalJugador={modalRetoConfig.rival}
         partidoActivo={modalRetoConfig.partido}
         clubes={clubes}
@@ -5596,48 +5745,42 @@ export default function App() {
         onConfirmarResultadoPartido={handleConfirmarActaPartido}
       />
 
-      <WeatherReportModal isOpen="{Boolean(clubClimaSel)}" onClose="{()"> setClubClimaSel(null)}
+      <WeatherReportModal
+        isOpen={climaAbiertoBool}
+        onClose={cerrarModalClima}
         club={clubClimaSel}
         isLightMode={isLightMode}
         onGuardarClima={handleGuardarClimaClub}
       />
 
-      <CoachProDetailModal isOpen="{Boolean(coachSel)}" onClose="{()"> setCoachSel(null)}
+      <CoachProDetailModal
+        isOpen={coachAbiertoBool}
+        onClose={cerrarModalCoach}
         coach={coachSel}
         usuarioActivo={usuarioActivo}
         isLightMode={isLightMode}
         onAgregarResenaCoach={handleAgregarResenaCoach}
       />
 
-      <TournamentBracketModal isOpen="{Boolean(torneoSel)}" onClose="{()"> setTorneoSel(null)}
+      <TournamentBracketModal
+        isOpen={torneoAbiertoBool}
+        onClose={cerrarModalTorneo}
         torneo={torneoSel}
         esAdmin={esAdmin}
         isLightMode={isLightMode}
         onSolicitarAccesoAdmin={handleSolicitarPinAdmin}
         onPublicarResultadoLlave={handlePublicarResultadoLlaveTorneo}
-        onInscribirTorneo={(t) => {
-          const url = `[https://wa.me/$](https://wa.me/$){ADMIN_CONFIG.WHATSAPP_ADMIN}?text=${encodeURIComponent(
-            `Hola Comité MATCHPOINT, deseo inscribirme en ${t.titulo}.`
-          )}`;
-          window.open(url, '_blank');
-        }}
+        onInscribirTorneo={handleInscribirTorneoWhatsApp}
       />
 
-      <AuthAndRecoveryModal isOpen="{authModalAbierto}" onClose="{()"> setAuthModalAbierto(false)}
+      <AuthAndRecoveryModal
+        isOpen={authModalAbierto}
+        onClose={cerrarModalAuth}
         jugadores={jugadores}
         isLightMode={isLightMode}
-        onLoginExitoso={(u) => setUsuarioActivo(u)}
-        onRegistrarNuevoSocio={(nuevo) => {
-          setJugadores((prev) => [...prev, nuevo]);
-          setUsuarioActivo(nuevo);
-        }}
-        onResetPasswordExitoso={(id, nuevaClave) => {
-          setJugadores((prev) =>
-            prev.map((j) => (j.id === id ? { ...j, password: nuevaClave } : j))
-          );
-          setBannerCelebracion('🔐 Contraseña actualizada correctamente.');
-          setTimeout(() => setBannerCelebracion(null), 4000);
-        }}
+        onLoginExitoso={setUsuarioActivo}
+        onRegistrarNuevoSocio={handleRegistrarSocioState}
+        onResetPasswordExitoso={handleResetPasswordState}
       />
     </div>
   );
