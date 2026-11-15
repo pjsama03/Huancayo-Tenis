@@ -5010,7 +5010,6 @@ export const MyProfileView = ({
 //     - Laureles de Oro (#1), Plata (#2) y Bronce (#3) en CADA categoría
 //     - Contenedor único con líneas divisorias finas 1px (Cero Box-in-Box)
 //     - Buscador de tenistas por nombre + Filtro por Categorías y por Clubes
-//     - Sin botón duplicado de "Reglas ELO", sin barra repetida de usuario
 // ============================================================================
 export const RankingOfficialView = ({
   players = [],
@@ -5032,7 +5031,6 @@ export const RankingOfficialView = ({
     [players]
   );
 
-  // Filtrado por categoría, club y buscador
   const filteredPlayers = useMemo(() => {
     return activePlayers.filter((p) => {
       const cat = getCategoryByElo(p.elo, p.seasonMatches);
@@ -5052,7 +5050,6 @@ export const RankingOfficialView = ({
     });
   }, [activePlayers, selectedCategory, selectedClubFilter, searchQuery]);
 
-  // Ranking de Clubes / Academias (Suma y Promedio de sus jugadores activos)
   const clubsStandings = useMemo(() => {
     return clubs
       .map((club) => {
@@ -5103,7 +5100,6 @@ export const RankingOfficialView = ({
 
   return (
     <div className="view-transition px-4 pt-4 pb-8 space-y-4 max-w-xl mx-auto">
-      {/* Cabecera estilo PIF ATP Rankings */}
       <div className="atp-card overflow-hidden">
         <div
           className="px-5 pt-4 pb-3 flex items-center justify-between"
@@ -5135,7 +5131,6 @@ export const RankingOfficialView = ({
           </button>
         </div>
 
-        {/* Pestañas Subrayadas: Individual vs Clubes */}
         <div
           className="grid grid-cols-2 px-5"
           style={{ borderBottom: "1px solid var(--border-hairline)" }}
@@ -5183,12 +5178,10 @@ export const RankingOfficialView = ({
 
         {viewMode === "jugadores" ? (
           <>
-            {/* Filtros de Categoría en Píldoras Circulares + Buscador por Nombre */}
             <div
               className="p-4 space-y-3"
               style={{ borderBottom: "1px solid var(--border-hairline)" }}
             >
-              {/* Cápsulas de Categorías */}
               <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
                 <button
                   type="button"
@@ -5229,7 +5222,6 @@ export const RankingOfficialView = ({
                 })}
               </div>
 
-              {/* Buscador + Filtro Rápido de Sede */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <div
                   className="sm:col-span-2 flex items-center gap-2 px-3 py-2 rounded-xl"
@@ -5280,7 +5272,6 @@ export const RankingOfficialView = ({
               </div>
             </div>
 
-            {/* Encabezado de Columnas de la Tabla */}
             <div
               className="px-4 py-2.5 grid grid-cols-12 items-center text-[10px] font-extrabold uppercase tracking-wider"
               style={{
@@ -5295,7 +5286,6 @@ export const RankingOfficialView = ({
               <div className="col-span-2 text-right">Acción</div>
             </div>
 
-            {/* Filas del Ranking con Laureles Oro (#1), Plata (#2) y Bronce (#3) en CADA Categoría */}
             <div>
               {filteredPlayers.length === 0 ? (
                 <div
@@ -5306,7 +5296,6 @@ export const RankingOfficialView = ({
                 </div>
               ) : (
                 filteredPlayers.map((p, index) => {
-                  // Posición dentro de la vista/categoría seleccionada (1, 2, 3 reciben Oro, Plata, Bronce)
                   const posInView = index + 1;
                   const catInfo = getCategoryByElo(p.elo, p.seasonMatches);
                   const clubObj = getClubById(p.clubId, clubs);
@@ -5326,7 +5315,6 @@ export const RankingOfficialView = ({
                         background: isMe ? "var(--bg-subtle)" : "transparent",
                       }}
                     >
-                      {/* Columna 1: Puesto (Oro, Plata, Bronce en Top 3) + Variación */}
                       <div className="col-span-2 flex flex-col items-start justify-center">
                         <span
                           className="w-7 h-7 rounded-lg font-display font-black text-xs flex items-center justify-center tabular-nums"
@@ -5351,7 +5339,6 @@ export const RankingOfficialView = ({
                         )}
                       </div>
 
-                      {/* Columna 2: Avatar con Laurel Top 3 + Nombre + Escudo Club + Categoría */}
                       <div className="col-span-6 flex items-center gap-2.5 min-w-0">
                         <LaurelAvatar
                           src={p.avatar}
@@ -5408,7 +5395,6 @@ export const RankingOfficialView = ({
                         </div>
                       </div>
 
-                      {/* Columna 3: Puntos Oficiales */}
                       <div className="col-span-2 text-right">
                         <div className="font-display font-black text-sm sm:text-base tabular-nums">
                           {Number(p.elo).toLocaleString("es-PE")}
@@ -5421,7 +5407,6 @@ export const RankingOfficialView = ({
                         </div>
                       </div>
 
-                      {/* Columna 4: Botón Directo Retar / H2H */}
                       <div
                         className="col-span-2 flex justify-end"
                         onClick={(e) => e.stopPropagation()}
@@ -5460,7 +5445,6 @@ export const RankingOfficialView = ({
             </div>
           </>
         ) : (
-          /* Vista de Clasificación por Clubes Oficiales */
           <div className="divide-y" style={{ borderColor: "var(--border-hairline)" }}>
             {clubsStandings.map((c, idx) => {
               const pos = idx + 1;
@@ -5518,11 +5502,12 @@ export const RankingOfficialView = ({
 };
 
 // ============================================================================
-// 26. VISTA PRINCIPAL: CENTRAL DE RETOS & PARTIDOS EN JUEGO (SIN REDUNDANCIAS)
-//     - Etiqueta única "En juego ahora" + nombre limpio del club
-//     - Centro "VS" limpio (Sin puntos expuestos a terceros, sin reglas obvias)
-//     - Cierre de Modo Árbitro: "Finalizar Partido (Pendiente de Revisión)"
-//     - Nombres completos ("Pablo vs. Kenji Takahashi") y fechas reales
+// 26. VISTA PRINCIPAL: CENTRAL DE RETOS & MODO ÁRBITRO OFICIAL ITF/ATP
+//     - Tope estricto por set (6-0 a 6-4, 7-5 o 7-6)
+//     - En 6-6 de Set 1 o Set 2 se abre automáticamente el Tie-Break a 7 puntos
+//       con diferencia mínima de 2 (7-5, 8-6, 10-8...), cerrando en 7-6(x)
+//     - En empate 1-1 de sets se abre automáticamente el 3er Set Super Tie-Break
+//       a 10 puntos con diferencia mínima de 2 (10-8, 12-10...)
 // ============================================================================
 export const ChallengesCenterView = ({
   challenges = [],
@@ -5537,8 +5522,8 @@ export const ChallengesCenterView = ({
   onFinalizeRefereeMatchPendingReview,
   onOpenHeadToHead,
 }) => {
-  const [subTab, setSubTab] = useState("cartelera"); // 'cartelera' | 'mis_duelos'
-  const [timeFilter, setTimeFilter] = useState("ALL"); // 'ALL' | 'manana' | 'tarde' | 'noche'
+  const [subTab, setSubTab] = useState("cartelera");
+  const [timeFilter, setTimeFilter] = useState("ALL");
 
   const liveMatches = challenges.filter((c) => c.status === "live");
   const confirmedMatches = challenges.filter((c) => c.status === "confirmed");
@@ -5549,7 +5534,6 @@ export const ChallengesCenterView = ({
     (c) => c.status === "pending" && c.challengerId === currentUser?.id
   );
 
-  // Jugadores con interruptor "Disponible Hoy" o filtrados por horario
   const availableRivals = useMemo(() => {
     return players
       .filter(
@@ -5563,39 +5547,235 @@ export const ChallengesCenterView = ({
       });
   }, [players, currentUser, timeFilter]);
 
-  // Verifica si un marcador en vivo de Árbitro ya alcanzó condición de victoria ITF/ATP
-  const checkLiveMatchHasWinner = (ls) => {
-    if (!ls) return null;
-    const setWinner = (a, b) => {
-      if ((a === 6 && b <= 4) || (a === 7 && (b === 5 || b === 6))) return "A";
-      if ((b === 6 && a <= 4) || (b === 7 && (a === 5 || a === 6))) return "B";
-      return null;
-    };
-    const w1 = setWinner(ls.s1A, ls.s1B);
-    const w2 = setWinner(ls.s2A, ls.s2B);
+  // Evaluador de un Set Regular (Set 1 o Set 2) con detección de Tie-Break en 6-6
+  const evaluateSetState = (gA, gB, tbA = 0, tbB = 0) => {
+    const a = Number(gA || 0);
+    const b = Number(gB || 0);
+    const tA = Number(tbA || 0);
+    const tB = Number(tbB || 0);
 
-    if (w1 && w2 && w1 === w2) {
+    // Ganado en games regulares (6-0 a 6-4 o 7-5)
+    if ((a === 6 && b <= 4) || (a === 7 && b === 5)) {
       return {
-        winnerSide: w1,
-        scoreString: `${ls.s1A}-${ls.s1B}, ${ls.s2A}-${ls.s2B}`,
+        finished: true,
+        winner: "A",
+        inTieBreak: false,
+        label: `${a}-${b}`,
       };
     }
-    if (w1 && w2 && w1 !== w2) {
-      const maxStb = Math.max(ls.stbA || 0, ls.stbB || 0);
-      const minStb = Math.min(ls.stbA || 0, ls.stbB || 0);
-      if (maxStb >= 10 && maxStb - minStb >= 2) {
+    if ((b === 6 && a <= 4) || (b === 7 && a === 5)) {
+      return {
+        finished: true,
+        winner: "B",
+        inTieBreak: false,
+        label: `${a}-${b}`,
+      };
+    }
+
+    // Ganado por Tie-Break cerrado (7-6 o 6-7)
+    if (a === 7 && b === 6) {
+      const loserPts = tB > 0 || tA > 0 ? Math.min(tA, tB) : 5;
+      return {
+        finished: true,
+        winner: "A",
+        inTieBreak: false,
+        tbLoser: loserPts,
+        label: `7-6(${loserPts})`,
+      };
+    }
+    if (b === 7 && a === 6) {
+      const loserPts = tA > 0 || tB > 0 ? Math.min(tA, tB) : 5;
+      return {
+        finished: true,
+        winner: "B",
+        inTieBreak: false,
+        tbLoser: loserPts,
+        label: `6-7(${loserPts})`,
+      };
+    }
+
+    // En 6-6 se juega obligatoriamente Tie-Break a 7 puntos con diferencia mínima de 2
+    if (a === 6 && b === 6) {
+      const maxTb = Math.max(tA, tB);
+      const minTb = Math.min(tA, tB);
+      if (maxTb >= 7 && maxTb - minTb >= 2) {
+        const w = tA > tB ? "A" : "B";
         return {
-          winnerSide: (ls.stbA || 0) > (ls.stbB || 0) ? "A" : "B",
-          scoreString: `${ls.s1A}-${ls.s1B}, ${ls.s2A}-${ls.s2B}, [${ls.stbA}-${ls.stbB}]`,
+          finished: true,
+          winner: w,
+          inTieBreak: false,
+          tbLoser: minTb,
+          label: w === "A" ? `7-6(${minTb})` : `6-7(${minTb})`,
         };
       }
+      return {
+        finished: false,
+        winner: null,
+        inTieBreak: true,
+        label: `6-6 (TB ${tA}-${tB})`,
+      };
     }
-    return null;
+
+    return {
+      finished: false,
+      winner: null,
+      inTieBreak: false,
+      label: `${a}-${b}`,
+    };
+  };
+
+  // Analiza el estado completo del partido en vivo bajo reglamento ITF/ATP
+  const analyzeRefereeMatch = (ls = {}) => {
+    const set1 = evaluateSetState(ls.s1A, ls.s1B, ls.tb1A, ls.tb1B);
+    const set2 = evaluateSetState(ls.s2A, ls.s2B, ls.tb2A, ls.tb2B);
+
+    // Si Set 1 aún no termina, estamos en Set 1
+    if (!set1.finished) {
+      return {
+        matchFinished: false,
+        winnerSide: null,
+        activePhase: set1.inTieBreak ? "SET1_TB" : "SET1_GAMES",
+        phaseTitle: set1.inTieBreak
+          ? "Set 1 · Tie-Break en curso (a 7 pts, dif. 2)"
+          : "Set 1 en juego",
+        unitLabel: set1.inTieBreak ? "Punto TB" : "Game",
+        fieldA: set1.inTieBreak ? "tb1A" : "s1A",
+        fieldB: set1.inTieBreak ? "tb1B" : "s1B",
+        set1,
+        set2,
+      };
+    }
+
+    // Si Set 1 terminó pero Set 2 aún no termina, estamos en Set 2
+    if (!set2.finished) {
+      return {
+        matchFinished: false,
+        winnerSide: null,
+        activePhase: set2.inTieBreak ? "SET2_TB" : "SET2_GAMES",
+        phaseTitle: set2.inTieBreak
+          ? "Set 2 · Tie-Break en curso (a 7 pts, dif. 2)"
+          : "Set 2 en juego",
+        unitLabel: set2.inTieBreak ? "Punto TB" : "Game",
+        fieldA: set2.inTieBreak ? "tb2A" : "s2A",
+        fieldB: set2.inTieBreak ? "tb2B" : "s2B",
+        set1,
+        set2,
+      };
+    }
+
+    // Ambos sets (1 y 2) terminaron: verificamos si alguien ganó 2-0
+    if (set1.winner === set2.winner) {
+      return {
+        matchFinished: true,
+        winnerSide: set1.winner,
+        activePhase: "FINISHED_2_SETS",
+        phaseTitle: "Partido concluido en 2 sets",
+        scoreString: `${set1.label}, ${set2.label}`,
+        set1,
+        set2,
+      };
+    }
+
+    // Empate 1-1 en sets -> 3er Set es SIEMPRE Super Tie-Break a 10 puntos (dif. mínima 2)
+    const stbA = Number(ls.stbA || 0);
+    const stbB = Number(ls.stbB || 0);
+    const maxStb = Math.max(stbA, stbB);
+    const minStb = Math.min(stbA, stbB);
+
+    if (maxStb >= 10 && maxStb - minStb >= 2) {
+      const winnerSide = stbA > stbB ? "A" : "B";
+      return {
+        matchFinished: true,
+        winnerSide,
+        activePhase: "FINISHED_STB",
+        phaseTitle: "Partido concluido en Super Tie-Break",
+        scoreString: `${set1.label}, ${set2.label}, [${stbA}-${stbB}]`,
+        set1,
+        set2,
+      };
+    }
+
+    return {
+      matchFinished: false,
+      winnerSide: null,
+      activePhase: "SET3_STB",
+      phaseTitle: "3er Set · Super Tie-Break (a 10 pts, dif. mínima 2)",
+      unitLabel: "Punto Super TB",
+      fieldA: "stbA",
+      fieldB: "stbB",
+      set1,
+      set2,
+    };
+  };
+
+  // Manejador inteligente al pulsar +1 o -1 en el Modo Árbitro
+  const handleRefereeStep = (ch, side, delta) => {
+    if (!onUpdateLiveRefereeScore) return;
+    const ls = ch.liveScore || {
+      currentSet: 1,
+      s1A: 0,
+      s1B: 0,
+      tb1A: 0,
+      tb1B: 0,
+      s2A: 0,
+      s2B: 0,
+      tb2A: 0,
+      tb2B: 0,
+      stbA: 0,
+      stbB: 0,
+    };
+
+    const status = analyzeRefereeMatch(ls);
+    if (status.matchFinished && delta > 0) return;
+
+    const targetField = side === "A" ? status.fieldA : status.fieldB;
+    if (!targetField) return;
+
+    const currentVal = Number(ls[targetField] || 0);
+    if (delta < 0 && currentVal <= 0) return;
+
+    // Aplicamos el cambio del punto o game
+    onUpdateLiveRefereeScore(ch.id, targetField, delta);
+
+    // Simulamos cómo queda el marcador tras este toque para cerrar Tie-Break o avanzar de set automáticamente
+    const nextLs = { ...ls, [targetField]: Math.max(0, currentVal + delta) };
+
+    // Si estábamos en Tie-Break de Set 1 y este punto lo cierra (>=7 y dif >=2), subimos el game a 7-6 y pasamos al Set 2
+    if (status.activePhase === "SET1_TB" && delta > 0) {
+      const tA = Number(nextLs.tb1A || 0);
+      const tB = Number(nextLs.tb1B || 0);
+      if (Math.max(tA, tB) >= 7 && Math.abs(tA - tB) >= 2) {
+        if (tA > tB) onUpdateLiveRefereeScore(ch.id, "s1A", 1);
+        else onUpdateLiveRefereeScore(ch.id, "s1B", 1);
+        onUpdateLiveRefereeScore(ch.id, "advanceSet", 2);
+        return;
+      }
+    }
+
+    // Si estábamos en Tie-Break de Set 2 y este punto lo cierra (>=7 y dif >=2), subimos el game a 7-6
+    if (status.activePhase === "SET2_TB" && delta > 0) {
+      const tA = Number(nextLs.tb2A || 0);
+      const tB = Number(nextLs.tb2B || 0);
+      if (Math.max(tA, tB) >= 7 && Math.abs(tA - tB) >= 2) {
+        if (tA > tB) onUpdateLiveRefereeScore(ch.id, "s2A", 1);
+        else onUpdateLiveRefereeScore(ch.id, "s2B", 1);
+      }
+    }
+
+    // Sincronizamos el número de set activo visual (1, 2 o 3)
+    const afterStatus = analyzeRefereeMatch(nextLs);
+    if (
+      afterStatus.activePhase === "SET2_GAMES" ||
+      afterStatus.activePhase === "SET2_TB"
+    ) {
+      if (ls.currentSet !== 2) onUpdateLiveRefereeScore(ch.id, "advanceSet", 2);
+    } else if (afterStatus.activePhase === "SET3_STB") {
+      if (ls.currentSet !== 3) onUpdateLiveRefereeScore(ch.id, "advanceSet", 3);
+    }
   };
 
   return (
     <div className="view-transition px-4 pt-4 pb-8 space-y-4 max-w-xl mx-auto">
-      {/* Cabecera de Acción Principal */}
       <div className="atp-card p-4 flex items-center justify-between gap-3">
         <div>
           <h1 className="font-display font-black text-lg sm:text-xl leading-tight">
@@ -5620,7 +5800,6 @@ export const ChallengesCenterView = ({
         </button>
       </div>
 
-      {/* Sub-pestañas con transición limpia */}
       <div className="atp-card overflow-hidden">
         <div
           className="grid grid-cols-2 px-4"
@@ -5669,7 +5848,7 @@ export const ChallengesCenterView = ({
 
         {subTab === "cartelera" ? (
           <div className="p-4 space-y-4">
-            {/* 1. Retos Pendientes Recibidos por el Jugador Conectado */}
+            {/* 1. Retos Pendientes Recibidos */}
             {myPendingIncoming.map((ch) => {
               const challenger = players.find((p) => p.id === ch.challengerId);
               return (
@@ -5696,24 +5875,22 @@ export const ChallengesCenterView = ({
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <SafeImage
-                        src={challenger?.avatar}
-                        alt={challenger?.name}
-                        circular
-                        style={{ width: 46, height: 46 }}
-                      />
-                      <div className="min-w-0">
-                        <div className="font-display font-extrabold text-sm truncate">
-                          {challenger?.name} vs. {currentUser?.name}
-                        </div>
-                        <div
-                          className="text-xs truncate"
-                          style={{ color: "var(--clay)" }}
-                        >
-                          {ch.customClubName} · {ch.ballAgreement}
-                        </div>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <SafeImage
+                      src={challenger?.avatar}
+                      alt={challenger?.name}
+                      circular
+                      style={{ width: 46, height: 46 }}
+                    />
+                    <div className="min-w-0">
+                      <div className="font-display font-extrabold text-sm truncate">
+                        {challenger?.name} vs. {currentUser?.name}
+                      </div>
+                      <div
+                        className="text-xs truncate"
+                        style={{ color: "var(--clay)" }}
+                      >
+                        {ch.customClubName} · {ch.ballAgreement}
                       </div>
                     </div>
                   </div>
@@ -5743,7 +5920,7 @@ export const ChallengesCenterView = ({
               );
             })}
 
-            {/* 2. Partidos EN JUEGO AHORA (Sin redundancias, con cierre de Árbitro) */}
+            {/* 2. Partidos EN JUEGO AHORA (Con Tie-Break a 7 y Super Tie-Break a 10) */}
             {liveMatches.map((ch) => {
               const pA = players.find((p) => p.id === ch.challengerId);
               const pB = players.find((p) => p.id === ch.challengedId);
@@ -5753,27 +5930,21 @@ export const ChallengesCenterView = ({
                 currentSet: 1,
                 s1A: 0,
                 s1B: 0,
+                tb1A: 0,
+                tb1B: 0,
                 s2A: 0,
                 s2B: 0,
+                tb2A: 0,
+                tb2B: 0,
                 stbA: 0,
                 stbB: 0,
               };
               const isParticipant =
                 currentUser?.id === pA?.id || currentUser?.id === pB?.id;
-              const liveWinStatus = checkLiveMatchHasWinner(ls);
-
-              const activeSetKeyA =
-                ls.currentSet === 1
-                  ? "s1A"
-                  : ls.currentSet === 2
-                  ? "s2A"
-                  : "stbA";
-              const activeSetKeyB =
-                ls.currentSet === 1
-                  ? "s1B"
-                  : ls.currentSet === 2
-                  ? "s2B"
-                  : "stbB";
+              const matchState = analyzeRefereeMatch(ls);
+              const showStbColumn =
+                matchState.activePhase === "SET3_STB" ||
+                matchState.activePhase === "FINISHED_STB";
 
               return (
                 <div
@@ -5786,21 +5957,19 @@ export const ChallengesCenterView = ({
                 >
                   {/* Cabecera Limpia: "En juego ahora" + Nombre Oficial del Club */}
                   <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
+                    <span
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold"
+                      style={{
+                        background: "var(--emerald-bg)",
+                        color: "var(--emerald)",
+                      }}
+                    >
                       <span
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold"
-                        style={{
-                          background: "var(--emerald-bg)",
-                          color: "var(--emerald)",
-                        }}
-                      >
-                        <span
-                          className="w-2 h-2 rounded-full animate-pulse"
-                          style={{ background: "var(--emerald)" }}
-                        />
-                        En juego ahora
-                      </span>
-                    </div>
+                        className="w-2 h-2 rounded-full animate-pulse"
+                        style={{ background: "var(--emerald)" }}
+                      />
+                      En juego ahora
+                    </span>
 
                     <span
                       className="text-xs font-bold truncate"
@@ -5891,7 +6060,7 @@ export const ChallengesCenterView = ({
                     </div>
                   </div>
 
-                  {/* Tablero de Sets Estilo FlashScore */}
+                  {/* Tablero de Sets + Tie-Break (7 pts) + Super Tie-Break (10 pts) */}
                   <div
                     className="rounded-xl p-3 space-y-2"
                     style={{
@@ -5899,22 +6068,66 @@ export const ChallengesCenterView = ({
                       border: "1px solid var(--border-hairline)",
                     }}
                   >
+                    <div
+                      className="grid grid-cols-12 items-center text-[10px] font-extrabold uppercase pb-1 border-b"
+                      style={{
+                        borderColor: "var(--border-hairline)",
+                        color: "var(--text-muted)",
+                      }}
+                    >
+                      <div className="col-span-6">{matchState.phaseTitle}</div>
+                      <div className="col-span-2 text-center">Set 1</div>
+                      <div className="col-span-2 text-center">Set 2</div>
+                      <div className="col-span-2 text-center">
+                        {showStbColumn ? "STB [10]" : "Set 3"}
+                      </div>
+                    </div>
+
+                    {/* Fila Jugador A */}
                     <div className="grid grid-cols-12 items-center text-xs font-bold py-1">
                       <div className="col-span-6 truncate">{pA?.name}</div>
                       <div className="col-span-2 text-center tabular-nums">
                         {ls.s1A}
+                        {(matchState.set1.inTieBreak ||
+                          (ls.s1A === 7 && ls.s1B === 6) ||
+                          (ls.s1B === 7 && ls.s1A === 6)) && (
+                          <sup
+                            className="ml-0.5 text-[10px] font-extrabold"
+                            style={{ color: "var(--gold)" }}
+                          >
+                            ({ls.tb1A || 0})
+                          </sup>
+                        )}
                       </div>
                       <div
                         className="col-span-2 text-center tabular-nums"
                         style={{ color: "var(--electric)" }}
                       >
                         {ls.s2A}
+                        {(matchState.set2.inTieBreak ||
+                          (ls.s2A === 7 && ls.s2B === 6) ||
+                          (ls.s2B === 7 && ls.s2A === 6)) && (
+                          <sup
+                            className="ml-0.5 text-[10px] font-extrabold"
+                            style={{ color: "var(--gold)" }}
+                          >
+                            ({ls.tb2A || 0})
+                          </sup>
+                        )}
                       </div>
-                      <div className="col-span-2 text-center tabular-nums">
-                        {ls.currentSet === 3 ? ls.stbA : "-"}
+                      <div
+                        className="col-span-2 text-center tabular-nums font-extrabold"
+                        style={{
+                          color: showStbColumn
+                            ? "var(--gold)"
+                            : "var(--text-muted)",
+                        }}
+                      >
+                        {showStbColumn ? ls.stbA || 0 : "-"}
                       </div>
                     </div>
 
+                    {/* Fila Jugador B */}
                     <div
                       className="grid grid-cols-12 items-center text-xs font-bold py-1 border-t"
                       style={{ borderColor: "var(--border-hairline)" }}
@@ -5922,75 +6135,156 @@ export const ChallengesCenterView = ({
                       <div className="col-span-6 truncate">{pB?.name}</div>
                       <div className="col-span-2 text-center tabular-nums">
                         {ls.s1B}
+                        {(matchState.set1.inTieBreak ||
+                          (ls.s1A === 7 && ls.s1B === 6) ||
+                          (ls.s1B === 7 && ls.s1A === 6)) && (
+                          <sup
+                            className="ml-0.5 text-[10px] font-extrabold"
+                            style={{ color: "var(--gold)" }}
+                          >
+                            ({ls.tb1B || 0})
+                          </sup>
+                        )}
                       </div>
                       <div
                         className="col-span-2 text-center tabular-nums"
                         style={{ color: "var(--electric)" }}
                       >
                         {ls.s2B}
+                        {(matchState.set2.inTieBreak ||
+                          (ls.s2A === 7 && ls.s2B === 6) ||
+                          (ls.s2B === 7 && ls.s2A === 6)) && (
+                          <sup
+                            className="ml-0.5 text-[10px] font-extrabold"
+                            style={{ color: "var(--gold)" }}
+                          >
+                            ({ls.tb2B || 0})
+                          </sup>
+                        )}
                       </div>
-                      <div className="col-span-2 text-center tabular-nums">
-                        {ls.currentSet === 3 ? ls.stbB : "-"}
+                      <div
+                        className="col-span-2 text-center tabular-nums font-extrabold"
+                        style={{
+                          color: showStbColumn
+                            ? "var(--gold)"
+                            : "var(--text-muted)",
+                        }}
+                      >
+                        {showStbColumn ? ls.stbB || 0 : "-"}
                       </div>
                     </div>
                   </div>
 
-                  {/* Controles de Árbitro en Cancha + Botón de Cierre cuando hay Ganador */}
+                  {/* Controles Inteligentes del Modo Árbitro */}
                   {!ls.liveFinishedPendingReview ? (
                     <div className="space-y-2.5">
-                      {!liveWinStatus ? (
-                        <div className="grid grid-cols-2 gap-2">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              onUpdateLiveRefereeScore &&
-                              onUpdateLiveRefereeScore(ch.id, activeSetKeyA, 1)
-                            }
-                            className="touch-btn py-2 px-3 rounded-xl text-xs font-bold border"
-                            style={{
-                              minHeight: 38,
-                              background: "var(--bg-card)",
-                              borderColor: "var(--border-strong)",
-                            }}
-                          >
-                            +1 Game {pA?.name.split(" ")[0]}
-                          </button>
+                      {!matchState.matchFinished ? (
+                        <>
+                          {/* Banner visual cuando entra a Tie-Break (6-6) o Super Tie-Break (1-1) */}
+                          {(matchState.activePhase === "SET1_TB" ||
+                            matchState.activePhase === "SET2_TB" ||
+                            matchState.activePhase === "SET3_STB") && (
+                            <div
+                              className="rounded-xl px-3 py-2 flex items-center justify-between text-xs font-extrabold"
+                              style={{
+                                background: "var(--gold-bg)",
+                                color: "var(--gold)",
+                                border: "1px solid var(--gold-border)",
+                              }}
+                            >
+                              <span>{matchState.phaseTitle}</span>
+                              <span className="font-mono-code text-sm">
+                                {matchState.activePhase === "SET1_TB"
+                                  ? `${ls.tb1A || 0} - ${ls.tb1B || 0}`
+                                  : matchState.activePhase === "SET2_TB"
+                                  ? `${ls.tb2A || 0} - ${ls.tb2B || 0}`
+                                  : `${ls.stbA || 0} - ${ls.stbB || 0}`}
+                              </span>
+                            </div>
+                          )}
 
+                          {/* Botones +1 y -1 (Corrección) para cada Jugador */}
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="flex gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleRefereeStep(ch, "A", 1)}
+                                className="touch-btn flex-1 py-2.5 px-2.5 rounded-xl text-xs font-extrabold border"
+                                style={{
+                                  minHeight: 40,
+                                  background: "var(--bg-card)",
+                                  borderColor: "var(--border-strong)",
+                                }}
+                              >
+                                +1 {matchState.unitLabel} {pA?.name.split(" ")[0]}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRefereeStep(ch, "A", -1)}
+                                className="touch-btn px-2.5 rounded-xl text-xs font-bold border"
+                                style={{
+                                  minHeight: 40,
+                                  background: "var(--bg-subtle)",
+                                  borderColor: "var(--border-hairline)",
+                                  color: "var(--text-muted)",
+                                }}
+                                title="Restar 1 si hubo error"
+                              >
+                                -1
+                              </button>
+                            </div>
+
+                            <div className="flex gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleRefereeStep(ch, "B", 1)}
+                                className="touch-btn flex-1 py-2.5 px-2.5 rounded-xl text-xs font-extrabold border"
+                                style={{
+                                  minHeight: 40,
+                                  background: "var(--bg-card)",
+                                  borderColor: "var(--border-strong)",
+                                }}
+                              >
+                                +1 {matchState.unitLabel} {pB?.name.split(" ")[0]}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRefereeStep(ch, "B", -1)}
+                                className="touch-btn px-2.5 rounded-xl text-xs font-bold border"
+                                style={{
+                                  minHeight: 40,
+                                  background: "var(--bg-subtle)",
+                                  borderColor: "var(--border-hairline)",
+                                  color: "var(--text-muted)",
+                                }}
+                                title="Restar 1 si hubo error"
+                              >
+                                -1
+                              </button>
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="space-y-2">
                           <button
                             type="button"
                             onClick={() =>
-                              onUpdateLiveRefereeScore &&
-                              onUpdateLiveRefereeScore(ch.id, activeSetKeyB, 1)
+                              onFinalizeRefereeMatchPendingReview &&
+                              onFinalizeRefereeMatchPendingReview(
+                                ch.id,
+                                matchState.scoreString
+                              )
                             }
-                            className="touch-btn py-2 px-3 rounded-xl text-xs font-bold border"
+                            className="touch-btn w-full py-3 rounded-xl font-display font-extrabold text-xs uppercase tracking-wider"
                             style={{
-                              minHeight: 38,
-                              background: "var(--bg-card)",
-                              borderColor: "var(--border-strong)",
+                              background: "var(--emerald)",
+                              color: "#FFFFFF",
                             }}
                           >
-                            +1 Game {pB?.name.split(" ")[0]}
+                            Finalizar Partido (Pendiente de Revisión ·{" "}
+                            {matchState.scoreString})
                           </button>
                         </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            onFinalizeRefereeMatchPendingReview &&
-                            onFinalizeRefereeMatchPendingReview(
-                              ch.id,
-                              liveWinStatus.scoreString
-                            )
-                          }
-                          className="touch-btn w-full py-3 rounded-xl font-display font-extrabold text-xs uppercase tracking-wider"
-                          style={{
-                            background: "var(--emerald)",
-                            color: "#FFFFFF",
-                          }}
-                        >
-                          Finalizar Partido (Pendiente de Revisión ·{" "}
-                          {liveWinStatus.scoreString})
-                        </button>
                       )}
 
                       <div
@@ -6001,23 +6295,6 @@ export const ChallengesCenterView = ({
                           Árbitro en cancha: {ch.refereeName || "Comunidad"} ·{" "}
                           {ch.refereeUpdatedAt || "En directo"}
                         </span>
-                        {ls.currentSet < 3 && !liveWinStatus && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              onUpdateLiveRefereeScore &&
-                              onUpdateLiveRefereeScore(
-                                ch.id,
-                                "advanceSet",
-                                ls.currentSet + 1
-                              )
-                            }
-                            className="font-bold"
-                            style={{ color: "var(--text-player)" }}
-                          >
-                            Pasar al Set {ls.currentSet + 1} →
-                          </button>
-                        )}
                       </div>
                     </div>
                   ) : (
@@ -6036,7 +6313,6 @@ export const ChallengesCenterView = ({
                     </div>
                   )}
 
-                  {/* Botón Subir Marcador Oficial (Solo visible a los 2 protagonistas del duelo) */}
                   {isParticipant && (
                     <button
                       type="button"
@@ -6053,7 +6329,7 @@ export const ChallengesCenterView = ({
               );
             })}
 
-            {/* 3. Duelos Confirmados Programados (Nombres Completos y Fechas Reales) */}
+            {/* 3. Duelos Confirmados Programados */}
             {confirmedMatches.map((ch) => {
               const pA = players.find((p) => p.id === ch.challengerId);
               const pB = players.find((p) => p.id === ch.challengedId);
@@ -6090,7 +6366,6 @@ export const ChallengesCenterView = ({
                     </span>
                   </div>
 
-                  {/* Nombres reales completos: "Pablo vs. Kenji Takahashi" */}
                   <div className="grid grid-cols-7 items-center gap-2">
                     <div className="col-span-3 flex items-center gap-2.5 min-w-0">
                       <SafeImage
@@ -6137,7 +6412,6 @@ export const ChallengesCenterView = ({
                     </div>
                   </div>
 
-                  {/* Nombre oficial completo de la sede + acuerdo de pelotas */}
                   <div
                     className="flex items-center justify-between text-xs pt-2 border-t"
                     style={{ borderColor: "var(--border-hairline)" }}
@@ -6150,7 +6424,6 @@ export const ChallengesCenterView = ({
                     </span>
                   </div>
 
-                  {/* El botón de Subir Marcador solo aparece a los 2 jugadores del duelo */}
                   {isParticipant && (
                     <button
                       type="button"
@@ -6167,7 +6440,7 @@ export const ChallengesCenterView = ({
               );
             })}
 
-            { myPendingOutgoing.length > 0 && (
+            {myPendingOutgoing.length > 0 && (
               <div className="pt-2 space-y-2">
                 <div
                   className="text-[11px] font-extrabold uppercase tracking-wider"
@@ -6219,7 +6492,6 @@ export const ChallengesCenterView = ({
             )}
           </div>
         ) : (
-          /* Sub-pestaña 2: Buscador de Rivales por Horario Coincidente */
           <div className="p-4 space-y-4">
             <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
               <button
@@ -6340,13 +6612,16 @@ export const ChallengesCenterView = ({
 // === INICIO DEL BLOQUE 8 DE 10 ===
 
 // ============================================================================
-// 27. VISTA PRINCIPAL: SEDES & COACH PRO (CLIMA EN TIEMPO REAL, GOOGLE MAPS,
-//     POP-UP DE INSTALACIONES Y BENEFICIOS VIP, Y COACH PRO B2B CON PIN PRIVADO)
+// 27. VISTA PRINCIPAL: SEDES & COACH PRO (EXPORTADA CON EL NOMBRE EXACTO
+//     SedesAndCoachProView QUE LLAMA EL BLOQUE 10)
 // ============================================================================
-export const SedesAndCoachView = ({
+export const SedesAndCoachProView = ({
   clubs = HUANCAYO_CLUBS,
   coaches = INITIAL_COACHES,
+  currentUser,
+  liveWeather = { temp: 19, uv: 8 },
   surfaceWeatherStates = SURFACE_WEATHER_STATES,
+  onUpdateSurfaceWeather,
   onOpenClubDetailModal,
   onOpenCoachProfileModal,
 }) => {
@@ -6354,15 +6629,33 @@ export const SedesAndCoachView = ({
 
   return (
     <div className="view-transition px-4 pt-4 pb-8 space-y-4 max-w-xl mx-auto">
-      {/* Cabecera */}
+      {/* Cabecera con Clima e Índice UV de Huancayo en Tiempo Real */}
       <div className="atp-card p-4 flex items-center justify-between gap-3">
         <div>
           <h1 className="font-display font-black text-lg sm:text-xl leading-tight">
             Sedes & Entrenadores
           </h1>
           <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-            Clima en vivo, ubicaciones GPS y Marketplace B2B de Coach Pro
+            Estado de canchas de arcilla, Google Maps y Coach Pro
           </p>
+        </div>
+
+        <div
+          className="px-3 py-2 rounded-2xl text-right flex-shrink-0"
+          style={{
+            background: "var(--bg-subtle)",
+            border: "1px solid var(--border-hairline)",
+          }}
+        >
+          <div className="font-display font-black text-sm tabular-nums">
+            {liveWeather?.temp ?? 19}°C · Huancayo
+          </div>
+          <div
+            className="text-[10px] font-extrabold uppercase"
+            style={{ color: "var(--gold)" }}
+          >
+            Índice UV {liveWeather?.uv ?? 8}
+          </div>
         </div>
       </div>
 
@@ -6423,7 +6716,7 @@ export const SedesAndCoachView = ({
                     border: "1px solid var(--border-strong)",
                   }}
                 >
-                  {/* Foto de Cabecera con clic interactivo para abrir Pop-up */}
+                  {/* Foto Interactiva: al tocar la imagen o el título abre el Pop-up con Blur */}
                   <div
                     onClick={() =>
                       onOpenClubDetailModal && onOpenClubDetailModal(club)
@@ -6436,10 +6729,9 @@ export const SedesAndCoachView = ({
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                       loading="lazy"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />
 
-                    {/* Escudo flotante */}
-                    <div className="absolute top-3 left-3">
+                    <div className="absolute top-3 left-3 flex items-center gap-2">
                       <SafeImage
                         src={club.shield}
                         alt={club.shortName}
@@ -6451,35 +6743,104 @@ export const SedesAndCoachView = ({
                           background: "#0A1633",
                         }}
                       />
+                      <span
+                        className="px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase"
+                        style={{
+                          background: "var(--clay)",
+                          color: "#FFFFFF",
+                        }}
+                      >
+                        {club.surface}
+                      </span>
                     </div>
 
-                    {/* Estado Climático en vivo */}
                     <div className="absolute top-3 right-3">
                       <span
                         className="px-3 py-1 rounded-full text-[10px] font-extrabold uppercase flex items-center gap-1.5 shadow-md"
-                        style={{ background: "rgba(10,22,51,0.88)", color: weather.color }}
+                        style={{
+                          background: "rgba(10,22,51,0.88)",
+                          color: weather.color,
+                        }}
                       >
-                        <span
-                          className="w-2 h-2 rounded-full"
-                          style={{ background: weather.color }}
+                        <SafeImage
+                          src={weather.icon}
+                          alt={weather.shortLabel}
+                          style={{ width: 16, height: 16 }}
                         />
                         {weather.shortLabel}
                       </span>
                     </div>
 
-                    <div className="absolute bottom-3 left-4 right-4">
-                      <h3 className="font-display font-black text-base sm:text-lg text-white leading-tight">
-                        {club.name}
-                      </h3>
-                      <p className="text-xs text-slate-300 font-medium">
-                        {club.zone} · {club.courtsCount} Canchas de {club.surface}
-                      </p>
+                    <div className="absolute bottom-3 left-4 right-4 flex items-end justify-between gap-2">
+                      <div>
+                        <h3 className="font-display font-black text-base sm:text-lg text-white leading-tight">
+                          {club.name}
+                        </h3>
+                        <p className="text-xs text-slate-300 font-medium">
+                          {club.zone} · {club.courtsCount} Canchas · Toca para ver instalaciones
+                        </p>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Cuerpo de la tarjeta frontal limpia */}
+                  {/* Cuerpo Limpio de la Sede */}
                   <div className="p-4 space-y-3.5">
-                    {/* Casilla Dorada Compacta de Beneficios VIP */}
+                    {/* Selector Rápido de Estado de Cancha por la Comunidad */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span
+                          className="font-bold"
+                          style={{ color: "var(--text-muted)" }}
+                        >
+                          Estado de superficie (Reportado por {club.lastReportBy})
+                        </span>
+                        <span style={{ color: "var(--text-muted)" }}>
+                          {club.lastReportTime}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {surfaceWeatherStates.map((st) => {
+                          const isCurrent = club.surfaceStateId === st.id;
+                          return (
+                            <button
+                              key={st.id}
+                              type="button"
+                              onClick={() =>
+                                onUpdateSurfaceWeather &&
+                                onUpdateSurfaceWeather(club.id, st.id)
+                              }
+                              className="py-1.5 px-1.5 rounded-xl text-[10px] font-extrabold flex items-center justify-center gap-1 border transition-all"
+                              style={{
+                                background: isCurrent
+                                  ? "var(--bg-card)"
+                                  : "transparent",
+                                borderColor: isCurrent
+                                  ? st.color
+                                  : "var(--border-hairline)",
+                                color: isCurrent ? st.color : "var(--text-muted)",
+                              }}
+                            >
+                              <SafeImage
+                                src={st.icon}
+                                alt={st.shortLabel}
+                                style={{ width: 14, height: 14 }}
+                              />
+                              <span className="truncate">
+                                {st.id === "seco"
+                                  ? "Seca"
+                                  : st.id === "humedad"
+                                  ? "Húmeda"
+                                  : st.id === "llovizna"
+                                  ? "Llovizna"
+                                  : "Lluvia"}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Casilla Dorada de Beneficios Exclusivos VIP */}
                     <div
                       onClick={() =>
                         onOpenClubDetailModal && onOpenClubDetailModal(club)
@@ -6490,29 +6851,36 @@ export const SedesAndCoachView = ({
                         border: "1px solid var(--gold-border)",
                       }}
                     >
-                      <div className="min-w-0">
-                        <div
-                          className="text-[10px] font-extrabold uppercase tracking-wider"
-                          style={{ color: "var(--gold)" }}
-                        >
-                          Pase Socio VIP Activo
-                        </div>
-                        <div
-                          className="font-display font-bold text-xs truncate mt-0.5"
-                          style={{ color: "var(--text-main)" }}
-                        >
-                          {club.vipHeadline}
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <SafeImage
+                          src={ASSETS.goldenTicket}
+                          alt="VIP"
+                          style={{ width: 32, height: 32, borderRadius: 8 }}
+                        />
+                        <div className="min-w-0">
+                          <div
+                            className="text-[10px] font-extrabold uppercase tracking-wider"
+                            style={{ color: "var(--gold)" }}
+                          >
+                            Beneficios Exclusivos VIP
+                          </div>
+                          <div
+                            className="font-display font-bold text-xs truncate mt-0.5"
+                            style={{ color: "var(--text-main)" }}
+                          >
+                            {club.vipHeadline}
+                          </div>
                         </div>
                       </div>
                       <span
                         className="text-xs font-extrabold flex-shrink-0"
                         style={{ color: "var(--gold)" }}
                       >
-                        Ver más →
+                        Abrir →
                       </span>
                     </div>
 
-                    {/* Botones de Acción: Google Maps exacto (sin Waze) + Reservar / Ver Sede */}
+                    {/* Botones: Google Maps Exacto (Sin Waze) + Instalaciones */}
                     <div className="grid grid-cols-2 gap-2">
                       <a
                         href={club.mapsUrl}
@@ -6536,7 +6904,7 @@ export const SedesAndCoachView = ({
                         className="touch-btn py-2.5 px-3 rounded-xl font-display font-extrabold text-xs"
                         style={{ background: "#D6FF00", color: "#0A1633" }}
                       >
-                        Detalle Sede
+                        Instalaciones & VIP
                       </button>
                     </div>
                   </div>
@@ -6569,35 +6937,38 @@ export const SedesAndCoachView = ({
                     />
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
+                        {/* Caja 5.0 ★ compacta y proporcionada */}
                         <span
-                          className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase"
+                          className="px-2 py-0.5 rounded-md text-[11px] font-extrabold inline-flex items-center gap-1"
                           style={{
                             background: "var(--gold-bg)",
                             color: "var(--gold)",
+                            border: "1px solid var(--gold-border)",
                           }}
                         >
                           ★ {coach.rating} ({coach.reviewsCount})
                         </span>
                         <span
                           className="text-xs font-bold truncate"
-                          style={{ color: "var(--text-muted)" }}
+                          style={{ color: "var(--clay)" }}
                         >
                           {coach.clubName}
                         </span>
                       </div>
-                      <h3 className="font-display font-extrabold text-sm sm:text-base mt-0.5 truncate">
+                      <h3 className="font-display font-extrabold text-sm sm:text-base mt-1 truncate">
                         {coach.name}
                       </h3>
                       <p
                         className="text-xs truncate"
                         style={{ color: "var(--text-muted)" }}
                       >
-                        {coach.title}
+                        {coach.specialty}
                       </p>
                     </div>
                   </div>
                 </div>
 
+                {/* Precio en tipografía mixta limpia (Sin TODO EN MAYÚSCULAS) */}
                 <div
                   className="rounded-xl p-3 flex items-center justify-between text-xs"
                   style={{
@@ -6605,28 +6976,36 @@ export const SedesAndCoachView = ({
                     border: "1px solid var(--border-hairline)",
                   }}
                 >
-                  <span className="font-semibold" style={{ color: "var(--text-player)" }}>
-                    {coach.specialty}
-                  </span>
-                  <span className="font-display font-black text-sm tabular-nums">
-                    {coach.priceLabel}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between pt-1">
                   <span
-                    className="text-xs font-semibold"
+                    className="font-semibold"
                     style={{ color: "var(--text-muted)" }}
                   >
-                    {coach.studentsPromoted} alumnos ascendidos en circuito
+                    {coach.studentsPromoted} alumnos ascendidos
                   </span>
-                  <span
-                    className="text-xs font-extrabold"
-                    style={{ color: "var(--text-player)" }}
-                  >
-                    Ver Packs y Turnos →
-                  </span>
+                  <div className="flex items-baseline gap-1">
+                    <span className="font-display font-black text-sm tabular-nums">
+                      {coach.priceLabel}
+                    </span>
+                    <span
+                      className="text-[11px]"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      {coach.unitLabel}
+                    </span>
+                  </div>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onOpenCoachProfileModal) onOpenCoachProfileModal(coach);
+                  }}
+                  className="touch-btn w-full py-2.5 rounded-xl font-display font-extrabold text-xs"
+                  style={{ background: "#D6FF00", color: "#0A1633" }}
+                >
+                  Ver Packs, Turnos y Reseñas
+                </button>
               </div>
             ))}
           </div>
@@ -6636,12 +7015,13 @@ export const SedesAndCoachView = ({
   );
 };
 
+// Alias de respaldo para evitar cualquier conflicto de nombre
+export const SedesAndCoachView = SedesAndCoachProView;
+
 // ============================================================================
-// 28. MODAL DE DETALLE DE SEDE (POP-UP CON BLUR iOS)
-//     - Instalaciones completas y servicios
-//     - Tarjeta dorada elegante de Beneficios Exclusivos VIP
+// 28. MODAL DE DETALLE DE SEDE (POP-UP CON BLUR iOS AL TOCAR FOTO O TÍTULO)
 // ============================================================================
-export const ClubDetailModal = ({ isOpen, onClose, club }) => {
+export const ClubDetailModal = ({ isOpen, onClose, club, onOpenVipModal }) => {
   if (!isOpen || !club) return null;
 
   return (
@@ -6660,7 +7040,7 @@ export const ClubDetailModal = ({ isOpen, onClose, club }) => {
             alt={club.name}
             className="w-full h-full object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
           <button
             type="button"
             onClick={onClose}
@@ -6668,33 +7048,61 @@ export const ClubDetailModal = ({ isOpen, onClose, club }) => {
           >
             <Icons.Close size={18} />
           </button>
-          <div className="absolute bottom-3 left-4 right-4">
-            <h2 className="font-display font-black text-lg text-white">
-              {club.name}
-            </h2>
-            <p className="text-xs text-slate-300">
-              {club.address} · {club.courtsCount} Canchas
-            </p>
+          <div className="absolute bottom-3 left-4 right-4 flex items-center gap-3">
+            <SafeImage
+              src={club.shield}
+              alt={club.name}
+              circular
+              style={{
+                width: 44,
+                height: 44,
+                border: "2px solid #FFFFFF",
+                background: "#0A1633",
+              }}
+            />
+            <div>
+              <h2 className="font-display font-black text-base sm:text-lg text-white">
+                {club.name}
+              </h2>
+              <p className="text-xs text-slate-300">
+                {club.address} · {club.courtsCount} Canchas de {club.surface}
+              </p>
+            </div>
           </div>
         </div>
 
         <div className="p-5 overflow-y-auto space-y-4 no-scrollbar">
-          {/* Tarjeta Dorada Beneficios VIP */}
+          {/* Tarjeta Dorada de Beneficios Exclusivos VIP */}
           <div
-            className="rounded-2xl p-4 space-y-2"
+            className="rounded-2xl p-4 space-y-2.5"
             style={{
               background: "var(--gold-bg)",
               border: "1px solid var(--gold-border)",
             }}
           >
-            <div
-              className="text-xs font-extrabold uppercase tracking-wider"
-              style={{ color: "var(--gold)" }}
-            >
-              Beneficios Exclusivos Socio VIP
+            <div className="flex items-center justify-between">
+              <span
+                className="text-xs font-extrabold uppercase tracking-wider"
+                style={{ color: "var(--gold)" }}
+              >
+                Beneficios Exclusivos Socio VIP
+              </span>
+              {onOpenVipModal && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenVipModal();
+                  }}
+                  className="text-[11px] font-extrabold underline"
+                  style={{ color: "var(--gold)" }}
+                >
+                  Ver Carnet VIP
+                </button>
+              )}
             </div>
             <ul className="space-y-1.5 text-xs">
-              {club.vipBenefitsList.map((benefit, idx) => (
+              {(club.vipBenefitsList || []).map((benefit, idx) => (
                 <li key={idx} className="flex items-start gap-2">
                   <span style={{ color: "var(--gold)" }}>✓</span>
                   <span style={{ color: "var(--text-main)" }}>{benefit}</span>
@@ -6703,16 +7111,16 @@ export const ClubDetailModal = ({ isOpen, onClose, club }) => {
             </ul>
           </div>
 
-          {/* Instalaciones */}
+          {/* Instalaciones y Características del Club */}
           <div className="space-y-2.5">
             <h3
               className="text-xs font-extrabold uppercase tracking-wider"
               style={{ color: "var(--text-muted)" }}
             >
-              Instalaciones & Servicios en Sede
+              Instalaciones y Servicios del Club
             </h3>
             <div className="grid grid-cols-1 gap-2">
-              {club.facilities.map((fac, idx) => (
+              {(club.facilities || []).map((fac, idx) => (
                 <div
                   key={idx}
                   className="rounded-xl p-3 flex items-center justify-between"
@@ -6737,16 +7145,28 @@ export const ClubDetailModal = ({ isOpen, onClose, club }) => {
             </div>
           </div>
 
-          <div className="pt-2">
+          <div className="grid grid-cols-2 gap-2 pt-1">
             <a
               href={club.mapsUrl}
               target="_blank"
               rel="noreferrer"
-              className="touch-btn w-full py-3 rounded-xl font-display font-extrabold text-xs uppercase tracking-wider flex items-center justify-center gap-2"
+              className="touch-btn py-3 rounded-xl font-display font-extrabold text-xs uppercase tracking-wider flex items-center justify-center gap-1.5"
               style={{ background: "#D6FF00", color: "#0A1633" }}
             >
-              <Icons.MapPin size={16} />
-              <span>Abrir en Google Maps</span>
+              <Icons.MapPin size={15} />
+              <span>Google Maps</span>
+            </a>
+
+            <a
+              href={`https://wa.me/${club.whatsappPhone || "51964112233"}?text=${encodeURIComponent(
+                `Hola ${club.name}, vengo de MATCHPOINT y deseo consultar disponibilidad de cancha de arcilla.`
+              )}`}
+              target="_blank"
+              rel="noreferrer"
+              className="touch-btn py-3 rounded-xl font-display font-extrabold text-xs uppercase tracking-wider flex items-center justify-center"
+              style={{ background: "var(--emerald)", color: "#FFFFFF" }}
+            >
+              Reservar Cancha
             </a>
           </div>
         </div>
@@ -6756,29 +7176,36 @@ export const ClubDetailModal = ({ isOpen, onClose, club }) => {
 };
 
 // ============================================================================
-// 29. MODAL B2B DE COACH PRO (POP-UP CON BLUR iOS · CERO ACORDEÓN)
-//     - PIN Privado Individual por Entrenador
-//     - Reproductor de video limpio ("Ver Video" / "Cerrar Video")
+// 29. MODAL B2B DE COACH PRO (POP-UP CON BLUR iOS · PIN PRIVADO INDIVIDUAL)
 // ============================================================================
 export const CoachProProfileModal = ({
   isOpen,
   onClose,
   coach,
-  onUpdateCoachPin,
+  currentUser,
+  onSaveCoachProfile,
+  onAddCoachReview,
 }) => {
   const [activeVideoUrl, setActiveVideoUrl] = useState(null);
   const [showPinAuth, setShowPinAuth] = useState(false);
   const [enteredPin, setEnteredPin] = useState("");
-  const [isAdminMode, setIsAdminMode] = useState(false);
+  const [isCoachEditorOpen, setIsCoachEditorOpen] = useState(false);
   const [editingPrice, setEditingPrice] = useState(coach?.pricePerHour || 50);
+  const [newSlotText, setNewSlotText] = useState("");
+
+  // Estado para dejar reseña verificada
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [reviewComment, setReviewComment] = useState("");
 
   useEffect(() => {
     if (coach) {
       setEditingPrice(coach.pricePerHour || 50);
       setShowPinAuth(false);
-      setIsAdminMode(false);
+      setIsCoachEditorOpen(false);
       setEnteredPin("");
       setActiveVideoUrl(null);
+      setShowReviewForm(false);
+      setReviewComment("");
     }
   }, [coach, isOpen]);
 
@@ -6786,22 +7213,57 @@ export const CoachProProfileModal = ({
 
   const handleVerifyPin = (e) => {
     e.preventDefault();
-    if (enteredPin === coach.PrivatePin) {
-      setIsAdminMode(true);
+    if (enteredPin.trim() === String(coach.PrivatePin)) {
+      setIsCoachEditorOpen(true);
       setShowPinAuth(false);
-      alert(`¡PIN correcto! Estás editando el perfil de ${coach.name}.`);
     } else {
-      alert("PIN incorrecto. Cada profesor tiene su clave privada asignada.");
+      alert("PIN incorrecto. Cada entrenador tiene su propio PIN privado.");
       setEnteredPin("");
     }
   };
 
-  const handleSavePrice = () => {
-    if (onUpdateCoachPin) {
-      onUpdateCoachPin(coach.id, { ...coach, pricePerHour: Number(editingPrice) });
+  const handleSaveCoachChanges = () => {
+    const numPrice = Math.max(20, Number(editingPrice) || 50);
+    const updatedSlots = newSlotText.trim()
+      ? [...(coach.freeSlots || []), newSlotText.trim()]
+      : coach.freeSlots || [];
+
+    if (onSaveCoachProfile) {
+      onSaveCoachProfile({
+        ...coach,
+        pricePerHour: numPrice,
+        priceLabel: `Desde S/ ${numPrice}`,
+        freeSlots: updatedSlots,
+      });
     }
-    alert("¡Tarifa actualizada con éxito!");
-    setIsAdminMode(false);
+    setNewSlotText("");
+    setIsCoachEditorOpen(false);
+  };
+
+  const handleRemoveSlot = (slotToRemove) => {
+    if (!onSaveCoachProfile) return;
+    onSaveCoachProfile({
+      ...coach,
+      freeSlots: (coach.freeSlots || []).filter((s) => s !== slotToRemove),
+    });
+  };
+
+  const handleSubmitReview = (e) => {
+    e.preventDefault();
+    if (!reviewComment.trim()) return;
+    const cat = getCategoryByElo(currentUser?.elo || 2000);
+    if (onAddCoachReview) {
+      onAddCoachReview(coach.id, {
+        id: `rev_${Date.now()}`,
+        author: currentUser?.name || "Jugador",
+        category: cat.name,
+        rating: 5,
+        date: "15 Nov 2026",
+        comment: reviewComment.trim(),
+      });
+    }
+    setReviewComment("");
+    setShowReviewForm(false);
   };
 
   return (
@@ -6814,7 +7276,6 @@ export const CoachProProfileModal = ({
         style={{ maxHeight: "90dvh" }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Cabecera del Entrenador */}
         <div className="h-44 w-full relative">
           <img
             src={coach.bannerImage}
@@ -6839,41 +7300,51 @@ export const CoachProProfileModal = ({
               style={{ width: 56, height: 56, border: "2px solid #FFFFFF" }}
             />
             <div className="min-w-0">
-              <h2 className="font-display font-black text-base sm:text-lg text-white truncate">
+              <div className="flex items-center gap-1.5">
+                <span
+                  className="px-2 py-0.5 rounded text-[10px] font-extrabold"
+                  style={{ background: "#D6FF00", color: "#0A1633" }}
+                >
+                  ★ {coach.rating} ({coach.reviewsCount})
+                </span>
+                <span className="text-xs text-amber-300 font-bold truncate">
+                  {coach.clubName}
+                </span>
+              </div>
+              <h2 className="font-display font-black text-base sm:text-lg text-white truncate mt-0.5">
                 {coach.name}
               </h2>
-              <p className="text-xs text-sky-300 font-semibold truncate">
-                {coach.clubName} · ★ {coach.rating}
-              </p>
+              <p className="text-xs text-slate-300 truncate">{coach.specialty}</p>
             </div>
           </div>
         </div>
 
-        {/* Cuerpo scrolleable */}
         <div className="p-5 overflow-y-auto space-y-4 no-scrollbar">
           <p className="text-xs leading-relaxed" style={{ color: "var(--text-secondary)" }}>
             {coach.bio}
           </p>
 
-          {/* Reproductor de Video (Botones limpios "Ver Video" / "Cerrar Video") */}
+          {/* Reproductor de Video con Texto Limpio ("Ver Video" / "Cerrar Video") */}
           <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() =>
-                  setActiveVideoUrl(
-                    activeVideoUrl === coach.videoVertical ? null : coach.videoVertical
-                  )
-                }
-                className="touch-btn py-2 px-3.5 rounded-xl text-xs font-extrabold flex items-center gap-1.5"
-                style={{ background: "var(--electric)", color: "#FFFFFF" }}
-              >
-                <Icons.Play size={14} />
-                <span>
-                  {activeVideoUrl === coach.videoVertical ? "Cerrar Video" : "Ver Video Táctico"}
-                </span>
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() =>
+                setActiveVideoUrl(
+                  activeVideoUrl === coach.videoVertical
+                    ? null
+                    : coach.videoVertical
+                )
+              }
+              className="touch-btn py-2 px-3.5 rounded-xl text-xs font-extrabold flex items-center gap-1.5"
+              style={{ background: "var(--electric)", color: "#FFFFFF" }}
+            >
+              <Icons.Play size={14} />
+              <span>
+                {activeVideoUrl === coach.videoVertical
+                  ? "Cerrar Video"
+                  : "Ver Video"}
+              </span>
+            </button>
 
             {activeVideoUrl && (
               <div className="rounded-2xl overflow-hidden bg-black aspect-[9/16] max-h-64 flex justify-center">
@@ -6888,17 +7359,17 @@ export const CoachProProfileModal = ({
             )}
           </div>
 
-          {/* Programas y Packs */}
+          {/* Programas y Packs Oficiales */}
           <div className="space-y-2.5">
             <h3
               className="text-xs font-extrabold uppercase tracking-wider"
               style={{ color: "var(--text-muted)" }}
             >
-              Programas & Tarifas Oficiales
+              Packs & Programas de Entrenamiento
             </h3>
 
-            <div className="space-y-2">
-              {coach.packages.map((pkg) => (
+            <div className="space-y-2.5">
+              {(coach.packages || []).map((pkg) => (
                 <div
                   key={pkg.id}
                   className="rounded-2xl p-3.5 space-y-2"
@@ -6910,13 +7381,26 @@ export const CoachProProfileModal = ({
                   <div className="flex items-center justify-between gap-2">
                     <span
                       className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase"
-                      style={{ background: "var(--gold-bg)", color: "var(--gold)" }}
+                      style={{
+                        background: "var(--gold-bg)",
+                        color: "var(--gold)",
+                      }}
                     >
                       {pkg.badge}
                     </span>
-                    <span className="font-display font-black text-sm tabular-nums">
-                      S/ {pkg.price}
-                    </span>
+                    <div className="text-right">
+                      <span className="font-display font-black text-sm tabular-nums">
+                        S/ {pkg.price}
+                      </span>
+                      {pkg.vipPrice && (
+                        <span
+                          className="block text-[10px] font-bold"
+                          style={{ color: "var(--gold)" }}
+                        >
+                          Socio VIP: S/ {pkg.vipPrice}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="font-display font-bold text-xs sm:text-sm">
@@ -6928,21 +7412,21 @@ export const CoachProProfileModal = ({
 
                   <a
                     href={`https://wa.me/${coach.phone}?text=${encodeURIComponent(
-                      `Hola ${coach.name}, vi tu programa "${pkg.name}" (S/ ${pkg.price}) en MATCHPOINT y deseo agendar una sesión.`
+                      `Hola ${coach.name}, vi tu programa "${pkg.name}" (S/ ${pkg.price}) en MATCHPOINT y deseo reservar.`
                     )}`}
                     target="_blank"
                     rel="noreferrer"
                     className="touch-btn w-full py-2.5 rounded-xl font-display font-extrabold text-xs uppercase tracking-wider block text-center"
-                    style={{ background: "#10B981", color: "#FFFFFF" }}
+                    style={{ background: "var(--emerald)", color: "#FFFFFF" }}
                   >
-                    Reservar por WhatsApp
+                    Reservar Programa por WhatsApp
                   </a>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Huecos Libres esta semana */}
+          {/* Huecos Libres para esta semana (Clic directo a WhatsApp) */}
           <div
             className="rounded-2xl p-4 space-y-2.5"
             style={{
@@ -6951,34 +7435,124 @@ export const CoachProProfileModal = ({
             }}
           >
             <h3 className="font-display font-bold text-xs uppercase tracking-wider">
-              Huecos Libres esta Semana
+              Huecos Libres esta Semana (Toca para reservar)
             </h3>
             <div className="flex flex-wrap gap-1.5">
-              {coach.freeSlots.map((slot, idx) => (
-                <span
+              {(coach.freeSlots || []).map((slot, idx) => (
+                <a
                   key={idx}
-                  className="px-2.5 py-1 rounded-lg text-xs font-semibold tabular-nums"
+                  href={`https://wa.me/${coach.phone}?text=${encodeURIComponent(
+                    `Hola ${coach.name}, quiero separar el turno libre del ${slot} en ${coach.clubName}.`
+                  )}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-3 py-1.5 rounded-xl text-xs font-bold tabular-nums transition-transform active:scale-95"
                   style={{
                     background: "var(--bg-card)",
-                    border: "1px solid var(--border-hairline)",
+                    border: "1px solid var(--border-strong)",
+                    color: "var(--text-player)",
                   }}
                 >
                   {slot}
-                </span>
+                </a>
               ))}
             </div>
           </div>
 
-          {/* Portal Coach Pro (PIN Privado Individual) */}
-          <div className="pt-2 border-t" style={{ borderColor: "var(--border-hairline)" }}>
-            {!isAdminMode && !showPinAuth ? (
+          {/* Reseñas de Alumnos del Circuito */}
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between">
+              <h3
+                className="text-xs font-extrabold uppercase tracking-wider"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Reseñas de Alumnos ({(coach.reviews || []).length})
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowReviewForm((v) => !v)}
+                className="text-xs font-extrabold"
+                style={{ color: "var(--text-player)" }}
+              >
+                {showReviewForm ? "Cancelar" : "+ Dejar Reseña"}
+              </button>
+            </div>
+
+            {showReviewForm && (
+              <form
+                onSubmit={handleSubmitReview}
+                className="rounded-2xl p-3.5 space-y-2.5"
+                style={{
+                  background: "var(--bg-subtle)",
+                  border: "1px solid var(--border-strong)",
+                }}
+              >
+                <textarea
+                  rows={2}
+                  value={reviewComment}
+                  onChange={(e) => setReviewComment(e.target.value)}
+                  placeholder="Comparte tu experiencia entrenando en cancha..."
+                  className="w-full p-2.5 rounded-xl text-xs focus:outline-none"
+                  style={{
+                    background: "var(--bg-input)",
+                    border: "1px solid var(--border-hairline)",
+                    color: "var(--text-main)",
+                  }}
+                />
+                <button
+                  type="submit"
+                  className="touch-btn w-full py-2 rounded-xl font-display font-extrabold text-xs"
+                  style={{ background: "#D6FF00", color: "#0A1633" }}
+                >
+                  Publicar Reseña
+                </button>
+              </form>
+            )}
+
+            <div className="space-y-2">
+              {(coach.reviews || []).map((rev) => (
+                <div
+                  key={rev.id}
+                  className="rounded-xl p-3 space-y-1"
+                  style={{
+                    background: "var(--bg-subtle)",
+                    border: "1px solid var(--border-hairline)",
+                  }}
+                >
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold">
+                      {rev.author} ·{" "}
+                      <span style={{ color: "var(--text-player)" }}>
+                        {rev.category}
+                      </span>
+                    </span>
+                    <span style={{ color: "var(--gold)" }}>★★★★★</span>
+                  </div>
+                  <p
+                    className="text-xs leading-snug"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
+                    {rev.comment}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Acceso Exclusivo con PIN Individual por Profesor */}
+          <div
+            className="pt-3 border-t"
+            style={{ borderColor: "var(--border-hairline)" }}
+          >
+            {!isCoachEditorOpen && !showPinAuth ? (
               <button
                 type="button"
                 onClick={() => setShowPinAuth(true)}
-                className="text-xs font-bold"
+                className="text-xs font-bold flex items-center gap-1.5"
                 style={{ color: "var(--text-muted)" }}
               >
-                🔒 ¿Eres {coach.name.split(" ")[1]}? Accede al Portal Coach Pro
+                <Icons.Lock size={14} />
+                <span>Acceso Profesor ({coach.name}) · Editar Turnos y Tarifa</span>
               </button>
             ) : showPinAuth ? (
               <form
@@ -6990,7 +7564,7 @@ export const CoachProProfileModal = ({
                 }}
               >
                 <div className="text-xs font-bold">
-                  Ingresa tu PIN privado de {coach.name}
+                  Ingresa el PIN privado de {coach.name}
                 </div>
                 <div className="flex gap-2">
                   <input
@@ -6998,8 +7572,12 @@ export const CoachProProfileModal = ({
                     value={enteredPin}
                     onChange={(e) => setEnteredPin(e.target.value)}
                     placeholder="PIN de 4 dígitos"
-                    className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/20 text-xs text-white focus:outline-none"
-                    autoFocus
+                    className="w-full px-3 py-2 rounded-xl text-xs focus:outline-none"
+                    style={{
+                      background: "var(--bg-input)",
+                      border: "1px solid var(--border-hairline)",
+                      color: "var(--text-main)",
+                    }}
                   />
                   <button
                     type="submit"
@@ -7018,28 +7596,73 @@ export const CoachProProfileModal = ({
                   border: "1px solid var(--emerald)",
                 }}
               >
-                <div className="font-display font-bold text-xs" style={{ color: "var(--emerald)" }}>
-                  Portal Coach Pro Activo · Edición Autorizada
+                <div
+                  className="font-display font-bold text-xs"
+                  style={{ color: "var(--emerald)" }}
+                >
+                  Panel Privado de {coach.name} Activo
                 </div>
+
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold">Tarifa por Hora (S/)</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="number"
-                      value={editingPrice}
-                      onChange={(e) => setEditingPrice(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/20 text-xs text-white focus:outline-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleSavePrice}
-                      className="touch-btn px-4 py-2 rounded-xl text-xs font-extrabold"
-                      style={{ background: "var(--emerald)", color: "#FFFFFF" }}
-                    >
-                      Guardar
-                    </button>
-                  </div>
+                  <label className="text-xs font-bold block">
+                    Tarifa base por turno (S/)
+                  </label>
+                  <input
+                    type="number"
+                    value={editingPrice}
+                    onChange={(e) => setEditingPrice(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl text-xs"
+                    style={{
+                      background: "var(--bg-input)",
+                      border: "1px solid var(--border-strong)",
+                      color: "var(--text-main)",
+                    }}
+                  />
                 </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold block">
+                    Agregar nuevo hueco libre
+                  </label>
+                  <input
+                    type="text"
+                    value={newSlotText}
+                    onChange={(e) => setNewSlotText(e.target.value)}
+                    placeholder="Ej. Vie 17:00 - 18:00"
+                    className="w-full px-3 py-2 rounded-xl text-xs"
+                    style={{
+                      background: "var(--bg-input)",
+                      border: "1px solid var(--border-strong)",
+                      color: "var(--text-main)",
+                    }}
+                  />
+                </div>
+
+                <div className="flex flex-wrap gap-1.5">
+                  {(coach.freeSlots || []).map((slot, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => handleRemoveSlot(slot)}
+                      className="px-2 py-1 rounded-lg text-[10px] font-bold"
+                      style={{
+                        background: "rgba(244,63,94,0.16)",
+                        color: "var(--crimson)",
+                      }}
+                    >
+                      ✕ {slot}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleSaveCoachChanges}
+                  className="touch-btn w-full py-2.5 rounded-xl text-xs font-extrabold"
+                  style={{ background: "var(--emerald)", color: "#FFFFFF" }}
+                >
+                  Guardar Cambios del Profesor
+                </button>
               </div>
             )}
           </div>
