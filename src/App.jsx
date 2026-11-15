@@ -7050,3 +7050,4000 @@ export const CoachProProfileModal = ({
 };
 
 // === FIN DEL BLOQUE 8 DE 10 ===
+
+// === INICIO DEL BLOQUE 9 DE 10 ===
+
+// ============================================================================
+// 30. VISTA PRINCIPAL: TORNEOS OFICIALES & SALÓN DE LA FAMA
+//     - Cuadros por categorías (4ª, 5ª, 3ª) con títulos limpios y escudos
+//     - Árbol Visual Conectado (Semifinales/Cuartos ➔ Gran Final + Consuelo)
+//     - Inscripción mediante Pago (Yape/Plin/BCP) + Aprobación del Admin
+//     - CERO avisos o botones expuestos de "Suite Admin" para los jugadores
+// ============================================================================
+export const TournamentsAndHallOfFameView = ({
+  tournaments = INITIAL_TOURNAMENTS,
+  hallOfFame = HALL_OF_FAME_CHAMPIONS,
+  players = [],
+  currentUser,
+  clubs = HUANCAYO_CLUBS,
+  onOpenTournamentPaymentModal,
+  onOpenHeadToHead,
+}) => {
+  const [subTab, setSubTab] = useState("torneos"); // 'torneos' | 'salon_fama'
+  const [selectedTournamentId, setSelectedTournamentId] = useState(
+    tournaments[0]?.id || "tourn_4ta_country"
+  );
+
+  const activeTournament =
+    tournaments.find((t) => t.id === selectedTournamentId) || tournaments[0];
+
+  const getPlayerById = (id) => players.find((p) => p.id === id) || null;
+
+  return (
+    <div className="view-transition px-4 pt-4 pb-8 space-y-4 max-w-xl mx-auto">
+      {/* Cabecera */}
+      <div className="atp-card p-4 flex items-center justify-between gap-3">
+        <div>
+          <h1 className="font-display font-black text-lg sm:text-xl leading-tight">
+            Torneos & Campeones
+          </h1>
+          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+            Cuadros oficiales en arcilla, Ronda Consuelo y Salón de la Fama
+          </p>
+        </div>
+      </div>
+
+      {/* Pestañas Subrayadas: Cuadros Activos vs Salón de la Fama */}
+      <div className="atp-card overflow-hidden">
+        <div
+          className="grid grid-cols-2 px-4"
+          style={{ borderBottom: "1px solid var(--border-hairline)" }}
+        >
+          <button
+            type="button"
+            onClick={() => setSubTab("torneos")}
+            className="py-3 text-xs font-display font-extrabold uppercase tracking-wider relative"
+            style={{
+              color:
+                subTab === "torneos" ? "var(--text-main)" : "var(--text-muted)",
+            }}
+          >
+            Torneos ({tournaments.length})
+            {subTab === "torneos" && (
+              <span
+                className="absolute bottom-0 inset-x-6 h-0.5 rounded-full"
+                style={{ background: "var(--electric)" }}
+              />
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSubTab("salon_fama")}
+            className="py-3 text-xs font-display font-extrabold uppercase tracking-wider relative"
+            style={{
+              color:
+                subTab === "salon_fama"
+                  ? "var(--text-main)"
+                  : "var(--text-muted)",
+            }}
+          >
+            Salón de la Fama ({hallOfFame.length})
+            {subTab === "salon_fama" && (
+              <span
+                className="absolute bottom-0 inset-x-6 h-0.5 rounded-full"
+                style={{ background: "var(--gold)" }}
+              />
+            )}
+          </button>
+        </div>
+
+        {subTab === "torneos" ? (
+          <div className="p-4 space-y-4">
+            {/* Selector de Categoría de Torneo en Píldoras */}
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+              {tournaments.map((t) => {
+                const isSelected = t.id === activeTournament?.id;
+                const clubObj = getClubById(t.clubId, clubs);
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setSelectedTournamentId(t.id)}
+                    className="px-3.5 py-2 rounded-xl flex items-center gap-2 whitespace-nowrap transition-all border"
+                    style={{
+                      background: isSelected
+                        ? "var(--bg-elevated)"
+                        : "var(--bg-subtle)",
+                      borderColor: isSelected
+                        ? "var(--electric)"
+                        : "var(--border-hairline)",
+                    }}
+                  >
+                    {clubObj && (
+                      <SafeImage
+                        src={clubObj.shield}
+                        alt={clubObj.shortName}
+                        circular
+                        style={{ width: 20, height: 20 }}
+                      />
+                    )}
+                    <div className="text-left">
+                      <div className="font-display font-extrabold text-xs">
+                        {t.categoryLabel}
+                      </div>
+                      <div
+                        className="text-[10px]"
+                        style={{ color: "var(--text-muted)" }}
+                      >
+                        {t.clubName}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {activeTournament && (
+              <div className="space-y-4">
+                {/* Banner Limpio del Torneo Seleccionado */}
+                <div
+                  className="rounded-2xl overflow-hidden"
+                  style={{
+                    background: "var(--bg-subtle)",
+                    border: "1px solid var(--border-strong)",
+                  }}
+                >
+                  <div className="h-40 w-full relative">
+                    <img
+                      src={activeTournament.bannerImage}
+                      alt={activeTournament.title}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />
+
+                    <div className="absolute top-3 left-3 flex items-center gap-2">
+                      <span
+                        className="px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase"
+                        style={{
+                          background: "var(--clay)",
+                          color: "#FFFFFF",
+                        }}
+                      >
+                        {activeTournament.surface}
+                      </span>
+                      <span
+                        className="px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase"
+                        style={{
+                          background: "rgba(10, 22, 51, 0.85)",
+                          color: "#D6FF00",
+                        }}
+                      >
+                        {activeTournament.dateRange}
+                      </span>
+                    </div>
+
+                    <div className="absolute bottom-3 left-4 right-4">
+                      <h2 className="font-display font-black text-base sm:text-lg text-white leading-tight">
+                        {activeTournament.title}
+                      </h2>
+                      <p className="text-xs text-slate-300">
+                        {activeTournament.clubName} · {activeTournament.ballsLabel}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Barra de Estado de Inscripción y Botón de Pago */}
+                  <div className="p-4 space-y-3">
+                    <div className="flex items-center justify-between text-xs">
+                      <div>
+                        <span
+                          className="font-bold"
+                          style={{ color: "var(--text-muted)" }}
+                        >
+                          Inscripción:{" "}
+                        </span>
+                        <span className="font-display font-black text-sm">
+                          S/ {activeTournament.entryFee}
+                        </span>
+                      </div>
+                      <div
+                        className="font-semibold tabular-nums"
+                        style={{ color: "var(--text-player)" }}
+                      >
+                        {(activeTournament.enrolledPlayerIds || []).length} /{" "}
+                        {activeTournament.maxPlayers} Inscritos
+                      </div>
+                    </div>
+
+                    {(() => {
+                      const isEnrolled = (
+                        activeTournament.enrolledPlayerIds || []
+                      ).includes(currentUser?.id);
+                      const isPendingApproval = (
+                        activeTournament.pendingApplicantIds || []
+                      ).includes(currentUser?.id);
+
+                      if (isEnrolled) {
+                        return (
+                          <div
+                            className="w-full py-2.5 px-4 rounded-xl text-xs font-extrabold text-center"
+                            style={{
+                              background: "var(--emerald-bg)",
+                              color: "var(--emerald)",
+                              border: "1px solid var(--emerald)",
+                            }}
+                          >
+                            ✓ Inscrito Oficialmente en el Cuadro
+                          </div>
+                        );
+                      }
+
+                      if (isPendingApproval) {
+                        return (
+                          <div
+                            className="w-full py-2.5 px-4 rounded-xl text-xs font-extrabold text-center"
+                            style={{
+                              background: "var(--gold-bg)",
+                              color: "var(--gold)",
+                              border: "1px solid var(--gold-border)",
+                            }}
+                          >
+                            Pago en Verificación · Pendiente de Aprobación
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            onOpenTournamentPaymentModal &&
+                            onOpenTournamentPaymentModal(activeTournament)
+                          }
+                          className="touch-btn w-full py-3 rounded-xl font-display font-extrabold text-xs uppercase tracking-wider"
+                          style={{ background: "#D6FF00", color: "#0A1633" }}
+                        >
+                          Inscribirse al Torneo (S/ {activeTournament.entryFee})
+                        </button>
+                      );
+                    })()}
+                  </div>
+                </div>
+
+                {/* ÁRBOL VISUAL DE LLAVES ELIMINATORIAS (Semifinales ➔ Final + Consuelo) */}
+                <div
+                  className="rounded-2xl p-4 space-y-4"
+                  style={{
+                    background: "var(--bg-subtle)",
+                    border: "1px solid var(--border-hairline)",
+                  }}
+                >
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-display font-extrabold text-xs uppercase tracking-wider">
+                      Cuadro Eliminatorio en Vivo
+                    </h3>
+                    <span
+                      className="text-[11px]"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      Toca un cruce para ver el Head2Head
+                    </span>
+                  </div>
+
+                  {/* Árbol Horizontal / Conectado */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+                    {/* Columna 1: Semifinales / Llaves Previas */}
+                    <div className="space-y-3">
+                      <div
+                        className="text-[10px] font-extrabold uppercase tracking-wider"
+                        style={{ color: "var(--text-player)" }}
+                      >
+                        Ronda Clasificatoria / Semifinales
+                      </div>
+                      {(activeTournament.bracket?.quarters || []).map((match) => {
+                        const pA = getPlayerById(match.playerAId);
+                        const pB = getPlayerById(match.playerBId);
+                        return (
+                          <div
+                            key={match.id}
+                            onClick={() =>
+                              pA &&
+                              pB &&
+                              onOpenHeadToHead &&
+                              onOpenHeadToHead(pA, pB)
+                            }
+                            className="rounded-xl p-3 space-y-2 cursor-pointer transition-colors hover:bg-white/[0.04]"
+                            style={{
+                              background: "var(--bg-card)",
+                              border: "1px solid var(--border-strong)",
+                            }}
+                          >
+                            <div className="flex items-center justify-between text-[10px] font-bold">
+                              <span style={{ color: "var(--text-muted)" }}>
+                                {match.roundLabel}
+                              </span>
+                              {match.score && (
+                                <span
+                                  className="font-mono-code font-bold"
+                                  style={{ color: "var(--emerald)" }}
+                                >
+                                  {match.score}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Jugador A */}
+                            <div className="flex items-center justify-between text-xs">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <SafeImage
+                                  src={pA?.avatar}
+                                  alt={pA?.name || "Por definir"}
+                                  circular
+                                  style={{ width: 22, height: 22 }}
+                                />
+                                <span
+                                  className={`truncate ${
+                                    match.winnerId === pA?.id
+                                      ? "font-extrabold"
+                                      : "font-medium"
+                                  }`}
+                                >
+                                  {pA?.name || "Por definir"}
+                                </span>
+                              </div>
+                              {match.winnerId === pA?.id && (
+                                <span style={{ color: "var(--emerald)" }}>✓</span>
+                              )}
+                            </div>
+
+                            {/* Jugador B */}
+                            <div
+                              className="flex items-center justify-between text-xs pt-1.5 border-t"
+                              style={{ borderColor: "var(--border-hairline)" }}
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <SafeImage
+                                  src={pB?.avatar}
+                                  alt={pB?.name || "Por definir"}
+                                  circular
+                                  style={{ width: 22, height: 22 }}
+                                />
+                                <span
+                                  className={`truncate ${
+                                    match.winnerId === pB?.id
+                                      ? "font-extrabold"
+                                      : "font-medium"
+                                  }`}
+                                >
+                                  {pB?.name || "Por definir"}
+                                </span>
+                              </div>
+                              {match.winnerId === pB?.id && (
+                                <span style={{ color: "var(--emerald)" }}>✓</span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Columna 2: Gran Final + Final Ronda Consuelo */}
+                    <div className="space-y-3">
+                      <div
+                        className="text-[10px] font-extrabold uppercase tracking-wider"
+                        style={{ color: "var(--gold)" }}
+                      >
+                        Definición de Campeón & Consuelo
+                      </div>
+
+                      {/* Gran Final */}
+                      {activeTournament.bracket?.final && (
+                        <div
+                          className="rounded-xl p-3.5 space-y-2"
+                          style={{
+                            background: "var(--gold-bg)",
+                            border: "1px solid var(--gold-border)",
+                          }}
+                        >
+                          <div className="flex items-center justify-between text-[10px] font-extrabold uppercase">
+                            <span style={{ color: "var(--gold)" }}>
+                              🏆 {activeTournament.bracket.final.roundLabel}
+                            </span>
+                            {activeTournament.bracket.final.score && (
+                              <span className="font-mono-code">
+                                {activeTournament.bracket.final.score}
+                              </span>
+                            )}
+                          </div>
+
+                          {[
+                            getPlayerById(activeTournament.bracket.final.playerAId),
+                            getPlayerById(activeTournament.bracket.final.playerBId),
+                          ].map((finPlayer, idx) => (
+                            <div
+                              key={idx}
+                              className="flex items-center justify-between text-xs py-1"
+                            >
+                              <div className="flex items-center gap-2">
+                                <SafeImage
+                                  src={finPlayer?.avatar}
+                                  alt={finPlayer?.name || "Ganador Semifinal"}
+                                  circular
+                                  style={{ width: 24, height: 24 }}
+                                />
+                                <span className="font-bold">
+                                  {finPlayer?.name || `Ganador Llave ${idx + 1}`}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Final Ronda Consuelo */}
+                      {activeTournament.bracket?.consolationFinal && (
+                        <div
+                          className="rounded-xl p-3 space-y-1.5"
+                          style={{
+                            background: "var(--bg-card)",
+                            border: "1px solid var(--border-hairline)",
+                          }}
+                        >
+                          <div
+                            className="text-[10px] font-extrabold uppercase"
+                            style={{ color: "var(--text-muted)" }}
+                          >
+                            {activeTournament.bracket.consolationFinal.roundLabel}
+                          </div>
+                          {[
+                            getPlayerById(
+                              activeTournament.bracket.consolationFinal.playerAId
+                            ),
+                            getPlayerById(
+                              activeTournament.bracket.consolationFinal.playerBId
+                            ),
+                          ].map((cPlayer, idx) => (
+                            <div
+                              key={idx}
+                              className="flex items-center gap-2 text-xs py-0.5"
+                            >
+                              <SafeImage
+                                src={cPlayer?.avatar}
+                                alt={cPlayer?.name || "En espera"}
+                                circular
+                                style={{ width: 20, height: 20 }}
+                              />
+                              <span>
+                                {cPlayer?.name || `2º Ronda Previa ${idx + 1}`}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          /* Sub-pestaña 2: SALÓN DE LA FAMA (Campeones de Torneos Previos) */
+          <div className="p-4 space-y-3.5">
+            {hallOfFame.map((item, idx) => {
+              const clubObj = getClubById(item.championClubId, clubs);
+              return (
+                <div
+                  key={item.id}
+                  className="rounded-2xl p-4 space-y-3"
+                  style={{
+                    background: "var(--bg-subtle)",
+                    border: "1px solid var(--gold-border)",
+                  }}
+                >
+                  <div className="flex items-center justify-between">
+                    <span
+                      className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider"
+                      style={{
+                        background: "var(--gold-bg)",
+                        color: "var(--gold)",
+                      }}
+                    >
+                      Campeón · {item.categoryLabel}
+                    </span>
+                    <span
+                      className="text-xs font-semibold"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      {item.dateLabel}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-3.5">
+                    <LaurelAvatar
+                      src={item.avatar}
+                      name={item.championName}
+                      rank={idx === 0 ? 1 : 1}
+                      size={52}
+                    />
+                    <div className="min-w-0">
+                      <div className="font-display font-black text-base truncate">
+                        {item.championName}
+                      </div>
+                      <div
+                        className="text-xs font-bold truncate"
+                        style={{ color: "var(--text-player)" }}
+                      >
+                        {item.tournamentName}
+                      </div>
+                      <div
+                        className="text-[11px] flex items-center gap-1.5 mt-0.5"
+                        style={{ color: "var(--text-muted)" }}
+                      >
+                        {clubObj && (
+                          <SafeImage
+                            src={clubObj.shield}
+                            alt={clubObj.shortName}
+                            circular
+                            style={{ width: 14, height: 14 }}
+                          />
+                        )}
+                        <span>
+                          Final: {item.finalScore} vs. {item.finalistName}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// 31. MODAL DE INSCRIPCIÓN A TORNEO (PAGO YAPE / PLIN / BCP + APROBACIÓN ADMIN)
+// ============================================================================
+export const TournamentPaymentModal = ({
+  isOpen,
+  onClose,
+  tournament,
+  currentUser,
+  onSubmitTournamentApplication,
+}) => {
+  const [paymentMethod, setPaymentMethod] = useState("Yape / Plin");
+  const [operationCode, setOperationCode] = useState("");
+
+  if (!isOpen || !tournament || !currentUser) return null;
+
+  const handleSendApplication = (e) => {
+    e.preventDefault();
+    if (onSubmitTournamentApplication) {
+      onSubmitTournamentApplication(tournament.id, currentUser.id, {
+        paymentMethod,
+        operationCode: operationCode.trim() || "Constancia por WhatsApp",
+      });
+    }
+
+    const waMessage = `Hola Comité MATCHPOINT, soy ${currentUser.name}. Solicito mi inscripción al torneo "${tournament.title}" (S/ ${tournament.entryFee} vía ${paymentMethod}). Envío mi constancia de pago para aprobación.`;
+    window.open(
+      `https://wa.me/${PAYMENT_METHODS_CONFIG.whatsappApprovalPhone}?text=${encodeURIComponent(
+        waMessage
+      )}`,
+      "_blank"
+    );
+    onClose();
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 ios-blur-backdrop flex items-center justify-center p-3 sm:p-5 overflow-y-auto"
+      onClick={onClose}
+    >
+      <div
+        className="ios-modal-card w-full max-w-md rounded-3xl overflow-hidden my-auto flex flex-col"
+        style={{ maxHeight: "90dvh" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div
+          className="px-5 pt-4 pb-3 flex items-center justify-between"
+          style={{ borderBottom: "1px solid var(--border-hairline)" }}
+        >
+          <div>
+            <h3 className="font-display font-extrabold text-base">
+              Inscripción Oficial al Torneo
+            </h3>
+            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+              {tournament.title}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="touch-btn w-9 h-9 rounded-full"
+            style={{ background: "var(--bg-subtle)" }}
+          >
+            <Icons.Close size={18} />
+          </button>
+        </div>
+
+        <form
+          onSubmit={handleSendApplication}
+          className="p-5 overflow-y-auto space-y-4 no-scrollbar"
+        >
+          {/* Resumen de Costo y qué incluye */}
+          <div
+            className="rounded-2xl p-4 space-y-2"
+            style={{
+              background: "var(--bg-subtle)",
+              border: "1px solid var(--border-strong)",
+            }}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold">Derecho de Inscripción</span>
+              <span
+                className="font-display font-black text-xl tabular-nums"
+                style={{ color: "var(--emerald)" }}
+              >
+                S/ {tournament.entryFee}
+              </span>
+            </div>
+            <div className="text-xs" style={{ color: "var(--text-secondary)" }}>
+              • <strong>Pelotas:</strong> {tournament.ballsLabel}
+            </div>
+            <div className="text-xs" style={{ color: "var(--text-secondary)" }}>
+              • <strong>Formato:</strong> {tournament.formatLabel}
+            </div>
+            <div className="text-xs" style={{ color: "var(--text-secondary)" }}>
+              • <strong>Sede:</strong> {tournament.clubName} ({tournament.dateRange})
+            </div>
+          </div>
+
+          {/* Cuentas Oficiales Yape / Plin / BCP */}
+          <div
+            className="rounded-2xl p-4 space-y-2"
+            style={{
+              background: "var(--gold-bg)",
+              border: "1px solid var(--gold-border)",
+            }}
+          >
+            <div
+              className="text-[11px] font-extrabold uppercase tracking-wider"
+              style={{ color: "var(--gold)" }}
+            >
+              Medios de Pago Oficiales
+            </div>
+            <div className="text-xs font-bold">
+              Yape / Plin:{" "}
+              <span className="font-mono-code">
+                {PAYMENT_METHODS_CONFIG.yapeNumber}
+              </span>
+            </div>
+            <div className="text-xs font-bold">
+              {PAYMENT_METHODS_CONFIG.bankAccountBcp}
+            </div>
+            <div className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+              Titular: {PAYMENT_METHODS_CONFIG.organizerName}
+            </div>
+          </div>
+
+          {/* Selector de Medio Utilizado */}
+          <div className="space-y-2">
+            <label
+              className="text-xs font-extrabold uppercase tracking-wider block"
+              style={{ color: "var(--text-muted)" }}
+            >
+              Selecciona tu Medio de Pago
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {["Yape", "Plin", "BCP"].map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setPaymentMethod(m)}
+                  className="touch-btn py-2.5 rounded-xl font-display font-bold text-xs border"
+                  style={{
+                    background:
+                      paymentMethod === m
+                        ? "var(--electric)"
+                        : "var(--bg-subtle)",
+                    color: paymentMethod === m ? "#FFFFFF" : "var(--text-main)",
+                    borderColor:
+                      paymentMethod === m
+                        ? "var(--electric)"
+                        : "var(--border-hairline)",
+                  }}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold block">
+              N.º de Operación o Nota (Opcional)
+            </label>
+            <input
+              type="text"
+              value={operationCode}
+              onChange={(e) => setOperationCode(e.target.value)}
+              placeholder="Ej. Op. 482910 — adjuntaré captura en WhatsApp"
+              className="w-full px-3.5 py-2.5 rounded-xl text-xs focus:outline-none"
+              style={{
+                background: "var(--bg-input)",
+                border: "1px solid var(--border-hairline)",
+                color: "var(--text-main)",
+              }}
+            />
+          </div>
+
+          <button
+            type="submit"
+            className="touch-btn w-full py-3.5 rounded-xl font-display font-extrabold text-xs uppercase tracking-wider"
+            style={{ background: "#D6FF00", color: "#0A1633" }}
+          >
+            Enviar Constancia por WhatsApp y Solicitar Cupo
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// 32. MODAL DE MEMBRESÍA "PASE SOCIO VIP" & BENEFICIOS + TIENDA PRO SHOP
+// ============================================================================
+export const VipMembershipModal = ({
+  isOpen,
+  onClose,
+  player,
+  clubs = HUANCAYO_CLUBS,
+  onRequestVipActivation,
+}) => {
+  if (!isOpen || !player) return null;
+
+  const handleRequestVip = () => {
+    if (onRequestVipActivation) {
+      onRequestVipActivation(player.id);
+    }
+    const msg = `Hola Comité MATCHPOINT, soy ${player.name}. Deseo activar mi Pase Socio VIP de Temporada (S/ ${PAYMENT_METHODS_CONFIG.vipMembershipPrice}). Envío mi constancia Yape/Plin.`;
+    window.open(
+      `https://wa.me/${PAYMENT_METHODS_CONFIG.whatsappApprovalPhone}?text=${encodeURIComponent(
+        msg
+      )}`,
+      "_blank"
+    );
+    onClose();
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 ios-blur-backdrop flex items-center justify-center p-3 sm:p-5 overflow-y-auto"
+      onClick={onClose}
+    >
+      <div
+        className="ios-modal-card w-full max-w-md rounded-3xl overflow-hidden my-auto flex flex-col"
+        style={{ maxHeight: "90dvh" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div
+          className="px-5 pt-4 pb-3 flex items-center justify-between"
+          style={{ borderBottom: "1px solid var(--border-hairline)" }}
+        >
+          <div>
+            <h3 className="font-display font-extrabold text-base">
+              Pase Socio VIP · MATCHPOINT
+            </h3>
+            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Descuentos oficiales en sedes aliadas y Pro Shop
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="touch-btn w-9 h-9 rounded-full"
+            style={{ background: "var(--bg-subtle)" }}
+          >
+            <Icons.Close size={18} />
+          </button>
+        </div>
+
+        <div className="p-5 overflow-y-auto space-y-4 no-scrollbar">
+          <CarnetDigitalVIP player={player} clubs={clubs} compact />
+
+          <div
+            className="rounded-2xl p-4 space-y-2.5"
+            style={{
+              background: "var(--gold-bg)",
+              border: "1px solid var(--gold-border)",
+            }}
+          >
+            <div
+              className="text-xs font-extrabold uppercase tracking-wider"
+              style={{ color: "var(--gold)" }}
+            >
+              ¿Qué incluye el Pase Socio VIP?
+            </div>
+            <ul className="space-y-1.5 text-xs">
+              <li>• 15% a 20% de descuento en alquiler de canchas en los 4 clubes aliados.</li>
+              <li>• Tarifa reducida en encordados electrónicos, pelotas y overgrips del Pro Shop.</li>
+              <li>• Descuento directo en los packs de entrenamiento de Coach Pro.</li>
+              <li>• Carnet Digital Dorado con código único verificable en recepción.</li>
+            </ul>
+          </div>
+
+          {!player.isVipMember ? (
+            <div
+              className="rounded-2xl p-4 space-y-3"
+              style={{
+                background: "var(--bg-subtle)",
+                border: "1px solid var(--border-strong)",
+              }}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold">
+                  Membresía ({PAYMENT_METHODS_CONFIG.vipMembershipDuration})
+                </span>
+                <span className="font-display font-black text-lg">
+                  S/ {PAYMENT_METHODS_CONFIG.vipMembershipPrice}
+                </span>
+              </div>
+              <div className="text-xs" style={{ color: "var(--text-muted)" }}>
+                Yape / Plin: <strong>{PAYMENT_METHODS_CONFIG.yapeNumber}</strong> ·{" "}
+                {PAYMENT_METHODS_CONFIG.bankAccountBcp}
+              </div>
+              <button
+                type="button"
+                onClick={handleRequestVip}
+                className="touch-btn w-full py-3 rounded-xl font-display font-extrabold text-xs uppercase tracking-wider"
+                style={{
+                  background: "linear-gradient(135deg, #FDE68A 0%, #D97706 100%)",
+                  color: "#0A1633",
+                }}
+              >
+                Enviar Constancia Yape/Plin y Activar VIP
+              </button>
+            </div>
+          ) : (
+            <div
+              className="rounded-2xl p-3.5 text-center text-xs font-extrabold"
+              style={{
+                background: "var(--emerald-bg)",
+                color: "var(--emerald)",
+              }}
+            >
+              Tu Pase Socio VIP se encuentra activo en esta temporada.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export const ProShopModal = ({
+  isOpen,
+  onClose,
+  items = PRO_SHOP_ITEMS,
+  currentUser,
+  onOpenVipModal,
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 ios-blur-backdrop flex items-center justify-center p-3 sm:p-5 overflow-y-auto"
+      onClick={onClose}
+    >
+      <div
+        className="ios-modal-card w-full max-w-md rounded-3xl overflow-hidden my-auto flex flex-col"
+        style={{ maxHeight: "90dvh" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div
+          className="px-5 pt-4 pb-3 flex items-center justify-between"
+          style={{ borderBottom: "1px solid var(--border-hairline)" }}
+        >
+          <div className="flex items-center gap-2">
+            <Icons.Bag size={19} />
+            <div>
+              <h3 className="font-display font-extrabold text-base">
+                MATCHPOINT Pro Shop
+              </h3>
+              <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                Equipamiento oficial, encordado y pelotas en Huancayo
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="touch-btn w-9 h-9 rounded-full"
+            style={{ background: "var(--bg-subtle)" }}
+          >
+            <Icons.Close size={18} />
+          </button>
+        </div>
+
+        <div className="p-5 overflow-y-auto space-y-3.5 no-scrollbar">
+          {items.map((item) => (
+            <div
+              key={item.id}
+              className="rounded-2xl p-4 flex items-center justify-between gap-3.5"
+              style={{
+                background: "var(--bg-subtle)",
+                border: "1px solid var(--border-hairline)",
+              }}
+            >
+              <SafeImage
+                src={item.image}
+                alt={item.name}
+                style={{ width: 58, height: 58, borderRadius: 14 }}
+              />
+              <div className="min-w-0 flex-1">
+                <span
+                  className="px-2 py-0.5 rounded text-[9px] font-extrabold uppercase"
+                  style={{
+                    background: "var(--clay-bg)",
+                    color: "var(--clay)",
+                  }}
+                >
+                  {item.badge}
+                </span>
+                <h4 className="font-display font-extrabold text-xs sm:text-sm mt-1">
+                  {item.name}
+                </h4>
+                <p
+                  className="text-[11px] mt-0.5"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  {item.specs}
+                </p>
+                <div className="flex items-center gap-3 mt-2">
+                  <span className="font-display font-black text-sm tabular-nums">
+                    S/ {item.regularPrice}
+                  </span>
+                  <span
+                    className="px-2 py-0.5 rounded text-[11px] font-extrabold tabular-nums"
+                    style={{
+                      background: "var(--gold-bg)",
+                      color: "var(--gold)",
+                    }}
+                  >
+                    Socio VIP: S/ {item.vipPrice}
+                  </span>
+                </div>
+              </div>
+
+              <a
+                href={`https://wa.me/${PAYMENT_METHODS_CONFIG.whatsappApprovalPhone}?text=${encodeURIComponent(
+                  `Hola MATCHPOINT Pro Shop, deseo pedir: ${item.name} (${
+                    currentUser?.isVipMember
+                      ? `Precio Socio VIP S/ ${item.vipPrice}`
+                      : `S/ ${item.regularPrice}`
+                  }).`
+                )}`}
+                target="_blank"
+                rel="noreferrer"
+                className="touch-btn px-3 py-2 rounded-xl font-display font-extrabold text-xs flex-shrink-0"
+                style={{ background: "#D6FF00", color: "#0A1633" }}
+              >
+                Pedir
+              </a>
+            </div>
+          ))}
+
+          {!currentUser?.isVipMember && onOpenVipModal && (
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onOpenVipModal();
+              }}
+              className="touch-btn w-full py-3 rounded-xl font-display font-extrabold text-xs"
+              style={{
+                background: "var(--gold-bg)",
+                color: "var(--gold)",
+                border: "1px solid var(--gold-border)",
+              }}
+            >
+              Obtén tu Carnet Socio VIP para comprar con descuento →
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// 33. MODALES DE LANZAR RETO (MODO DUAL AUTOMÁTICO) Y SUBIR MARCADOR OFICIAL
+// ============================================================================
+export const LaunchChallengeModal = ({
+  isOpen,
+  onClose,
+  currentUser,
+  preselectedRival,
+  players = [],
+  clubs = HUANCAYO_CLUBS,
+  completedMatches = [],
+  onCreateChallenge,
+}) => {
+  const rivalsList = useMemo(
+    () =>
+      players.filter(
+        (p) => p.id !== currentUser?.id && p.activeStatus !== "inactive"
+      ),
+    [players, currentUser]
+  );
+
+  const [rivalId, setRivalId] = useState(
+    preselectedRival?.id || rivalsList[0]?.id || ""
+  );
+  const [clubId, setClubId] = useState(clubs[0]?.id || "country");
+  const [customVenueText, setCustomVenueText] = useState("");
+  const [dateTimeLabel, setDateTimeLabel] = useState("17 Nov 2026 · 19:00");
+  const [ballAgreement, setBallAgreement] = useState(BALL_AGREEMENT_OPTIONS[0]);
+  const [voluntaryFriendly, setVoluntaryFriendly] = useState(false);
+
+  useEffect(() => {
+    if (preselectedRival?.id) setRivalId(preselectedRival.id);
+    else if (rivalsList[0]?.id) setRivalId(rivalsList[0].id);
+    setVoluntaryFriendly(false);
+  }, [preselectedRival, rivalsList, isOpen]);
+
+  if (!isOpen || !currentUser) return null;
+
+  const selectedRival =
+    rivalsList.find((r) => r.id === rivalId) || rivalsList[0];
+
+  const preCalc = getPreMatchThresholds(currentUser, selectedRival, {
+    forceFriendly: voluntaryFriendly,
+    completedMatches,
+    totalActivePlayers: players.length,
+  });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!selectedRival) return;
+    const clubObj = getClubById(clubId, clubs);
+    const finalClubName =
+      clubId === "custom"
+        ? customVenueText.trim() || "Cancha Privada / Otra Sede"
+        : clubObj?.name || "Country Club Los Huancas";
+
+    if (onCreateChallenge) {
+      onCreateChallenge({
+        challengerId: currentUser.id,
+        challengedId: selectedRival.id,
+        clubId,
+        customClubName: finalClubName,
+        dateTimeLabel: dateTimeLabel.trim() || "17 Nov 2026 · 19:00",
+        ballAgreement,
+        isFriendly: preCalc.isFriendly,
+      });
+    }
+    onClose();
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 ios-blur-backdrop flex items-center justify-center p-3 sm:p-5 overflow-y-auto"
+      onClick={onClose}
+    >
+      <div
+        className="ios-modal-card w-full max-w-md rounded-3xl overflow-hidden my-auto flex flex-col"
+        style={{ maxHeight: "90dvh" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div
+          className="px-5 pt-4 pb-3 flex items-center justify-between"
+          style={{ borderBottom: "1px solid var(--border-hairline)" }}
+        >
+          <h3 className="font-display font-extrabold text-base">
+            Lanzar Desafío
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="touch-btn w-9 h-9 rounded-full"
+            style={{ background: "var(--bg-subtle)" }}
+          >
+            <Icons.Close size={18} />
+          </button>
+        </div>
+
+        <form
+          onSubmit={handleSubmit}
+          className="p-5 overflow-y-auto space-y-4 no-scrollbar"
+        >
+          {/* Selector de Rival */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-extrabold uppercase tracking-wider block">
+              Elegir Rival
+            </label>
+            <select
+              value={rivalId}
+              onChange={(e) => setRivalId(e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-xl text-xs font-bold focus:outline-none"
+              style={{
+                background: "var(--bg-input)",
+                border: "1px solid var(--border-strong)",
+                color: "var(--text-main)",
+              }}
+            >
+              {rivalsList.map((r) => {
+                const cat = getCategoryByElo(r.elo, r.seasonMatches);
+                return (
+                  <option key={r.id} value={r.id}>
+                    {r.name} — {r.elo} Pts ({cat.short})
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+
+          {/* Pronóstico Transparente Pre-Partido (o Aviso Automático de Amistoso si >1,000 pts) */}
+          <div
+            className="rounded-2xl p-3.5 space-y-2"
+            style={{
+              background: "var(--bg-subtle)",
+              border: "1px solid var(--border-strong)",
+            }}
+          >
+            {preCalc.isFriendly ? (
+              <div className="space-y-1">
+                <div
+                  className="text-xs font-extrabold"
+                  style={{ color: "var(--electric)" }}
+                >
+                  Modo Partido Amistoso / Exhibición H2H (0 Pts ELO)
+                </div>
+                <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+                  {preCalc.friendlyReason}. El resultado se registra en su
+                  historial Head2Head y genera Póster Story 9:16 sin alterar el
+                  ranking.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold">Pronóstico Oficial de Puntos</span>
+                  <span
+                    className="text-[11px] font-semibold"
+                    style={{ color: "var(--emerald)" }}
+                  >
+                    {preCalc.rematchInfo.label}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs pt-1">
+                  <div
+                    className="rounded-xl p-2.5"
+                    style={{ background: "var(--bg-card)" }}
+                  >
+                    <div
+                      className="text-[10px]"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      Para {currentUser.name}
+                    </div>
+                    <div className="font-display font-bold mt-0.5">
+                      <span style={{ color: "var(--emerald)" }}>
+                        +{preCalc.winCeilingA} máx
+                      </span>{" "}
+                      /{" "}
+                      <span style={{ color: "var(--crimson)" }}>
+                        {preCalc.lossMaxA} máx
+                      </span>
+                    </div>
+                  </div>
+                  <div
+                    className="rounded-xl p-2.5"
+                    style={{ background: "var(--bg-card)" }}
+                  >
+                    <div
+                      className="text-[10px]"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      Para {selectedRival?.name}
+                    </div>
+                    <div className="font-display font-bold mt-0.5">
+                      <span style={{ color: "var(--emerald)" }}>
+                        +{preCalc.winCeilingB} máx
+                      </span>{" "}
+                      /{" "}
+                      <span style={{ color: "var(--crimson)" }}>
+                        {preCalc.lossMaxB} máx
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {!preCalc.gapExceedsLimit && (
+              <div className="pt-1 flex items-center justify-between">
+                <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+                  ¿Prefieres jugarlo como Amistoso sin puntos?
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setVoluntaryFriendly((v) => !v)}
+                  className="px-2.5 py-1 rounded-lg text-[11px] font-bold"
+                  style={{
+                    background: voluntaryFriendly
+                      ? "var(--electric)"
+                      : "var(--bg-card)",
+                    color: voluntaryFriendly ? "#FFFFFF" : "var(--text-muted)",
+                  }}
+                >
+                  {voluntaryFriendly ? "Sí, Amistoso" : "Oficial por Puntos"}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Sede Oficial u Otra Cancha */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-extrabold uppercase tracking-wider block">
+              Sede del Encuentro
+            </label>
+            <select
+              value={clubId}
+              onChange={(e) => setClubId(e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-xl text-xs font-bold focus:outline-none"
+              style={{
+                background: "var(--bg-input)",
+                border: "1px solid var(--border-hairline)",
+                color: "var(--text-main)",
+              }}
+            >
+              {clubs.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+              <option value="custom">Otra Cancha / Sede Personalizada</option>
+            </select>
+
+            {clubId === "custom" && (
+              <input
+                type="text"
+                value={customVenueText}
+                onChange={(e) => setCustomVenueText(e.target.value)}
+                placeholder="Escribe el nombre de la cancha..."
+                className="w-full px-3.5 py-2.5 rounded-xl text-xs mt-2 focus:outline-none"
+                style={{
+                  background: "var(--bg-input)",
+                  border: "1px solid var(--border-strong)",
+                  color: "var(--text-main)",
+                }}
+              />
+            )}
+          </div>
+
+          {/* Fecha y Hora + Acuerdo de Pelotas */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div className="space-y-1">
+              <label className="text-xs font-bold block">Fecha y Hora</label>
+              <input
+                type="text"
+                value={dateTimeLabel}
+                onChange={(e) => setDateTimeLabel(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl text-xs focus:outline-none"
+                style={{
+                  background: "var(--bg-input)",
+                  border: "1px solid var(--border-hairline)",
+                  color: "var(--text-main)",
+                }}
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold block">Pelotas</label>
+              <select
+                value={ballAgreement}
+                onChange={(e) => setBallAgreement(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl text-xs focus:outline-none"
+                style={{
+                  background: "var(--bg-input)",
+                  border: "1px solid var(--border-hairline)",
+                  color: "var(--text-main)",
+                }}
+              >
+                {BALL_AGREEMENT_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            className="touch-btn w-full py-3.5 rounded-xl font-display font-extrabold text-xs uppercase tracking-wider"
+            style={{ background: "#D6FF00", color: "#0A1633" }}
+          >
+            Enviar Desafío Oficial
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export const SubmitOfficialScoreModal = ({
+  isOpen,
+  onClose,
+  challenge,
+  players = [],
+  onConfirmOfficialScore,
+}) => {
+  const [s1A, setS1A] = useState("6");
+  const [s1B, setS1B] = useState("4");
+  const [tb1Loser, setTb1Loser] = useState("5");
+  const [s2A, setS2A] = useState("6");
+  const [s2B, setS2B] = useState("3");
+  const [tb2Loser, setTb2Loser] = useState("5");
+  const [stbA, setStbA] = useState("");
+  const [stbB, setStbB] = useState("");
+  const [specialFinish, setSpecialFinish] = useState("normal");
+  const [retiredWinnerSide, setRetiredWinnerSide] = useState("A");
+  const [validationError, setValidationError] = useState("");
+
+  useEffect(() => {
+    if (challenge?.liveScore) {
+      const ls = challenge.liveScore;
+      setS1A(String(ls.s1A ?? 6));
+      setS1B(String(ls.s1B ?? 4));
+      setS2A(String(ls.s2A ?? 6));
+      setS2B(String(ls.s2B ?? 3));
+      setStbA(ls.stbA ? String(ls.stbA) : "");
+      setStbB(ls.stbB ? String(ls.stbB) : "");
+    } else {
+      setS1A("6");
+      setS1B("4");
+      setS2A("6");
+      setS2B("3");
+      setStbA("");
+      setStbB("");
+    }
+    setSpecialFinish("normal");
+    setValidationError("");
+  }, [challenge, isOpen]);
+
+  if (!isOpen || !challenge) return null;
+
+  const pA = players.find((p) => p.id === challenge.challengerId);
+  const pB = players.find((p) => p.id === challenge.challengedId);
+
+  const isSet1Tb =
+    (Number(s1A) === 7 && Number(s1B) === 6) ||
+    (Number(s1B) === 7 && Number(s1A) === 6);
+  const isSet2Tb =
+    (Number(s2A) === 7 && Number(s2B) === 6) ||
+    (Number(s2B) === 7 && Number(s2A) === 6);
+
+  const set1WinSide = Number(s1A) > Number(s1B) ? "A" : "B";
+  const set2WinSide = Number(s2A) > Number(s2B) ? "A" : "B";
+  const isSplitSets =
+    s1A !== "" && s1B !== "" && s2A !== "" && s2B !== "" && set1WinSide !== set2WinSide;
+
+  const handleConfirm = (e) => {
+    e.preventDefault();
+    const evaluation = validateAndEvaluateMatchScore({
+      s1A,
+      s1B,
+      tb1Loser,
+      s2A,
+      s2B,
+      tb2Loser,
+      stbA,
+      stbB,
+      specialFinish,
+      retiredWinnerSide,
+    });
+
+    if (!evaluation.valid) {
+      setValidationError(evaluation.error);
+      return;
+    }
+
+    setValidationError("");
+    if (onConfirmOfficialScore) {
+      onConfirmOfficialScore(challenge.id, evaluation);
+    }
+    onClose();
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 ios-blur-backdrop flex items-center justify-center p-3 sm:p-5 overflow-y-auto"
+      onClick={onClose}
+    >
+      <div
+        className="ios-modal-card w-full max-w-md rounded-3xl overflow-hidden my-auto flex flex-col"
+        style={{ maxHeight: "90dvh" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div
+          className="px-5 pt-4 pb-3 flex items-center justify-between"
+          style={{ borderBottom: "1px solid var(--border-hairline)" }}
+        >
+          <div>
+            <h3 className="font-display font-extrabold text-base">
+              Confirmar Marcador Oficial
+            </h3>
+            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+              {pA?.name} vs. {pB?.name}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="touch-btn w-9 h-9 rounded-full"
+            style={{ background: "var(--bg-subtle)" }}
+          >
+            <Icons.Close size={18} />
+          </button>
+        </div>
+
+        <form
+          onSubmit={handleConfirm}
+          className="p-5 overflow-y-auto space-y-4 no-scrollbar"
+        >
+          {/* Selector de Tipo de Finalización (Normal / Retiro / Walkover) */}
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { id: "normal", label: "Partido Completo" },
+              { id: "retirement", label: "Retiro Lesión" },
+              { id: "walkover", label: "Walkover (W.O.)" },
+            ].map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => setSpecialFinish(opt.id)}
+                className="touch-btn py-2 px-2 rounded-xl text-xs font-bold border"
+                style={{
+                  background:
+                    specialFinish === opt.id
+                      ? "var(--electric)"
+                      : "var(--bg-subtle)",
+                  color:
+                    specialFinish === opt.id ? "#FFFFFF" : "var(--text-main)",
+                  borderColor:
+                    specialFinish === opt.id
+                      ? "var(--electric)"
+                      : "var(--border-hairline)",
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          {specialFinish !== "normal" && (
+            <div className="space-y-2">
+              <label className="text-xs font-bold block">
+                ¿Quién avanza como ganador oficial?
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setRetiredWinnerSide("A")}
+                  className="touch-btn py-2.5 rounded-xl text-xs font-extrabold border"
+                  style={{
+                    background:
+                      retiredWinnerSide === "A" ? "#D6FF00" : "var(--bg-subtle)",
+                    color:
+                      retiredWinnerSide === "A" ? "#0A1633" : "var(--text-main)",
+                  }}
+                >
+                  {pA?.name}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRetiredWinnerSide("B")}
+                  className="touch-btn py-2.5 rounded-xl text-xs font-extrabold border"
+                  style={{
+                    background:
+                      retiredWinnerSide === "B" ? "#D6FF00" : "var(--bg-subtle)",
+                    color:
+                      retiredWinnerSide === "B" ? "#0A1633" : "var(--text-main)",
+                  }}
+                >
+                  {pB?.name}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {specialFinish !== "walkover" && (
+            <div className="space-y-3">
+              {/* Set 1 */}
+              <div
+                className="rounded-2xl p-3.5 space-y-2"
+                style={{
+                  background: "var(--bg-subtle)",
+                  border: "1px solid var(--border-hairline)",
+                }}
+              >
+                <div className="text-xs font-extrabold">Set 1 (Games)</div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label
+                      className="text-[11px] block mb-1"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      {pA?.name}
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="7"
+                      value={s1A}
+                      onChange={(e) => setS1A(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl text-center font-display font-black text-base"
+                      style={{
+                        background: "var(--bg-input)",
+                        border: "1px solid var(--border-strong)",
+                        color: "var(--text-main)",
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label
+                      className="text-[11px] block mb-1"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      {pB?.name}
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="7"
+                      value={s1B}
+                      onChange={(e) => setS1B(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl text-center font-display font-black text-base"
+                      style={{
+                        background: "var(--bg-input)",
+                        border: "1px solid var(--border-strong)",
+                        color: "var(--text-main)",
+                      }}
+                    />
+                  </div>
+                </div>
+                {isSet1Tb && (
+                  <div className="pt-1 flex items-center justify-between text-xs">
+                    <span>Puntos de quien perdió el Tie-Break 7-6:</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={tb1Loser}
+                      onChange={(e) => setTb1Loser(e.target.value)}
+                      className="w-16 px-2 py-1 rounded-lg text-center font-bold"
+                      style={{
+                        background: "var(--bg-input)",
+                        border: "1px solid var(--border-strong)",
+                        color: "var(--text-main)",
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Set 2 */}
+              <div
+                className="rounded-2xl p-3.5 space-y-2"
+                style={{
+                  background: "var(--bg-subtle)",
+                  border: "1px solid var(--border-hairline)",
+                }}
+              >
+                <div className="text-xs font-extrabold">Set 2 (Games)</div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label
+                      className="text-[11px] block mb-1"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      {pA?.name}
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="7"
+                      value={s2A}
+                      onChange={(e) => setS2A(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl text-center font-display font-black text-base"
+                      style={{
+                        background: "var(--bg-input)",
+                        border: "1px solid var(--border-strong)",
+                        color: "var(--text-main)",
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label
+                      className="text-[11px] block mb-1"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      {pB?.name}
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="7"
+                      value={s2B}
+                      onChange={(e) => setS2B(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl text-center font-display font-black text-base"
+                      style={{
+                        background: "var(--bg-input)",
+                        border: "1px solid var(--border-strong)",
+                        color: "var(--text-main)",
+                      }}
+                    />
+                  </div>
+                </div>
+                {isSet2Tb && (
+                  <div className="pt-1 flex items-center justify-between text-xs">
+                    <span>Puntos de quien perdió el Tie-Break 7-6:</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={tb2Loser}
+                      onChange={(e) => setTb2Loser(e.target.value)}
+                      className="w-16 px-2 py-1 rounded-lg text-center font-bold"
+                      style={{
+                        background: "var(--bg-input)",
+                        border: "1px solid var(--border-strong)",
+                        color: "var(--text-main)",
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Set 3: Super Tie-Break a 10 Puntos */}
+              {isSplitSets && (
+                <div
+                  className="rounded-2xl p-3.5 space-y-2"
+                  style={{
+                    background: "var(--gold-bg)",
+                    border: "1px solid var(--gold-border)",
+                  }}
+                >
+                  <div
+                    className="text-xs font-extrabold"
+                    style={{ color: "var(--gold)" }}
+                  >
+                    3er Set · Super Tie-Break (a 10 puntos, dif. mínima 2)
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder={`Pts ${pA?.name.split(" ")[0]}`}
+                      value={stbA}
+                      onChange={(e) => setStbA(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl text-center font-display font-black text-base"
+                      style={{
+                        background: "var(--bg-input)",
+                        border: "1px solid var(--border-strong)",
+                        color: "var(--text-main)",
+                      }}
+                    />
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder={`Pts ${pB?.name.split(" ")[0]}`}
+                      value={stbB}
+                      onChange={(e) => setStbB(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl text-center font-display font-black text-base"
+                      style={{
+                        background: "var(--bg-input)",
+                        border: "1px solid var(--border-strong)",
+                        color: "var(--text-main)",
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {validationError && (
+            <div
+              className="rounded-xl p-3 text-xs font-bold"
+              style={{
+                background: "rgba(244, 63, 94, 0.15)",
+                color: "var(--crimson)",
+              }}
+            >
+              {validationError}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            className="touch-btn w-full py-3.5 rounded-xl font-display font-extrabold text-xs uppercase tracking-wider"
+            style={{ background: "#D6FF00", color: "#0A1633" }}
+          >
+            Confirmar Marcador Oficial
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// === FIN DEL BLOQUE 9 DE 10 ===
+
+// === INICIO DEL BLOQUE 10 DE 10 ===
+
+// ============================================================================
+// 34. MODAL DE REGLAS DEL CIRCUITO (100% VISUAL · CERO PÁRRAFOS LARGOS)
+// ============================================================================
+export const VisualRulesModal = ({ isOpen, onClose }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 ios-blur-backdrop flex items-center justify-center p-3 sm:p-5 overflow-y-auto"
+      onClick={onClose}
+    >
+      <div
+        className="ios-modal-card w-full max-w-md rounded-3xl overflow-hidden my-auto flex flex-col"
+        style={{ maxHeight: "90dvh" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div
+          className="px-5 pt-4 pb-3 flex items-center justify-between"
+          style={{ borderBottom: "1px solid var(--border-hairline)" }}
+        >
+          <div>
+            <h3 className="font-display font-extrabold text-base">
+              Sistema de Juego & Categorías
+            </h3>
+            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Escalera progresiva, Checkpoints y puntuación por sets
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="touch-btn w-9 h-9 rounded-full"
+            style={{ background: "var(--bg-subtle)" }}
+          >
+            <Icons.Close size={18} />
+          </button>
+        </div>
+
+        <div className="p-5 overflow-y-auto space-y-4 no-scrollbar">
+          {/* 1. Escalera Visual de Categorías y Checkpoints */}
+          <div className="space-y-2">
+            <div
+              className="text-[11px] font-extrabold uppercase tracking-wider"
+              style={{ color: "var(--text-muted)" }}
+            >
+              1. Escalera Oficial & Checkpoints de Temporada
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {CATEGORIES_PROGRESSIVE.map((cat) => (
+                <div
+                  key={cat.id}
+                  className="rounded-xl p-3 space-y-1"
+                  style={{
+                    background: cat.bg,
+                    border: `1px solid ${cat.border}`,
+                  }}
+                >
+                  <div className="flex items-center justify-between">
+                    <span
+                      className="font-display font-black text-xs"
+                      style={{ color: cat.color }}
+                    >
+                      {cat.name}
+                    </span>
+                  </div>
+                  <div className="font-mono-code font-bold text-xs">
+                    {cat.id === "2DA"
+                      ? "5,000+ Pts"
+                      : `${cat.min} – ${cat.max} Pts`}
+                  </div>
+                  {cat.checkpoint && (
+                    <div
+                      className="text-[10px] font-extrabold"
+                      style={{ color: "var(--gold)" }}
+                    >
+                      Checkpoint: {cat.checkpoint} Pts
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 2. Las 3 Jaulas Finitas (Gráfico Visual Rápido) */}
+          <div
+            className="rounded-2xl p-4 space-y-2.5"
+            style={{
+              background: "var(--bg-subtle)",
+              border: "1px solid var(--border-hairline)",
+            }}
+          >
+            <div
+              className="text-[11px] font-extrabold uppercase tracking-wider"
+              style={{ color: "var(--text-player)" }}
+            >
+              2. Cada Game Cuenta (3 Jaulas de Marcador)
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-center text-xs">
+              <div
+                className="rounded-xl p-2.5"
+                style={{ background: "var(--bg-card)" }}
+              >
+                <div
+                  className="font-display font-black text-sm"
+                  style={{ color: "var(--emerald)" }}
+                >
+                  76% – 100%
+                </div>
+                <div className="text-[10px] font-bold mt-0.5">
+                  Victoria 2 Sets
+                </div>
+                <div
+                  className="text-[9px]"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  6-0, 6-0 paga 100%
+                </div>
+              </div>
+
+              <div
+                className="rounded-xl p-2.5"
+                style={{ background: "var(--bg-card)" }}
+              >
+                <div
+                  className="font-display font-black text-sm"
+                  style={{ color: "var(--electric)" }}
+                >
+                  70% – 75%
+                </div>
+                <div className="text-[10px] font-bold mt-0.5">
+                  Victoria 3 Sets
+                </div>
+                <div
+                  className="text-[9px]"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  Super TB a 10 pts
+                </div>
+              </div>
+
+              <div
+                className="rounded-xl p-2.5"
+                style={{ background: "var(--bg-card)" }}
+              >
+                <div
+                  className="font-display font-black text-sm"
+                  style={{ color: "var(--gold)" }}
+                >
+                  Protección
+                </div>
+                <div className="text-[10px] font-bold mt-0.5">
+                  Caer en 3 Sets
+                </div>
+                <div
+                  className="text-[9px]"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  Ahorras hasta 62%
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 3. Reglas Clave en Tarjetas Cortas */}
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div
+              className="rounded-xl p-3 space-y-1"
+              style={{
+                background: "var(--bg-subtle)",
+                border: "1px solid var(--border-hairline)",
+              }}
+            >
+              <div className="font-display font-extrabold">
+                Duelos entre Amigos
+              </div>
+              <div
+                className="text-[11px]"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Hasta 1,000 pts de brecha suma al Ranking. Si supera 1,000 pts,
+                se juega como Amistoso H2H.
+              </div>
+            </div>
+
+            <div
+              className="rounded-xl p-3 space-y-1"
+              style={{
+                background: "var(--bg-subtle)",
+                border: "1px solid var(--border-hairline)",
+              }}
+            >
+              <div className="font-display font-extrabold">Master Top 8</div>
+              <div
+                className="text-[11px]"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Clasifican los 8 mejores de cada categoría con mínimo 4 partidos
+                jugados en la temporada.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// 35. MODAL DE ACCESO DUAL (CELULAR / CORREO), REGISTRO Y RECUPERACIÓN EN 2 PASOS
+// ============================================================================
+export const AuthAndAccountModal = ({
+  isOpen,
+  onClose,
+  players = [],
+  currentUser,
+  clubs = HUANCAYO_CLUBS,
+  onSwitchUser,
+  onRegisterNewPlayer,
+  onResetPasswordSuccess,
+}) => {
+  const [tab, setTab] = useState("login"); // 'login' | 'register' | 'recover'
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPass, setShowPass] = useState(false);
+  const [authError, setAuthError] = useState("");
+
+  // Registro de nuevo tenista
+  const [regName, setRegName] = useState("");
+  const [regPhone, setRegPhone] = useState("");
+  const [regEmail, setRegEmail] = useState("");
+  const [regClubId, setRegClubId] = useState("country");
+  const [regPassword, setRegPassword] = useState("");
+
+  // Recuperación en 2 pasos reales separados
+  const [recoverStep, setRecoverStep] = useState(1); // 1: Verificar identidad | 2: Nueva clave
+  const [recEmail, setRecEmail] = useState("");
+  const [recPhone, setRecPhone] = useState("");
+  const [verifiedPlayerId, setVerifiedPlayerId] = useState(null);
+  const [newPass, setNewPass] = useState("");
+  const [newPassConfirm, setNewPassConfirm] = useState("");
+  const [recoverSuccessMsg, setRecoverSuccessMsg] = useState("");
+
+  useEffect(() => {
+    setAuthError("");
+    setRecoverStep(1);
+    setVerifiedPlayerId(null);
+    setRecoverSuccessMsg("");
+  }, [isOpen, tab]);
+
+  if (!isOpen) return null;
+
+  const handleLoginSubmit = (e) => {
+    e.preventDefault();
+    const clean = identifier.trim().toLowerCase();
+    const found = players.find(
+      (p) =>
+        p.email?.toLowerCase() === clean ||
+        p.phone?.replace(/\s+/g, "") === clean
+    );
+    if (!found) {
+      setAuthError("No encontramos una cuenta con ese celular o correo.");
+      return;
+    }
+    if (password && found.password && password !== found.password) {
+      setAuthError("Contraseña incorrecta.");
+      return;
+    }
+    if (onSwitchUser) onSwitchUser(found.id);
+    onClose();
+  };
+
+  const handleRegisterSubmit = (e) => {
+    e.preventDefault();
+    if (!regName.trim() || !regPhone.trim()) {
+      setAuthError("Ingresa tu nombre completo y número de WhatsApp.");
+      return;
+    }
+    if (onRegisterNewPlayer) {
+      onRegisterNewPlayer({
+        name: regName.trim(),
+        phone: regPhone.trim(),
+        email:
+          regEmail.trim() ||
+          `${regName.trim().toLowerCase().replace(/\s+/g, ".")}@matchpoint.pe`,
+        clubId: regClubId,
+        password: regPassword || "123",
+      });
+    }
+    onClose();
+  };
+
+  const handleVerifyStep1 = (e) => {
+    e.preventDefault();
+    const cleanMail = recEmail.trim().toLowerCase();
+    const cleanPhone = recPhone.trim().replace(/\s+/g, "");
+    const match = players.find(
+      (p) =>
+        p.email?.toLowerCase() === cleanMail &&
+        p.phone?.replace(/\s+/g, "") === cleanPhone
+    );
+    if (!match) {
+      setAuthError(
+        "El correo y el número de WhatsApp no coinciden con ningún jugador registrado."
+      );
+      return;
+    }
+    setAuthError("");
+    setVerifiedPlayerId(match.id);
+    setRecoverStep(2);
+  };
+
+  const handleSaveNewPassStep2 = (e) => {
+    e.preventDefault();
+    if (!newPass || newPass.length < 3) {
+      setAuthError("Ingresa una contraseña válida (mínimo 3 caracteres).");
+      return;
+    }
+    if (newPass !== newPassConfirm) {
+      setAuthError("Las contraseñas no coinciden.");
+      return;
+    }
+    if (onResetPasswordSuccess && verifiedPlayerId) {
+      onResetPasswordSuccess(verifiedPlayerId, newPass);
+    }
+    setAuthError("");
+    setRecoverSuccessMsg("Contraseña actualizada correctamente.");
+    setTimeout(() => {
+      setTab("login");
+      setRecoverSuccessMsg("");
+    }, 1100);
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 ios-blur-backdrop flex items-center justify-center p-3 sm:p-5 overflow-y-auto"
+      onClick={onClose}
+    >
+      <div
+        className="ios-modal-card w-full max-w-md rounded-3xl overflow-hidden my-auto flex flex-col"
+        style={{ maxHeight: "90dvh" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div
+          className="px-5 pt-4 pb-3 flex items-center justify-between"
+          style={{ borderBottom: "1px solid var(--border-hairline)" }}
+        >
+          <div className="flex items-center gap-2">
+            <SafeImage
+              src={ASSETS.logo}
+              alt="MP"
+              style={{ width: 26, height: 26, borderRadius: 7 }}
+            />
+            <h3 className="font-display font-extrabold text-base">
+              Cuenta de Jugador
+            </h3>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="touch-btn w-9 h-9 rounded-full"
+            style={{ background: "var(--bg-subtle)" }}
+          >
+            <Icons.Close size={18} />
+          </button>
+        </div>
+
+        {/* Pestañas */}
+        <div
+          className="grid grid-cols-3 px-4"
+          style={{ borderBottom: "1px solid var(--border-hairline)" }}
+        >
+          {[
+            { id: "login", label: "Ingresar" },
+            { id: "register", label: "Crear Cuenta" },
+            { id: "recover", label: "Recuperar" },
+          ].map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setTab(t.id)}
+              className="py-3 text-xs font-display font-extrabold uppercase tracking-wider relative"
+              style={{
+                color: tab === t.id ? "var(--text-main)" : "var(--text-muted)",
+              }}
+            >
+              {t.label}
+              {tab === t.id && (
+                <span
+                  className="absolute bottom-0 inset-x-3 h-0.5 rounded-full"
+                  style={{ background: "var(--electric)" }}
+                />
+              )}
+            </button>
+          ))}
+        </div>
+
+        <div className="p-5 overflow-y-auto space-y-4 no-scrollbar">
+          {tab === "login" && (
+            <>
+              <form onSubmit={handleLoginSubmit} className="space-y-3">
+                <div>
+                  <label className="text-xs font-bold block mb-1">
+                    Celular (WhatsApp) o Correo
+                  </label>
+                  <input
+                    type="text"
+                    value={identifier}
+                    onChange={(e) => setIdentifier(e.target.value)}
+                    placeholder="Ej. 966778899 o pablo@matchpoint.pe"
+                    className="w-full px-3.5 py-2.5 rounded-xl text-xs focus:outline-none"
+                    style={{
+                      background: "var(--bg-input)",
+                      border: "1px solid var(--border-hairline)",
+                      color: "var(--text-main)",
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold block mb-1">
+                    Contraseña
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPass ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Ingresa tu clave"
+                      className="w-full px-3.5 py-2.5 rounded-xl text-xs focus:outline-none pr-10"
+                      style={{
+                        background: "var(--bg-input)",
+                        border: "1px solid var(--border-hairline)",
+                        color: "var(--text-main)",
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPass((v) => !v)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      {showPass ? <Icons.EyeOff size={16} /> : <Icons.Eye size={16} />}
+                    </button>
+                  </div>
+                </div>
+
+                {authError && (
+                  <div
+                    className="text-xs font-bold"
+                    style={{ color: "var(--crimson)" }}
+                  >
+                    {authError}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  className="touch-btn w-full py-3 rounded-xl font-display font-extrabold text-xs uppercase tracking-wider"
+                  style={{ background: "#D6FF00", color: "#0A1633" }}
+                >
+                  Iniciar Sesión
+                </button>
+              </form>
+
+              {/* Selector de Cuentas Activas del Circuito */}
+              <div
+                className="pt-3 border-t space-y-2"
+                style={{ borderColor: "var(--border-hairline)" }}
+              >
+                <div
+                  className="text-[11px] font-extrabold uppercase tracking-wider"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  Cambio Rápido de Cuenta
+                </div>
+                <div className="grid grid-cols-2 gap-1.5 max-h-44 overflow-y-auto no-scrollbar">
+                  {players.map((p) => {
+                    const isCurrent = p.id === currentUser?.id;
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => {
+                          if (onSwitchUser) onSwitchUser(p.id);
+                          onClose();
+                        }}
+                        className="px-2.5 py-2 rounded-xl flex items-center gap-2 text-left border transition-all"
+                        style={{
+                          background: isCurrent
+                            ? "var(--bg-elevated)"
+                            : "var(--bg-subtle)",
+                          borderColor: isCurrent
+                            ? "#D6FF00"
+                            : "var(--border-hairline)",
+                        }}
+                      >
+                        <SafeImage
+                          src={p.avatar}
+                          alt={p.name}
+                          circular
+                          style={{ width: 26, height: 26 }}
+                        />
+                        <div className="min-w-0">
+                          <div className="font-display font-bold text-xs truncate">
+                            {p.name}
+                          </div>
+                          <div
+                            className="text-[10px] tabular-nums"
+                            style={{ color: "var(--text-muted)" }}
+                          >
+                            {p.elo} Pts
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          )}
+
+          {tab === "register" && (
+            <form onSubmit={handleRegisterSubmit} className="space-y-3">
+              <div>
+                <label className="text-xs font-bold block mb-1">
+                  Nombre y Apellido
+                </label>
+                <input
+                  type="text"
+                  value={regName}
+                  onChange={(e) => setRegName(e.target.value)}
+                  placeholder="Ej. Rodrigo Mantari"
+                  className="w-full px-3.5 py-2.5 rounded-xl text-xs focus:outline-none"
+                  style={{
+                    background: "var(--bg-input)",
+                    border: "1px solid var(--border-hairline)",
+                    color: "var(--text-main)",
+                  }}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs font-bold block mb-1">
+                    WhatsApp (9 dígitos)
+                  </label>
+                  <input
+                    type="tel"
+                    value={regPhone}
+                    onChange={(e) => setRegPhone(e.target.value)}
+                    placeholder="964112233"
+                    className="w-full px-3 py-2.5 rounded-xl text-xs focus:outline-none"
+                    style={{
+                      background: "var(--bg-input)",
+                      border: "1px solid var(--border-hairline)",
+                      color: "var(--text-main)",
+                    }}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold block mb-1">
+                    Club Principal
+                  </label>
+                  <select
+                    value={regClubId}
+                    onChange={(e) => setRegClubId(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl text-xs focus:outline-none"
+                    style={{
+                      background: "var(--bg-input)",
+                      border: "1px solid var(--border-hairline)",
+                      color: "var(--text-main)",
+                    }}
+                  >
+                    {clubs.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.shortName}
+                      </option>
+                    ))}
+                    <option value="individual">Independiente</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold block mb-1">
+                  Correo Electrónico
+                </label>
+                <input
+                  type="email"
+                  value={regEmail}
+                  onChange={(e) => setRegEmail(e.target.value)}
+                  placeholder="correo@ejemplo.com"
+                  className="w-full px-3.5 py-2.5 rounded-xl text-xs focus:outline-none"
+                  style={{
+                    background: "var(--bg-input)",
+                    border: "1px solid var(--border-hairline)",
+                    color: "var(--text-main)",
+                  }}
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold block mb-1">
+                  Contraseña
+                </label>
+                <input
+                  type="password"
+                  value={regPassword}
+                  onChange={(e) => setRegPassword(e.target.value)}
+                  placeholder="Crea tu contraseña"
+                  className="w-full px-3.5 py-2.5 rounded-xl text-xs focus:outline-none"
+                  style={{
+                    background: "var(--bg-input)",
+                    border: "1px solid var(--border-hairline)",
+                    color: "var(--text-main)",
+                  }}
+                />
+              </div>
+
+              {authError && (
+                <div
+                  className="text-xs font-bold"
+                  style={{ color: "var(--crimson)" }}
+                >
+                  {authError}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                className="touch-btn w-full py-3.5 rounded-xl font-display font-extrabold text-xs uppercase tracking-wider"
+                style={{ background: "#D6FF00", color: "#0A1633" }}
+              >
+                Registrarme y Realizar Diagnóstico Inicial →
+              </button>
+            </form>
+          )}
+
+          {tab === "recover" && (
+            /* Flujo de Recuperación en 2 Pasos Separados */
+            <div className="space-y-3">
+              {recoverStep === 1 ? (
+                <form onSubmit={handleVerifyStep1} className="space-y-3">
+                  <div
+                    className="text-xs"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    <strong>Paso 1 de 2:</strong> Verifica tu identidad con tu
+                    correo registrado y tu número de WhatsApp.
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold block mb-1">
+                      Correo Registrado
+                    </label>
+                    <input
+                      type="email"
+                      value={recEmail}
+                      onChange={(e) => setRecEmail(e.target.value)}
+                      placeholder="Ej. pablo@matchpoint.pe"
+                      className="w-full px-3.5 py-2.5 rounded-xl text-xs focus:outline-none"
+                      style={{
+                        background: "var(--bg-input)",
+                        border: "1px solid var(--border-hairline)",
+                        color: "var(--text-main)",
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold block mb-1">
+                      Número de WhatsApp
+                    </label>
+                    <input
+                      type="tel"
+                      value={recPhone}
+                      onChange={(e) => setRecPhone(e.target.value)}
+                      placeholder="Ej. 966778899"
+                      className="w-full px-3.5 py-2.5 rounded-xl text-xs focus:outline-none"
+                      style={{
+                        background: "var(--bg-input)",
+                        border: "1px solid var(--border-hairline)",
+                        color: "var(--text-main)",
+                      }}
+                    />
+                  </div>
+                  {authError && (
+                    <div
+                      className="text-xs font-bold"
+                      style={{ color: "var(--crimson)" }}
+                    >
+                      {authError}
+                    </div>
+                  )}
+                  <button
+                    type="submit"
+                    className="touch-btn w-full py-3 rounded-xl font-display font-extrabold text-xs uppercase tracking-wider"
+                    style={{ background: "var(--electric)", color: "#FFFFFF" }}
+                  >
+                    Verificar Identidad →
+                  </button>
+                </form>
+              ) : (
+                <form onSubmit={handleSaveNewPassStep2} className="space-y-3">
+                  <div
+                    className="text-xs font-bold"
+                    style={{ color: "var(--emerald)" }}
+                  >
+                    ✓ Identidad verificada (Paso 2 de 2): Crea tu nueva
+                    contraseña.
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold block mb-1">
+                      Nueva Contraseña
+                    </label>
+                    <input
+                      type="password"
+                      value={newPass}
+                      onChange={(e) => setNewPass(e.target.value)}
+                      placeholder="Nueva contraseña"
+                      className="w-full px-3.5 py-2.5 rounded-xl text-xs focus:outline-none"
+                      style={{
+                        background: "var(--bg-input)",
+                        border: "1px solid var(--border-strong)",
+                        color: "var(--text-main)",
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold block mb-1">
+                      Confirmar Nueva Contraseña
+                    </label>
+                    <input
+                      type="password"
+                      value={newPassConfirm}
+                      onChange={(e) => setNewPassConfirm(e.target.value)}
+                      placeholder="Repite la nueva contraseña"
+                      className="w-full px-3.5 py-2.5 rounded-xl text-xs focus:outline-none"
+                      style={{
+                        background: "var(--bg-input)",
+                        border: "1px solid var(--border-strong)",
+                        color: "var(--text-main)",
+                      }}
+                    />
+                  </div>
+                  {authError && (
+                    <div
+                      className="text-xs font-bold"
+                      style={{ color: "var(--crimson)" }}
+                    >
+                      {authError}
+                    </div>
+                  )}
+                  {recoverSuccessMsg && (
+                    <div
+                      className="text-xs font-extrabold"
+                      style={{ color: "var(--emerald)" }}
+                    >
+                      {recoverSuccessMsg}
+                    </div>
+                  )}
+                  <button
+                    type="submit"
+                    className="touch-btn w-full py-3 rounded-xl font-display font-extrabold text-xs uppercase tracking-wider"
+                    style={{ background: "#D6FF00", color: "#0A1633" }}
+                  >
+                    Guardar Nueva Contraseña
+                  </button>
+                </form>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// 36. CUESTIONARIO INICIAL 1 POR 1 (EXCLUSIVO REGISTRO NUEVO) Y GUÍA RÁPIDA
+// ============================================================================
+export const InitialCalibrationWizardModal = ({
+  isOpen,
+  player,
+  onCompleteInitialSeed,
+}) => {
+  const [stepIdx, setStepIdx] = useState(0);
+  const [answers, setAnswers] = useState([2, 2, 2, 2, 2]);
+
+  if (!isOpen || !player) return null;
+
+  const currentQ = CALIBRATION_QUESTIONS_1X1[stepIdx];
+
+  const handleSelectOption = (pts) => {
+    const next = [...answers];
+    next[stepIdx] = pts;
+    setAnswers(next);
+
+    if (stepIdx + 1 < CALIBRATION_QUESTIONS_1X1.length) {
+      setStepIdx(stepIdx + 1);
+    } else {
+      const seedResult = computeInitialSeedFromAnswers(next);
+      if (onCompleteInitialSeed) {
+        onCompleteInitialSeed(player.id, seedResult.seedElo);
+      }
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 ios-blur-backdrop flex items-center justify-center p-4">
+      <div className="ios-modal-card w-full max-w-md rounded-3xl p-5 space-y-4">
+        <div className="flex items-center justify-between text-xs font-bold">
+          <span style={{ color: "var(--electric)" }}>
+            Diagnóstico Inicial Único · Pregunta {stepIdx + 1} de{" "}
+            {CALIBRATION_QUESTIONS_1X1.length}
+          </span>
+          <span className="tabular-nums">
+            {Math.round(((stepIdx + 1) / CALIBRATION_QUESTIONS_1X1.length) * 100)}%
+          </span>
+        </div>
+
+        <div className="space-y-1">
+          <h3 className="font-display font-black text-base sm:text-lg">
+            {currentQ.title}
+          </h3>
+          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+            {currentQ.subtitle}
+          </p>
+        </div>
+
+        <div className="space-y-2 pt-1">
+          {currentQ.options.map((opt, idx) => (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => handleSelectOption(opt.points)}
+              className="w-full p-3.5 rounded-2xl text-left text-xs font-semibold border transition-all hover:border-sky-400"
+              style={{
+                background: "var(--bg-subtle)",
+                borderColor: "var(--border-strong)",
+                color: "var(--text-main)",
+              }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// 37. MENÚ LATERAL (CONMUTADOR CLARO/OSCURO, REGLAS, COMITÉ) Y ADMIN OCULTO
+// ============================================================================
+export const SideNavigationDrawer = ({
+  isOpen,
+  onClose,
+  theme,
+  onToggleTheme,
+  onOpenVisualRules,
+  onOpenVipModal,
+  onOpenAuthModal,
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 ios-blur-backdrop flex justify-start"
+      onClick={onClose}
+    >
+      <div
+        className="w-72 max-w-[82vw] h-full p-5 flex flex-col justify-between safe-modal-top"
+        style={{
+          background: "var(--bg-card)",
+          borderRight: "1px solid var(--border-strong)",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="space-y-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <SafeImage
+                src={ASSETS.logo}
+                alt="MATCHPOINT"
+                style={{ width: 32, height: 32, borderRadius: 8 }}
+              />
+              <span className="font-display font-black text-base">
+                MATCHPOINT
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="touch-btn w-9 h-9 rounded-full"
+              style={{ background: "var(--bg-subtle)" }}
+            >
+              <Icons.Close size={18} />
+            </button>
+          </div>
+
+          {/* Conmutador Simétrico Modo Oscuro / Modo Claro */}
+          <div
+            className="rounded-2xl p-3.5 space-y-2"
+            style={{
+              background: "var(--bg-subtle)",
+              border: "1px solid var(--border-hairline)",
+            }}
+          >
+            <div
+              className="text-[10px] font-extrabold uppercase tracking-wider"
+              style={{ color: "var(--text-muted)" }}
+            >
+              Apariencia de Pantalla
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => theme !== "dark" && onToggleTheme()}
+                className="touch-btn py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5"
+                style={{
+                  minHeight: 38,
+                  background:
+                    theme === "dark" ? "var(--electric)" : "transparent",
+                  color: theme === "dark" ? "#FFFFFF" : "var(--text-muted)",
+                }}
+              >
+                <Icons.Moon size={15} />
+                <span>Oscuro</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => theme !== "light" && onToggleTheme()}
+                className="touch-btn py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5"
+                style={{
+                  minHeight: 38,
+                  background:
+                    theme === "light" ? "var(--electric)" : "transparent",
+                  color: theme === "light" ? "#FFFFFF" : "var(--text-muted)",
+                }}
+              >
+                <Icons.Sun size={15} />
+                <span>Claro</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Opciones del Menú */}
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                if (onOpenVisualRules) onOpenVisualRules();
+              }}
+              className="w-full p-3.5 rounded-2xl text-left font-display font-bold text-xs flex items-center justify-between"
+              style={{
+                background: "var(--bg-subtle)",
+                border: "1px solid var(--border-hairline)",
+              }}
+            >
+              <span>Sistema de Juego & Categorías</span>
+              <span>→</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                if (onOpenVipModal) onOpenVipModal();
+              }}
+              className="w-full p-3.5 rounded-2xl text-left font-display font-bold text-xs flex items-center justify-between"
+              style={{
+                background: "var(--gold-bg)",
+                border: "1px solid var(--gold-border)",
+                color: "var(--gold)",
+              }}
+            >
+              <span>Pase Socio VIP & Beneficios</span>
+              <span>→</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                if (onOpenAuthModal) onOpenAuthModal();
+              }}
+              className="w-full p-3.5 rounded-2xl text-left font-display font-bold text-xs flex items-center justify-between"
+              style={{
+                background: "var(--bg-subtle)",
+                border: "1px solid var(--border-hairline)",
+              }}
+            >
+              <span>Cambiar de Cuenta / Registro</span>
+              <span>→</span>
+            </button>
+          </div>
+
+          {/* Contacto Comité Oficial (100% enfocado en asistencia) */}
+          <div
+            className="rounded-2xl p-4 space-y-2.5"
+            style={{
+              background: "var(--bg-subtle)",
+              border: "1px solid var(--border-hairline)",
+            }}
+          >
+            <div className="font-display font-extrabold text-xs">
+              Comité Organizador Huancayo
+            </div>
+            <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+              Soporte oficial para inscripciones, coordinación de sedes y
+              consultas del circuito.
+            </p>
+            <a
+              href={`https://wa.me/${PAYMENT_METHODS_CONFIG.whatsappApprovalPhone}?text=${encodeURIComponent(
+                "Hola Comité Oficial MATCHPOINT, necesito asistencia con mi cuenta del circuito."
+              )}`}
+              target="_blank"
+              rel="noreferrer"
+              className="touch-btn w-full py-2.5 rounded-xl font-display font-extrabold text-xs block text-center"
+              style={{ background: "var(--emerald)", color: "#FFFFFF" }}
+            >
+              Contactar al Comité por WhatsApp
+            </a>
+          </div>
+        </div>
+
+        <div
+          className="text-[11px] text-center pt-3 border-t"
+          style={{
+            borderColor: "var(--border-hairline)",
+            color: "var(--text-muted)",
+          }}
+        >
+          MATCHPOINT Huancayo · Temporada 2026
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// 38. SUITE ADMIN OCULTA (SOLO SE ABRE CON 5 TOQUES EN EL LOGO MATCHPOINT)
+//     - Aprobación de pagos de Torneos e Inscripción al Cuadro
+//     - Activación de Pase Socio VIP
+//     - Gestión de Cuentas y Reset de Temporada
+// ============================================================================
+export const HiddenAdminSuiteModal = ({
+  isOpen,
+  onClose,
+  players = [],
+  tournaments = [],
+  vipPendingPlayerIds = [],
+  onApproveTournamentApplicant,
+  onRejectTournamentApplicant,
+  onApproveVipMember,
+  onAdminResetPlayerPassword,
+  onAdminTogglePlayerStatus,
+  onTriggerSeasonReset,
+}) => {
+  const [pinInput, setPinInput] = useState("");
+  const [unlocked, setUnlocked] = useState(false);
+
+  if (!isOpen) return null;
+
+  const handlePinCheck = (e) => {
+    e.preventDefault();
+    if (pinInput.trim() === "1234") {
+      setUnlocked(true);
+    } else {
+      alert("PIN de Administrador incorrecto.");
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 ios-blur-backdrop flex items-center justify-center p-3 sm:p-5 overflow-y-auto"
+      onClick={onClose}
+    >
+      <div
+        className="ios-modal-card w-full max-w-md rounded-3xl overflow-hidden my-auto flex flex-col"
+        style={{ maxHeight: "90dvh" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div
+          className="px-5 pt-4 pb-3 flex items-center justify-between"
+          style={{ borderBottom: "1px solid var(--border-hairline)" }}
+        >
+          <h3 className="font-display font-extrabold text-base">
+            Panel de Control del Organizador
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="touch-btn w-9 h-9 rounded-full"
+            style={{ background: "var(--bg-subtle)" }}
+          >
+            <Icons.Close size={18} />
+          </button>
+        </div>
+
+        <div className="p-5 overflow-y-auto space-y-4 no-scrollbar">
+          {!unlocked ? (
+            <form onSubmit={handlePinCheck} className="space-y-3">
+              <label className="text-xs font-bold block">
+                Ingresa tu PIN de Administrador
+              </label>
+              <input
+                type="password"
+                value={pinInput}
+                onChange={(e) => setPinInput(e.target.value)}
+                placeholder="PIN (1234)"
+                className="w-full px-3.5 py-2.5 rounded-xl text-xs focus:outline-none"
+                style={{
+                  background: "var(--bg-input)",
+                  border: "1px solid var(--border-strong)",
+                  color: "var(--text-main)",
+                }}
+              />
+              <button
+                type="submit"
+                className="touch-btn w-full py-3 rounded-xl font-display font-extrabold text-xs"
+                style={{ background: "#D6FF00", color: "#0A1633" }}
+              >
+                Desbloquear Panel
+              </button>
+            </form>
+          ) : (
+            <>
+              {/* 1. Solicitudes de Inscripción a Torneos por Aprobar */}
+              <div className="space-y-2">
+                <div
+                  className="text-xs font-extrabold uppercase tracking-wider"
+                  style={{ color: "var(--gold)" }}
+                >
+                  1. Pagos de Torneos por Aprobar
+                </div>
+                {tournaments.map((t) =>
+                  (t.pendingApplicantIds || []).map((pid) => {
+                    const applicant = players.find((p) => p.id === pid);
+                    return (
+                      <div
+                        key={`${t.id}_${pid}`}
+                        className="rounded-xl p-3 flex items-center justify-between gap-2"
+                        style={{
+                          background: "var(--bg-subtle)",
+                          border: "1px solid var(--gold-border)",
+                        }}
+                      >
+                        <div className="min-w-0">
+                          <div className="font-display font-bold text-xs truncate">
+                            {applicant?.name}
+                          </div>
+                          <div
+                            className="text-[11px] truncate"
+                            style={{ color: "var(--text-muted)" }}
+                          >
+                            {t.title} (S/ {t.entryFee})
+                          </div>
+                        </div>
+                        <div className="flex gap-1.5 flex-shrink-0">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              onApproveTournamentApplicant &&
+                              onApproveTournamentApplicant(t.id, pid)
+                            }
+                            className="px-2.5 py-1.5 rounded-lg text-[11px] font-extrabold"
+                            style={{
+                              background: "var(--emerald)",
+                              color: "#FFFFFF",
+                            }}
+                          >
+                            ✓ Aprobar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              onRejectTournamentApplicant &&
+                              onRejectTournamentApplicant(t.id, pid)
+                            }
+                            className="px-2.5 py-1.5 rounded-lg text-[11px] font-bold"
+                            style={{
+                              background: "var(--crimson)",
+                              color: "#FFFFFF",
+                            }}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* 2. Solicitudes de Pase Socio VIP */}
+              {vipPendingPlayerIds.length > 0 && (
+                <div className="space-y-2">
+                  <div
+                    className="text-xs font-extrabold uppercase tracking-wider"
+                    style={{ color: "var(--gold)" }}
+                  >
+                    2. Activaciones de Pase Socio VIP Pendientes
+                  </div>
+                  {vipPendingPlayerIds.map((pid) => {
+                    const p = players.find((item) => item.id === pid);
+                    return (
+                      <div
+                        key={pid}
+                        className="rounded-xl p-3 flex items-center justify-between"
+                        style={{
+                          background: "var(--bg-subtle)",
+                          border: "1px solid var(--border-strong)",
+                        }}
+                      >
+                        <span className="text-xs font-bold">{p?.name}</span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            onApproveVipMember && onApproveVipMember(pid)
+                          }
+                          className="px-3 py-1.5 rounded-lg text-xs font-extrabold"
+                          style={{
+                            background: "var(--emerald)",
+                            color: "#FFFFFF",
+                          }}
+                        >
+                          Activar VIP
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* 3. Gestión de Cuentas de Jugadores */}
+              <div className="space-y-2">
+                <div
+                  className="text-xs font-extrabold uppercase tracking-wider"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  Gestión de Cuentas y Claves
+                </div>
+                <div className="space-y-1.5 max-h-56 overflow-y-auto no-scrollbar">
+                  {players.map((p) => (
+                    <div
+                      key={p.id}
+                      className="rounded-xl p-2.5 flex items-center justify-between gap-2 text-xs"
+                      style={{
+                        background: "var(--bg-subtle)",
+                        border: "1px solid var(--border-hairline)",
+                      }}
+                    >
+                      <div className="min-w-0">
+                        <div className="font-bold truncate">{p.name}</div>
+                        <div
+                          className="text-[10px]"
+                          style={{ color: "var(--text-muted)" }}
+                        >
+                          {p.elo} Pts ·{" "}
+                          {p.activeStatus === "inactive" ? "Pausado" : "Activo"}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            onAdminResetPlayerPassword &&
+                            onAdminResetPlayerPassword(p.id)
+                          }
+                          className="px-2 py-1 rounded text-[10px] font-bold border"
+                          style={{ borderColor: "var(--border-strong)" }}
+                        >
+                          Clave: Tenis2026
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            onAdminTogglePlayerStatus &&
+                            onAdminTogglePlayerStatus(p.id)
+                          }
+                          className="px-2 py-1 rounded text-[10px] font-bold"
+                          style={{
+                            background:
+                              p.activeStatus === "inactive"
+                                ? "var(--emerald)"
+                                : "var(--bg-card)",
+                            color:
+                              p.activeStatus === "inactive"
+                                ? "#FFFFFF"
+                                : "var(--text-muted)",
+                          }}
+                        >
+                          {p.activeStatus === "inactive"
+                            ? "Reactivar"
+                            : "Pausar"}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 4. Cierre de Temporada con Respeto a Checkpoints */}
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={onTriggerSeasonReset}
+                  className="touch-btn w-full py-2.5 rounded-xl text-xs font-bold border"
+                  style={{
+                    borderColor: "var(--gold-border)",
+                    color: "var(--gold)",
+                  }}
+                >
+                  Iniciar Nueva Temporada (Aplicar Pisos y Checkpoints)
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// 39. BARRA INFERIOR DE 5 PESTAÑAS CON HALO LUMINOSO ACTIVO
+// ============================================================================
+export const BottomTabNavigation = ({ activeTab, onSelectTab }) => {
+  const tabs = [
+    { id: "perfil", label: "Mi Perfil", icon: ASSETS.navPerfil },
+    { id: "ranking", label: "Ranking", icon: ASSETS.navRanking },
+    { id: "retos", label: "Retos", icon: ASSETS.navRetos, isCenter: true },
+    { id: "sedes", label: "Sedes", icon: ASSETS.navSedes },
+    { id: "torneos", label: "Torneos", icon: ASSETS.navTorneos },
+  ];
+
+  return (
+    <nav className="safe-bottom-bar px-2 pt-2 select-none">
+      <div className="max-w-xl mx-auto grid grid-cols-5 items-center gap-1">
+        {tabs.map((tab) => {
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => onSelectTab(tab.id)}
+              className="touch-btn flex flex-col items-center justify-center py-1 relative"
+            >
+              <div
+                className="w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200"
+                style={{
+                  background: isActive
+                    ? "rgba(214, 255, 0, 0.16)"
+                    : "var(--bg-subtle)",
+                  border: isActive
+                    ? "2px solid #D6FF00"
+                    : "1px solid var(--border-hairline)",
+                  boxShadow: isActive
+                    ? "0 0 16px rgba(214, 255, 0, 0.32)"
+                    : "none",
+                  transform: tab.isCenter && isActive ? "scale(1.06)" : "none",
+                }}
+              >
+                <SafeImage
+                  src={tab.icon}
+                  alt={tab.label}
+                  circular
+                  style={{ width: 26, height: 26 }}
+                />
+              </div>
+
+              <span
+                className="text-[10px] font-display font-extrabold mt-1 tracking-tight"
+                style={{
+                  color: isActive ? "var(--text-main)" : "var(--text-muted)",
+                }}
+              >
+                {tab.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </nav>
+  );
+};
+
+// ============================================================================
+// 40. COMPONENTE MAESTRO PRINCIPAL: export default function App()
+// ============================================================================
+export default function App() {
+  const [theme, setTheme] = usePersistentState("theme", "dark");
+  const [activeTab, setActiveTab] = usePersistentState("active_tab", "perfil");
+  const [players, setPlayers] = usePersistentState("players", INITIAL_PLAYERS);
+  const [currentUserId, setCurrentUserId] = usePersistentState(
+    "current_user_id",
+    "p_pablo"
+  );
+  const [challenges, setChallenges] = usePersistentState(
+    "challenges",
+    INITIAL_CHALLENGES
+  );
+  const [completedMatches, setCompletedMatches] = usePersistentState(
+    "completed_matches",
+    INITIAL_COMPLETED_MATCHES
+  );
+  const [clubs, setClubs] = usePersistentState("clubs", HUANCAYO_CLUBS);
+  const [coaches, setCoaches] = usePersistentState("coaches", INITIAL_COACHES);
+  const [tournaments, setTournaments] = usePersistentState(
+    "tournaments",
+    INITIAL_TOURNAMENTS
+  );
+  const [vipPendingIds, setVipPendingIds] = usePersistentState(
+    "vip_pending_ids",
+    []
+  );
+  const [dismissedPendingPopupIds, setDismissedPendingPopupIds] =
+    usePersistentState("dismissed_popups", []);
+
+  // Modales independientes enfrente de pantalla
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isBulletinOpen, setIsBulletinOpen] = useState(false);
+  const [isProShopOpen, setIsProShopOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isVipModalOpen, setIsVipModalOpen] = useState(false);
+  const [isVisualRulesOpen, setIsVisualRulesOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isAdminSuiteOpen, setIsAdminSuiteOpen] = useState(false);
+
+  const [h2hPair, setH2hPair] = useState({ open: false, pA: null, pB: null });
+  const [storyPosterMatch, setStoryPosterMatch] = useState(null);
+  const [launchChallengeTarget, setLaunchChallengeTarget] = useState({
+    open: false,
+    rival: null,
+  });
+  const [officialScoreChallenge, setOfficialScoreChallenge] = useState(null);
+  const [selectedClubDetail, setSelectedClubDetail] = useState(null);
+  const [selectedCoachModal, setSelectedCoachModal] = useState(null);
+  const [tournamentPaymentTarget, setTournamentPaymentTarget] = useState(null);
+  const [newAccountCalibrationPlayerId, setNewAccountCalibrationPlayerId] =
+    useState(null);
+
+  const [liveWeatherHuancayo, setLiveWeatherHuancayo] = useState({
+    temp: 19,
+    uv: 8,
+  });
+  const [editorialNews, setEditorialNews] = useState(FALLBACK_EDITORIAL_NEWS);
+
+  const currentUser = useMemo(
+    () => players.find((p) => p.id === currentUserId) || players[0],
+    [players, currentUserId]
+  );
+
+  // Cierre universal de cualquier ventana emergente con la tecla Escape
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") {
+        setIsDrawerOpen(false);
+        setIsBulletinOpen(false);
+        setIsProShopOpen(false);
+        setIsSettingsOpen(false);
+        setIsVipModalOpen(false);
+        setIsVisualRulesOpen(false);
+        setIsAuthModalOpen(false);
+        setIsAdminSuiteOpen(false);
+        setH2hPair({ open: false, pA: null, pB: null });
+        setStoryPosterMatch(null);
+        setLaunchChallengeTarget({ open: false, rival: null });
+        setOfficialScoreChallenge(null);
+        setSelectedClubDetail(null);
+        setSelectedCoachModal(null);
+        setTournamentPaymentTarget(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  // Clima real de Huancayo (Open-Meteo) + Noticias reales con foto verificada
+  useEffect(() => {
+    fetch(
+      "https://api.open-meteo.com/v1/forecast?latitude=-12.0651&longitude=-75.2049&current=temperature_2m,uv_index"
+    )
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.current) {
+          setLiveWeatherHuancayo({
+            temp: Math.round(data.current.temperature_2m ?? 19),
+            uv: Math.round(data.current.uv_index ?? 8),
+          });
+        }
+      })
+      .catch(() => {});
+
+    fetch(
+      "https://api.rss2json.com/v1/api.json?rss_url=https%3A%2F%2Fwww.puntodebreak.com%2Frss.xml"
+    )
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data?.items) && data.items.length > 0) {
+          const parsed = data.items.slice(0, 6).map((item, idx) => ({
+            id: `rss_${idx}`,
+            source: "Punto de Break",
+            title: item.title,
+            publishedAt: item.pubDate
+              ? item.pubDate.slice(0, 16)
+              : "Actualidad",
+            link: item.link || "https://www.puntodebreak.com/",
+            imageUrl: extractRealPhotoFromRssItem(item),
+          }));
+          setEditorialNews(parsed);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Reto pendiente entrante que dispara pop-up una sola vez hasta decidir
+  const incomingPopupChallenge = useMemo(() => {
+    return challenges.find(
+      (c) =>
+        c.status === "pending" &&
+        c.challengedId === currentUser?.id &&
+        !dismissedPendingPopupIds.includes(c.id)
+    );
+  }, [challenges, currentUser, dismissedPendingPopupIds]);
+
+  const unreadAlertsCount = useMemo(() => {
+    return challenges.filter(
+      (c) => c.status === "pending" && c.challengedId === currentUser?.id
+    ).length;
+  }, [challenges, currentUser]);
+
+  // Handlers de Persistencia Real
+  const handleSaveProfile = useCallback(
+    (updatedPlayer) => {
+      setPlayers((prev) =>
+        prev.map((p) => (p.id === updatedPlayer.id ? updatedPlayer : p))
+      );
+      syncWithSupabase("jugadores", updatedPlayer);
+    },
+    [setPlayers]
+  );
+
+  const handleToggleLookingForMatch = useCallback(() => {
+    if (!currentUser) return;
+    const updated = {
+      ...currentUser,
+      lookingForMatchToday: !currentUser.lookingForMatchToday,
+      lookingForMatchNote: !currentUser.lookingForMatchToday
+        ? "Disponible hoy para single"
+        : "",
+    };
+    handleSaveProfile(updated);
+  }, [currentUser, handleSaveProfile]);
+
+  const handleAcceptChallenge = useCallback(
+    (challengeId) => {
+      setChallenges((prev) =>
+        prev.map((c) =>
+          c.id === challengeId ? { ...c, status: "confirmed" } : c
+        )
+      );
+      setDismissedPendingPopupIds((prev) =>
+        prev.includes(challengeId) ? prev : [...prev, challengeId]
+      );
+    },
+    [setChallenges, setDismissedPendingPopupIds]
+  );
+
+  const handleRejectChallenge = useCallback(
+    (challengeId) => {
+      setChallenges((prev) => prev.filter((c) => c.id !== challengeId));
+      setDismissedPendingPopupIds((prev) =>
+        prev.includes(challengeId) ? prev : [...prev, challengeId]
+      );
+    },
+    [setChallenges, setDismissedPendingPopupIds]
+  );
+
+  const handleCreateChallenge = useCallback(
+    (payload) => {
+      const newCh = {
+        id: `ch_${Date.now()}`,
+        ...payload,
+        status: "pending", // Siempre nace como "pending" para notificar al rival
+        proposedScore: null,
+        liveScore: null,
+      };
+      setChallenges((prev) => [newCh, ...prev]);
+      syncWithSupabase("partidos", newCh);
+    },
+    [setChallenges]
+  );
+
+  const handleUpdateLiveRefereeScore = useCallback(
+    (challengeId, fieldKey, deltaOrSet) => {
+      setChallenges((prev) =>
+        prev.map((ch) => {
+          if (ch.id !== challengeId) return ch;
+          const ls = ch.liveScore || {
+            currentSet: 1,
+            s1A: 0,
+            s1B: 0,
+            s2A: 0,
+            s2B: 0,
+            stbA: 0,
+            stbB: 0,
+          };
+          if (fieldKey === "advanceSet") {
+            return {
+              ...ch,
+              refereeName: currentUser?.name || "Árbitro",
+              refereeUpdatedAt: "Ahora",
+              liveScore: { ...ls, currentSet: deltaOrSet },
+            };
+          }
+          const nextVal = Math.max(0, Number(ls[fieldKey] || 0) + deltaOrSet);
+          return {
+            ...ch,
+            refereeName: currentUser?.name || "Árbitro",
+            refereeUpdatedAt: "Ahora",
+            liveScore: { ...ls, [fieldKey]: nextVal },
+          };
+        })
+      );
+    },
+    [setChallenges, currentUser]
+  );
+
+  const handleFinalizeRefereeMatchPendingReview = useCallback(
+    (challengeId, finalScoreString) => {
+      setChallenges((prev) =>
+        prev.map((ch) =>
+          ch.id === challengeId
+            ? {
+                ...ch,
+                proposedScore: finalScoreString,
+                liveScore: {
+                  ...(ch.liveScore || {}),
+                  liveFinishedPendingReview: true,
+                },
+              }
+            : ch
+        )
+      );
+    },
+    [setChallenges]
+  );
+
+  const handleConfirmOfficialScore = useCallback(
+    (challengeId, scoreEvaluation) => {
+      const ch = challenges.find((c) => c.id === challengeId);
+      if (!ch) return;
+
+      const pA = players.find((p) => p.id === ch.challengerId);
+      const pB = players.find((p) => p.id === ch.challengedId);
+      if (!pA || !pB) return;
+
+      const settlement = calculateMatchEloSettlement({
+        playerA: pA,
+        playerB: pB,
+        scoreEvaluation,
+        forceFriendly: ch.isFriendly,
+        completedMatches,
+        totalActivePlayers: players.length,
+      });
+
+      const aWon = scoreEvaluation.winnerSide === "A";
+      const winner = aWon ? pA : pB;
+      const loser = aWon ? pB : pA;
+
+      setPlayers((prev) =>
+        prev.map((p) => {
+          if (p.id === pA.id) {
+            return {
+              ...p,
+              elo: settlement.newEloA,
+              lastDelta: settlement.deltaA,
+              wins: aWon ? (p.wins || 0) + 1 : p.wins || 0,
+              losses: !aWon ? (p.losses || 0) + 1 : p.losses || 0,
+              seasonMatches: (p.seasonMatches || 0) + 1,
+              streak: aWon ? (p.streak || 0) + 1 : 0,
+              calibrationMatches: Math.min(5, (p.calibrationMatches ?? 5) + 1),
+            };
+          }
+          if (p.id === pB.id) {
+            return {
+              ...p,
+              elo: settlement.newEloB,
+              lastDelta: settlement.deltaB,
+              wins: !aWon ? (p.wins || 0) + 1 : p.wins || 0,
+              losses: aWon ? (p.losses || 0) + 1 : p.losses || 0,
+              seasonMatches: (p.seasonMatches || 0) + 1,
+              streak: !aWon ? (p.streak || 0) + 1 : 0,
+              calibrationMatches: Math.min(5, (p.calibrationMatches ?? 5) + 1),
+            };
+          }
+          return p;
+        })
+      );
+
+      const completedRecord = {
+        id: `hist_${Date.now()}`,
+        challengerId: pA.id,
+        challengedId: pB.id,
+        winnerId: winner.id,
+        loserId: loser.id,
+        score: scoreEvaluation.formattedScore,
+        clubId: ch.clubId,
+        clubName: ch.customClubName,
+        dateLabel: ch.dateTimeLabel,
+        completedAt: Date.now(),
+        winnerDelta: Math.abs(
+          aWon ? settlement.deltaA : settlement.deltaB
+        ),
+        loserDelta: aWon ? settlement.deltaB : settlement.deltaA,
+        isFriendly: settlement.isFriendly,
+      };
+
+      setCompletedMatches((prev) => [completedRecord, ...prev]);
+      setChallenges((prev) => prev.filter((item) => item.id !== challengeId));
+      setStoryPosterMatch(completedRecord);
+    },
+    [challenges, players, completedMatches, setPlayers, setCompletedMatches, setChallenges]
+  );
+
+  const handleUpdateSurfaceWeather = useCallback(
+    (clubId, newStateId) => {
+      setClubs((prev) =>
+        prev.map((c) =>
+          c.id === clubId
+            ? {
+                ...c,
+                surfaceStateId: newStateId,
+                lastReportBy: currentUser?.name || "Jugador",
+                lastReportTime: "Hace instantes",
+              }
+            : c
+        )
+      );
+    },
+    [setClubs, currentUser]
+  );
+
+  const handleSaveCoachProfile = useCallback(
+    (updatedCoach) => {
+      setCoaches((prev) =>
+        prev.map((c) => (c.id === updatedCoach.id ? updatedCoach : c))
+      );
+      setSelectedCoachModal(updatedCoach);
+    },
+    [setCoaches]
+  );
+
+  const handleAddCoachReview = useCallback(
+    (coachId, reviewObj) => {
+      setCoaches((prev) =>
+        prev.map((c) => {
+          if (c.id !== coachId) return c;
+          const updatedReviews = [reviewObj, ...(c.reviews || [])];
+          return {
+            ...c,
+            reviewsCount: updatedReviews.length,
+            reviews: updatedReviews,
+          };
+        })
+      );
+    },
+    [setCoaches]
+  );
+
+  const handleSubmitTournamentApplication = useCallback(
+    (tournamentId, playerId) => {
+      setTournaments((prev) =>
+        prev.map((t) => {
+          if (t.id !== tournamentId) return t;
+          const currentPending = t.pendingApplicantIds || [];
+          if (currentPending.includes(playerId)) return t;
+          return {
+            ...t,
+            pendingApplicantIds: [...currentPending, playerId],
+          };
+        })
+      );
+    },
+    [setTournaments]
+  );
+
+  const handleApproveTournamentApplicant = useCallback(
+    (tournamentId, playerId) => {
+      setTournaments((prev) =>
+        prev.map((t) => {
+          if (t.id !== tournamentId) return t;
+          const nextPending = (t.pendingApplicantIds || []).filter(
+            (id) => id !== playerId
+          );
+          const nextEnrolled = (t.enrolledPlayerIds || []).includes(playerId)
+            ? t.enrolledPlayerIds
+            : [...(t.enrolledPlayerIds || []), playerId];
+          return {
+            ...t,
+            pendingApplicantIds: nextPending,
+            enrolledPlayerIds: nextEnrolled,
+          };
+        })
+      );
+    },
+    [setTournaments]
+  );
+
+  const handleRejectTournamentApplicant = useCallback(
+    (tournamentId, playerId) => {
+      setTournaments((prev) =>
+        prev.map((t) =>
+          t.id === tournamentId
+            ? {
+                ...t,
+                pendingApplicantIds: (t.pendingApplicantIds || []).filter(
+                  (id) => id !== playerId
+                ),
+              }
+            : t
+        )
+      );
+    },
+    [setTournaments]
+  );
+
+  const handleRegisterNewPlayer = useCallback(
+    (newPlayerData) => {
+      const newId = `p_${Date.now()}`;
+      const created = {
+        id: newId,
+        name: newPlayerData.name,
+        email: newPlayerData.email,
+        phone: newPlayerData.phone,
+        password: newPlayerData.password,
+        age: 26,
+        clubId: newPlayerData.clubId || "country",
+        elo: 500,
+        previousRank: players.length + 1,
+        lastDelta: 0,
+        wins: 0,
+        losses: 0,
+        seasonMatches: 0,
+        streak: 0,
+        calibrationMatches: 0,
+        hand: "Diestro",
+        bestShot: "Derecha (Forehand)",
+        availableDays: ["S", "D"],
+        availableSlots: ["18:00–22:00"],
+        whatsappPrivate: false,
+        isVipMember: false,
+        vipCode: `MP-2026-${Math.floor(1000 + Math.random() * 9000)}`,
+        activeStatus: "active",
+        avatar: "",
+      };
+      setPlayers((prev) => [...prev, created]);
+      setCurrentUserId(newId);
+      setNewAccountCalibrationPlayerId(newId);
+    },
+    [players.length, setPlayers, setCurrentUserId]
+  );
+
+  const handleCompleteInitialSeed = useCallback(
+    (playerId, seedElo) => {
+      setPlayers((prev) =>
+        prev.map((p) => (p.id === playerId ? { ...p, elo: seedElo } : p))
+      );
+      setNewAccountCalibrationPlayerId(null);
+      setActiveTab("perfil");
+    },
+    [setPlayers, setActiveTab]
+  );
+
+  return (
+    <div className={`app-shell ${theme === "light" ? "theme-light" : ""}`}>
+      <style>{GLOBAL_STYLES}</style>
+
+      {/* 1. Header Superior Limpio Estilo ATP Tour */}
+      <TopHeaderBar
+        onOpenDrawer={() => setIsDrawerOpen(true)}
+        onOpenProShop={() => setIsProShopOpen(true)}
+        onOpenBulletin={() => setIsBulletinOpen(true)}
+        onSecretAdminTrigger={() => setIsAdminSuiteOpen(true)}
+        unreadBulletinCount={unreadAlertsCount}
+      />
+
+      {/* 2. Contenedor Principal de Vistas con Scroll Independiente */}
+      <main className="app-scroll-container no-scrollbar">
+        {activeTab === "perfil" && (
+          <MyProfileView
+            player={currentUser}
+            allPlayers={players}
+            completedMatches={completedMatches}
+            clubs={clubs}
+            onOpenSettings={() => setIsSettingsOpen(true)}
+            onOpenVipUpgrade={() => setIsVipModalOpen(true)}
+            onOpenHeadToHead={(pA, pB) =>
+              setH2hPair({ open: true, pA, pB })
+            }
+            onOpenStoryPoster={(m) => setStoryPosterMatch(m)}
+            onToggleLookingForMatch={handleToggleLookingForMatch}
+          />
+        )}
+
+        {activeTab === "ranking" && (
+          <RankingOfficialView
+            players={players}
+            currentUser={currentUser}
+            clubs={clubs}
+            onSelectPlayerForH2H={(pA, pB) =>
+              setH2hPair({ open: true, pA, pB })
+            }
+            onLaunchChallenge={(rival) =>
+              setLaunchChallengeTarget({ open: true, rival })
+            }
+          />
+        )}
+
+        {activeTab === "retos" && (
+          <ChallengesCenterView
+            challenges={challenges}
+            players={players}
+            currentUser={currentUser}
+            clubs={clubs}
+            onOpenNewChallengeModal={(rival) =>
+              setLaunchChallengeTarget({ open: true, rival })
+            }
+            onOpenOfficialScoreModal={(ch) => setOfficialScoreChallenge(ch)}
+            onAcceptChallenge={handleAcceptChallenge}
+            onRejectChallenge={handleRejectChallenge}
+            onUpdateLiveRefereeScore={handleUpdateLiveRefereeScore}
+            onFinalizeRefereeMatchPendingReview={
+              handleFinalizeRefereeMatchPendingReview
+            }
+            onOpenHeadToHead={(pA, pB) =>
+              setH2hPair({ open: true, pA, pB })
+            }
+          />
+        )}
+
+        {activeTab === "sedes" && (
+          <SedesAndCoachProView
+            clubs={clubs}
+            coaches={coaches}
+            currentUser={currentUser}
+            liveWeather={liveWeatherHuancayo}
+            onUpdateSurfaceWeather={handleUpdateSurfaceWeather}
+            onOpenClubDetailModal={(club) => setSelectedClubDetail(club)}
+            onOpenCoachProfileModal={(coach) => setSelectedCoachModal(coach)}
+          />
+        )}
+
+        {activeTab === "torneos" && (
+          <TournamentsAndHallOfFameView
+            tournaments={tournaments}
+            hallOfFame={HALL_OF_FAME_CHAMPIONS}
+            players={players}
+            currentUser={currentUser}
+            clubs={clubs}
+            onOpenTournamentPaymentModal={(t) =>
+              setTournamentPaymentTarget(t)
+            }
+            onOpenHeadToHead={(pA, pB) =>
+              setH2hPair({ open: true, pA, pB })
+            }
+          />
+        )}
+      </main>
+
+      {/* 3. Barra de Navegación Inferior de 5 Pestañas con Halo Activo */}
+      <BottomTabNavigation
+        activeTab={activeTab}
+        onSelectTab={(tabId) => setActiveTab(tabId)}
+      />
+
+      {/* 4. Pop-up Automático de Reto Entrante (Guardado en localStorage, Cero Bucle) */}
+      {incomingPopupChallenge && (
+        <div className="fixed inset-0 z-50 ios-blur-backdrop flex items-center justify-center p-4">
+          <div className="ios-modal-card w-full max-w-sm rounded-3xl p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <span
+                className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase"
+                style={{ background: "#D6FF00", color: "#0A1633" }}
+              >
+                Nuevo Desafío Recibido
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  setDismissedPendingPopupIds((prev) => [
+                    ...prev,
+                    incomingPopupChallenge.id,
+                  ])
+                }
+                className="touch-btn w-8 h-8 rounded-full"
+                style={{ background: "var(--bg-subtle)" }}
+              >
+                <Icons.Close size={16} />
+              </button>
+            </div>
+
+            {(() => {
+              const challenger = players.find(
+                (p) => p.id === incomingPopupChallenge.challengerId
+              );
+              return (
+                <div className="flex items-center gap-3.5">
+                  <SafeImage
+                    src={challenger?.avatar}
+                    alt={challenger?.name}
+                    circular
+                    style={{ width: 54, height: 54 }}
+                  />
+                  <div>
+                    <div className="font-display font-black text-base">
+                      {challenger?.name} te desafía
+                    </div>
+                    <div
+                      className="text-xs font-semibold"
+                      style={{ color: "var(--clay)" }}
+                    >
+                      {incomingPopupChallenge.customClubName}
+                    </div>
+                    <div
+                      className="text-xs"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      {incomingPopupChallenge.dateTimeLabel} ·{" "}
+                      {incomingPopupChallenge.ballAgreement}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            <div className="grid grid-cols-2 gap-2.5 pt-1">
+              <button
+                type="button"
+                onClick={() =>
+                  handleAcceptChallenge(incomingPopupChallenge.id)
+                }
+                className="touch-btn py-3 rounded-xl font-display font-extrabold text-xs uppercase"
+                style={{ background: "#D6FF00", color: "#0A1633" }}
+              >
+                Aceptar Reto
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  handleRejectChallenge(incomingPopupChallenge.id)
+                }
+                className="touch-btn py-3 rounded-xl font-semibold text-xs border"
+                style={{
+                  borderColor: "var(--border-strong)",
+                  color: "var(--text-muted)",
+                }}
+              >
+                Declinar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. Todos los Modales Independientes con Desenfoque iOS */}
+      <SideNavigationDrawer
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        theme={theme}
+        onToggleTheme={() =>
+          setTheme((prev) => (prev === "dark" ? "light" : "dark"))
+        }
+        onOpenVisualRules={() => setIsVisualRulesOpen(true)}
+        onOpenVipModal={() => setIsVipModalOpen(true)}
+        onOpenAuthModal={() => setIsAuthModalOpen(true)}
+      />
+
+      <BulletinAndNewsModal
+        isOpen={isBulletinOpen}
+        onClose={() => setIsBulletinOpen(false)}
+        currentUser={currentUser}
+        challenges={challenges}
+        players={players}
+        newsItems={editorialNews}
+        liveTicker={ATP_WTA_LIVE_TICKER}
+        onAcceptChallenge={handleAcceptChallenge}
+        onRejectChallenge={handleRejectChallenge}
+        onGoToChallenges={() => setActiveTab("retos")}
+      />
+
+      <ProShopModal
+        isOpen={isProShopOpen}
+        onClose={() => setIsProShopOpen(false)}
+        items={PRO_SHOP_ITEMS}
+        currentUser={currentUser}
+        onOpenVipModal={() => setIsVipModalOpen(true)}
+      />
+
+      <ProfileSettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        player={currentUser}
+        clubs={clubs}
+        onSaveProfile={handleSaveProfile}
+        onOpenSwitchAccount={() => setIsAuthModalOpen(true)}
+        onOpenTutorialOnce={() => setIsVisualRulesOpen(true)}
+      />
+
+      <VipMembershipModal
+        isOpen={isVipModalOpen}
+        onClose={() => setIsVipModalOpen(false)}
+        player={currentUser}
+        clubs={clubs}
+        onRequestVipActivation={(pid) =>
+          setVipPendingIds((prev) =>
+            prev.includes(pid) ? prev : [...prev, pid]
+          )
+        }
+      />
+
+      <VisualRulesModal
+        isOpen={isVisualRulesOpen}
+        onClose={() => setIsVisualRulesOpen(false)}
+      />
+
+      <AtpHeadToHeadModal
+        isOpen={h2hPair.open}
+        onClose={() => setH2hPair({ open: false, pA: null, pB: null })}
+        initialPlayerA={h2hPair.pA || currentUser}
+        initialPlayerB={h2hPair.pB}
+        allPlayers={players}
+        completedMatches={completedMatches}
+        clubs={clubs}
+        onLaunchChallenge={(rival) =>
+          setLaunchChallengeTarget({ open: true, rival })
+        }
+      />
+
+      <StoryPosterModal
+        isOpen={Boolean(storyPosterMatch)}
+        onClose={() => setStoryPosterMatch(null)}
+        matchData={storyPosterMatch}
+        players={players}
+      />
+
+      <LaunchChallengeModal
+        isOpen={launchChallengeTarget.open}
+        onClose={() =>
+          setLaunchChallengeTarget({ open: false, rival: null })
+        }
+        currentUser={currentUser}
+        preselectedRival={launchChallengeTarget.rival}
+        players={players}
+        clubs={clubs}
+        completedMatches={completedMatches}
+        onCreateChallenge={handleCreateChallenge}
+      />
+
+      <SubmitOfficialScoreModal
+        isOpen={Boolean(officialScoreChallenge)}
+        onClose={() => setOfficialScoreChallenge(null)}
+        challenge={officialScoreChallenge}
+        players={players}
+        onConfirmOfficialScore={handleConfirmOfficialScore}
+      />
+
+      <ClubDetailModal
+        isOpen={Boolean(selectedClubDetail)}
+        onClose={() => setSelectedClubDetail(null)}
+        club={selectedClubDetail}
+        onOpenVipModal={() => setIsVipModalOpen(true)}
+      />
+
+      <CoachProProfileModal
+        isOpen={Boolean(selectedCoachModal)}
+        onClose={() => setSelectedCoachModal(null)}
+        coach={selectedCoachModal}
+        currentUser={currentUser}
+        onSaveCoachProfile={handleSaveCoachProfile}
+        onAddCoachReview={handleAddCoachReview}
+      />
+
+      <TournamentPaymentModal
+        isOpen={Boolean(tournamentPaymentTarget)}
+        onClose={() => setTournamentPaymentTarget(null)}
+        tournament={tournamentPaymentTarget}
+        currentUser={currentUser}
+        onSubmitTournamentApplication={handleSubmitTournamentApplication}
+      />
+
+      <AuthAndAccountModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        players={players}
+        currentUser={currentUser}
+        clubs={clubs}
+        onSwitchUser={(uid) => setCurrentUserId(uid)}
+        onRegisterNewPlayer={handleRegisterNewPlayer}
+        onResetPasswordSuccess={(uid, newPass) =>
+          setPlayers((prev) =>
+            prev.map((p) =>
+              p.id === uid ? { ...p, password: newPass } : p
+            )
+          )
+        }
+      />
+
+      <InitialCalibrationWizardModal
+        isOpen={Boolean(newAccountCalibrationPlayerId)}
+        player={players.find((p) => p.id === newAccountCalibrationPlayerId)}
+        onCompleteInitialSeed={handleCompleteInitialSeed}
+      />
+
+      <HiddenAdminSuiteModal
+        isOpen={isAdminSuiteOpen}
+        onClose={() => setIsAdminSuiteOpen(false)}
+        players={players}
+        tournaments={tournaments}
+        vipPendingPlayerIds={vipPendingIds}
+        onApproveTournamentApplicant={handleApproveTournamentApplicant}
+        onRejectTournamentApplicant={handleRejectTournamentApplicant}
+        onApproveVipMember={(pid) => {
+          setPlayers((prev) =>
+            prev.map((p) =>
+              p.id === pid ? { ...p, isVipMember: true } : p
+            )
+          );
+          setVipPendingIds((prev) => prev.filter((id) => id !== pid));
+        }}
+        onAdminResetPlayerPassword={(pid) =>
+          setPlayers((prev) =>
+            prev.map((p) =>
+              p.id === pid ? { ...p, password: "Tenis2026" } : p
+            )
+          )
+        }
+        onAdminTogglePlayerStatus={(pid) =>
+          setPlayers((prev) =>
+            prev.map((p) =>
+              p.id === pid
+                ? {
+                    ...p,
+                    activeStatus:
+                      p.activeStatus === "inactive" ? "active" : "inactive",
+                  }
+                : p
+            )
+          )
+        }
+        onTriggerSeasonReset={() =>
+          setPlayers((prev) => prev.map((p) => applySeasonResetToPlayer(p)))
+        }
+      />
+    </div>
+  );
+}
+
+// === FIN DEL BLOQUE 10 DE 10 ===
