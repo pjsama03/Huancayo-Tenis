@@ -16010,3 +16010,5357 @@ export function ProShopModal({
 }
 
 // === FIN DEL BLOQUE 11 DE 14 ===
+
+// ============================================================================
+// PARTE 12 DE 14: PORTAL DE ACCESO PROFESIONAL SPLIT-SCREEN 50/50 (LOGIN
+// ESMERALDA, REGISTRO PÚRPURA CON BLOQUEO LEGAL +18 AÑOS, CHECKBOX OBLIGATORIO
+// DESMARCADO POR DEFECTO, ENLACES LEGALES SIN PERDER DATOS Y TIMESTAMP EN
+// SUPABASE, Y RECUPERACIÓN EN 2 PASOS) + TEST INICIAL DIDÁCTICO DE 5 PREGUNTAS
+// + GUÍA VISUAL INTERACTIVA DEL CIRCUITO
+// ============================================================================
+
+// ----------------------------------------------------------------------------
+// 1. CLÁUSULAS LEGALES OFICIALES INTEGRADAS (NORMATIVA PERÚ: LEY N° 29733,
+//    INDECOPI Y DESLINDE DE RESPONSABILIDAD)
+//    Disponibles tanto desde el Registro (sin perder los datos escritos) como
+//    desde el Menú Lateral y Pie de Página.
+// ----------------------------------------------------------------------------
+export const OFFICIAL_TERMS_CLAUSES = [
+  {
+    number: "1",
+    title: "Naturaleza del Servicio",
+    body: "MATCHPOINT es una plataforma tecnológica de gestión deportiva y rankings recreativos; no organiza eventos médicos ni garantiza supervisión presencial permanente en canchas de terceros.",
+  },
+  {
+    number: "2",
+    title: "Exención de Responsabilidad Física (Deslinde)",
+    body: "El usuario participa en los partidos, retos y torneos bajo su propia responsabilidad y riesgo físico. MATCHPOINT y sus administradores quedan exentos de toda responsabilidad civil, médica o penal por lesiones, accidentes, golpes de calor o altercados ocurridos antes, durante o después de los encuentros.",
+  },
+  {
+    number: "3",
+    title: "Política Estricta de No Reembolso",
+    body: "Los pagos realizados por concepto de inscripciones a torneos, membresías VIP o servicios publicados son finales y no son reembolsables si el usuario cancela su participación con menos de 24 horas de anticipación, no se presenta al partido (walkover) o es descalificado.",
+  },
+  {
+    number: "4",
+    title: "Derecho de Admisión, Sanciones y Baneo",
+    body: "El Comité Administrador se reserva el derecho de suspender temporal o definitivamente cualquier cuenta, sin derecho a reembolso ni indemnización, ante casos de suplantación de identidad, falsificación o arreglo de marcadores, agresión verbal/física o conducta antideportiva.",
+  },
+  {
+    number: "5",
+    title: "Reglas del Ranking y Modificaciones",
+    body: "El sistema de puntaje oficial es administrado por la plataforma; MATCHPOINT puede ajustar parámetros técnicos para preservar la equidad deportiva.",
+  },
+];
+
+export const OFFICIAL_PRIVACY_CLAUSES = [
+  {
+    number: "1",
+    title: "Datos Recopilados",
+    body: "Nombre completo, número de celular (WhatsApp), correo electrónico, fotografía de perfil, club de procedencia, edad y estadísticas de partidos.",
+  },
+  {
+    number: "2",
+    title: "Finalidad del Tratamiento",
+    body: "Los datos se usan exclusivamente para operar el ranking deportivo, permitir la coordinación de partidos entre rivales autorizados, validar pagos y enviar comunicaciones oficiales del circuito.",
+  },
+  {
+    number: "3",
+    title: "Privacidad del Teléfono",
+    body: "Desde los ajustes de tu perfil puedes elegir en cualquier momento si tu número de WhatsApp es visible para el circuito o restringido únicamente a rivales con reto aceptado.",
+  },
+  {
+    number: "4",
+    title: "Derechos ARCO (Acceso, Rectificación, Cancelación y Oposición)",
+    body: "En cumplimiento de la Ley N° 29733 de Protección de Datos Personales del Perú, el usuario puede solicitar la modificación o eliminación definitiva de sus datos personales de la base de datos de MATCHPOINT enviando una solicitud al canal oficial de soporte y administración.",
+  },
+];
+
+// ----------------------------------------------------------------------------
+// 2. PORTAL DE ACCESO PROFESIONAL SPLIT-SCREEN 50/50 (<AuthAndAccountModal/>)
+//    Inspirado en WTA Unlocked (Ronda 28) + Implementación Legal Perú:
+//    - Transición breve de redirección con aro esmeralda.
+//    - Login 50/50 con formulario limpio sobre blanco y póster esmeralda.
+//    - Registro 50/50 con póster púrpura noche, validación estricta +18 años,
+//      checkbox desmarcado por defecto, enlaces clicables a Términos y
+//      Privacidad que abren encima sin perder los datos del formulario, y
+//      guardado de timestamp en Supabase.
+//    - Recuperación de contraseña en 2 pasos con franja inferior esmeralda.
+// ----------------------------------------------------------------------------
+export function AuthAndAccountModal({
+  isOpen,
+  onClose,
+  initialMode = "login", // 'login' | 'register' | 'recover'
+  players = INITIAL_PLAYERS,
+  sedes = INITIAL_SEDES,
+  currentUser,
+  onLoginSuccess,
+  onRegisterNewPlayer,
+  onResetPlayerPassword,
+  onTriggerAdminSuite,
+}) {
+  const [authMode, setAuthMode] = useState(initialMode);
+  const [isRedirecting, setIsRedirecting] = useState(false);
+
+  // Estados de Login
+  const [loginIdentifier, setLoginIdentifier] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [loginError, setLoginError] = useState("");
+
+  // Estados de Registro (persisten intactos al abrir Términos o Privacidad)
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showRegisterPassword, setShowRegisterPassword] = useState(false);
+  const [age, setAge] = useState("");
+  const [height, setHeight] = useState("1.75 m");
+  const [gender, setGender] = useState("M");
+  const [hand, setHand] = useState("Diestro");
+  const [bestShot, setBestShot] = useState("Derecha con topspin");
+  const [club, setClub] = useState("Country Club Los Huancas");
+  const [individualMode, setIndividualMode] = useState(false);
+  const [uploadedAvatar, setUploadedAvatar] = useState("");
+  // Checkbox obligatorio DESMARCADO por defecto
+  const [acceptedLegalTerms, setAcceptedLegalTerms] = useState(false);
+  const [registerError, setRegisterError] = useState("");
+
+  // Visor interno de documentos legales (se abre encima sin borrar el formulario)
+  const [inlineLegalDoc, setInlineLegalDoc] = useState(null); // 'terms' | 'privacy' | null
+
+  // Estados de Recuperación en 2 pasos
+  const [recoverStep, setRecoverStep] = useState(1);
+  const [recoverContact, setRecoverContact] = useState("");
+  const [recoverAgeVerify, setRecoverAgeVerify] = useState("");
+  const [recoverNewPass, setRecoverNewPass] = useState("");
+  const [matchedRecoverPlayer, setMatchedRecoverPlayer] = useState(null);
+  const [recoverStatusMsg, setRecoverStatusMsg] = useState("");
+
+  const avatarFileInputRef = useRef(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setAuthMode(initialMode || "login");
+      setIsRedirecting(true);
+      const t = setTimeout(() => setIsRedirecting(false), 460);
+      return () => clearTimeout(t);
+    }
+  }, [isOpen, initialMode]);
+
+  if (!isOpen) return null;
+
+  const switchModeWithTransition = (nextMode) => {
+    triggerHaptic("tab");
+    setLoginError("");
+    setRegisterError("");
+    setRecoverStatusMsg("");
+    setIsRedirecting(true);
+    setTimeout(() => {
+      setAuthMode(nextMode);
+      setIsRedirecting(false);
+    }, 320);
+  };
+
+  // Validación estricta de mayoría de edad (+18 años) en tiempo real
+  const numericAge = Number(age);
+  const isUnderageEntered = age !== "" && (!numericAge || numericAge < 18);
+  const isAdultValid = age !== "" && numericAge >= 18 && numericAge <= 95;
+  const canSubmitRegistration =
+    firstName.trim().length >= 2 &&
+    lastName.trim().length >= 2 &&
+    phone.replace(/\D/g, "").length >= 9 &&
+    email.includes("@") &&
+    password.length >= 4 &&
+    isAdultValid &&
+    acceptedLegalTerms === true;
+
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const compressed = await compressImageFile(file, 640, 0.8);
+      setUploadedAvatar(compressed);
+      triggerHaptic("success");
+    } catch (err) {
+      // Silencioso
+    }
+  };
+
+  // Manejo de Inicio de Sesión Dual (Celular de 9 dígitos o Correo + Acceso Admin)
+  const handleLoginSubmit = (e) => {
+    e.preventDefault();
+    setLoginError("");
+    const cleanInput = loginIdentifier.trim().toLowerCase();
+
+    if (!cleanInput) {
+      setLoginError("Ingresa tu número de celular (9 dígitos) o tu correo electrónico.");
+      return;
+    }
+
+    // Acceso oculto a la Suite de Administrador si escribe admin@matchpoint.pe + PIN 1234
+    if (
+      (cleanInput === "admin" || cleanInput === "admin@matchpoint.pe") &&
+      loginPassword === CIRCUIT_CONFIG.adminSecretPin
+    ) {
+      triggerHaptic("success");
+      onClose();
+      if (onTriggerAdminSuite) onTriggerAdminSuite();
+      return;
+    }
+
+    const digitsOnly = cleanInput.replace(/\D/g, "");
+    const foundPlayer = players.find((p) => {
+      const pEmail = (p.email || "").toLowerCase();
+      const pPhone = (p.whatsapp || "").replace(/\D/g, "");
+      const pName = (p.name || "").toLowerCase();
+      return (
+        pEmail === cleanInput ||
+        (digitsOnly.length >= 9 && pPhone.endsWith(digitsOnly.slice(-9))) ||
+        pName === cleanInput
+      );
+    });
+
+    if (!foundPlayer) {
+      setLoginError(
+        "No encontramos una cuenta con ese celular o correo. Revisa el dato o crea tu cuenta gratis."
+      );
+      return;
+    }
+
+    if (
+      foundPlayer.customPassword &&
+      loginPassword &&
+      foundPlayer.customPassword !== loginPassword
+    ) {
+      setLoginError("La contraseña ingresada no coincide.");
+      return;
+    }
+
+    triggerHaptic("success");
+    if (onLoginSuccess) onLoginSuccess(foundPlayer.id);
+    onClose();
+  };
+
+  // Manejo de Registro con Respaldo Legal en Base de Datos (Timestamp exacto)
+  const handleRegisterSubmit = async (e) => {
+    e.preventDefault();
+    setRegisterError("");
+
+    if (!isAdultValid) {
+      setRegisterError(
+        "Debes ser mayor de 18 años para registrarte en MATCHPOINT (Ley N° 29733)."
+      );
+      return;
+    }
+
+    if (!acceptedLegalTerms) {
+      setRegisterError(
+        "Debes marcar la casilla aceptando los Términos y Condiciones y la Política de Privacidad."
+      );
+      return;
+    }
+
+    const cleanDigits = phone.replace(/\D/g, "");
+    if (cleanDigits.length < 9) {
+      setRegisterError("Ingresa un número de celular válido de 9 dígitos para WhatsApp.");
+      return;
+    }
+
+    const formattedWhatsapp = cleanDigits.startsWith("51")
+      ? cleanDigits
+      : `51${cleanDigits.slice(-9)}`;
+
+    const consentTimestamp = new Date().toISOString();
+    const chosenSede = sedes.find((s) => s.name === club);
+
+    const newPlayerPayload = {
+      id: `p-user-${Date.now()}`,
+      name: `${firstName.trim()} ${lastName.trim()}`,
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      elo: 1200, // Se ajustará enseguida con el Test Inicial de 5 preguntas
+      bestRank: players.length + 1,
+      rank: players.length + 1,
+      age: numericAge,
+      height: height || "1.75 m",
+      city: "Huancayo",
+      club: individualMode ? "Independiente" : club,
+      clubLogo: chosenSede?.logoAsset || ASSETS.clubCountry,
+      individualMode,
+      hand,
+      backhand: "Revés a dos manos",
+      bestShot,
+      availability: "Lun a Sáb · Tardes y fines de semana",
+      wins: 0,
+      losses: 0,
+      streak: 0,
+      titles: 0,
+      matchesPlayed: 0,
+      gems: 20, // Bono inicial equilibrado de 20 Gemas
+      isVip: false,
+      vipCode: `MP-2026-${String(players.length + 1).padStart(4, "0")}`,
+      whatsapp: formattedWhatsapp,
+      whatsappPrivacy: "rivals_only",
+      email: email.trim().toLowerCase(),
+      customPassword: password,
+      surfaceThemeId: "finals",
+      unlockedThemes: ["finals"],
+      activeBadgeId: "",
+      unlockedBadges: [],
+      avatar:
+        uploadedAvatar ||
+        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80",
+      heroPhoto: ASSETS.perfilBgFinals,
+      cutoutAvatar: "",
+      photoFrame: { zoom: 1, offsetX: 0, offsetY: 0, angle: 0 },
+      gender,
+      hasCompletedTest: false, // Dispara automáticamente el Test Inicial Didáctico
+      legalConsentAccepted: true,
+      legalConsentVersion: "PERU-2026-V1",
+      legalConsentTimestamp: consentTimestamp,
+      declaredAdultOver18: true,
+    };
+
+    // Guarda el consentimiento y timestamp en Supabase como respaldo legal
+    syncRecordToSupabase("players_legal_consents", {
+      player_id: newPlayerPayload.id,
+      full_name: newPlayerPayload.name,
+      email: newPlayerPayload.email,
+      whatsapp: newPlayerPayload.whatsapp,
+      age_declared: numericAge,
+      accepted_terms_and_privacy: true,
+      consent_timestamp: consentTimestamp,
+    }).catch(() => {});
+
+    triggerHaptic("success");
+    if (onRegisterNewPlayer) {
+      onRegisterNewPlayer(newPlayerPayload);
+    }
+    onClose();
+  };
+
+  // Manejo de Recuperación en 2 pasos
+  const handleVerifyRecoveryIdentity = (e) => {
+    e.preventDefault();
+    setRecoverStatusMsg("");
+    const clean = recoverContact.trim().toLowerCase();
+    const digits = clean.replace(/\D/g, "");
+
+    const found = players.find((p) => {
+      const pMail = (p.email || "").toLowerCase();
+      const pPhone = (p.whatsapp || "").replace(/\D/g, "");
+      return (
+        pMail === clean ||
+        (digits.length >= 9 && pPhone.endsWith(digits.slice(-9)))
+      );
+    });
+
+    if (!found) {
+      setRecoverStatusMsg(
+        "No encontramos una cuenta con ese celular o correo. Puedes solicitar ayuda directa por WhatsApp abajo."
+      );
+      return;
+    }
+
+    if (
+      recoverAgeVerify.trim() &&
+      Number(recoverAgeVerify) !== Number(found.age)
+    ) {
+      setRecoverStatusMsg(
+        "La edad ingresada no coincide con la registrada en el perfil."
+      );
+      return;
+    }
+
+    triggerHaptic("success");
+    setMatchedRecoverPlayer(found);
+    setRecoverStep(2);
+  };
+
+  const handleSaveRecoveredPassword = (e) => {
+    e.preventDefault();
+    if (!matchedRecoverPlayer || recoverNewPass.trim().length < 4) {
+      setRecoverStatusMsg("Escribe una nueva contraseña de al menos 4 caracteres.");
+      return;
+    }
+    triggerHaptic("success");
+    if (onResetPlayerPassword) {
+      onResetPlayerPassword(matchedRecoverPlayer.id, recoverNewPass.trim());
+    }
+    if (onLoginSuccess) {
+      onLoginSuccess(matchedRecoverPlayer.id);
+    }
+    onClose();
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[65] flex items-center justify-center p-2 sm:p-4 mp-modal-backdrop"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && onClose) {
+          triggerHaptic("light");
+          onClose();
+        }
+      }}
+    >
+      <div className="relative w-full max-w-4xl max-h-[92dvh] rounded-3xl overflow-hidden bg-white text-[#1E0734] shadow-[0_25px_75px_rgba(0,0,0,0.8)] border border-white/40 flex flex-col mp-modal-sheet">
+        {/* Botón flotante de cierre */}
+        <button
+          type="button"
+          onClick={() => {
+            triggerHaptic("light");
+            if (onClose) onClose();
+          }}
+          aria-label="Cerrar portal de acceso"
+          className="absolute top-3.5 right-3.5 z-30 w-9 h-9 rounded-full bg-[#1E0734] text-white hover:bg-[#290C46] flex items-center justify-center shadow-lg mp-close-btn"
+        >
+          <WtaIcon name="close" size={18} />
+        </button>
+
+        {/* A. PANTALLA DE TRANSICIÓN / REDIRECCIÓN LIMPIA (ESTILO WTA UNLOCKED) */}
+        {isRedirecting ? (
+          <div className="min-h-[420px] flex flex-col items-center justify-center p-8 bg-[#FAF9F5] text-[#1E0734] text-center space-y-4">
+            <div className="relative w-20 h-20 flex items-center justify-center">
+              <div className="absolute inset-0 rounded-full border-2 border-[#1E0734]/10" />
+              <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-[#00DC7D] border-r-[#00DC7D] animate-spin" />
+              <BrandLogo variant="isotipo" size="md" />
+            </div>
+            <div className="font-wta-condensed text-2xl font-bold uppercase tracking-tight">
+              ABRIENDO PORTAL OFICIAL MATCHPOINT
+            </div>
+            <p className="text-xs text-[#1E0734]/65">
+              Cargando credenciales seguras del circuito...
+            </p>
+          </div>
+        ) : (
+          /* B. PORTAL SPLIT-SCREEN 50/50 (FORMULARIO SOBRE BLANCO / PÓSTER DEPORTIVO) */
+          <div className="flex-1 overflow-y-auto overscroll-contain grid grid-cols-1 lg:grid-cols-12">
+            {/* ==================== MITAD IZQUIERDA (50% -> 6 COLS): FORMULARIO ==================== */}
+            <div className="lg:col-span-6 p-5 sm:p-7 bg-white text-[#1E0734] flex flex-col justify-between space-y-4">
+              {/* Cabecera del Formulario */}
+              <div className="flex items-center justify-between gap-2 pr-8">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="text-xs font-extrabold text-[#1E0734]/70 hover:text-[#1E0734] flex items-center gap-1"
+                >
+                  <WtaIcon name="chevron-left" size={14} />
+                  <span>Volver al circuito</span>
+                </button>
+
+                {authMode === "login" ? (
+                  <button
+                    type="button"
+                    onClick={() => switchModeWithTransition("register")}
+                    className="text-xs font-extrabold text-[#00A859] hover:underline"
+                  >
+                    ¿No tienes cuenta? Regístrate
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => switchModeWithTransition("login")}
+                    className="text-xs font-extrabold text-[#1E0734] hover:underline"
+                  >
+                    ¿Ya tienes cuenta? Inicia sesión
+                  </button>
+                )}
+              </div>
+
+              {/* ---------------- MODO 1: INICIO DE SESIÓN ---------------- */}
+              {authMode === "login" && (
+                <div className="space-y-4 my-auto">
+                  <div>
+                    <BrandLogo variant="pill-light" size="md" />
+                    <h2 className="font-wta-condensed text-3xl sm:text-4xl font-bold uppercase text-[#1E0734] leading-none mt-2">
+                      INICIA SESIÓN EN TU CUENTA
+                    </h2>
+                    <p className="text-xs text-[#1E0734]/70 mt-1">
+                      Ingresa con tu número de celular peruano (9 dígitos) o correo
+                      electrónico.
+                    </p>
+                  </div>
+
+                  {/* Acceso Rápido Demo en 1 Toque para Pruebas entre Cuentas */}
+                  <div className="p-3 rounded-2xl bg-[#FAF9F5] border border-[#1E0734]/12 space-y-2">
+                    <span className="text-[10px] font-wta-display font-black uppercase tracking-wider text-[#00A859] block">
+                      CAMBIO RÁPIDO DE CUENTA (MODO PRUEBA EN CANCHA)
+                    </span>
+                    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+                      {players.slice(0, 6).map((p) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => {
+                            triggerHaptic("hero");
+                            if (onLoginSuccess) onLoginSuccess(p.id);
+                            onClose();
+                          }}
+                          className={`px-2.5 py-1.5 rounded-xl border text-[11px] font-extrabold flex items-center gap-1.5 shrink-0 mp-btn-tactile ${
+                            p.id === currentUser?.id
+                              ? "bg-[#1E0734] text-[#00DC7D] border-[#1E0734]"
+                              : "bg-white border-[#1E0734]/15 text-[#1E0734]"
+                          }`}
+                        >
+                          <SmartImage
+                            src={p.avatar}
+                            alt={p.firstName}
+                            isAvatar
+                            className="w-5 h-5 rounded-full object-cover"
+                          />
+                          <span>{p.firstName}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <form onSubmit={handleLoginSubmit} className="space-y-3">
+                    <div>
+                      <label className="block text-[11px] font-extrabold uppercase tracking-wider text-[#1E0734]/75 mb-1">
+                        Celular (WhatsApp) o Correo Electrónico
+                      </label>
+                      <input
+                        type="text"
+                        value={loginIdentifier}
+                        onChange={(e) => setLoginIdentifier(e.target.value)}
+                        placeholder="Ej. 999888777 o pablo@matchpoint.pe"
+                        className="w-full px-3.5 py-3 rounded-2xl border border-[#1E0734]/20 bg-[#FAF9F5] text-[#1E0734] font-semibold mp-input-alive"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[11px] font-extrabold uppercase tracking-wider text-[#1E0734]/75">
+                          Contraseña
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => switchModeWithTransition("recover")}
+                          className="text-[11px] font-extrabold text-[#00A859] hover:underline"
+                        >
+                          ¿Olvidaste tu contraseña?
+                        </button>
+                      </div>
+
+                      <div className="relative">
+                        <input
+                          type={showLoginPassword ? "text" : "password"}
+                          value={loginPassword}
+                          onChange={(e) => setLoginPassword(e.target.value)}
+                          placeholder="Ingresa tu clave"
+                          className="w-full pl-3.5 pr-10 py-3 rounded-2xl border border-[#1E0734]/20 bg-[#FAF9F5] text-[#1E0734] font-semibold mp-input-alive"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setShowLoginPassword((prev) => !prev)
+                          }
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-[#1E0734]/60 hover:text-[#1E0734]"
+                        >
+                          <WtaIcon
+                            name={showLoginPassword ? "eye-off" : "eye"}
+                            size={17}
+                          />
+                        </button>
+                      </div>
+                    </div>
+
+                    {loginError && (
+                      <div className="p-3 rounded-2xl bg-rose-500/12 border border-rose-500/35 text-rose-700 text-xs font-bold">
+                        {loginError}
+                      </div>
+                    )}
+
+                    <button
+                      type="submit"
+                      className="w-full py-3.5 px-6 rounded-full mp-btn-emerald mp-btn-shimmer font-wta-display font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg"
+                    >
+                      <span>Entrar a mi cuenta</span>
+                      <WtaIcon name="arrow-right" size={16} />
+                    </button>
+                  </form>
+                </div>
+              )}
+
+              {/* ---------------- MODO 2: REGISTRO CON BLINDAJE LEGAL PERÚ ---------------- */}
+              {authMode === "register" && (
+                <form onSubmit={handleRegisterSubmit} className="space-y-3 my-auto">
+                  <div>
+                    <span className="px-2.5 py-0.5 rounded-full bg-[#1E0734] text-[#00DC7D] text-[10px] font-wta-display font-black uppercase tracking-wider">
+                      NUEVO JUGADOR · BONO +20 GEMAS
+                    </span>
+                    <h2 className="font-wta-condensed text-3xl font-bold uppercase text-[#1E0734] leading-none mt-1.5">
+                      CREA TU CUENTA OFICIAL GRATIS
+                    </h2>
+                  </div>
+
+                  {/* Nombre y Apellido en 2 Columnas */}
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="block text-[10px] font-extrabold uppercase tracking-wider text-[#1E0734]/75 mb-1">
+                        Nombre *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        placeholder="Ej. Mateo"
+                        className="w-full px-3 py-2.5 rounded-xl border border-[#1E0734]/20 bg-[#FAF9F5] text-xs font-bold mp-input-alive"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-extrabold uppercase tracking-wider text-[#1E0734]/75 mb-1">
+                        Apellido *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        placeholder="Ej. Villavicencio"
+                        className="w-full px-3 py-2.5 rounded-xl border border-[#1E0734]/20 bg-[#FAF9F5] text-xs font-bold mp-input-alive"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Celular (WhatsApp) y Correo */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="block text-[10px] font-extrabold uppercase tracking-wider text-[#1E0734]/75 mb-1">
+                        Celular WhatsApp (9 dígitos) *
+                      </label>
+                      <input
+                        type="tel"
+                        required
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="999 888 777"
+                        className="w-full px-3 py-2.5 rounded-xl border border-[#1E0734]/20 bg-[#FAF9F5] text-xs font-bold mp-input-alive"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-extrabold uppercase tracking-wider text-[#1E0734]/75 mb-1">
+                        Correo Electrónico *
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="correo@ejemplo.com"
+                        className="w-full px-3 py-2.5 rounded-xl border border-[#1E0734]/20 bg-[#FAF9F5] text-xs font-bold mp-input-alive"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Edad (+18 Obligatorio), Estatura y Contraseña */}
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="block text-[10px] font-extrabold uppercase tracking-wider text-[#1E0734]/75 mb-1">
+                        Edad (+18) *
+                      </label>
+                      <input
+                        type="number"
+                        min="18"
+                        max="95"
+                        required
+                        value={age}
+                        onChange={(e) => setAge(e.target.value)}
+                        placeholder="Ej. 28"
+                        className={`w-full px-3 py-2.5 rounded-xl border bg-[#FAF9F5] text-xs font-bold mp-input-alive ${
+                          isUnderageEntered
+                            ? "border-rose-600 bg-rose-50 text-rose-700"
+                            : "border-[#1E0734]/20 text-[#1E0734]"
+                        }`}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-extrabold uppercase tracking-wider text-[#1E0734]/75 mb-1">
+                        Estatura
+                      </label>
+                      <input
+                        type="text"
+                        value={height}
+                        onChange={(e) => setHeight(e.target.value)}
+                        placeholder="1.76 m"
+                        className="w-full px-3 py-2.5 rounded-xl border border-[#1E0734]/20 bg-[#FAF9F5] text-xs font-bold mp-input-alive"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-extrabold uppercase tracking-wider text-[#1E0734]/75 mb-1">
+                        Contraseña *
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showRegisterPassword ? "text" : "password"}
+                          required
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          placeholder="Clave"
+                          className="w-full pl-2.5 pr-7 py-2.5 rounded-xl border border-[#1E0734]/20 bg-[#FAF9F5] text-xs font-bold mp-input-alive"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setShowRegisterPassword((prev) => !prev)
+                          }
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-[#1E0734]/55"
+                        >
+                          <WtaIcon
+                            name={showRegisterPassword ? "eye-off" : "eye"}
+                            size={14}
+                          />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Aviso inmediato si intenta ingresar menos de 18 años */}
+                  {isUnderageEntered && (
+                    <div className="p-2.5 rounded-xl bg-rose-500/15 border border-rose-600/40 text-rose-700 text-[11px] font-extrabold">
+                      Bloqueo legal: Queda prohibido el registro a menores de 18 años en
+                      MATCHPOINT.
+                    </div>
+                  )}
+
+                  {/* Mano de Juego, Mejor Golpe, Club y Foto Opcional */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] font-extrabold uppercase tracking-wider text-[#1E0734]/75 mb-1">
+                        Mano hábil
+                      </label>
+                      <select
+                        value={hand}
+                        onChange={(e) => setHand(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-[#1E0734]/20 bg-[#FAF9F5] text-xs font-bold mp-input-alive"
+                      >
+                        <option value="Diestro">Diestro</option>
+                        <option value="Zurdo">Zurdo</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-extrabold uppercase tracking-wider text-[#1E0734]/75 mb-1">
+                        Club en Huancayo
+                      </label>
+                      <select
+                        value={individualMode ? "INDEPENDIENTE" : club}
+                        onChange={(e) => {
+                          if (e.target.value === "INDEPENDIENTE") {
+                            setIndividualMode(true);
+                          } else {
+                            setIndividualMode(false);
+                            setClub(e.target.value);
+                          }
+                        }}
+                        className="w-full px-3 py-2 rounded-xl border border-[#1E0734]/20 bg-[#FAF9F5] text-xs font-bold mp-input-alive"
+                      >
+                        {sedes.map((s) => (
+                          <option key={s.id} value={s.name}>
+                            {s.shortName}
+                          </option>
+                        ))}
+                        <option value="INDEPENDIENTE">
+                          Jugador Independiente
+                        </option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2 pt-0.5">
+                    <input
+                      ref={avatarFileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleAvatarUpload}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => avatarFileInputRef.current?.click()}
+                      className="px-3 py-1.5 rounded-xl bg-[#FAF9F5] border border-[#1E0734]/20 text-xs font-bold flex items-center gap-1.5 mp-btn-tactile"
+                    >
+                      <WtaIcon name="camera" size={14} className="text-[#00A859]" />
+                      <span>
+                        {uploadedAvatar ? "Foto cargada ✓" : "Subir foto (opcional)"}
+                      </span>
+                    </button>
+
+                    <div className="inline-flex rounded-xl p-0.5 bg-[#FAF9F5] border border-[#1E0734]/15 text-[11px] font-bold">
+                      <button
+                        type="button"
+                        onClick={() => setGender("M")}
+                        className={`px-2.5 py-1 rounded-lg ${
+                          gender === "M" ? "bg-[#1E0734] text-white" : ""
+                        }`}
+                      >
+                        Varones
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setGender("F")}
+                        className={`px-2.5 py-1 rounded-lg ${
+                          gender === "F" ? "bg-[#1E0734] text-white" : ""
+                        }`}
+                      >
+                        Damas
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* ==========================================================
+                      CASILLA DE VERIFICACIÓN LEGAL OBLIGATORIA (NORMATIVA PERÚ)
+                      - Desmarcada por defecto.
+                      - Bloquea el botón "Crear Cuenta" hasta marcarla.
+                      - Enlaces clicables a Términos y Privacidad sin perder datos.
+                      ========================================================== */}
+                  <div className="p-3 rounded-2xl bg-[#FAF9F5] border border-[#1E0734]/20 space-y-1.5">
+                    <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={acceptedLegalTerms}
+                        onChange={(e) => {
+                          triggerHaptic("tab");
+                          setAcceptedLegalTerms(e.target.checked);
+                        }}
+                        className="mt-0.5 w-4 h-4 rounded accent-[#00A859] shrink-0 cursor-pointer"
+                      />
+                      <span className="text-[11px] leading-relaxed text-[#1E0734] font-semibold">
+                        Declaro ser mayor de 18 años y acepto los{" "}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            triggerHaptic("tab");
+                            setInlineLegalDoc("terms");
+                          }}
+                          className="font-extrabold text-[#00A859] underline hover:text-[#1E0734]"
+                        >
+                          Términos y Condiciones
+                        </button>{" "}
+                        y la{" "}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            triggerHaptic("tab");
+                            setInlineLegalDoc("privacy");
+                          }}
+                          className="font-extrabold text-[#00A859] underline hover:text-[#1E0734]"
+                        >
+                          Política de Privacidad
+                        </button>{" "}
+                        de MATCHPOINT.
+                      </span>
+                    </label>
+                  </div>
+
+                  {registerError && (
+                    <div className="p-2.5 rounded-xl bg-rose-500/15 border border-rose-500/35 text-rose-700 text-xs font-bold">
+                      {registerError}
+                    </div>
+                  )}
+
+                  {/* Botón Crear Cuenta: BLOQUEADO hasta marcar el checkbox y validar +18 */}
+                  <button
+                    type="submit"
+                    disabled={!canSubmitRegistration}
+                    className={`w-full py-3.5 px-6 rounded-full font-wta-display font-extrabold text-sm flex items-center justify-center gap-2 transition-all ${
+                      canSubmitRegistration
+                        ? "bg-[#1E0734] hover:bg-[#290C46] text-[#00DC7D] shadow-xl cursor-pointer mp-btn-tactile"
+                        : "bg-[#1E0734]/20 text-[#1E0734]/45 cursor-not-allowed"
+                    }`}
+                  >
+                    <WtaIcon
+                      name={canSubmitRegistration ? "check" : "lock"}
+                      size={16}
+                    />
+                    <span>
+                      {canSubmitRegistration
+                        ? "Crear Cuenta e Ir al Test Inicial"
+                        : "Completa tus datos (+18) y acepta los términos"}
+                    </span>
+                  </button>
+                </form>
+              )}
+
+              {/* ---------------- MODO 3: RECUPERACIÓN EN 2 PASOS ---------------- */}
+              {authMode === "recover" && (
+                <div className="space-y-4 my-auto">
+                  <div>
+                    <span className="px-2.5 py-0.5 rounded-full bg-[#00DC7D]/20 text-[#00A859] text-[10px] font-wta-display font-black uppercase tracking-wider">
+                      RECUPERACIÓN DE ACCESO EN 2 PASOS
+                    </span>
+                    <h2 className="font-wta-condensed text-3xl font-bold uppercase text-[#1E0734] mt-1">
+                      RESTABLECE TU CONTRASEÑA
+                    </h2>
+                  </div>
+
+                  {recoverStep === 1 ? (
+                    <form
+                      onSubmit={handleVerifyRecoveryIdentity}
+                      className="space-y-3"
+                    >
+                      <div>
+                        <label className="block text-[11px] font-extrabold uppercase tracking-wider text-[#1E0734]/75 mb-1">
+                          Paso 1: Tu celular (9 dígitos) o correo
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={recoverContact}
+                          onChange={(e) => setRecoverContact(e.target.value)}
+                          placeholder="Ej. 999888777 o correo@matchpoint.pe"
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-[#1E0734]/20 bg-[#FAF9F5] text-xs font-bold mp-input-alive"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-extrabold uppercase tracking-wider text-[#1E0734]/75 mb-1">
+                          Confirma tu edad registrada
+                        </label>
+                        <input
+                          type="number"
+                          value={recoverAgeVerify}
+                          onChange={(e) => setRecoverAgeVerify(e.target.value)}
+                          placeholder="Ej. 26"
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-[#1E0734]/20 bg-[#FAF9F5] text-xs font-bold mp-input-alive"
+                        />
+                      </div>
+
+                      {recoverStatusMsg && (
+                        <div className="p-2.5 rounded-xl bg-rose-500/15 border border-rose-500/35 text-rose-700 text-xs font-bold">
+                          {recoverStatusMsg}
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => switchModeWithTransition("login")}
+                          className="py-3 px-4 rounded-full bg-[#FAF9F5] border border-[#1E0734]/20 text-xs font-extrabold mp-btn-tactile"
+                        >
+                          « Volver al Login
+                        </button>
+                        <button
+                          type="submit"
+                          className="flex-1 py-3 px-5 rounded-full bg-[#1E0734] text-[#00DC7D] font-wta-display font-extrabold text-xs mp-btn-tactile"
+                        >
+                          Verificar cuenta ➔
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <form
+                      onSubmit={handleSaveRecoveredPassword}
+                      className="space-y-3"
+                    >
+                      <div className="p-3 rounded-2xl bg-[#00DC7D]/15 border border-[#00A859]/40 text-xs font-bold text-[#1E0734]">
+                        Identidad verificada para{" "}
+                        <strong>{matchedRecoverPlayer?.name}</strong>. Ingresa tu
+                        nueva contraseña:
+                      </div>
+
+                      <input
+                        type="password"
+                        required
+                        value={recoverNewPass}
+                        onChange={(e) => setRecoverNewPass(e.target.value)}
+                        placeholder="Escribe tu nueva contraseña"
+                        className="w-full px-3.5 py-3 rounded-xl border border-[#1E0734]/20 bg-[#FAF9F5] text-xs font-bold mp-input-alive"
+                      />
+
+                      <button
+                        type="submit"
+                        className="w-full py-3.5 px-5 rounded-full mp-btn-emerald font-wta-display font-extrabold text-xs"
+                      >
+                        Guardar nueva clave y entrar
+                      </button>
+                    </form>
+                  )}
+
+                  {/* Soporte Directo por WhatsApp con el Administrador */}
+                  <div className="pt-2 border-t border-[#1E0734]/10">
+                    <a
+                      href={`https://wa.me/${
+                        CIRCUIT_CONFIG.adminWhatsApp
+                      }?text=${encodeURIComponent(
+                        `Hola Administrador MATCHPOINT, solicito restablecer el acceso a mi cuenta vinculada a: ${
+                          recoverContact || "mi celular"
+                        }.`
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full py-2.5 px-4 rounded-2xl bg-[#00A859]/12 text-[#00A859] font-extrabold text-xs flex items-center justify-center gap-1.5"
+                    >
+                      <WtaIcon name="whatsapp" size={15} />
+                      <span>Solicitar rescate directo por WhatsApp</span>
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {/* Franja Inferior Legal Verde Esmeralda (Estilo WTA Unlocked) */}
+              <div className="pt-3 border-t border-[#1E0734]/10 flex flex-wrap items-center justify-between gap-2 text-[11px] font-bold text-[#1E0734]/65">
+                <span>© 2026 MATCHPOINT</span>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setInlineLegalDoc("terms")}
+                    className="hover:text-[#00A859] underline"
+                  >
+                    Términos
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setInlineLegalDoc("privacy")}
+                    className="hover:text-[#00A859] underline"
+                  >
+                    Privacidad (Ley N° 29733)
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* ==================== MITAD DERECHA (50% -> 6 COLS): PÓSTER EDITORIAL ==================== */}
+            <div
+              className={`lg:col-span-6 relative min-h-[260px] lg:min-h-[540px] p-6 flex flex-col justify-between overflow-hidden text-white ${
+                authMode === "register" ? "bg-[#1E0734]" : "bg-[#00A859]"
+              }`}
+            >
+              <SmartImage
+                src={
+                  authMode === "register"
+                    ? ASSETS.registroPosterPurpura
+                    : ASSETS.loginPosterEsmeralda
+                }
+                alt="Póster Oficial MatchPoint"
+                className="absolute inset-0 w-full h-full object-cover opacity-55"
+              />
+              <div
+                className="absolute inset-0"
+                style={{
+                  background:
+                    authMode === "register"
+                      ? "linear-gradient(180deg, rgba(30,7,52,0.55) 0%, rgba(30,7,52,0.35) 40%, rgba(22,4,40,0.96) 100%)"
+                      : "linear-gradient(180deg, rgba(0,168,89,0.55) 0%, rgba(30,7,52,0.45) 45%, rgba(30,7,52,0.95) 100%)",
+                }}
+              />
+
+              <div className="relative z-10">
+                <BrandLogo variant="night-cobrand" size="md" />
+              </div>
+
+              <div className="relative z-10 space-y-3 mt-12">
+                <span className="px-3 py-1 rounded-full bg-[#00DC7D] text-[#1E0734] text-[10px] font-wta-display font-black uppercase tracking-wider inline-block">
+                  {authMode === "register"
+                    ? "REGISTRO OFICIAL DE JUGADORES"
+                    : "ACCESO AL CIRCUITO DE HUANCAYO"}
+                </span>
+
+                <h3 className="font-wta-condensed text-3xl sm:text-4xl font-bold uppercase leading-none">
+                  {authMode === "register"
+                    ? "CREA TU CUENTA GRATIS Y DESBLOQUEA EL CIRCUITO"
+                    : "ENTRA A CANCHA, SUMA PUNTOS Y GANA GEMAS"}
+                </h3>
+
+                {/* Línea degradada esmeralda-oro bajo el titular */}
+                <div className="h-1 w-28 rounded-full bg-gradient-to-r from-[#00DC7D] to-[#F59E0B]" />
+
+                <ul className="space-y-1.5 text-xs text-white/90 font-semibold">
+                  <li className="flex items-center gap-2">
+                    <WtaIcon
+                      name="check"
+                      size={14}
+                      className="text-[#00DC7D]"
+                    />
+                    <span>
+                      Ranking oficial por categorías (5ª P hasta 2ª Libre y +40 Master)
+                    </span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <WtaIcon
+                      name="check"
+                      size={14}
+                      className="text-[#00DC7D]"
+                    />
+                    <span>
+                      Comparador Head to Head y Estudio de Silueta estilo WTA
+                    </span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <WtaIcon
+                      name="check"
+                      size={14}
+                      className="text-[#00DC7D]"
+                    />
+                    <span>
+                      Canje de Gemas por escenarios Grand Slam y bonos en tienda
+                    </span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* VISOR LEGAL SUPERPUESTO (SE ABRE ENCIMA SIN BORRAR LOS DATOS ESCRITOS EN EL REGISTRO) */}
+        {inlineLegalDoc && (
+          <div className="absolute inset-0 z-40 bg-[#1E0734]/95 text-white p-5 sm:p-7 flex flex-col justify-between mp-view-enter">
+            <div className="flex items-center justify-between border-b border-white/15 pb-3">
+              <div>
+                <span className="text-[10px] font-wta-display font-black uppercase tracking-wider text-[#00DC7D] block">
+                  NORMATIVA LEGAL VIGENTE · PERÚ
+                </span>
+                <h3 className="font-wta-condensed text-2xl font-bold uppercase">
+                  {inlineLegalDoc === "terms"
+                    ? "TÉRMINOS Y CONDICIONES DE USO"
+                    : "POLÍTICA DE PRIVACIDAD (LEY N° 29733)"}
+                </h3>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setInlineLegalDoc(null)}
+                className="px-3.5 py-1.5 rounded-full bg-[#00DC7D] text-[#1E0734] text-xs font-extrabold"
+              >
+                Volver al formulario
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto my-4 space-y-3 pr-1">
+              {(inlineLegalDoc === "terms"
+                ? OFFICIAL_TERMS_CLAUSES
+                : OFFICIAL_PRIVACY_CLAUSES
+              ).map((cl) => (
+                <div
+                  key={cl.number}
+                  className="p-3.5 rounded-2xl bg-white/8 border border-white/12 space-y-1"
+                >
+                  <h4 className="text-xs sm:text-sm font-extrabold text-[#00DC7D]">
+                    {cl.number}. {cl.title}
+                  </h4>
+                  <p className="text-xs text-white/85 leading-relaxed">
+                    {cl.body}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            <div className="pt-3 border-t border-white/15 flex items-center justify-between gap-3">
+              <span className="text-[11px] text-white/70">
+                Tus datos escritos en el formulario se mantienen guardados.
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHaptic("success");
+                  setAcceptedLegalTerms(true);
+                  setInlineLegalDoc(null);
+                }}
+                className="py-2.5 px-5 rounded-full mp-btn-emerald font-wta-display font-extrabold text-xs"
+              >
+                Leído y Aceptar
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ----------------------------------------------------------------------------
+// 3. TEST INICIAL DIDÁCTICO DE 5 PREGUNTAS A PRUEBA DE INCONGRUENCIAS
+//    (<InitialCalibrationWizardModal/>)
+//    - Paso 0: Bienvenida explicada con lenguaje sencillo.
+//    - Pasos 1 a 5: Botones grandes con colores por nivel, check animado y
+//      opción de regresar a la pregunta anterior.
+//    - Pantalla Final: Categoría asignada, bono de +20 Gemas y explicación
+//      de los primeros 5 partidos de prueba.
+// ----------------------------------------------------------------------------
+export function InitialCalibrationWizardModal({
+  isOpen,
+  onClose,
+  currentUser,
+  lightMode = false,
+  onCompleteCalibration,
+}) {
+  const [step, setStep] = useState(0); // 0 = Intro, 1..5 = Preguntas, 6 = Resultado
+  const [answersMap, setAnswersMap] = useState({});
+  const [diagnosisResult, setDiagnosisResult] = useState(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setStep(0);
+      setAnswersMap({});
+      setDiagnosisResult(null);
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const currentQuestion =
+    step >= 1 && step <= 5 ? INITIAL_CALIBRATION_QUESTIONS[step - 1] : null;
+
+  const handleChooseOption = (questionObj, optionObj) => {
+    triggerHaptic("tab");
+    const updatedMap = {
+      ...answersMap,
+      [questionObj.id]: optionObj,
+    };
+    setAnswersMap(updatedMap);
+
+    setTimeout(() => {
+      if (step < 5) {
+        setStep((prev) => prev + 1);
+      } else {
+        const result = evaluateInitialCalibration(updatedMap);
+        setDiagnosisResult(result);
+        setStep(6);
+        triggerHaptic("success");
+      }
+    }, 220);
+  };
+
+  const handleConfirmFinish = () => {
+    triggerHaptic("hero");
+    if (onCompleteCalibration && diagnosisResult) {
+      onCompleteCalibration({
+        assignedElo: diagnosisResult.assignedElo,
+        categoryName: diagnosisResult.category.name,
+      });
+    }
+    onClose();
+  };
+
+  return (
+    <WtaModalWrapper
+      isOpen={isOpen}
+      onClose={step === 6 ? handleConfirmFinish : onClose}
+      title={
+        step === 0
+          ? "Ubica tu Categoría de Inicio"
+          : step <= 5
+          ? `Pregunta ${step} de 5`
+          : "¡Tu Categoría Está Lista!"
+      }
+      subtitle={
+        step === 0
+          ? "Responde 5 preguntas breves sobre tu experiencia en cancha para emparejarte con rivales de tu mismo nivel."
+          : step <= 5
+          ? currentQuestion?.subtitle
+          : "Ya puedes lanzar retos y competir en el circuito oficial de Huancayo."
+      }
+      badgeText="UBICACIÓN DE NIVEL (1 SOLA VEZ)"
+      iconName="sparkles"
+      lightMode={lightMode}
+      maxWidthClass="max-w-lg"
+    >
+      {/* PASO 0: BIENVENIDA CERCANA Y DIDÁCTICA */}
+      {step === 0 && (
+        <div className="space-y-4 mp-view-enter">
+          <div
+            className={`p-4 rounded-3xl border space-y-3 text-xs leading-relaxed ${
+              lightMode
+                ? "bg-white border-[#1E0734]/12 text-[#1E0734]"
+                : "bg-[#1E0734] border-white/12 text-white"
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <SmartImage
+                src={ASSETS.pelotaVoltAzul}
+                alt="Pelota"
+                className="w-12 h-12 object-contain shrink-0"
+              />
+              <div>
+                <h4 className="font-wta-condensed text-xl font-bold uppercase text-[#00DC7D]">
+                  HOLA {currentUser?.firstName || "TENISTA"}, ASÍ FUNCIONA:
+                </h4>
+                <p className="opacity-85 mt-0.5">
+                  Este cuestionario rápido solo se realiza una vez al crear tu
+                  cuenta.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-2 border-t border-current/10">
+              <div className="flex items-start gap-2">
+                <span className="w-5 h-5 rounded-full bg-[#00DC7D] text-[#1E0734] font-black flex items-center justify-center shrink-0">
+                  1
+                </span>
+                <span>
+                  <strong>Toca la opción que mejor te describa:</strong> No hay
+                  respuestas buenas ni malas; sirve para que no juegues contra
+                  alguien de nivel muy distinto al tuyo.
+                </span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="w-5 h-5 rounded-full bg-[#00DC7D] text-[#1E0734] font-black flex items-center justify-center shrink-0">
+                  2
+                </span>
+                <span>
+                  <strong>Tus primeros 5 partidos de prueba:</strong> Una vez en
+                  cancha, tus primeros 5 partidos ajustarán tu puntaje real de
+                  forma automática.
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic("hero");
+              setStep(1);
+            }}
+            className="w-full py-4 px-6 rounded-2xl mp-btn-emerald mp-btn-shimmer font-wta-display font-extrabold text-sm flex items-center justify-center gap-2 shadow-xl"
+          >
+            <span>Comenzar las 5 preguntas</span>
+            <WtaIcon name="arrow-right" size={18} />
+          </button>
+        </div>
+      )}
+
+      {/* PASOS 1 A 5: LAS 5 PREGUNTAS CON BOTONES GRANDES Y REBOTE ELÁSTICO */}
+      {step >= 1 && step <= 5 && currentQuestion && (
+        <div key={currentQuestion.id} className="space-y-4 mp-view-enter">
+          {/* Barra de progreso 1 a 5 */}
+          <div className="grid grid-cols-5 gap-1.5">
+            {[1, 2, 3, 4, 5].map((idx) => (
+              <div
+                key={idx}
+                className={`h-1.5 rounded-full transition-all ${
+                  idx <= step ? "bg-[#00DC7D]" : "bg-current/15"
+                }`}
+              />
+            ))}
+          </div>
+
+          <h4 className="font-wta-display text-base sm:text-lg font-extrabold leading-snug">
+            {currentQuestion.title}
+          </h4>
+
+          <div className="space-y-2.5">
+            {currentQuestion.options.map((opt) => {
+              const isSelected = answersMap[currentQuestion.id]?.id === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => handleChooseOption(currentQuestion, opt)}
+                  className={`w-full p-3.5 rounded-2xl border-2 text-left flex items-center justify-between gap-3 mp-btn-tactile ${
+                    isSelected
+                      ? "bg-[#00DC7D]/20 border-[#00DC7D] shadow-lg scale-[1.01]"
+                      : lightMode
+                      ? "bg-white border-[#1E0734]/12 hover:border-[#00DC7D]"
+                      : "bg-[#1E0734] border-white/15 hover:border-[#00DC7D]"
+                  }`}
+                >
+                  <div className="space-y-0.5 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="px-2 py-0.2 rounded text-[10px] font-wta-display font-black uppercase"
+                        style={{
+                          backgroundColor: opt.accentColor,
+                          color: "#1E0734",
+                        }}
+                      >
+                        {opt.tierTag}
+                      </span>
+                      <span className="text-xs sm:text-sm font-extrabold">
+                        {opt.label}
+                      </span>
+                    </div>
+                    <p className="text-[11px] opacity-75 leading-snug">
+                      {opt.detail}
+                    </p>
+                  </div>
+
+                  <div
+                    className={`w-7 h-7 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                      isSelected
+                        ? "bg-[#00DC7D] border-[#00DC7D] text-[#1E0734]"
+                        : "border-current/25"
+                    }`}
+                  >
+                    {isSelected && (
+                      <WtaIcon name="check" size={15} strokeWidth={3} />
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {step > 1 && (
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic("tab");
+                setStep((prev) => prev - 1);
+              }}
+              className="text-xs font-extrabold text-[#00DC7D] flex items-center gap-1 pt-1"
+            >
+              <WtaIcon name="chevron-left" size={14} />
+              <span>Volver a la pregunta anterior</span>
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* PASO 6: DIAGNÓSTICO FINAL DE CATEGORÍA Y PUNTOS */}
+      {step === 6 && diagnosisResult && (
+        <div className="space-y-4 text-center mp-view-enter">
+          <div className="p-5 rounded-3xl bg-gradient-to-b from-[#00DC7D]/20 via-[#1E0734] to-[#160428] border-2 border-[#00DC7D] text-white space-y-2.5 shadow-xl">
+            <span className="px-3 py-0.5 rounded-full bg-[#00DC7D] text-[#1E0734] text-[10px] font-wta-display font-black uppercase tracking-widest inline-block">
+              CATEGORÍA INICIAL ASIGNADA
+            </span>
+
+            <div className="font-wta-condensed text-4xl sm:text-5xl font-bold uppercase text-[#00DC7D] leading-none">
+              {diagnosisResult.category.fullName}
+            </div>
+
+            <div className="font-wta-condensed text-2xl font-bold text-white tabular-nums">
+              Puntaje de partida: {diagnosisResult.assignedElo} PTS
+            </div>
+
+            <p className="text-xs text-white/85 leading-relaxed max-w-md mx-auto">
+              {diagnosisResult.explanation}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleConfirmFinish}
+            className="w-full py-4 px-6 rounded-2xl mp-btn-emerald mp-btn-shimmer font-wta-display font-extrabold text-sm flex items-center justify-center gap-2 shadow-xl"
+          >
+            <WtaIcon name="check" size={18} strokeWidth={2.8} />
+            <span>Entrar al Ranking con mi Categoría</span>
+          </button>
+        </div>
+      )}
+    </WtaModalWrapper>
+  );
+}
+
+// ----------------------------------------------------------------------------
+// 4. GUÍA VISUAL DEL CIRCUITO (<VisualRulesModal/>)
+//    Explica mediante ejemplos reales de marcadores cómo suben y se protegen
+//    los puntos, el equilibrio +40 Master y la economía de Gemas.
+// ----------------------------------------------------------------------------
+export function VisualRulesModal({ isOpen, onClose, lightMode = false }) {
+  if (!isOpen) return null;
+
+  return (
+    <WtaModalWrapper
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Guía Visual del Circuito"
+      subtitle="Cómo funcionan los puntos, los pisos seguros de categoría y las Gemas de mérito en Huancayo."
+      badgeText="REGLAS CLARAS EN CANCHA"
+      iconName="trophy"
+      lightMode={lightMode}
+      maxWidthClass="max-w-lg"
+    >
+      <div className="space-y-3.5 text-xs">
+        <div
+          className={`p-4 rounded-2xl border space-y-2 ${
+            lightMode
+              ? "bg-white border-[#1E0734]/12"
+              : "bg-[#1E0734] border-white/12"
+          }`}
+        >
+          <span className="px-2.5 py-0.5 rounded-full bg-[#00DC7D] text-[#1E0734] text-[10px] font-wta-display font-black uppercase">
+            1. CÓMO SE CALCULAN TUS PUNTOS EN CANCHA
+          </span>
+          <p className="leading-relaxed opacity-85">
+            Cada partido oficial pone en juego un rango justo según la diferencia
+            de nivel entre ambos tenistas:
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+            <div className="p-2.5 rounded-xl bg-current/5 border border-current/10">
+              <strong className="text-[#00DC7D] block">Victoria clara (6-2, 6-1)</strong>
+              <span className="text-[11px] opacity-80">
+                Sumas cerca del tope máximo de puntos en juego.
+              </span>
+            </div>
+            <div className="p-2.5 rounded-xl bg-current/5 border border-current/10">
+              <strong className="text-[#6EF2B5] block">Batalla a 3 Sets</strong>
+              <span className="text-[11px] opacity-80">
+                Si das pelea y caes en el Super Tie-Break, pierdes menos de la
+                mitad de puntos.
+              </span>
+            </div>
+            <div className="p-2.5 rounded-xl bg-current/5 border border-current/10">
+              <strong className="text-[#F59E0B] block">Pisos Protegidos</strong>
+              <span className="text-[11px] opacity-80">
+                Al subir de categoría o cruzar 2,750 y 4,250 pts, aseguras ese
+                escalón.
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div
+          className={`p-4 rounded-2xl border space-y-2 ${
+            lightMode
+              ? "bg-white border-[#1E0734]/12"
+              : "bg-[#1E0734] border-white/12"
+          }`}
+        >
+          <span className="px-2.5 py-0.5 rounded-full bg-[#F59E0B] text-[#1E0734] text-[10px] font-wta-display font-black uppercase">
+            2. CÓMO GANAR GEMAS DE MÉRITO
+          </span>
+          <ul className="space-y-1.5 opacity-90">
+            <li>• <strong>Racha de 3+ victorias seguidas:</strong> +6 a +15 Gemas por partido.</li>
+            <li>• <strong>Vencer a un rival de mayor puntaje:</strong> +10 a +25 Gemas.</li>
+            <li>• <strong>Campeón o Finalista de Torneo Oficial:</strong> +180 a +1,000 Gemas.</li>
+            <li>• <strong>Trivia semanal y reporte de clima en sede:</strong> +3 a +5 Gemas.</li>
+          </ul>
+        </div>
+      </div>
+    </WtaModalWrapper>
+  );
+}
+
+// === FIN DEL BLOQUE 12 DE 14 ===
+
+// ============================================================================
+// PARTE 13 DE 14: LIBRO DE RECLAMACIONES VIRTUAL (INDECOPI), MODALES LEGALES
+// PERÚ (TÉRMINOS Y PRIVACIDAD LEY N° 29733), REPRODUCTOR DE TIPS GRATUITOS,
+// NOTICIERO EN GRILLA BENTO CON FOTOS REALES, CINTA SUPERIOR DE 1 LÍNEA (34PX),
+// HEADER EN PÍLDORA FLOTANTE SIN RECORTES, MENÚ LATERAL INSTITUCIONAL, BARRA
+// DE 6 REDES SOCIALES Y BARRA DE NAVEGACIÓN INFERIOR CON HALO ESMERALDA
+// ============================================================================
+
+// ----------------------------------------------------------------------------
+// 1. LIBRO DE RECLAMACIONES VIRTUAL OFICIAL (<VirtualClaimsBookModal/>)
+//    Cumplimiento estricto del Código de Protección y Defensa del Consumidor
+//    (Indecopi — Perú):
+//    - Distintivo oficial del Libro de Reclamaciones Virtual.
+//    - Formulario con Nombre completo, DNI o Carné de Extranjería, Correo,
+//      Teléfono, Tipo (Reclamo o Queja) y Detalle del incidente.
+//    - Genera código correlativo automático (ej. LR-2026-001) y lo guarda en
+//      el almacenamiento local y en Supabase.
+// ----------------------------------------------------------------------------
+export function VirtualClaimsBookModal({
+  isOpen,
+  onClose,
+  currentUser,
+  claimsHistory = [],
+  lightMode = false,
+  onSubmitNewClaim,
+}) {
+  const [fullName, setFullName] = useState(currentUser?.name || "");
+  const [documentId, setDocumentId] = useState("");
+  const [email, setEmail] = useState(currentUser?.email || "");
+  const [phone, setPhone] = useState(currentUser?.whatsapp || "");
+  const [claimType, setClaimType] = useState("Reclamo"); // 'Reclamo' | 'Queja'
+  const [serviceRelated, setServiceRelated] = useState(
+    "Inscripción a Torneo / Ranking / Membresía VIP"
+  );
+  const [detail, setDetail] = useState("");
+  const [consumerRequest, setConsumerRequest] = useState("");
+  const [submittedClaim, setSubmittedClaim] = useState(null);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  useEffect(() => {
+    if (isOpen) {
+      setFullName(currentUser?.name || "");
+      setEmail(currentUser?.email || "");
+      setPhone(currentUser?.whatsapp || "");
+      setDocumentId("");
+      setClaimType("Reclamo");
+      setDetail("");
+      setConsumerRequest("");
+      setSubmittedClaim(null);
+      setErrorMsg("");
+    }
+  }, [isOpen, currentUser]);
+
+  if (!isOpen) return null;
+
+  const nextSequentialNumber = (Array.isArray(claimsHistory) ? claimsHistory.length : 0) + 1;
+  const previewCorrelativeCode = `LR-2026-${String(nextSequentialNumber).padStart(3, "0")}`;
+
+  const handleSendClaim = (e) => {
+    e.preventDefault();
+    setErrorMsg("");
+
+    if (
+      fullName.trim().length < 3 ||
+      documentId.trim().length < 7 ||
+      email.trim().length < 5 ||
+      phone.trim().length < 7 ||
+      detail.trim().length < 10
+    ) {
+      setErrorMsg(
+        "Por favor completa todos los campos obligatorios y detalla el incidente (mínimo 10 caracteres)."
+      );
+      return;
+    }
+
+    const nowStamp = new Date().toLocaleString("es-PE");
+    const isoStamp = new Date().toISOString();
+
+    const newClaimRecord = {
+      id: `claim-${Date.now()}`,
+      code: previewCorrelativeCode,
+      fullName: fullName.trim(),
+      documentId: documentId.trim(),
+      email: email.trim(),
+      phone: phone.trim(),
+      type: claimType,
+      serviceRelated,
+      detail: detail.trim(),
+      consumerRequest:
+        consumerRequest.trim() || "Atención y respuesta conforme a ley.",
+      status: "recibido",
+      createdAt: nowStamp,
+      createdAtIso: isoStamp,
+    };
+
+    // Guarda el registro en Supabase como respaldo legal ante Indecopi
+    syncRecordToSupabase("indecopi_claims_book", {
+      claim_code: newClaimRecord.code,
+      full_name: newClaimRecord.fullName,
+      document_id: newClaimRecord.documentId,
+      email: newClaimRecord.email,
+      phone: newClaimRecord.phone,
+      claim_type: newClaimRecord.type,
+      service_related: newClaimRecord.serviceRelated,
+      incident_detail: newClaimRecord.detail,
+      consumer_request: newClaimRecord.consumerRequest,
+      created_at: isoStamp,
+    }).catch(() => {});
+
+    triggerHaptic("success");
+    if (onSubmitNewClaim) {
+      onSubmitNewClaim(newClaimRecord);
+    }
+    setSubmittedClaim(newClaimRecord);
+  };
+
+  return (
+    <WtaModalWrapper
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Libro de Reclamaciones Virtual"
+      subtitle="Conforme al Código de Protección y Defensa del Consumidor (Ley N° 29571 — Indecopi Perú)."
+      badgeText={`HOJA N° ${previewCorrelativeCode}`}
+      iconName="reclamaciones"
+      lightMode={lightMode}
+      maxWidthClass="max-w-lg"
+    >
+      {submittedClaim ? (
+        <div className="space-y-4 mp-view-enter">
+          <div className="p-5 rounded-3xl bg-[#00DC7D]/15 border-2 border-[#00DC7D] text-center space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-[#00DC7D] text-[#1E0734] flex items-center justify-center mx-auto shadow-md">
+              <WtaIcon name="check" size={24} strokeWidth={2.8} />
+            </div>
+
+            <span className="px-3 py-0.5 rounded-full bg-[#1E0734] text-[#00DC7D] text-[10px] font-wta-display font-black uppercase tracking-widest inline-block">
+              CONSTANCIA DE REGISTRO OFICIAL
+            </span>
+
+            <h4 className="font-wta-condensed text-3xl font-bold uppercase text-[#00DC7D] leading-none">
+              CÓDIGO: {submittedClaim.code}
+            </h4>
+
+            <p className="text-xs leading-relaxed opacity-90">
+              Tu <strong>{submittedClaim.type.toUpperCase()}</strong> ha quedado
+              registrada en la base de datos de MATCHPOINT con fecha{" "}
+              <strong>{submittedClaim.createdAt}</strong>. El Comité dará
+              respuesta formal a tu correo electrónico dentro del plazo legal.
+            </p>
+
+            <div className="p-3 rounded-2xl bg-black/25 border border-white/10 text-left text-[11px] space-y-1">
+              <div className="flex justify-between">
+                <span className="opacity-70">Titular:</span>
+                <strong className="font-extrabold">{submittedClaim.fullName}</strong>
+              </div>
+              <div className="flex justify-between">
+                <span className="opacity-70">DNI / CE:</span>
+                <strong className="font-extrabold">
+                  {submittedClaim.documentId}
+                </strong>
+              </div>
+              <div className="flex justify-between">
+                <span className="opacity-70">Tipo:</span>
+                <strong className="font-extrabold text-[#00DC7D]">
+                  {submittedClaim.type}
+                </strong>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                const msg = encodeURIComponent(
+                  `Constancia de Hoja de Reclamación *${submittedClaim.code}* en MATCHPOINT:\n` +
+                    `• Titular: ${submittedClaim.fullName} (DNI/CE: ${submittedClaim.documentId})\n` +
+                    `• Tipo: ${submittedClaim.type}\n` +
+                    `• Detalle: ${submittedClaim.detail}`
+                );
+                window.open(
+                  `https://wa.me/${CIRCUIT_CONFIG.adminWhatsApp}?text=${msg}`,
+                  "_blank",
+                  "noopener,noreferrer"
+                );
+              }}
+              className="py-3 px-4 rounded-2xl bg-white/12 hover:bg-white/20 border border-current/20 font-wta-display font-bold text-xs flex items-center justify-center gap-1.5 mp-btn-tactile"
+            >
+              <WtaIcon name="whatsapp" size={15} className="text-[#00DC7D]" />
+              <span>Enviar copia a soporte</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="py-3 px-4 rounded-2xl mp-btn-emerald font-wta-display font-extrabold text-xs"
+            >
+              Cerrar ventana
+            </button>
+          </div>
+        </div>
+      ) : (
+        <form onSubmit={handleSendClaim} className="space-y-3.5">
+          {/* Encabezado Reglamentario Indecopi */}
+          <div
+            className={`p-3 rounded-2xl border flex items-center justify-between gap-3 text-xs ${
+              lightMode
+                ? "bg-white border-[#1E0734]/15 text-[#1E0734]"
+                : "bg-[#1E0734] border-[#00DC7D]/35 text-white"
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-[#00DC7D]/20 text-[#00DC7D] border border-[#00DC7D]/50 flex items-center justify-center shrink-0">
+                <WtaIcon name="reclamaciones" size={18} />
+              </div>
+              <div>
+                <div className="font-extrabold text-xs">
+                  Proveedor: MATCHPOINT · Circuito Oficial Huancayo
+                </div>
+                <div className="text-[10px] opacity-70">
+                  Fecha de emisión: {new Date().toLocaleDateString("es-PE")}
+                </div>
+              </div>
+            </div>
+            <span className="px-2.5 py-1 rounded-xl bg-[#00DC7D] text-[#1E0734] font-wta-condensed font-bold text-sm shrink-0">
+              {previewCorrelativeCode}
+            </span>
+          </div>
+
+          {/* 1. Identificación del Consumidor Reclamante */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div>
+              <label className="block text-[10px] font-extrabold uppercase tracking-wider mb-1 opacity-80">
+                Nombre Completo *
+              </label>
+              <input
+                type="text"
+                required
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="Nombres y apellidos completos"
+                className={`w-full px-3 py-2.5 rounded-xl border text-xs font-bold mp-input-alive ${
+                  lightMode
+                    ? "bg-white border-[#1E0734]/20 text-[#1E0734]"
+                    : "bg-[#1E0734] border-white/20 text-white"
+                }`}
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-extrabold uppercase tracking-wider mb-1 opacity-80">
+                DNI o Carné de Extranjería *
+              </label>
+              <input
+                type="text"
+                required
+                value={documentId}
+                onChange={(e) => setDocumentId(e.target.value)}
+                placeholder="Ej. 72849102"
+                className={`w-full px-3 py-2.5 rounded-xl border text-xs font-bold mp-input-alive ${
+                  lightMode
+                    ? "bg-white border-[#1E0734]/20 text-[#1E0734]"
+                    : "bg-[#1E0734] border-white/20 text-white"
+                }`}
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-extrabold uppercase tracking-wider mb-1 opacity-80">
+                Correo Electrónico *
+              </label>
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="correo@ejemplo.com"
+                className={`w-full px-3 py-2.5 rounded-xl border text-xs font-bold mp-input-alive ${
+                  lightMode
+                    ? "bg-white border-[#1E0734]/20 text-[#1E0734]"
+                    : "bg-[#1E0734] border-white/20 text-white"
+                }`}
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-extrabold uppercase tracking-wider mb-1 opacity-80">
+                Teléfono / Celular *
+              </label>
+              <input
+                type="tel"
+                required
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="999 888 777"
+                className={`w-full px-3 py-2.5 rounded-xl border text-xs font-bold mp-input-alive ${
+                  lightMode
+                    ? "bg-white border-[#1E0734]/20 text-[#1E0734]"
+                    : "bg-[#1E0734] border-white/20 text-white"
+                }`}
+              />
+            </div>
+          </div>
+
+          {/* 2. Selector de Tipo: Reclamo vs Queja (Definición Legal Indecopi) */}
+          <div>
+            <label className="block text-[10px] font-extrabold uppercase tracking-wider mb-1.5 opacity-80">
+              Tipo de Solicitud *
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                {
+                  id: "Reclamo",
+                  title: "Reclamo",
+                  desc: "Disconformidad relacionada directamente a los servicios o productos.",
+                },
+                {
+                  id: "Queja",
+                  title: "Queja",
+                  desc: "Malestar o descontento respecto a la atención al público.",
+                },
+              ].map((tp) => (
+                <button
+                  key={tp.id}
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic("tab");
+                    setClaimType(tp.id);
+                  }}
+                  className={`p-3 rounded-2xl border text-left transition-all mp-btn-tactile ${
+                    claimType === tp.id
+                      ? "border-2 border-[#00DC7D] bg-[#00DC7D]/15"
+                      : lightMode
+                      ? "bg-white border-[#1E0734]/15"
+                      : "bg-white/6 border-white/15"
+                  }`}
+                >
+                  <div className="text-xs font-extrabold text-[#00DC7D]">
+                    {tp.title}
+                  </div>
+                  <p className="text-[10px] opacity-75 leading-snug mt-0.5">
+                    {tp.desc}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 3. Detalle del Incidente y Pedido */}
+          <div>
+            <label className="block text-[10px] font-extrabold uppercase tracking-wider mb-1 opacity-80">
+              Detalle del Incidente *
+            </label>
+            <textarea
+              rows={3}
+              required
+              value={detail}
+              onChange={(e) => setDetail(e.target.value)}
+              placeholder="Describe con detalle lo ocurrido, incluyendo fecha y servicio involucrado..."
+              className={`w-full px-3.5 py-2.5 rounded-2xl border text-xs font-medium mp-input-alive ${
+                lightMode
+                  ? "bg-white border-[#1E0734]/20 text-[#1E0734]"
+                  : "bg-[#1E0734] border-white/20 text-white"
+              }`}
+            />
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-extrabold uppercase tracking-wider mb-1 opacity-80">
+              Pedido o solución esperada (opcional)
+            </label>
+            <input
+              type="text"
+              value={consumerRequest}
+              onChange={(e) => setConsumerRequest(e.target.value)}
+              placeholder="Ej. Revisión de inscripción o corrección de registro..."
+              className={`w-full px-3.5 py-2.5 rounded-xl border text-xs font-medium mp-input-alive ${
+                lightMode
+                  ? "bg-white border-[#1E0734]/20 text-[#1E0734]"
+                  : "bg-[#1E0734] border-white/20 text-white"
+              }`}
+            />
+          </div>
+
+          {errorMsg && (
+            <div className="p-2.5 rounded-xl bg-rose-500/20 border border-rose-400/50 text-rose-200 text-xs font-bold">
+              {errorMsg}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            className="w-full py-3.5 px-6 rounded-2xl mp-btn-emerald mp-btn-shimmer font-wta-display font-extrabold text-sm flex items-center justify-center gap-2 shadow-xl"
+          >
+            <WtaIcon name="reclamaciones" size={17} />
+            <span>Enviar Hoja de Reclamación</span>
+          </button>
+        </form>
+      )}
+    </WtaModalWrapper>
+  );
+}
+
+// ----------------------------------------------------------------------------
+// 2. MODAL DE TÉRMINOS Y CONDICIONES (5 CLÁUSULAS) Y POLÍTICA DE PRIVACIDAD
+//    (LEY N° 29733 — 4 CLÁUSULAS + DERECHOS ARCO) (<LegalTermsAndPrivacyModal/>)
+// ----------------------------------------------------------------------------
+export function LegalTermsAndPrivacyModal({
+  isOpen,
+  onClose,
+  initialDoc = "terms", // 'terms' | 'privacy'
+  currentUser,
+  lightMode = false,
+}) {
+  const [activeDoc, setActiveDoc] = useState(initialDoc || "terms");
+
+  useEffect(() => {
+    if (isOpen && initialDoc) {
+      setActiveDoc(initialDoc);
+    }
+  }, [isOpen, initialDoc]);
+
+  if (!isOpen) return null;
+
+  const isTerms = activeDoc === "terms";
+  const clausesList = isTerms ? OFFICIAL_TERMS_CLAUSES : OFFICIAL_PRIVACY_CLAUSES;
+
+  const handleRequestArcoRights = () => {
+    triggerHaptic("hero");
+    const msg = encodeURIComponent(
+      `Hola *Soporte Legal MATCHPOINT*, en ejercicio de mis *Derechos ARCO (Ley N° 29733 — Protección de Datos Personales)*, yo *${
+        currentUser?.name || "[Nombre Completo]"
+      }* solicito la revisión / actualización / cancelación de mis datos vinculados al correo *${
+        currentUser?.email || "[Mi Correo]"
+      }*.`
+    );
+    window.open(
+      `https://wa.me/${CIRCUIT_CONFIG.adminWhatsApp}?text=${msg}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
+  };
+
+  return (
+    <WtaModalWrapper
+      isOpen={isOpen}
+      onClose={onClose}
+      title={
+        isTerms
+          ? "Términos y Condiciones Oficiales"
+          : "Política de Privacidad (Ley N° 29733)"
+      }
+      subtitle={
+        isTerms
+          ? "Reglamento de uso, exención de responsabilidad física y normas disciplinarias de MATCHPOINT."
+          : "Protección de datos personales, privacidad de tu teléfono y ejercicio de Derechos ARCO en el Perú."
+      }
+      badgeText="MARCO LEGAL PERÚ · 2026"
+      iconName="shield"
+      lightMode={lightMode}
+      maxWidthClass="max-w-xl"
+    >
+      <div className="space-y-4">
+        {/* Conmutador entre Términos y Política de Privacidad */}
+        <div className="grid grid-cols-2 gap-1.5 p-1 rounded-2xl bg-[#1E0734] border border-white/15">
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic("tab");
+              setActiveDoc("terms");
+            }}
+            className={`py-2 px-3 rounded-xl text-xs font-wta-display font-extrabold transition-all ${
+              isTerms
+                ? "bg-[#00DC7D] text-[#1E0734] shadow-sm"
+                : "text-white/75 hover:text-white"
+            }`}
+          >
+            Términos y Condiciones
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic("tab");
+              setActiveDoc("privacy");
+            }}
+            className={`py-2 px-3 rounded-xl text-xs font-wta-display font-extrabold transition-all ${
+              !isTerms
+                ? "bg-[#00DC7D] text-[#1E0734] shadow-sm"
+                : "text-white/75 hover:text-white"
+            }`}
+          >
+            Política de Privacidad
+          </button>
+        </div>
+
+        {/* Lista Estructurada de Cláusulas Obligatorias */}
+        <div className="space-y-3">
+          {clausesList.map((cl) => (
+            <div
+              key={cl.number}
+              className={`p-4 rounded-2xl border space-y-1.5 ${
+                lightMode
+                  ? "bg-white border-[#1E0734]/12 text-[#1E0734]"
+                  : "bg-[#1E0734] border-white/12 text-white"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <span className="w-6 h-6 rounded-lg bg-[#00DC7D] text-[#1E0734] font-wta-condensed font-bold text-sm flex items-center justify-center shrink-0">
+                  {cl.number}
+                </span>
+                <h4 className="text-xs sm:text-sm font-extrabold text-[#00DC7D]">
+                  {cl.title}
+                </h4>
+              </div>
+              <p className="text-xs leading-relaxed opacity-90 pl-8">
+                {cl.body}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        {/* Canal Directo para Ejercer Derechos ARCO (Ley N° 29733) */}
+        {!isTerms && (
+          <div className="p-3.5 rounded-2xl bg-[#00DC7D]/15 border border-[#00DC7D]/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+            <div>
+              <strong className="font-extrabold text-[#00DC7D] block">
+                Solicitud de Derechos ARCO (Ley N° 29733):
+              </strong>
+              <span className="opacity-85">
+                Solicita la modificación o eliminación definitiva de tus datos
+                personales con nuestro canal de soporte.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={handleRequestArcoRights}
+              className="px-3.5 py-2 rounded-xl bg-[#1E0734] text-[#00DC7D] font-extrabold shrink-0 mp-btn-tactile"
+            >
+              Solicitar ARCO ➔
+            </button>
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={onClose}
+          className="w-full py-3.5 px-6 rounded-2xl mp-btn-emerald font-wta-display font-extrabold text-xs sm:text-sm"
+        >
+          Entendido y Cerrar
+        </button>
+      </div>
+    </WtaModalWrapper>
+  );
+}
+
+// ----------------------------------------------------------------------------
+// 3. MODAL REPRODUCTOR DE LOS 2 TIPS GRATUITOS DE LA SEMANA Y ACADEMIA TV
+//    (<WeeklyFreeTipsPlayerModal/>)
+//    Se abre desde la cinta superior fina (34px) o desde la sección de videos.
+// ----------------------------------------------------------------------------
+export function WeeklyFreeTipsPlayerModal({
+  isOpen,
+  onClose,
+  initialClassItem = null,
+  classesList = WEEKLY_TIPS_AND_CLASSES,
+  unlockedClassIds = [],
+  currentUser,
+  lightMode = false,
+  onUnlockClassWithGems,
+}) {
+  const [selectedVideo, setSelectedVideo] = useState(
+    initialClassItem || classesList[0]
+  );
+
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedVideo(initialClassItem || classesList[0]);
+    }
+  }, [isOpen, initialClassItem, classesList]);
+
+  if (!isOpen || !selectedVideo) return null;
+
+  const isUnlocked =
+    selectedVideo.isFreeWeeklyTip ||
+    unlockedClassIds.includes(selectedVideo.id);
+
+  return (
+    <WtaModalWrapper
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Tips de la Semana & Academia TV"
+      subtitle="Consejos prácticos grabados en las canchas de Huancayo por nuestros entrenadores."
+      badgeText={selectedVideo.categoryTag}
+      iconName="video"
+      lightMode={lightMode}
+      maxWidthClass="max-w-xl"
+    >
+      <div className="space-y-4">
+        {/* Reproductor Principal */}
+        <div className="rounded-3xl overflow-hidden bg-black border-2 border-[#00DC7D]/50 shadow-2xl relative aspect-video">
+          {isUnlocked ? (
+            <video
+              key={selectedVideo.id}
+              src={selectedVideo.videoSrc}
+              poster={selectedVideo.thumbnail}
+              controls
+              playsInline
+              preload="none"
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="relative w-full h-full flex flex-col items-center justify-center p-6 text-center text-white">
+              <SmartImage
+                src={selectedVideo.thumbnail}
+                alt={selectedVideo.title}
+                className="absolute inset-0 w-full h-full object-cover opacity-35"
+              />
+              <div className="relative z-10 space-y-3 max-w-sm">
+                <div className="w-12 h-12 rounded-2xl bg-[#1E0734] text-[#00DC7D] border border-[#00DC7D] flex items-center justify-center mx-auto">
+                  <WtaIcon name="lock" size={22} />
+                </div>
+                <h4 className="font-wta-condensed text-2xl font-bold uppercase">
+                  {selectedVideo.title}
+                </h4>
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic("hero");
+                    if (onUnlockClassWithGems) {
+                      onUnlockClassWithGems(selectedVideo);
+                    }
+                  }}
+                  className="py-3 px-5 rounded-full mp-btn-emerald font-wta-display font-extrabold text-xs inline-flex items-center gap-1.5"
+                >
+                  <WtaIcon name="gem" size={14} />
+                  <span>Desbloquear clase con {selectedVideo.costGems} Gemas</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Claves Técnicas del Video */}
+        <div
+          className={`p-4 rounded-2xl border space-y-2 text-xs ${
+            lightMode
+              ? "bg-white border-[#1E0734]/12 text-[#1E0734]"
+              : "bg-[#1E0734] border-white/12 text-white"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="font-wta-display font-extrabold uppercase text-[#00DC7D] text-[11px]">
+              CLAVES DE {selectedVideo.coachName.toUpperCase()}
+            </span>
+            <span className="opacity-70 font-bold">
+              Duración: {selectedVideo.duration}
+            </span>
+          </div>
+
+          <h4 className="font-wta-display text-sm font-extrabold">
+            {selectedVideo.title}
+          </h4>
+
+          <ul className="space-y-1.5 pt-1">
+            {(selectedVideo.keyTakeaways || []).map((tk, idx) => (
+              <li key={idx} className="flex items-start gap-2">
+                <span className="w-4 h-4 rounded-full bg-[#00DC7D]/20 text-[#00DC7D] font-black text-[10px] flex items-center justify-center shrink-0 mt-0.5">
+                  ✓
+                </span>
+                <span className="opacity-90 leading-relaxed">{tk}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Selector de los demás videos */}
+        <div className="space-y-1.5">
+          <span className="text-[11px] font-wta-display font-extrabold uppercase tracking-wider opacity-75 block">
+            Más consejos disponibles:
+          </span>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {classesList.map((item) => {
+              const unlocked =
+                item.isFreeWeeklyTip || unlockedClassIds.includes(item.id);
+              const isCurrent = item.id === selectedVideo.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic("tab");
+                    setSelectedVideo(item);
+                  }}
+                  className={`p-2.5 rounded-2xl border text-left flex items-center justify-between gap-2 mp-btn-tactile ${
+                    isCurrent
+                      ? "border-2 border-[#00DC7D] bg-[#00DC7D]/15"
+                      : lightMode
+                      ? "bg-white border-[#1E0734]/12"
+                      : "bg-white/6 border-white/12"
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <span
+                      className={`text-[9px] font-wta-display font-black uppercase px-1.5 py-0.2 rounded ${
+                        item.isFreeWeeklyTip
+                          ? "bg-[#00DC7D] text-[#1E0734]"
+                          : "bg-[#F59E0B] text-[#1E0734]"
+                      }`}
+                    >
+                      {item.isFreeWeeklyTip ? "Gratis" : `${item.costGems} 💎`}
+                    </span>
+                    <div className="text-xs font-extrabold truncate mt-1">
+                      {item.title}
+                    </div>
+                  </div>
+                  <WtaIcon
+                    name={unlocked ? "play" : "lock"}
+                    size={14}
+                    className="text-[#00DC7D] shrink-0"
+                  />
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </WtaModalWrapper>
+  );
+}
+
+// ----------------------------------------------------------------------------
+// 4. MODAL DE AVISOS DEL CIRCUITO Y NOTICIERO EN GRILLA BENTO EDITORIAL
+//    CON FOTOS REALES (<BulletinAndNewsModal/>)
+//    - Pestaña 1: Avisos oficiales del circuito y estado de tus retos.
+//    - Pestaña 2: Actualidad Tenis en Grilla Bento sobre Blanco Marfil (#FAF9F5)
+//      con fotografías periodísticas reales (nunca ilustraciones internas 3D).
+// ----------------------------------------------------------------------------
+export const EDITORIAL_TENNIS_NEWS = [
+  {
+    id: "news-1",
+    sourceName: "WTA / ATP Tour",
+    timeAgo: "Hace 2 horas",
+    category: "ACTUALIDAD INTERNACIONAL",
+    title: "La gira sobre polvo de ladrillo marca récords de asistencia y partidos a tres sets",
+    summary:
+      "El calendario sudamericano y europeo confirma el auge de las superficies lentas para desarrollar resistencia táctica y variantes con efecto.",
+    imageUrl:
+      "https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?auto=format&fit=crop&w=1000&q=80",
+    externalUrl: "https://www.wtatennis.com/news",
+    isFeaturedNeon: true,
+  },
+  {
+    id: "news-2",
+    sourceName: "Circuito Huancayo",
+    timeAgo: "Hoy",
+    category: "VALLE DEL MANTARO",
+    title: "Recta final por los 8 cupos al Torneo de Maestros en Country Club Los Huancas",
+    summary:
+      "Cada reto oficial disputado en noviembre suma puntos directos para entrar al cuadro de honor de fin de temporada.",
+    imageUrl:
+      "https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?auto=format&fit=crop&w=900&q=80",
+    externalUrl: "https://www.atptour.com/es/news",
+    isFeaturedNeon: false,
+  },
+  {
+    id: "news-3",
+    sourceName: "Preparación Física",
+    timeAgo: "Ayer",
+    category: "SALUD EN CANCHA",
+    title: "Hidratación y ajuste de tensión de cuerdas para jugar a más de 3,200 metros de altitud",
+    summary:
+      "Subir entre 2 y 3 libras la tensión habitual ayuda a mantener la pelota dentro de la línea de fondo en Huancayo.",
+    imageUrl:
+      "https://images.unsplash.com/photo-1542144582-1ba00456b5e3?auto=format&fit=crop&w=900&q=80",
+    externalUrl: "https://www.puntodebreak.com",
+    isFeaturedNeon: false,
+  },
+];
+
+export function BulletinAndNewsModal({
+  isOpen,
+  onClose,
+  announcements = [],
+  challenges = [],
+  currentUser,
+  lightMode = false,
+  onOpenIncomingChallenge,
+}) {
+  const [tab, setTab] = useState("notices"); // 'notices' | 'news_bento'
+
+  if (!isOpen) return null;
+
+  const myPendingChallenges = challenges.filter(
+    (c) => c.status === "pending" && c.challengedId === currentUser?.id
+  );
+
+  return (
+    <WtaModalWrapper
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Centro de Avisos y Actualidad Tenis"
+      subtitle="Comunicados oficiales del Comité de Huancayo, alertas de retos y prensa deportiva."
+      badgeText="BOLETÍN OFICIAL"
+      iconName="newspaper"
+      lightMode={lightMode}
+      maxWidthClass="max-w-2xl"
+    >
+      <div className="space-y-4">
+        {/* Selector de Pestaña */}
+        <div className="grid grid-cols-2 gap-1.5 p-1 rounded-2xl bg-[#1E0734] border border-white/15">
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic("tab");
+              setTab("notices");
+            }}
+            className={`py-2 px-3 rounded-xl text-xs font-wta-display font-extrabold transition-all ${
+              tab === "notices"
+                ? "bg-[#00DC7D] text-[#1E0734] shadow-sm"
+                : "text-white/75 hover:text-white"
+            }`}
+          >
+            Avisos del Circuito ({announcements.length + myPendingChallenges.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic("tab");
+              setTab("news_bento");
+            }}
+            className={`py-2 px-3 rounded-xl text-xs font-wta-display font-extrabold transition-all ${
+              tab === "news_bento"
+                ? "bg-[#00DC7D] text-[#1E0734] shadow-sm"
+                : "text-white/75 hover:text-white"
+            }`}
+          >
+            Actualidad Tenis
+          </button>
+        </div>
+
+        {/* PESTAÑA 1: AVISOS DEL CIRCUITO Y ALERTAS DE RETOS */}
+        {tab === "notices" && (
+          <div className="space-y-2.5 mp-view-enter">
+            {myPendingChallenges.map((ch) => (
+              <div
+                key={ch.id}
+                onClick={() => {
+                  onClose();
+                  if (onOpenIncomingChallenge) onOpenIncomingChallenge(ch);
+                }}
+                className="p-3.5 rounded-2xl bg-[#00DC7D]/20 border-2 border-[#00DC7D] flex items-center justify-between gap-3 cursor-pointer"
+              >
+                <div>
+                  <span className="px-2 py-0.5 rounded bg-[#00DC7D] text-[#1E0734] text-[9px] font-wta-display font-black uppercase">
+                    RETO RECIBIDO
+                  </span>
+                  <div className="text-xs sm:text-sm font-extrabold mt-1">
+                    {ch.challengerName} te desafió en {ch.club}
+                  </div>
+                  <span className="text-[11px] opacity-80">{ch.dateText}</span>
+                </div>
+                <span className="px-3 py-1.5 rounded-xl bg-[#1E0734] text-[#00DC7D] text-xs font-extrabold shrink-0">
+                  Ver reto ➔
+                </span>
+              </div>
+            ))}
+
+            {announcements.map((ann) => (
+              <div
+                key={ann.id}
+                className={`p-4 rounded-2xl border space-y-1 ${
+                  lightMode
+                    ? "bg-white border-[#1E0734]/12 text-[#1E0734]"
+                    : "bg-[#1E0734] border-white/12 text-white"
+                }`}
+              >
+                <div className="flex items-center justify-between text-[10px] font-extrabold">
+                  <span className="text-[#00DC7D] uppercase tracking-wider">
+                    {ann.tag || "COMUNICADO OFICIAL"}
+                  </span>
+                  <span className="opacity-65">{ann.date}</span>
+                </div>
+                <h4 className="text-xs sm:text-sm font-extrabold">{ann.title}</h4>
+                <p className="text-xs opacity-80 leading-relaxed">{ann.body}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* PESTAÑA 2: GRILLA EDITORIAL BENTO SOBRE MARFIL (#FAF9F5 — RONDA 22) */}
+        {tab === "news_bento" && (
+          <div className="rounded-3xl p-4 bg-[#FAF9F5] text-[#1E0734] border border-[#1E0734]/12 space-y-3 mp-view-enter">
+            {EDITORIAL_TENNIS_NEWS.map((art) => (
+              <a
+                key={art.id}
+                href={art.externalUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => triggerHaptic("card")}
+                className={`block rounded-2xl overflow-hidden bg-white transition-all wta-card-aura ${
+                  art.isFeaturedNeon
+                    ? "border-2 border-[#00DC7D] shadow-md"
+                    : "border border-[#1E0734]/10"
+                }`}
+              >
+                <div className="grid grid-cols-1 sm:grid-cols-12 items-center">
+                  <div className="sm:col-span-4 h-36 sm:h-full overflow-hidden bg-[#1E0734]">
+                    <img
+                      src={art.imageUrl}
+                      alt={art.title}
+                      loading="lazy"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="sm:col-span-8 p-3.5 space-y-1.5">
+                    <div className="flex items-center justify-between text-[10px] font-extrabold">
+                      <span className="px-2 py-0.5 rounded-full bg-[#1E0734] text-[#00DC7D]">
+                        {art.category}
+                      </span>
+                      <span className="text-[#1E0734]/60">
+                        {art.sourceName} · {art.timeAgo}
+                      </span>
+                    </div>
+                    <h4 className="font-wta-condensed text-lg sm:text-xl font-bold uppercase text-[#1E0734] leading-tight">
+                      {art.title}
+                    </h4>
+                    <p className="text-xs text-[#1E0734]/75 line-clamp-2">
+                      {art.summary}
+                    </p>
+                  </div>
+                </div>
+              </a>
+            ))}
+          </div>
+        )}
+      </div>
+    </WtaModalWrapper>
+  );
+}
+
+// ----------------------------------------------------------------------------
+// 5. CINTA SUPERIOR DESLIZANTE DE 1 SOLA LÍNEA (<TopFreeTipsTickerBar/> — 34PX)
+//    Reemplaza al antiguo bloque enorme de 1/3 de pantalla y lleva directo a
+//    los 2 tips gratuitos de la semana sin recargar la vista en iPhone.
+// ----------------------------------------------------------------------------
+export function TopFreeTipsTickerBar({
+  onOpenWeeklyTips,
+  onOpenMasterTop8,
+  lightMode = false,
+}) {
+  const [msgIndex, setMsgIndex] = useState(0);
+
+  const tickerMessages = useMemo(
+    () => [
+      {
+        id: "tk-1",
+        badge: "TIPS GRATIS",
+        text: "2 consejos de entrenadores en cancha disponibles esta semana",
+        cta: "Ver video ➔",
+        action: "tips",
+      },
+      {
+        id: "tk-2",
+        badge: "RACHA DE MÉRITO",
+        text: "Encadena 3 victorias o vence a un rival superior para ganar Gemas",
+        cta: "Ver cómo ➔",
+        action: "tips",
+      },
+      {
+        id: "tk-3",
+        badge: "CARRERA TOP 8",
+        text: "Los 8 primeros del Ranking clasifican al Torneo de Maestros",
+        cta: "Ver Top 8 ➔",
+        action: "top8",
+      },
+    ],
+    []
+  );
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setMsgIndex((prev) => (prev + 1) % tickerMessages.length);
+    }, 5500);
+    return () => clearInterval(interval);
+  }, [tickerMessages.length]);
+
+  const currentMsg = tickerMessages[msgIndex] || tickerMessages[0];
+
+  return (
+    <div
+      onClick={() => {
+        triggerHaptic("tab");
+        if (currentMsg.action === "top8" && onOpenMasterTop8) {
+          onOpenMasterTop8();
+        } else if (onOpenWeeklyTips) {
+          onOpenWeeklyTips();
+        }
+      }}
+      style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
+      className={`w-full shrink-0 border-b cursor-pointer select-none transition-colors ${
+        lightMode
+          ? "bg-[#1E0734] text-white border-[#1E0734]/15"
+          : "bg-gradient-to-r from-[#160428] via-[#290C46] to-[#160428] text-white border-white/10"
+      }`}
+    >
+      <div className="h-[34px] px-3.5 sm:px-5 flex items-center justify-between gap-2 text-[11px]">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="px-2 py-0.2 rounded-full bg-[#00DC7D] text-[#1E0734] text-[9px] font-wta-display font-black uppercase tracking-wider shrink-0">
+            {currentMsg.badge}
+          </span>
+          <span className="font-semibold truncate text-white/90">
+            {currentMsg.text}
+          </span>
+        </div>
+
+        <span className="font-wta-display font-extrabold text-[#00DC7D] shrink-0">
+          {currentMsg.cta}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ----------------------------------------------------------------------------
+// 6. CABECERA SUPERIOR EN PÍLDORA FLOTANTE SIN RECORTES (<TopFloatingPillHeader/>)
+//    Resuelve de raíz el corte "MATC..." en pantallas estrechas de iPhone (375px):
+//    - Muestra el botón de Menú Lateral (☰), el Isotipo Vectorial limpio (con
+//      los 5 toques secretos para abrir la Suite Admin), el saldo de Gemas,
+//      el botón compacto "Tienda" y la campana/boletín de avisos con punto verde.
+// ----------------------------------------------------------------------------
+export function TopFloatingPillHeader({
+  currentUser,
+  unreadNoticesCount = 1,
+  sponsors = INITIAL_SPONSORS,
+  lightMode = false,
+  onOpenSideMenu,
+  onOpenProShop,
+  onOpenBulletin,
+  onSecretAdminTrigger,
+}) {
+  return (
+    <header className="px-3 sm:px-5 pt-2 pb-1.5 shrink-0 z-30">
+      <div
+        className={`h-13 px-3 sm:px-4 rounded-full flex items-center justify-between gap-2 shadow-[0_8px_26px_rgba(0,0,0,0.28)] border transition-colors ${
+          lightMode
+            ? "bg-white text-[#1E0734] border-[#1E0734]/12"
+            : "bg-white text-[#1E0734] border-white/90"
+        }`}
+        style={{ height: 52 }}
+      >
+        {/* Izquierda: Menú Hamburguesa (☰) + Marca sin recortes */}
+        <div className="flex items-center gap-2 min-w-0">
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic("tab");
+              if (onOpenSideMenu) onOpenSideMenu();
+            }}
+            aria-label="Abrir menú principal"
+            className="w-9 h-9 rounded-full bg-[#1E0734]/8 hover:bg-[#1E0734]/15 text-[#1E0734] flex items-center justify-center shrink-0 mp-btn-tactile"
+          >
+            <WtaIcon name="menu" size={19} strokeWidth={2.4} />
+          </button>
+
+          {/* En pantallas estrechas usa el isotipo limpio; en medianas/grandes muestra MATCHPOINT */}
+          <div className="sm:hidden">
+            <BrandLogo
+              variant="isotipo"
+              sponsorName={
+                sponsors?.titleSponsor?.active ? sponsors.titleSponsor.name : ""
+              }
+              size="sm"
+              onSecretAdminTrigger={onSecretAdminTrigger}
+            />
+          </div>
+          <div className="hidden sm:block">
+            <BrandLogo
+              variant="pill-light"
+              sponsorName={
+                sponsors?.titleSponsor?.active ? sponsors.titleSponsor.name : ""
+              }
+              size="md"
+              onSecretAdminTrigger={onSecretAdminTrigger}
+            />
+          </div>
+        </div>
+
+        {/* Derecha: Saldo de Gemas + Botón Tienda + Avisos con Punto Verde Esmeralda */}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {/* Píldora de Gemas */}
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic("tab");
+              if (onOpenProShop) onOpenProShop();
+            }}
+            title="Mis Gemas acumuladas"
+            className="px-2.5 py-1.5 rounded-full bg-[#1E0734] text-white text-xs font-wta-display font-extrabold flex items-center gap-1 shadow-sm mp-btn-tactile tabular-nums"
+          >
+            <WtaIcon name="gem" size={14} className="text-[#00DC7D]" />
+            <span>{currentUser?.gems ?? 0}</span>
+          </button>
+
+          {/* Botón Píldora Tienda Pro Shop */}
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic("hero");
+              if (onOpenProShop) onOpenProShop();
+            }}
+            className="px-3 py-1.5 rounded-full bg-gradient-to-r from-[#00A859] to-[#00DC7D] text-[#1E0734] text-xs font-wta-display font-extrabold flex items-center gap-1 shadow-sm mp-btn-tactile"
+          >
+            <WtaIcon name="bag" size={13} strokeWidth={2.5} />
+            <span>Tienda</span>
+          </button>
+
+          {/* Icono de Boletín / Noticiero con Punto Verde Esmeralda */}
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic("tab");
+              if (onOpenBulletin) onOpenBulletin();
+            }}
+            aria-label="Abrir avisos y noticiero"
+            className="relative w-9 h-9 rounded-full bg-[#1E0734]/8 hover:bg-[#1E0734]/15 text-[#1E0734] flex items-center justify-center shrink-0 mp-btn-tactile"
+          >
+            <WtaIcon name="newspaper" size={18} strokeWidth={2.2} />
+            {unreadNoticesCount > 0 && (
+              <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-[#00DC7D] border-2 border-white" />
+            )}
+          </button>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+// ----------------------------------------------------------------------------
+// 7. MENÚ LATERAL INSTITUCIONAL (3 RAYITAS) Y SECCIÓN "INFORMACIÓN LEGAL"
+//    (<InstitutionalSideDrawer/>)
+//    - Switch deslizante Modo Claro (#FAF9F5) vs Modo Oscuro (#1E0734).
+//    - Sección "Información Legal" obligatoria con los 3 botones:
+//      1) Libro de Reclamaciones Virtual (Indecopi).
+//      2) Términos y Condiciones.
+//      3) Política de Privacidad (Ley N° 29733).
+//    - Aviso de marca exacto en el Footer: "© 2026 MATCHPOINT. Todos los
+//      derechos reservados."
+// ----------------------------------------------------------------------------
+export function InstitutionalSideDrawer({
+  isOpen,
+  onClose,
+  currentUser,
+  lightMode = false,
+  onToggleLightMode,
+  onNavigateTab,
+  onOpenAuthPortal,
+  onOpenVipCardModal,
+  onOpenProShopModal,
+  onOpenH2HModal,
+  onOpenStoryPosterModal,
+  onOpenVisionIaModal,
+  onOpenVisualRulesModal,
+  onOpenClaimsBookModal,
+  onOpenLegalDocModal,
+  onSecretAdminTrigger,
+}) {
+  const versionTapRef = useRef({ count: 0, timer: null });
+
+  if (!isOpen) return null;
+
+  const handleVersionTap = () => {
+    triggerHaptic("light");
+    versionTapRef.current.count += 1;
+    if (versionTapRef.current.timer) clearTimeout(versionTapRef.current.timer);
+    if (versionTapRef.current.count >= 3) {
+      versionTapRef.current.count = 0;
+      onClose();
+      if (onSecretAdminTrigger) onSecretAdminTrigger();
+      return;
+    }
+    versionTapRef.current.timer = setTimeout(() => {
+      versionTapRef.current.count = 0;
+    }, 1600);
+  };
+
+  const catObj = getCategoryByElo(currentUser?.elo || 1500);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex mp-modal-backdrop"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && onClose) {
+          triggerHaptic("light");
+          onClose();
+        }
+      }}
+    >
+      <aside
+        className={`w-[86vw] max-w-[340px] h-full flex flex-col justify-between overflow-y-auto overscroll-contain p-4 sm:p-5 shadow-[20px_0_60px_rgba(0,0,0,0.75)] border-r ${
+          lightMode
+            ? "bg-[#FAF9F5] text-[#1E0734] border-[#1E0734]/15"
+            : "bg-[#1E0734] text-white border-[#00DC7D]/30"
+        }`}
+      >
+        <div className="space-y-4">
+          {/* 1. Cabecera del Menú + Selector Modo Claro / Oscuro */}
+          <div className="flex items-center justify-between gap-2 pb-3 border-b border-current/10">
+            <BrandLogo
+              variant={lightMode ? "pill-light" : "night-cobrand"}
+              size="md"
+              onSecretAdminTrigger={() => {
+                onClose();
+                if (onSecretAdminTrigger) onSecretAdminTrigger();
+              }}
+            />
+
+            <div className="flex items-center gap-1.5">
+              {/* Conmutador Sol / Luna */}
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHaptic("tab");
+                  if (onToggleLightMode) onToggleLightMode();
+                }}
+                title={lightMode ? "Cambiar a Modo Noche" : "Cambiar a Modo Claro"}
+                className={`px-2.5 py-1.5 rounded-full border text-xs font-extrabold flex items-center gap-1.5 mp-btn-tactile ${
+                  lightMode
+                    ? "bg-[#1E0734] text-[#00DC7D] border-[#1E0734]"
+                    : "bg-white/10 text-[#00DC7D] border-white/20"
+                }`}
+              >
+                <WtaIcon name={lightMode ? "moon" : "sun"} size={14} />
+                <span>{lightMode ? "Noche" : "Claro"}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-8 h-8 rounded-full bg-current/10 flex items-center justify-center mp-close-btn"
+              >
+                <WtaIcon name="close" size={16} />
+              </button>
+            </div>
+          </div>
+
+          {/* 2. Tarjeta de Jugador Activo + Botón de Acceso / Registro */}
+          {currentUser && (
+            <div
+              className={`p-3.5 rounded-3xl border space-y-2.5 ${
+                lightMode
+                  ? "bg-white border-[#1E0734]/12 shadow-sm"
+                  : "bg-[#290C46] border-white/15 shadow-lg"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <SmartImage
+                  src={currentUser.avatar}
+                  alt={currentUser.name}
+                  isAvatar
+                  className="w-12 h-12 rounded-2xl object-cover border-2 border-[#00DC7D] shrink-0"
+                />
+                <div className="min-w-0">
+                  <span className="px-2 py-0.2 rounded bg-[#00DC7D] text-[#1E0734] text-[9px] font-wta-display font-black uppercase">
+                    #{currentUser.rank} · {catObj.name}
+                  </span>
+                  <div className="font-wta-condensed text-xl font-bold uppercase truncate mt-0.5">
+                    {currentUser.name}
+                  </div>
+                  <span className="text-[11px] opacity-70 block truncate">
+                    {currentUser.elo} pts · {currentUser.gems || 0} Gemas
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-1.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic("tab");
+                    onClose();
+                    if (onOpenAuthPortal) onOpenAuthPortal("login");
+                  }}
+                  className="py-2 px-2.5 rounded-xl bg-[#00DC7D] text-[#1E0734] text-[11px] font-wta-display font-extrabold mp-btn-tactile"
+                >
+                  Cambiar cuenta
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic("tab");
+                    onClose();
+                    if (onOpenAuthPortal) onOpenAuthPortal("register");
+                  }}
+                  className="py-2 px-2.5 rounded-xl bg-current/10 border border-current/15 text-[11px] font-wta-display font-extrabold mp-btn-tactile"
+                >
+                  Crear cuenta
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 3. Herramientas Oficiales del Circuito */}
+          <div className="space-y-1.5">
+            <span className="text-[10px] font-wta-display font-black uppercase tracking-widest text-[#00DC7D] px-1 block">
+              HERRAMIENTAS DEL CIRCUITO
+            </span>
+
+            {[
+              {
+                label: "Carnet Digital Socio VIP 3D",
+                badge: currentUser?.isVip ? "Activo" : "S/ 29.90",
+                icon: "crown",
+                onClick: () => {
+                  onClose();
+                  if (onOpenVipCardModal) onOpenVipCardModal();
+                },
+              },
+              {
+                label: "Tienda Oficial Pro Shop & Gemas",
+                badge: `${currentUser?.gems || 0} 💎`,
+                icon: "bag",
+                onClick: () => {
+                  onClose();
+                  if (onOpenProShopModal) onOpenProShopModal();
+                },
+              },
+              {
+                label: "Comparador Head to Head",
+                badge: "VS",
+                icon: "h2h",
+                onClick: () => {
+                  onClose();
+                  if (onOpenH2HModal) onOpenH2HModal();
+                },
+              },
+              {
+                label: "Estudio Póster Story 9:16",
+                badge: "IG / WA",
+                icon: "share",
+                onClick: () => {
+                  onClose();
+                  if (onOpenStoryPosterModal) onOpenStoryPosterModal();
+                },
+              },
+              {
+                label: "MatchPoint Vision IA (Video)",
+                badge: "60 FPS",
+                icon: "video",
+                onClick: () => {
+                  onClose();
+                  if (onOpenVisionIaModal) onOpenVisionIaModal();
+                },
+              },
+              {
+                label: "Guía Visual de Puntos y Categorías",
+                badge: "Reglas",
+                icon: "trophy",
+                onClick: () => {
+                  onClose();
+                  if (onOpenVisualRulesModal) onOpenVisualRulesModal();
+                },
+              },
+            ].map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                onClick={() => {
+                  triggerHaptic("tab");
+                  item.onClick();
+                }}
+                className={`w-full p-2.5 rounded-2xl border text-left flex items-center justify-between gap-2 mp-btn-tactile ${
+                  lightMode
+                    ? "bg-white border-[#1E0734]/10 hover:border-[#00DC7D]"
+                    : "bg-white/6 border-white/10 hover:border-[#00DC7D]"
+                }`}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-xl bg-[#00DC7D]/15 text-[#00DC7D] flex items-center justify-center shrink-0">
+                    <WtaIcon name={item.icon} size={16} />
+                  </div>
+                  <span className="text-xs font-extrabold truncate">
+                    {item.label}
+                  </span>
+                </div>
+                <span className="px-2 py-0.5 rounded-lg bg-[#00DC7D]/20 text-[#00DC7D] text-[10px] font-extrabold shrink-0">
+                  {item.badge}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {/* ================================================================
+              4. SECCIÓN OBLIGATORIA: "INFORMACIÓN LEGAL" (NORMATIVA PERÚ)
+                 - Botón 1: Libro de Reclamaciones Virtual (Indecopi).
+                 - Botón 2: Términos y Condiciones.
+                 - Botón 3: Política de Privacidad (Ley N° 29733).
+              ================================================================ */}
+          <div className="pt-2 border-t border-current/10 space-y-1.5">
+            <span className="text-[10px] font-wta-display font-black uppercase tracking-widest text-[#F59E0B] px-1 block">
+              INFORMACIÓN LEGAL (PERÚ)
+            </span>
+
+            {/* Botón 1 — Libro de Reclamaciones Virtual (Obligatorio por Indecopi) */}
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic("hero");
+                onClose();
+                if (onOpenClaimsBookModal) onOpenClaimsBookModal();
+              }}
+              className="w-full p-3 rounded-2xl bg-gradient-to-r from-[#00A859]/20 to-[#00DC7D]/10 border-2 border-[#00DC7D]/60 text-left flex items-center justify-between gap-2.5 mp-btn-tactile"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-[#00DC7D] text-[#1E0734] flex items-center justify-center shrink-0 shadow-sm">
+                  <WtaIcon name="reclamaciones" size={18} strokeWidth={2.4} />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-xs font-extrabold leading-tight">
+                    Libro de Reclamaciones Virtual
+                  </div>
+                  <span className="text-[10px] text-[#00DC7D] font-bold block">
+                    Hoja oficial conforme a Indecopi
+                  </span>
+                </div>
+              </div>
+              <WtaIcon
+                name="chevron-right"
+                size={15}
+                className="text-[#00DC7D] shrink-0"
+              />
+            </button>
+
+            {/* Botón 2 — Términos y Condiciones */}
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic("tab");
+                onClose();
+                if (onOpenLegalDocModal) onOpenLegalDocModal("terms");
+              }}
+              className={`w-full p-2.5 rounded-2xl border text-left flex items-center justify-between gap-2 mp-btn-tactile ${
+                lightMode
+                  ? "bg-white border-[#1E0734]/10"
+                  : "bg-white/6 border-white/10"
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <WtaIcon name="shield" size={16} className="text-[#00DC7D]" />
+                <span className="text-xs font-extrabold">
+                  Términos y Condiciones
+                </span>
+              </div>
+              <WtaIcon name="chevron-right" size={14} className="opacity-65" />
+            </button>
+
+            {/* Botón 3 — Política de Privacidad (Ley N° 29733) */}
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic("tab");
+                onClose();
+                if (onOpenLegalDocModal) onOpenLegalDocModal("privacy");
+              }}
+              className={`w-full p-2.5 rounded-2xl border text-left flex items-center justify-between gap-2 mp-btn-tactile ${
+                lightMode
+                  ? "bg-white border-[#1E0734]/10"
+                  : "bg-white/6 border-white/10"
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <WtaIcon name="lock" size={16} className="text-[#00DC7D]" />
+                <span className="text-xs font-extrabold">
+                  Política de Privacidad (Ley N° 29733)
+                </span>
+              </div>
+              <WtaIcon name="chevron-right" size={14} className="opacity-65" />
+            </button>
+          </div>
+        </div>
+
+        {/* 5. Pie de Página (Footer) con Aviso de Marca Exacto */}
+        <div className="pt-4 mt-4 border-t border-current/10 text-center space-y-1">
+          <p className="text-[11px] font-extrabold opacity-80">
+            © 2026 MATCHPOINT. Todos los derechos reservados.
+          </p>
+          <button
+            type="button"
+            onClick={handleVersionTap}
+            className="text-[10px] opacity-55 hover:opacity-90 font-semibold"
+          >
+            Huancayo, Región Junín · v2.5.0
+          </button>
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+// ----------------------------------------------------------------------------
+// 8. BARRA INSTITUCIONAL DE LAS 6 REDES SOCIALES Y LINKS LEGALES EN EL FOOTER
+//    DEL SCROLL (<WtaInstitutionalFooterBar/> — RONDAS 27 Y 28)
+// ----------------------------------------------------------------------------
+export function WtaInstitutionalFooterBar({
+  lightMode = false,
+  onOpenClaimsBookModal,
+  onOpenLegalDocModal,
+}) {
+  const socialItems = [
+    {
+      id: "ig",
+      name: "Instagram",
+      icon: "instagram",
+      href: CIRCUIT_CONFIG.socialLinks.instagram,
+    },
+    {
+      id: "tt",
+      name: "TikTok",
+      icon: "tiktok",
+      href: CIRCUIT_CONFIG.socialLinks.tiktok,
+    },
+    {
+      id: "fb",
+      name: "Facebook",
+      icon: "facebook",
+      href: CIRCUIT_CONFIG.socialLinks.facebook,
+    },
+    {
+      id: "yt",
+      name: "YouTube",
+      icon: "youtube",
+      href: CIRCUIT_CONFIG.socialLinks.youtube,
+    },
+    {
+      id: "x",
+      name: "X",
+      icon: "x-social",
+      href: CIRCUIT_CONFIG.socialLinks.x,
+    },
+    {
+      id: "wa",
+      name: "WhatsApp",
+      icon: "whatsapp",
+      href: CIRCUIT_CONFIG.socialLinks.whatsapp,
+    },
+  ];
+
+  return (
+    <footer className="px-3.5 sm:px-5 pt-2 pb-6 space-y-3">
+      {/* Píldora Blanca con los 6 Botones Circulares de Redes Sociales */}
+      <div className="p-3.5 rounded-3xl bg-white text-[#1E0734] shadow-md border border-[#1E0734]/10 flex flex-wrap items-center justify-between gap-3">
+        <BrandLogo variant="pill-light" size="sm" />
+
+        <div className="flex items-center gap-2">
+          {socialItems.map((soc) => (
+            <a
+              key={soc.id}
+              href={soc.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={soc.name}
+              onClick={() => triggerHaptic("tab")}
+              className="w-9 h-9 rounded-full bg-[#1E0734] text-white hover:text-[#00DC7D] hover:border-[#00DC7D] border border-transparent flex items-center justify-center shadow-sm transition-all mp-btn-tactile"
+            >
+              <WtaIcon name={soc.icon} size={16} />
+            </a>
+          ))}
+        </div>
+      </div>
+
+      {/* Accesos Directos a Información Legal + Copyright Oficial */}
+      <div
+        className={`p-3.5 rounded-2xl border text-center space-y-2 text-xs ${
+          lightMode
+            ? "bg-white border-[#1E0734]/10 text-[#1E0734]"
+            : "bg-[#23083C]/80 border-white/10 text-white"
+        }`}
+      >
+        <div className="flex flex-wrap items-center justify-center gap-3 font-extrabold">
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic("tab");
+              if (onOpenClaimsBookModal) onOpenClaimsBookModal();
+            }}
+            className="text-[#00DC7D] hover:underline flex items-center gap-1"
+          >
+            <WtaIcon name="reclamaciones" size={14} />
+            <span>Libro de Reclamaciones Virtual</span>
+          </button>
+          <span className="opacity-30">|</span>
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic("tab");
+              if (onOpenLegalDocModal) onOpenLegalDocModal("terms");
+            }}
+            className="hover:text-[#00DC7D] underline"
+          >
+            Términos y Condiciones
+          </button>
+          <span className="opacity-30">|</span>
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic("tab");
+              if (onOpenLegalDocModal) onOpenLegalDocModal("privacy");
+            }}
+            className="hover:text-[#00DC7D] underline"
+          >
+            Política de Privacidad
+          </button>
+        </div>
+
+        <p className="text-[11px] opacity-70 font-semibold">
+          © 2026 MATCHPOINT. Todos los derechos reservados.
+        </p>
+      </div>
+    </footer>
+  );
+}
+
+// ----------------------------------------------------------------------------
+// 9. BARRA DE NAVEGACIÓN INFERIOR CON CÁPSULA MAGNÉTICA Y HALO ESMERALDA
+//    (<BottomNavigationDock/>)
+//    - Anclada al fondo respetando env(safe-area-inset-bottom) en iPhone.
+//    - 5 pestañas principales con tus iconos 3D de public/assets/ + onda
+//      concéntrica si hay un reto entrante pendiente.
+// ----------------------------------------------------------------------------
+export function BottomNavigationDock({
+  activeTab = "retos",
+  onChangeTab,
+  pendingChallengesCount = 0,
+  lightMode = false,
+}) {
+  const navItems = [
+    {
+      id: "retos",
+      label: "Retos",
+      asset: ASSETS.navRetos,
+      fallbackIcon: "swords",
+      badgeCount: pendingChallengesCount,
+    },
+    {
+      id: "ranking",
+      label: "Ranking",
+      asset: ASSETS.navRanking,
+      fallbackIcon: "ranking",
+      badgeCount: 0,
+    },
+    {
+      id: "torneos",
+      label: "Torneos",
+      asset: ASSETS.navTorneos,
+      fallbackIcon: "trophy",
+      badgeCount: 0,
+    },
+    {
+      id: "sedes",
+      label: "Sedes",
+      asset: ASSETS.navSedes,
+      fallbackIcon: "court",
+      badgeCount: 0,
+    },
+    {
+      id: "perfil",
+      label: "Mi Perfil",
+      asset: ASSETS.navPerfil,
+      fallbackIcon: "user",
+      badgeCount: 0,
+    },
+  ];
+
+  return (
+    <nav
+      aria-label="Navegación principal"
+      style={{
+        paddingBottom: "calc(env(safe-area-inset-bottom, 6px) + 6px)",
+      }}
+      className={`fixed bottom-0 left-0 right-0 z-40 px-3 pt-2 border-t backdrop-blur-2xl transition-colors ${
+        lightMode
+          ? "bg-white/95 border-[#1E0734]/12 text-[#1E0734] shadow-[0_-8px_28px_rgba(30,7,52,0.12)]"
+          : "bg-[#160428]/95 border-white/12 text-white shadow-[0_-10px_34px_rgba(0,0,0,0.6)]"
+      }`}
+    >
+      <div className="max-w-lg mx-auto grid grid-cols-5 gap-1">
+        {navItems.map((item) => {
+          const isActive = activeTab === item.id;
+          const hasAlert = item.badgeCount > 0;
+
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => {
+                triggerHaptic("tab");
+                if (onChangeTab) onChangeTab(item.id);
+              }}
+              className={`relative py-1.5 px-1 rounded-2xl flex flex-col items-center justify-center transition-all duration-200 mp-btn-tactile ${
+                isActive
+                  ? lightMode
+                    ? "bg-[#1E0734] text-[#00DC7D] shadow-md scale-[1.03]"
+                    : "bg-[#00DC7D]/18 text-[#00DC7D] border border-[#00DC7D]/55 shadow-[0_0_16px_rgba(0,220,125,0.28)] scale-[1.03]"
+                  : "opacity-75 hover:opacity-100"
+              }`}
+            >
+              <div
+                className={`relative w-7 h-7 flex items-center justify-center rounded-xl ${
+                  hasAlert ? "mp-challenge-ripple" : ""
+                }`}
+              >
+                <SmartImage
+                  src={item.asset}
+                  alt={item.label}
+                  className="w-6 h-6 object-contain"
+                />
+
+                {hasAlert && (
+                  <span className="absolute -top-1 -right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-[#00DC7D] text-[#1E0734] text-[9px] font-wta-display font-black flex items-center justify-center border border-[#1E0734]">
+                    {item.badgeCount}
+                  </span>
+                )}
+              </div>
+
+              <span
+                className={`text-[10px] font-wta-display tracking-tight mt-0.5 ${
+                  isActive ? "font-black" : "font-bold"
+                }`}
+              >
+                {item.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
+
+// === FIN DEL BLOQUE 13 DE 14 ===
+
+// ============================================================================
+// PARTE 14 DE 14: SUITE DE ADMINISTRADOR CMS OCULTA DE 7 PESTAÑAS (5 TOQUES EN
+// EL LOGO + PIN 1234: APROBACIÓN DE PAGOS YAPE/PLIN, TENISTAS/ELO/GEMAS,
+// TORNEOS, SEDES, COACH/TIENDA, ALERTA 80% MEMORIA + CSV Y PATROCINADORES) +
+// COMPONENTE MAESTRO PRINCIPAL export default function App()
+// ============================================================================
+
+export const INITIAL_ANNOUNCEMENTS = [
+  {
+    id: "ann-1",
+    tag: "COMUNICADO OFICIAL",
+    date: "16 Nov 2026",
+    title: "Abierto Valle del Mantaro en etapa de Cuartos de Final",
+    body: "Los partidos de cuartos y semifinales se disputan este fin de semana en las canchas de arcilla del Country Club Los Huancas.",
+  },
+  {
+    id: "ann-2",
+    tag: "CARRERA ANUAL",
+    date: "14 Nov 2026",
+    title: "Clasificación al Torneo de Maestros (Master Top 8 Finals)",
+    body: "Recuerda que los 8 mejores tenistas del Ranking General y de la división +40 Master clasifican directo a la gran definición de diciembre.",
+  },
+];
+
+// ----------------------------------------------------------------------------
+// 1. SUITE DE ADMINISTRADOR CMS OCULTA DE 7 PESTAÑAS (<HiddenAdminSuiteModal/>)
+//    Acceso exclusivo mediante 5 toques en el logotipo + PIN 1234 (o ingresando
+//    como admin@matchpoint.pe en el Login). Jamás aparece en botones públicos.
+// ----------------------------------------------------------------------------
+export function HiddenAdminSuiteModal({
+  isOpen,
+  onClose,
+  players = [],
+  setPlayers,
+  challenges = [],
+  setChallenges,
+  matches = [],
+  setMatches,
+  sedes = [],
+  setSedes,
+  coaches = [],
+  setCoaches,
+  tournaments = [],
+  setTournaments,
+  proShopItems = [],
+  setProShopItems,
+  sponsors = INITIAL_SPONSORS,
+  setSponsors,
+  paymentVerifications = [],
+  onApprovePaymentVerification,
+  onRejectPaymentVerification,
+  claimsHistory = [],
+  onMarkClaimResolved,
+  announcements = [],
+  onPublishAnnouncement,
+  lightMode = false,
+}) {
+  const [pinVerified, setPinVerified] = useState(false);
+  const [pinInput, setPinInput] = useState("");
+  const [pinError, setPinError] = useState("");
+  const [adminTab, setAdminTab] = useState("pagos"); // 'pagos' | 'tenistas' | 'torneos' | 'sedes' | 'tienda' | 'sistema' | 'sponsors'
+  const [adminToast, setAdminToast] = useState("");
+
+  // Estados para crear un nuevo jugador desde el padrón
+  const [newPlayerName, setNewPlayerName] = useState("");
+  const [newPlayerElo, setNewPlayerElo] = useState(1400);
+  const [newPlayerAge, setNewPlayerAge] = useState(28);
+  const [newPlayerClub, setNewPlayerClub] = useState("Country Club Los Huancas");
+  const [newPlayerPhone, setNewPlayerPhone] = useState("51999888777");
+
+  // Estados para crear un nuevo torneo
+  const [newTrnName, setNewTrnName] = useState("");
+  const [newTrnDates, setNewTrnDates] = useState("10 – 14 DIC 2026");
+  const [newTrnFee, setNewTrnFee] = useState(60);
+  const [newTrnClub, setNewTrnClub] = useState("Country Club Los Huancas");
+
+  // Estados para publicar un comunicado oficial
+  const [annTitle, setAnnTitle] = useState("");
+  const [annBody, setAnnBody] = useState("");
+
+  useEffect(() => {
+    if (!isOpen) {
+      setPinInput("");
+      setPinError("");
+      setAdminToast("");
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const showQuickNotice = (msg) => {
+    setAdminToast(msg);
+    setTimeout(() => setAdminToast(""), 3200);
+  };
+
+  const handlePinSubmit = (e) => {
+    e.preventDefault();
+    if (pinInput.trim() === CIRCUIT_CONFIG.adminSecretPin) {
+      triggerHaptic("success");
+      setPinVerified(true);
+      setPinError("");
+    } else {
+      triggerHaptic("light");
+      setPinError("PIN de Comité incorrecto. Intenta nuevamente.");
+    }
+  };
+
+  const storageStatus = evaluateStorageUsage(matches, challenges, claimsHistory);
+  const pendingPaymentsCount = paymentVerifications.filter(
+    (pv) => pv.status === "pending_verification"
+  ).length;
+
+  // Ajuste rápido de puntos o gemas de un tenista
+  const adjustPlayerMetric = (playerId, field, delta) => {
+    triggerHaptic("tab");
+    setPlayers((prev) =>
+      prev.map((p) => {
+        if (p.id !== playerId) return p;
+        const nextVal = Math.max(
+          field === "elo" ? 100 : 0,
+          Number(p[field] || 0) + delta
+        );
+        return { ...p, [field]: nextVal };
+      })
+    );
+    showQuickNotice("Registro del tenista actualizado en vivo.");
+  };
+
+  const togglePlayerVipStatus = (playerId) => {
+    triggerHaptic("success");
+    setPlayers((prev) =>
+      prev.map((p) => {
+        if (p.id !== playerId) return p;
+        const nextVip = !p.isVip;
+        return {
+          ...p,
+          isVip: nextVip,
+          gems: nextVip ? Number(p.gems || 0) + 150 : p.gems,
+        };
+      })
+    );
+    showQuickNotice("Estado Socio VIP actualizado.");
+  };
+
+  const handleAdminCreatePlayer = (e) => {
+    e.preventDefault();
+    if (newPlayerName.trim().length < 3) return;
+    triggerHaptic("success");
+    const parts = newPlayerName.trim().split(/\s+/);
+    const firstName = parts[0];
+    const lastName = parts.slice(1).join(" ") || "Huancayo";
+    const chosenSede = sedes.find((s) => s.name === newPlayerClub);
+
+    const created = {
+      id: `p-admin-${Date.now()}`,
+      name: newPlayerName.trim(),
+      firstName,
+      lastName,
+      elo: Number(newPlayerElo) || 1200,
+      bestRank: players.length + 1,
+      rank: players.length + 1,
+      age: Number(newPlayerAge) || 28,
+      height: "1.76 m",
+      city: "Huancayo",
+      club: newPlayerClub,
+      clubLogo: chosenSede?.logoAsset || ASSETS.clubCountry,
+      individualMode: false,
+      hand: "Diestro",
+      backhand: "Revés a dos manos",
+      bestShot: "Derecha con topspin",
+      availability: "Tardes y fines de semana",
+      wins: 0,
+      losses: 0,
+      streak: 0,
+      titles: 0,
+      matchesPlayed: 0,
+      gems: 20,
+      isVip: false,
+      vipCode: `MP-2026-${String(players.length + 1).padStart(4, "0")}`,
+      whatsapp: newPlayerPhone.replace(/\D/g, "") || "51999888777",
+      whatsappPrivacy: "rivals_only",
+      email: `${firstName.toLowerCase()}@matchpoint.pe`,
+      surfaceThemeId: "finals",
+      unlockedThemes: ["finals"],
+      activeBadgeId: "",
+      unlockedBadges: [],
+      avatar:
+        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80",
+      heroPhoto: ASSETS.perfilBgFinals,
+      cutoutAvatar: "",
+      photoFrame: { zoom: 1, offsetX: 0, offsetY: 0, angle: 0 },
+      gender: "M",
+      hasCompletedTest: true,
+    };
+
+    setPlayers((prev) => [...prev, created]);
+    setNewPlayerName("");
+    showQuickNotice(`Tenista ${created.name} incorporado al padrón oficial.`);
+  };
+
+  const handleAdminCreateTournament = (e) => {
+    e.preventDefault();
+    if (newTrnName.trim().length < 3) return;
+    triggerHaptic("success");
+    const chosenSede = sedes.find((s) => s.name === newTrnClub);
+
+    const newTrn = {
+      id: `torneo-${Date.now()}`,
+      name: newTrnName.trim(),
+      shortTitle: newTrnName.trim().toUpperCase(),
+      city: "HUANCAYO",
+      club: newTrnClub,
+      clubLogo: chosenSede?.logoAsset || ASSETS.clubCountry,
+      surface: "ARCILLA",
+      status: "upcoming",
+      statusLabel: "INSCRIPCIONES ABIERTAS",
+      datesLabel: newTrnDates.toUpperCase(),
+      entryFeeSoles: Number(newTrnFee) || 60,
+      vipEntryFeeSoles: Math.max(35, (Number(newTrnFee) || 60) - 10),
+      championGemsReward: 400,
+      finalistGemsReward: 200,
+      prizePoolText: "Trofeos Oficiales + Premios Pro Shop + 400 Gemas al Campeón",
+      categories: ["3ª y 4ª Categoría", "5ª Categoría", "+40 Master"],
+      coverAsset: ASSETS.torneoApertura,
+      spotsTotal: 16,
+      spotsTaken: 4,
+      registeredPlayerIds: ["p-mateo", "p-pablo"],
+      bracket: {
+        quarters: [],
+        semis: [],
+        final: null,
+        consolationSemis: [],
+        consolationFinal: null,
+      },
+    };
+
+    setTournaments((prev) => [newTrn, ...prev]);
+    setNewTrnName("");
+    showQuickNotice(`Torneo "${newTrn.name}" publicado en el carrusel.`);
+  };
+
+  return (
+    <WtaModalWrapper
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Suite de Control del Comité (CMS)"
+      subtitle="Administración integral de pagos Yape/Plin, tenistas, torneos, sedes, tienda, memoria y patrocinadores."
+      badgeText="PANEL PRIVADO DEL ORGANIZADOR"
+      iconName="settings"
+      lightMode={lightMode}
+      maxWidthClass="max-w-3xl"
+    >
+      {!pinVerified ? (
+        <form
+          onSubmit={handlePinSubmit}
+          className="p-5 rounded-3xl bg-[#1E0734] border border-[#00DC7D]/45 text-white text-center space-y-4 max-w-sm mx-auto my-4"
+        >
+          <div className="w-12 h-12 rounded-2xl bg-[#00DC7D]/20 text-[#00DC7D] border border-[#00DC7D]/50 flex items-center justify-center mx-auto">
+            <WtaIcon name="lock" size={22} />
+          </div>
+
+          <div>
+            <h4 className="font-wta-condensed text-2xl font-bold uppercase text-white">
+              INGRESA EL PIN MAESTRO DEL COMITÉ
+            </h4>
+            <p className="text-xs text-white/70 mt-1">
+              Acceso restringido a los administradores de MATCHPOINT Huancayo.
+            </p>
+          </div>
+
+          <input
+            type="password"
+            inputMode="numeric"
+            autoFocus
+            value={pinInput}
+            onChange={(e) => setPinInput(e.target.value)}
+            placeholder="PIN de 4 dígitos (1234)"
+            className="w-full py-3 px-4 rounded-2xl bg-[#290C46] border border-[#00DC7D]/50 text-center font-wta-condensed text-2xl tracking-widest text-[#00DC7D] mp-input-alive"
+          />
+
+          {pinError && (
+            <div className="text-xs font-bold text-rose-400">{pinError}</div>
+          )}
+
+          <button
+            type="submit"
+            className="w-full py-3.5 px-6 rounded-2xl mp-btn-emerald font-wta-display font-extrabold text-xs sm:text-sm"
+          >
+            Desbloquear Suite CMS
+          </button>
+        </form>
+      ) : (
+        <div className="space-y-4">
+          {/* Alerta automática si la memoria supera el 75% / 80% */}
+          {storageStatus.isWarningZone && (
+            <div className="p-3.5 rounded-2xl bg-[#F59E0B]/20 border-2 border-[#F59E0B] text-xs flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <strong className="font-extrabold text-[#F59E0B] block">
+                  Aviso Preventivo de Capacidad ({storageStatus.usagePercent}% ocupado):
+                </strong>
+                <span>
+                  Te recomendamos descargar el respaldo en Excel/CSV desde la
+                  pestaña 6 para liberar espacio histórico.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAdminTab("sistema")}
+                className="px-3 py-1.5 rounded-xl bg-[#F59E0B] text-[#1E0734] font-extrabold shrink-0"
+              >
+                Ir a Respaldo CSV ➔
+              </button>
+            </div>
+          )}
+
+          {adminToast && (
+            <div className="p-3 rounded-2xl bg-[#00DC7D]/20 border border-[#00DC7D] text-[#00DC7D] text-xs font-extrabold text-center">
+              ✓ {adminToast}
+            </div>
+          )}
+
+          {/* Barra de las 7 Pestañas de la Suite Admin CMS */}
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
+            {[
+              {
+                id: "pagos",
+                label: `1. Pagos y Reclamos (${pendingPaymentsCount})`,
+              },
+              { id: "tenistas", label: `2. Tenistas (${players.length})` },
+              { id: "torneos", label: "3. Torneos y Llaves" },
+              { id: "sedes", label: "4. Sedes y Clima" },
+              { id: "tienda", label: "5. Coach & Pro Shop" },
+              { id: "sistema", label: "6. Avisos y Memoria CSV" },
+              { id: "sponsors", label: "7. Patrocinadores" },
+            ].map((tb) => (
+              <button
+                key={tb.id}
+                type="button"
+                onClick={() => {
+                  triggerHaptic("tab");
+                  setAdminTab(tb.id);
+                }}
+                className={`px-3.5 py-2 rounded-full text-xs font-wta-display font-extrabold shrink-0 wta-pill-tab ${
+                  adminTab === tb.id
+                    ? "wta-pill-tab-active"
+                    : "wta-pill-tab-inactive"
+                }`}
+              >
+                {tb.label}
+              </button>
+            ))}
+          </div>
+
+          {/* ================================================================
+              PESTAÑA 1: APROBACIÓN MANUAL DE PAGOS YAPE/PLIN & RECLAMOS INDECOPI
+              ================================================================ */}
+          {adminTab === "pagos" && (
+            <div className="space-y-4 mp-view-enter">
+              <div className="space-y-2.5">
+                <h4 className="font-wta-condensed text-lg font-bold uppercase text-[#00DC7D]">
+                  SOLICITUDES DE PAGO DIRECTO (YAPE / PLIN) EN VERIFICACIÓN
+                </h4>
+
+                {paymentVerifications.length === 0 ? (
+                  <div className="p-4 rounded-2xl bg-white/5 border border-white/10 text-xs opacity-75">
+                    No hay pagos pendientes de verificación en este momento.
+                  </div>
+                ) : (
+                  paymentVerifications.map((pv) => (
+                    <div
+                      key={pv.id}
+                      className="p-3.5 rounded-2xl bg-[#1E0734] border border-white/15 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-white"
+                    >
+                      <div className="space-y-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
+                              pv.status === "approved"
+                                ? "bg-[#00DC7D] text-[#1E0734]"
+                                : pv.status === "rejected"
+                                ? "bg-rose-500/30 text-rose-200"
+                                : "bg-[#F59E0B] text-[#1E0734]"
+                            }`}
+                          >
+                            {pv.status === "approved"
+                              ? "APROBADO Y ACTIVO"
+                              : pv.status === "rejected"
+                              ? "RECHAZADO"
+                              : "PAGO EN VERIFICACIÓN"}
+                          </span>
+                          <span className="font-extrabold text-[#6EF2B5]">
+                            {pv.ticketCode || pv.id}
+                          </span>
+                          <span className="opacity-65">· {pv.createdAt}</span>
+                        </div>
+
+                        <div className="text-sm font-extrabold">
+                          {pv.playerName} — {pv.conceptTitle}
+                        </div>
+
+                        <div className="text-white/75">
+                          Canal: <strong>{pv.channel}</strong> · Monto:{" "}
+                          <strong className="text-[#00DC7D]">
+                            S/ {Number(pv.amountSoles).toFixed(2)}
+                          </strong>{" "}
+                          · Operación: <strong>{pv.operationCode}</strong>
+                        </div>
+                      </div>
+
+                      {pv.status === "pending_verification" && (
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              triggerHaptic("success");
+                              if (onApprovePaymentVerification) {
+                                onApprovePaymentVerification(pv);
+                              }
+                              showQuickNotice(
+                                `Pago de ${pv.playerName} aprobado y servicio activado.`
+                              );
+                            }}
+                            className="px-3.5 py-2 rounded-xl mp-btn-emerald font-extrabold text-xs"
+                          >
+                            Aprobar y Activar ✓
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              triggerHaptic("light");
+                              if (onRejectPaymentVerification) {
+                                onRejectPaymentVerification(pv.id);
+                              }
+                            }}
+                            className="px-3 py-2 rounded-xl bg-rose-500/20 text-rose-300 border border-rose-400/40 font-bold text-xs"
+                          >
+                            Rechazar
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Registro del Libro de Reclamaciones Virtual (Indecopi) */}
+              <div className="pt-3 border-t border-white/10 space-y-2.5">
+                <h4 className="font-wta-condensed text-lg font-bold uppercase text-[#F59E0B]">
+                  HOJAS DEL LIBRO DE RECLAMACIONES VIRTUAL ({claimsHistory.length})
+                </h4>
+
+                {claimsHistory.length === 0 ? (
+                  <div className="p-4 rounded-2xl bg-white/5 border border-white/10 text-xs opacity-75">
+                    Sin hojas de reclamación registradas.
+                  </div>
+                ) : (
+                  claimsHistory.map((cl) => (
+                    <div
+                      key={cl.id}
+                      className="p-3.5 rounded-2xl bg-[#1E0734] border border-white/15 space-y-1.5 text-xs text-white"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="px-2 py-0.5 rounded bg-[#F59E0B] text-[#1E0734] font-black text-[10px]">
+                          {cl.code} · {cl.type.toUpperCase()}
+                        </span>
+                        <span className="opacity-70">{cl.createdAt}</span>
+                      </div>
+                      <div className="font-extrabold">
+                        {cl.fullName} (DNI/CE: {cl.documentId}) · {cl.phone} ·{" "}
+                        {cl.email}
+                      </div>
+                      <p className="text-white/80 leading-relaxed">{cl.detail}</p>
+                      <div className="pt-1 flex items-center justify-between">
+                        <span className="text-[11px] text-[#00DC7D] font-bold">
+                          Estado: {cl.status === "atendido" ? "Atendido ✓" : "Recibido"}
+                        </span>
+                        {cl.status !== "atendido" && onMarkClaimResolved && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onMarkClaimResolved(cl.id);
+                              showQuickNotice(`Hoja ${cl.code} marcada como atendida.`);
+                            }}
+                            className="px-2.5 py-1 rounded-lg bg-[#00DC7D] text-[#1E0734] font-extrabold text-[11px]"
+                          >
+                            Marcar atendido
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ================================================================
+              PESTAÑA 2: PADRÓN DE TENISTAS, PUNTOS ELO, GEMAS Y NUEVO JUGADOR
+              ================================================================ */}
+          {adminTab === "tenistas" && (
+            <div className="space-y-4 mp-view-enter">
+              {/* Formulario para incorporar un nuevo tenista */}
+              <form
+                onSubmit={handleAdminCreatePlayer}
+                className="p-4 rounded-2xl bg-[#1E0734] border border-[#00DC7D]/40 space-y-3 text-xs text-white"
+              >
+                <span className="font-wta-display font-extrabold uppercase tracking-wider text-[#00DC7D] block">
+                  AGREGAR NUEVO TENISTA AL PADRÓN OFICIAL
+                </span>
+
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                  <input
+                    type="text"
+                    required
+                    value={newPlayerName}
+                    onChange={(e) => setNewPlayerName(e.target.value)}
+                    placeholder="Nombre y Apellido"
+                    className="sm:col-span-2 px-3 py-2 rounded-xl bg-[#290C46] border border-white/20 text-white font-bold"
+                  />
+                  <input
+                    type="number"
+                    value={newPlayerElo}
+                    onChange={(e) => setNewPlayerElo(e.target.value)}
+                    placeholder="Puntos ELO"
+                    className="px-3 py-2 rounded-xl bg-[#290C46] border border-white/20 text-white font-bold"
+                  />
+                  <input
+                    type="number"
+                    value={newPlayerAge}
+                    onChange={(e) => setNewPlayerAge(e.target.value)}
+                    placeholder="Edad (+18)"
+                    className="px-3 py-2 rounded-xl bg-[#290C46] border border-white/20 text-white font-bold"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between gap-2">
+                  <select
+                    value={newPlayerClub}
+                    onChange={(e) => setNewPlayerClub(e.target.value)}
+                    className="px-3 py-2 rounded-xl bg-[#290C46] border border-white/20 text-white font-bold"
+                  >
+                    {sedes.map((s) => (
+                      <option key={s.id} value={s.name}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  <button
+                    type="submit"
+                    className="py-2 px-4 rounded-xl mp-btn-emerald font-extrabold text-xs"
+                  >
+                    + Incorporar Tenista
+                  </button>
+                </div>
+              </form>
+
+              {/* Lista de Tenistas con Controles Directos de ELO, Gemas y VIP */}
+              <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                {players.map((p) => (
+                  <div
+                    key={p.id}
+                    className="p-3 rounded-2xl bg-[#1E0734] border border-white/12 flex flex-wrap items-center justify-between gap-2 text-xs text-white"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <SmartImage
+                        src={p.avatar}
+                        alt={p.name}
+                        isAvatar
+                        className="w-9 h-9 rounded-xl object-cover shrink-0"
+                      />
+                      <div className="min-w-0">
+                        <div className="font-extrabold truncate">{p.name}</div>
+                        <div className="text-[11px] text-[#6EF2B5]">
+                          {p.elo} pts · {p.gems || 0} 💎 ·{" "}
+                          {p.isVip ? "Socio VIP" : "Gratis"}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => adjustPlayerMetric(p.id, "elo", 25)}
+                        className="px-2 py-1 rounded-lg bg-[#00DC7D]/20 text-[#00DC7D] font-extrabold text-[11px]"
+                      >
+                        +25 Pts
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => adjustPlayerMetric(p.id, "elo", -25)}
+                        className="px-2 py-1 rounded-lg bg-white/10 text-white font-bold text-[11px]"
+                      >
+                        -25 Pts
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => adjustPlayerMetric(p.id, "gems", 50)}
+                        className="px-2 py-1 rounded-lg bg-[#F59E0B]/20 text-[#F59E0B] font-extrabold text-[11px]"
+                      >
+                        +50 💎
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => togglePlayerVipStatus(p.id)}
+                        className={`px-2.5 py-1 rounded-lg font-extrabold text-[11px] ${
+                          p.isVip
+                            ? "bg-[#F59E0B] text-[#1E0734]"
+                            : "bg-white/10 text-white/80"
+                        }`}
+                      >
+                        {p.isVip ? "VIP Activo" : "Dar VIP"}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ================================================================
+              PESTAÑA 3: CREACIÓN Y CONTROL DE TORNEOS OFICIALES
+              ================================================================ */}
+          {adminTab === "torneos" && (
+            <div className="space-y-4 mp-view-enter">
+              <form
+                onSubmit={handleAdminCreateTournament}
+                className="p-4 rounded-2xl bg-[#1E0734] border border-[#00DC7D]/40 space-y-3 text-xs text-white"
+              >
+                <span className="font-wta-display font-extrabold uppercase tracking-wider text-[#00DC7D] block">
+                  PUBLICAR NUEVO TORNEO EN EL CARRUSEL
+                </span>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <input
+                    type="text"
+                    required
+                    value={newTrnName}
+                    onChange={(e) => setNewTrnName(e.target.value)}
+                    placeholder="Nombre del Torneo"
+                    className="px-3 py-2 rounded-xl bg-[#290C46] border border-white/20 text-white font-bold"
+                  />
+                  <input
+                    type="text"
+                    value={newTrnDates}
+                    onChange={(e) => setNewTrnDates(e.target.value)}
+                    placeholder="Fechas (ej. 10 - 14 DIC)"
+                    className="px-3 py-2 rounded-xl bg-[#290C46] border border-white/20 text-white font-bold"
+                  />
+                  <input
+                    type="number"
+                    value={newTrnFee}
+                    onChange={(e) => setNewTrnFee(e.target.value)}
+                    placeholder="Inscripción S/"
+                    className="px-3 py-2 rounded-xl bg-[#290C46] border border-white/20 text-white font-bold"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="py-2.5 px-5 rounded-xl mp-btn-emerald font-extrabold text-xs"
+                >
+                  + Publicar Torneo Oficial
+                </button>
+              </form>
+
+              <div className="space-y-2">
+                {tournaments.map((t) => (
+                  <div
+                    key={t.id}
+                    className="p-3 rounded-2xl bg-[#1E0734] border border-white/15 flex items-center justify-between gap-2 text-xs text-white"
+                  >
+                    <div>
+                      <div className="font-extrabold">{t.name}</div>
+                      <div className="text-[11px] text-[#6EF2B5]">
+                        {t.datesLabel} · S/ {t.entryFeeSoles} · {t.statusLabel}
+                      </div>
+                    </div>
+
+                    <select
+                      value={t.status}
+                      onChange={(e) => {
+                        const nextStatus = e.target.value;
+                        const labelMap = {
+                          upcoming: "INSCRIPCIONES ABIERTAS",
+                          in_progress: "EN CURSO · CUADRO ACTIVO",
+                          finals_race: "CLASIFICACIÓN TOP 8 EN VIVO",
+                        };
+                        setTournaments((prev) =>
+                          prev.map((item) =>
+                            item.id === t.id
+                              ? {
+                                  ...item,
+                                  status: nextStatus,
+                                  statusLabel: labelMap[nextStatus],
+                                }
+                              : item
+                          )
+                        );
+                        showQuickNotice("Estado del torneo actualizado.");
+                      }}
+                      className="px-2.5 py-1.5 rounded-xl bg-[#290C46] border border-[#00DC7D]/50 text-[#00DC7D] font-bold text-xs"
+                    >
+                      <option value="upcoming">Inscripciones Abiertas</option>
+                      <option value="in_progress">En Curso</option>
+                      <option value="finals_race">Carrera Top 8</option>
+                    </select>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ================================================================
+              PESTAÑA 4: SEDES, TARIFAS Y ESTADO CLIMÁTICO EN CANCHA
+              ================================================================ */}
+          {adminTab === "sedes" && (
+            <div className="space-y-3 mp-view-enter">
+              {sedes.map((s) => (
+                <div
+                  key={s.id}
+                  className="p-3.5 rounded-2xl bg-[#1E0734] border border-white/15 space-y-2.5 text-xs text-white"
+                >
+                  <div className="flex items-center justify-between">
+                    <strong className="text-sm font-extrabold text-[#00DC7D]">
+                      {s.name}
+                    </strong>
+                    <select
+                      value={s.weatherState}
+                      onChange={(e) => {
+                        const nextW = e.target.value;
+                        setSedes((prev) =>
+                          prev.map((item) =>
+                            item.id === s.id
+                              ? {
+                                  ...item,
+                                  weatherState: nextW,
+                                  lastWeatherReport: "Actualizado por Comité",
+                                }
+                              : item
+                          )
+                        );
+                        showQuickNotice(`Clima en ${s.shortName} actualizado.`);
+                      }}
+                      className="px-2.5 py-1 rounded-xl bg-[#290C46] border border-[#00DC7D]/50 text-[#00DC7D] font-bold"
+                    >
+                      <option value="seco">Cancha Seca</option>
+                      <option value="humedad">Humedad Leve</option>
+                      <option value="llovizna">En Secado / Llovizna</option>
+                      <option value="lluvia">Cerrada por Lluvia</option>
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <span className="text-[10px] opacity-70 block">
+                        Día (S/)
+                      </span>
+                      <input
+                        type="number"
+                        value={s.priceDaySoles}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setSedes((prev) =>
+                            prev.map((item) =>
+                              item.id === s.id
+                                ? { ...item, priceDaySoles: val }
+                                : item
+                            )
+                          );
+                        }}
+                        className="w-full px-2.5 py-1.5 rounded-lg bg-[#290C46] border border-white/20 text-white font-bold"
+                      />
+                    </div>
+                    <div>
+                      <span className="text-[10px] opacity-70 block">
+                        Noche LED (S/)
+                      </span>
+                      <input
+                        type="number"
+                        value={s.priceNightSoles}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setSedes((prev) =>
+                            prev.map((item) =>
+                              item.id === s.id
+                                ? { ...item, priceNightSoles: val }
+                                : item
+                            )
+                          );
+                        }}
+                        className="w-full px-2.5 py-1.5 rounded-lg bg-[#290C46] border border-white/20 text-white font-bold"
+                      />
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-[#F59E0B] font-bold block">
+                        Tarifa VIP (S/)
+                      </span>
+                      <input
+                        type="number"
+                        value={s.priceVipSoles}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setSedes((prev) =>
+                            prev.map((item) =>
+                              item.id === s.id
+                                ? { ...item, priceVipSoles: val }
+                                : item
+                            )
+                          );
+                        }}
+                        className="w-full px-2.5 py-1.5 rounded-lg bg-[#290C46] border border-[#F59E0B]/50 text-[#F59E0B] font-bold"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ================================================================
+              PESTAÑA 5: TARIFAS DE ENTRENADORES Y PRECIOS PRO SHOP
+              ================================================================ */}
+          {adminTab === "tienda" && (
+            <div className="space-y-3 mp-view-enter max-h-80 overflow-y-auto pr-1">
+              <h4 className="font-wta-condensed text-base font-bold uppercase text-[#00DC7D]">
+                AJUSTE EN VIVO DE PRECIOS PRO SHOP (GEMAS Y COPAGO EN SOLES)
+              </h4>
+
+              {proShopItems.map((item) => (
+                <div
+                  key={item.id}
+                  className="p-3 rounded-2xl bg-[#1E0734] border border-white/15 grid grid-cols-1 sm:grid-cols-12 items-center gap-2 text-xs text-white"
+                >
+                  <div className="sm:col-span-6 font-extrabold truncate">
+                    {item.name}
+                  </div>
+                  <div className="sm:col-span-3 flex items-center gap-1.5">
+                    <span className="text-[10px] opacity-70">Gemas:</span>
+                    <input
+                      type="number"
+                      value={item.costGems}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setProShopItems((prev) =>
+                          prev.map((it) =>
+                            it.id === item.id ? { ...it, costGems: val } : it
+                          )
+                        );
+                      }}
+                      className="w-20 px-2 py-1 rounded-lg bg-[#290C46] border border-[#00DC7D]/40 text-[#00DC7D] font-bold"
+                    />
+                  </div>
+                  <div className="sm:col-span-3 flex items-center gap-1.5">
+                    <span className="text-[10px] opacity-70">Copago S/:</span>
+                    <input
+                      type="number"
+                      value={item.copayCashSoles || 0}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setProShopItems((prev) =>
+                          prev.map((it) =>
+                            it.id === item.id
+                              ? { ...it, copayCashSoles: val }
+                              : it
+                          )
+                        );
+                      }}
+                      className="w-16 px-2 py-1 rounded-lg bg-[#290C46] border border-white/20 text-white font-bold"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ================================================================
+              PESTAÑA 6: COMUNICADOS, TEMPORADA Y CONTROL DEL 80% DE MEMORIA CSV
+              ================================================================ */}
+          {adminTab === "sistema" && (
+            <div className="space-y-4 mp-view-enter">
+              {/* Monitor de Memoria y Exportación CSV */}
+              <div className="p-4 rounded-2xl bg-[#1E0734] border border-[#00DC7D]/40 space-y-3 text-xs text-white">
+                <div className="flex items-center justify-between">
+                  <span className="font-wta-display font-extrabold uppercase text-[#00DC7D]">
+                    CAPACIDAD DE REGISTROS Y RESPALDO HISTÓRICO EN EXCEL / CSV
+                  </span>
+                  <span className="font-extrabold text-[#F59E0B]">
+                    {storageStatus.totalRecords} / {storageStatus.limit} registros (
+                    {storageStatus.usagePercent}%)
+                  </span>
+                </div>
+
+                <div className="h-2.5 rounded-full bg-white/10 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full ${
+                      storageStatus.isWarningZone
+                        ? "bg-[#F59E0B]"
+                        : "bg-[#00DC7D]"
+                    }`}
+                    style={{ width: `${storageStatus.usagePercent}%` }}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic("success");
+                      exportHistoricalDataToCSV({
+                        matches,
+                        players,
+                        claims: claimsHistory,
+                      });
+                      showQuickNotice(
+                        "Archivo CSV descargado correctamente en tu dispositivo."
+                      );
+                    }}
+                    className="py-2.5 px-4 rounded-xl mp-btn-emerald font-extrabold text-xs flex items-center justify-center gap-1.5"
+                  >
+                    <WtaIcon name="download" size={15} />
+                    <span>Descargar Histórico en CSV / Excel</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic("tab");
+                      setMatches((prev) => prev.slice(0, 6));
+                      setChallenges((prev) =>
+                        prev.filter((c) => c.status !== "completed")
+                      );
+                      showQuickNotice(
+                        "Memoria histórica depurada conservando intacto el Ranking."
+                      );
+                    }}
+                    className="py-2.5 px-4 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 font-bold text-xs"
+                  >
+                    Limpiar historial antiguo (Mantener Ranking)
+                  </button>
+                </div>
+              </div>
+
+              {/* Publicar Comunicado en el Boletín */}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!annTitle.trim() || !annBody.trim()) return;
+                  triggerHaptic("success");
+                  if (onPublishAnnouncement) {
+                    onPublishAnnouncement({
+                      id: `ann-${Date.now()}`,
+                      tag: "COMUNICADO DEL COMITÉ",
+                      date: new Date().toLocaleDateString("es-PE"),
+                      title: annTitle.trim(),
+                      body: annBody.trim(),
+                    });
+                  }
+                  setAnnTitle("");
+                  setAnnBody("");
+                  showQuickNotice("Comunicado oficial publicado en el Boletín.");
+                }}
+                className="p-4 rounded-2xl bg-[#1E0734] border border-white/15 space-y-2.5 text-xs text-white"
+              >
+                <span className="font-wta-display font-extrabold uppercase text-[#00DC7D] block">
+                  PUBLICAR AVISO OFICIAL A LOS JUGADORES
+                </span>
+                <input
+                  type="text"
+                  value={annTitle}
+                  onChange={(e) => setAnnTitle(e.target.value)}
+                  placeholder="Título del comunicado..."
+                  className="w-full px-3 py-2 rounded-xl bg-[#290C46] border border-white/20 text-white font-bold"
+                />
+                <textarea
+                  rows={2}
+                  value={annBody}
+                  onChange={(e) => setAnnBody(e.target.value)}
+                  placeholder="Mensaje para todos los tenistas del circuito..."
+                  className="w-full px-3 py-2 rounded-xl bg-[#290C46] border border-white/20 text-white"
+                />
+                <button
+                  type="submit"
+                  className="py-2.5 px-5 rounded-xl mp-btn-emerald font-extrabold text-xs"
+                >
+                  Publicar Aviso Oficial
+                </button>
+              </form>
+            </div>
+          )}
+
+          {/* ================================================================
+              PESTAÑA 7: PATROCINADORES Y AUSPICIADORES NATIVOS (MODELO WTA)
+              ================================================================ */}
+          {adminTab === "sponsors" && (
+            <div className="space-y-3 mp-view-enter text-xs">
+              <div className="p-4 rounded-2xl bg-[#1E0734] border border-[#00DC7D]/40 space-y-3 text-white">
+                <span className="font-wta-display font-extrabold uppercase text-[#00DC7D] block">
+                  1. PATROCINADOR PRINCIPAL (CO-BRANDING CABECERA Y STORIES 9:16)
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    value={sponsors?.titleSponsor?.name || ""}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setSponsors((prev) => ({
+                        ...prev,
+                        titleSponsor: { ...prev.titleSponsor, name: val },
+                      }));
+                    }}
+                    placeholder="Nombre de Marca Aliada"
+                    className="px-3 py-2 rounded-xl bg-[#290C46] border border-white/20 text-white font-bold"
+                  />
+                  <label className="flex items-center gap-2 font-bold">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(sponsors?.titleSponsor?.active)}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setSponsors((prev) => ({
+                          ...prev,
+                          titleSponsor: {
+                            ...prev.titleSponsor,
+                            active: checked,
+                          },
+                        }));
+                      }}
+                      className="w-4 h-4 accent-[#00DC7D]"
+                    />
+                    <span>Mostrar en Cabecera y Pósteres 9:16</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-[#1E0734] border border-white/15 space-y-3 text-white">
+                <span className="font-wta-display font-extrabold uppercase text-[#00DC7D] block">
+                  2. AUSPICIADOR DEL WIDGET DE RELOJ Y CLIMA EN VIVO
+                </span>
+                <input
+                  type="text"
+                  value={sponsors?.weatherSponsor?.name || ""}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSponsors((prev) => ({
+                      ...prev,
+                      weatherSponsor: { ...prev.weatherSponsor, name: val },
+                    }));
+                  }}
+                  placeholder="Ej. Fisioterapia Mantaro / Clínica Deportiva"
+                  className="w-full px-3 py-2 rounded-xl bg-[#290C46] border border-white/20 text-white font-bold"
+                />
+              </div>
+
+              <div className="p-4 rounded-2xl bg-[#1E0734] border border-white/15 space-y-3 text-white">
+                <span className="font-wta-display font-extrabold uppercase text-[#00DC7D] block">
+                  3. SORTEO MENSUAL DE JUGADORES ACTIVOS (PRO SHOP)
+                </span>
+                <input
+                  type="text"
+                  value={sponsors?.monthlyRaffleSponsor?.prizeTitle || ""}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSponsors((prev) => ({
+                      ...prev,
+                      monthlyRaffleSponsor: {
+                        ...prev.monthlyRaffleSponsor,
+                        prizeTitle: val,
+                      },
+                    }));
+                  }}
+                  placeholder="Descripción del premio mensual..."
+                  className="w-full px-3 py-2 rounded-xl bg-[#290C46] border border-white/20 text-white font-bold"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </WtaModalWrapper>
+  );
+}
+
+// ----------------------------------------------------------------------------
+// 2. COMPONENTE MAESTRO PRINCIPAL: export default function App()
+//    Ensambla las 14 partes en una arquitectura cohesiva de una sola pieza,
+//    con arranque inteligente en 2 caminos, persistencia real y diseño WTA.
+// ----------------------------------------------------------------------------
+export default function App() {
+  // Calibrador silencioso de pantalla para celulares desde 2018 hasta 2026
+  const viewportProfile = useMobileViewportEngine();
+  const mainScrollRef = useRef(null);
+
+  // Estados persistentes en localStorage + sincronización con Supabase
+  const [hasCompletedOnboarding, setHasCompletedOnboarding] =
+    usePersistentState("onboarding_done_v1", false);
+  const [showSplashCurtain, setShowSplashCurtain] = useState(true);
+  const [lightMode, setLightMode] = usePersistentState("light_mode_v1", false);
+  const [activeTab, setActiveTab] = usePersistentState("active_tab_v1", "retos");
+
+  const [players, setPlayers] = usePersistentState("players_v1", INITIAL_PLAYERS);
+  const [currentUserId, setCurrentUserId] = usePersistentState(
+    "current_user_id_v1",
+    "p-pablo"
+  );
+  const [challenges, setChallenges] = usePersistentState(
+    "challenges_v1",
+    INITIAL_CHALLENGES
+  );
+  const [matches, setMatches] = usePersistentState("matches_v1", INITIAL_MATCHES);
+  const [sedes, setSedes] = usePersistentState("sedes_v1", INITIAL_SEDES);
+  const [coaches, setCoaches] = usePersistentState("coaches_v1", INITIAL_COACHES);
+  const [tournaments, setTournaments] = usePersistentState(
+    "tournaments_v1",
+    INITIAL_TOURNAMENTS
+  );
+  const [proShopItems, setProShopItems] = usePersistentState(
+    "proshop_v1",
+    INITIAL_PROSHOP_ITEMS
+  );
+  const [sponsors, setSponsors] = usePersistentState(
+    "sponsors_v1",
+    INITIAL_SPONSORS
+  );
+  const [answeredTriviaIds, setAnsweredTriviaIds] = usePersistentState(
+    "trivia_answered_v1",
+    []
+  );
+  const [unlockedClassIds, setUnlockedClassIds] = usePersistentState(
+    "unlocked_classes_v1",
+    []
+  );
+  const [paymentVerifications, setPaymentVerifications] = usePersistentState(
+    "payment_verifications_v1",
+    []
+  );
+  const [claimsHistory, setClaimsHistory] = usePersistentState(
+    "indecopi_claims_v1",
+    []
+  );
+  const [announcements, setAnnouncements] = usePersistentState(
+    "announcements_v1",
+    INITIAL_ANNOUNCEMENTS
+  );
+
+  // Estados de Modales Enfrente de Pantalla (Blur iOS 22px)
+  const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
+  const [selectedPublicPlayer, setSelectedPublicPlayer] = useState(null);
+  const [launchChallengeTarget, setLaunchChallengeTarget] = useState(undefined); // undefined = cerrado, null = abierto libre, obj = rival preseleccionado
+  const [incomingChallengeModalItem, setIncomingChallengeModalItem] =
+    useState(null);
+  const [counterProposalChallenge, setCounterProposalChallenge] =
+    useState(null);
+  const [liveUmpireChallenge, setLiveUmpireChallenge] = useState(null);
+  const [h2hModalPair, setH2hModalPair] = useState(null); // { playerA, playerB } | null
+  const [storyPosterData, setStoryPosterData] = useState(null);
+  const [selectedTournamentModal, setSelectedTournamentModal] = useState(null);
+  const [isMasterTop8ModalOpen, setIsMasterTop8ModalOpen] = useState(false);
+  const [selectedSedeModal, setSelectedSedeModal] = useState(null);
+  const [selectedCoachModal, setSelectedCoachModal] = useState(null);
+  const [isVisionIaModalOpen, setIsVisionIaModalOpen] = useState(false);
+  const [isVipCardModalOpen, setIsVipCardModalOpen] = useState(false);
+  const [isProShopModalOpen, setIsProShopModalOpen] = useState(false);
+  const [directPaymentRequest, setDirectPaymentRequest] = useState(null);
+  const [authPortalMode, setAuthPortalMode] = useState(null); // 'login' | 'register' | 'recover' | null
+  const [isCalibrationWizardOpen, setIsCalibrationWizardOpen] = useState(false);
+  const [isVisualRulesOpen, setIsVisualRulesOpen] = useState(false);
+  const [isClaimsBookOpen, setIsClaimsBookOpen] = useState(false);
+  const [legalDocModalType, setLegalDocModalType] = useState(null); // 'terms' | 'privacy' | null
+  const [weeklyTipVideoItem, setWeeklyTipVideoItem] = useState(null);
+  const [isBulletinOpen, setIsBulletinOpen] = useState(false);
+  const [isAdminSuiteOpen, setIsAdminSuiteOpen] = useState(false);
+  const [celebrationRewardData, setCelebrationRewardData] = useState(null);
+
+  // Calcula el ranking ordenado en vivo y obtiene al usuario actual
+  const rankedPlayers = useMemo(() => {
+    const sorted = [...players].sort(
+      (a, b) => Number(b.elo || 0) - Number(a.elo || 0)
+    );
+    return sorted.map((p, idx) => ({
+      ...p,
+      rank: idx + 1,
+      bestRank: Math.min(Number(p.bestRank || idx + 1), idx + 1),
+    }));
+  }, [players]);
+
+  const currentUser = useMemo(
+    () =>
+      rankedPlayers.find((p) => p.id === currentUserId) ||
+      rankedPlayers[2] ||
+      rankedPlayers[0],
+    [rankedPlayers, currentUserId]
+  );
+
+  const pendingForCurrentUserCount = useMemo(
+    () =>
+      challenges.filter(
+        (c) => c.status === "pending" && c.challengedId === currentUser?.id
+      ).length,
+    [challenges, currentUser?.id]
+  );
+
+  // Al cambiar de pestaña principal, sube suavemente el scroll al inicio
+  const handleChangeMainTab = useCallback(
+    (nextTab) => {
+      setActiveTab(nextTab);
+      if (mainScrollRef.current) {
+        mainScrollRef.current.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    },
+    [setActiveTab]
+  );
+
+  // Actualiza atributos del jugador activo
+  const handleUpdateCurrentUser = useCallback(
+    (updates) => {
+      if (!currentUser) return;
+      setPlayers((prev) =>
+        prev.map((p) => (p.id === currentUser.id ? { ...p, ...updates } : p))
+      );
+    },
+    [currentUser, setPlayers]
+  );
+
+  // Crea un nuevo reto en estado "pending"
+  const handleCreateChallenge = useCallback(
+    (payload) => {
+      const newCh = {
+        id: `ch-${Date.now()}`,
+        status: "pending",
+        challengerId: payload.challengerId,
+        challengerName: payload.challengerName,
+        challengedId: payload.challengedId,
+        challengedName: payload.challengedName,
+        club: payload.club,
+        dateText: payload.dateText,
+        ballsAgreement: payload.ballsAgreement,
+        isFriendly: Boolean(payload.isFriendly),
+        message: payload.message || "",
+        liveScore: null,
+      };
+      setChallenges((prev) => [newCh, ...prev]);
+      syncRecordToSupabase("challenges", newCh).catch(() => {});
+    },
+    [setChallenges]
+  );
+
+  // Aceptar un reto entrante
+  const handleAcceptIncomingChallenge = useCallback(
+    (challengeId) => {
+      setChallenges((prev) =>
+        prev.map((c) =>
+          c.id === challengeId ? { ...c, status: "accepted" } : c
+        )
+      );
+      setIncomingChallengeModalItem(null);
+    },
+    [setChallenges]
+  );
+
+  // Rechazar un reto entrante
+  const handleDeclineIncomingChallenge = useCallback(
+    (challengeId) => {
+      setChallenges((prev) => prev.filter((c) => c.id !== challengeId));
+      setIncomingChallengeModalItem(null);
+    },
+    [setChallenges]
+  );
+
+  // Guardar contrapropuesta de fecha, hora o sede
+  const handleSaveCounterProposal = useCallback(
+    ({ challengeId, newClub, newDateText, newBallsAgreement }) => {
+      setChallenges((prev) =>
+        prev.map((c) =>
+          c.id === challengeId
+            ? {
+                ...c,
+                club: newClub,
+                dateText: newDateText,
+                ballsAgreement: newBallsAgreement,
+                status: "accepted",
+              }
+            : c
+        )
+      );
+      setCounterProposalChallenge(null);
+      setIncomingChallengeModalItem(null);
+    },
+    [setChallenges]
+  );
+
+  // Confirmar resultado oficial desde el Modo Árbitro ITF/ATP y calcular ELO + Gemas
+  const handleConfirmOfficialMatchResult = useCallback(
+    ({ challengeId, playerA, playerB, sets, club, isFriendly }) => {
+      const calc = calculateMatchEloAndGems({
+        playerA,
+        playerB,
+        sets,
+        isTournament: false,
+        isFriendly,
+      });
+
+      if (!calc.valid) return;
+
+      const winnerIsA = calc.winnerSide === "A";
+      const winnerObj = winnerIsA ? playerA : playerB;
+      const loserObj = winnerIsA ? playerB : playerA;
+
+      // Actualiza ELO, Victorias, Derrotas, Rachas y Gemas de ambos tenistas
+      setPlayers((prev) =>
+        prev.map((p) => {
+          if (p.id === playerA.id) {
+            return {
+              ...p,
+              elo: calc.newEloA,
+              wins: winnerIsA ? Number(p.wins || 0) + 1 : Number(p.wins || 0),
+              losses: !winnerIsA
+                ? Number(p.losses || 0) + 1
+                : Number(p.losses || 0),
+              streak: winnerIsA ? Number(p.streak || 0) + 1 : 0,
+              matchesPlayed: Number(p.matchesPlayed || 0) + 1,
+              gems: Number(p.gems || 0) + Number(calc.gemsA || 0),
+            };
+          }
+          if (p.id === playerB.id) {
+            return {
+              ...p,
+              elo: calc.newEloB,
+              wins: !winnerIsA ? Number(p.wins || 0) + 1 : Number(p.wins || 0),
+              losses: winnerIsA
+                ? Number(p.losses || 0) + 1
+                : Number(p.losses || 0),
+              streak: !winnerIsA ? Number(p.streak || 0) + 1 : 0,
+              matchesPlayed: Number(p.matchesPlayed || 0) + 1,
+              gems: Number(p.gems || 0) + Number(calc.gemsB || 0),
+            };
+          }
+          return p;
+        })
+      );
+
+      const newMatchRecord = {
+        id: `m-${Date.now()}`,
+        date: new Date().toLocaleDateString("es-PE", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        }),
+        club: club || "Country Club Los Huancas",
+        surface: "ARCILLA",
+        roundLabel: calc.isFriendlyResult
+          ? "Partido Amistoso"
+          : "Reto Oficial Ranking",
+        durationText: "01:45",
+        playerAId: playerA.id,
+        playerAName: playerA.name,
+        playerBId: playerB.id,
+        playerBName: playerB.name,
+        sets: calc.scoreText
+          ? sets.slice(0, sets[2]?.a || sets[2]?.b ? 3 : 2)
+          : sets,
+        score: calc.scoreText,
+        winnerId: winnerObj.id,
+        winnerName: winnerObj.name,
+        eloDelta: calc.deltaWinner,
+      };
+
+      setMatches((prev) => [newMatchRecord, ...prev]);
+      setChallenges((prev) => prev.filter((c) => c.id !== challengeId));
+      setLiveUmpireChallenge(null);
+
+      syncRecordToSupabase("matches", newMatchRecord).catch(() => {});
+
+      setCelebrationRewardData({
+        title: `¡Victoria de ${winnerObj.firstName || winnerObj.name}!`,
+        subtitle: calc.isFriendlyResult
+          ? "Encuentro amistoso registrado en tu historial."
+          : `El ranking oficial se ha actualizado en vivo (${calc.scoreText}).`,
+        eloDelta: calc.deltaWinner,
+        newElo: winnerIsA ? calc.newEloA : calc.newEloB,
+        gemsEarned: winnerIsA ? calc.gemsA : calc.gemsB,
+        reasonLabel: winnerIsA ? calc.gemReasonA : calc.gemReasonB,
+        isMajorAchievement: calc.isMajorAchievement,
+        matchSummary: {
+          winnerName: winnerObj.name,
+          loserName: loserObj.name,
+          scoreText: calc.scoreText,
+          club: newMatchRecord.club,
+        },
+      });
+    },
+    [setPlayers, setMatches, setChallenges]
+  );
+
+  // Aprobar pago desde la Suite Admin CMS
+  const handleApprovePaymentVerification = useCallback(
+    (paymentItem) => {
+      setPaymentVerifications((prev) =>
+        prev.map((pv) =>
+          pv.id === paymentItem.id ? { ...pv, status: "approved" } : pv
+        )
+      );
+
+      if (paymentItem.itemType === "vip_pass") {
+        const isAnnual = paymentItem.referenceId === "vip-annual-2026";
+        const bonusGems = isAnnual ? 1800 : 150;
+        setPlayers((prev) =>
+          prev.map((p) =>
+            p.id === paymentItem.playerId
+              ? {
+                  ...p,
+                  isVip: true,
+                  gems: Number(p.gems || 0) + bonusGems,
+                }
+              : p
+          )
+        );
+      } else if (paymentItem.itemType === "tournament") {
+        setTournaments((prev) =>
+          prev.map((t) => {
+            if (t.id !== paymentItem.referenceId) return t;
+            const currentList = t.registeredPlayerIds || [];
+            if (currentList.includes(paymentItem.playerId)) return t;
+            return {
+              ...t,
+              spotsTaken: Math.min(t.spotsTotal, Number(t.spotsTaken || 0) + 1),
+              registeredPlayerIds: [...currentList, paymentItem.playerId],
+            };
+          })
+        );
+      }
+    },
+    [setPaymentVerifications, setPlayers, setTournaments]
+  );
+
+  return (
+    <div
+      className={`mp-app-shell ${
+        lightMode
+          ? "bg-[#FAF9F5] text-[#1E0734]"
+          : "bg-[#1E0734] text-white"
+      }`}
+    >
+      {/* Inyección de la Hoja Maestra de Estilos WTA y las 5 Familias de Microinteracciones */}
+      <style>{GLOBAL_WTA_STYLES}</style>
+
+      {/* Flujo de Arranque en 2 Caminos:
+          - 1ª vez: Bienvenida a pantalla completa y guarda estado permanente.
+          - 2ª+ veces: Logo rápido con aro esmeralda y cortina directa a Retos. */}
+      {(!hasCompletedOnboarding || showSplashCurtain) && (
+        <SmartOnboardingAndSplash
+          hasCompletedOnboarding={hasCompletedOnboarding}
+          lightMode={lightMode}
+          sponsorName={
+            sponsors?.titleSponsor?.active ? sponsors.titleSponsor.name : ""
+          }
+          onFinishOnboarding={() => {
+            setHasCompletedOnboarding(true);
+            setShowSplashCurtain(false);
+            setActiveTab("retos");
+          }}
+          onFinishQuickSplash={() => {
+            setShowSplashCurtain(false);
+          }}
+        />
+      )}
+
+      {/* 1. Cinta Superior Deslizante de 1 Línea (34px) hacia los 2 Tips Gratuitos */}
+      <TopFreeTipsTickerBar
+        lightMode={lightMode}
+        onOpenWeeklyTips={() =>
+          setWeeklyTipVideoItem(WEEKLY_TIPS_AND_CLASSES[0])
+        }
+        onOpenMasterTop8={() => setIsMasterTop8ModalOpen(true)}
+      />
+
+      {/* 2. Cabecera Superior en Píldora Flotante (Cero cortes "MATC...") */}
+      <TopFloatingPillHeader
+        currentUser={currentUser}
+        unreadNoticesCount={pendingForCurrentUserCount}
+        sponsors={sponsors}
+        lightMode={lightMode}
+        onOpenSideMenu={() => setIsSideMenuOpen(true)}
+        onOpenProShop={() => setIsProShopModalOpen(true)}
+        onOpenBulletin={() => setIsBulletinOpen(true)}
+        onSecretAdminTrigger={() => setIsAdminSuiteOpen(true)}
+      />
+
+      {/* 3. Contenedor Principal Scrolleable con las 5 Vistas Oficiales */}
+      <main ref={mainScrollRef} className="mp-scroll-container">
+        <div className="max-w-5xl mx-auto">
+          {activeTab === "retos" && (
+            <ChallengesCenterView
+              currentUser={currentUser}
+              players={rankedPlayers}
+              challenges={challenges}
+              matches={matches}
+              sedes={sedes}
+              tournaments={tournaments}
+              stories={INITIAL_STORIES_9_16}
+              sponsors={sponsors}
+              answeredTriviaIds={answeredTriviaIds}
+              lightMode={lightMode}
+              onOpenLaunchChallenge={(opp) =>
+                setLaunchChallengeTarget(opp || null)
+              }
+              onOpenLiveUmpire={(ch) => setLiveUmpireChallenge(ch)}
+              onOpenAcceptIncoming={(ch) => setIncomingChallengeModalItem(ch)}
+              onOpenCounterProposal={(ch) => setCounterProposalChallenge(ch)}
+              onOpenStoryPoster={(data) => setStoryPosterData(data)}
+              onOpenH2HWithPlayers={(pA, pB) =>
+                setH2hModalPair({
+                  playerA: pA || currentUser,
+                  playerB: pB || rankedPlayers[0],
+                })
+              }
+              onSelectPlayerProfile={(p) => setSelectedPublicPlayer(p)}
+              onNavigateTab={handleChangeMainTab}
+              onOpenMasterTop8={() => setIsMasterTop8ModalOpen(true)}
+              onClaimTriviaGems={(triviaId, rewardGems) => {
+                if (!answeredTriviaIds.includes(triviaId)) {
+                  setAnsweredTriviaIds((prev) => [...prev, triviaId]);
+                  handleUpdateCurrentUser({
+                    gems: Number(currentUser?.gems || 0) + rewardGems,
+                  });
+                }
+              }}
+            />
+          )}
+
+          {activeTab === "ranking" && (
+            <RankingOfficialView
+              players={rankedPlayers}
+              currentUser={currentUser}
+              matches={matches}
+              challenges={challenges}
+              lightMode={lightMode}
+              onSelectPlayerProfile={(p) => setSelectedPublicPlayer(p)}
+              onChallengePlayer={(opp) => setLaunchChallengeTarget(opp)}
+              onOpenH2HWithPlayers={(pA, pB) =>
+                setH2hModalPair({
+                  playerA: pA || currentUser,
+                  playerB: pB || rankedPlayers[0],
+                })
+              }
+              onOpenMasterTop8={() => setIsMasterTop8ModalOpen(true)}
+            />
+          )}
+
+          {activeTab === "torneos" && (
+            <TournamentsAndHallOfFameView
+              tournaments={tournaments}
+              players={rankedPlayers}
+              currentUser={currentUser}
+              lightMode={lightMode}
+              onOpenTournamentDetail={(trn) => setSelectedTournamentModal(trn)}
+              onOpenMasterTop8={() => setIsMasterTop8ModalOpen(true)}
+              onSelectPlayerProfile={(p) => setSelectedPublicPlayer(p)}
+              onOpenH2HWithPlayers={(pA, pB) =>
+                setH2hModalPair({
+                  playerA: pA || currentUser,
+                  playerB: pB || rankedPlayers[0],
+                })
+              }
+              onOpenDirectPayment={(req) => setDirectPaymentRequest(req)}
+            />
+          )}
+
+          {activeTab === "sedes" && (
+            <SedesAndCoachProView
+              sedes={sedes}
+              coaches={coaches}
+              classesList={WEEKLY_TIPS_AND_CLASSES}
+              unlockedClassIds={unlockedClassIds}
+              currentUser={currentUser}
+              lightMode={lightMode}
+              onSelectSedeModal={(s) => setSelectedSedeModal(s)}
+              onSelectCoachModal={(c) => setSelectedCoachModal(c)}
+              onOpenVisionIaModal={() => setIsVisionIaModalOpen(true)}
+              onOpenWeeklyTipsModal={(cls) => setWeeklyTipVideoItem(cls)}
+              onUnlockClassWithGems={(cls) => {
+                if (Number(currentUser?.gems || 0) >= cls.costGems) {
+                  triggerHaptic("success");
+                  handleUpdateCurrentUser({
+                    gems: Number(currentUser.gems) - cls.costGems,
+                  });
+                  setUnlockedClassIds((prev) => [...prev, cls.id]);
+                  setWeeklyTipVideoItem(cls);
+                } else {
+                  setWeeklyTipVideoItem(cls);
+                }
+              }}
+              onLaunchChallengeAtSede={() => setLaunchChallengeTarget(null)}
+            />
+          )}
+
+          {activeTab === "perfil" && (
+            <PlayerProfileWtaView
+              currentUser={currentUser}
+              players={rankedPlayers}
+              matches={matches}
+              sedes={sedes}
+              lightMode={lightMode}
+              onUpdateCurrentUser={handleUpdateCurrentUser}
+              onSwitchActivePlayerAccount={(nextId) => setCurrentUserId(nextId)}
+              onOpenVipCardModal={() => setIsVipCardModalOpen(true)}
+              onOpenProShopModal={() => setIsProShopModalOpen(true)}
+              onOpenH2HWithPlayers={(pA, pB) =>
+                setH2hModalPair({
+                  playerA: pA || currentUser,
+                  playerB: pB || rankedPlayers[0],
+                })
+              }
+              onOpenStoryPoster={(data) => setStoryPosterData(data)}
+              onOpenCircuitGuide={() => setIsVisualRulesOpen(true)}
+              onOpenAuthPortal={(mode) => setAuthPortalMode(mode || "login")}
+            />
+          )}
+
+          {/* Barra Institucional de 6 Redes Sociales y Enlaces Legales en el Pie del Scroll */}
+          <WtaInstitutionalFooterBar
+            lightMode={lightMode}
+            onOpenClaimsBookModal={() => setIsClaimsBookOpen(true)}
+            onOpenLegalDocModal={(docType) => setLegalDocModalType(docType)}
+          />
+        </div>
+      </main>
+
+      {/* 4. Barra de Navegación Inferior con Halo Esmeralda (Oculta si el teclado está abierto) */}
+      {!viewportProfile.keyboardOpen && (
+        <BottomNavigationDock
+          activeTab={activeTab}
+          onChangeTab={handleChangeMainTab}
+          pendingChallengesCount={pendingForCurrentUserCount}
+          lightMode={lightMode}
+        />
+      )}
+
+      {/* ====================================================================
+          5. MODALES Y HOJAS EMERGENTES ENFRENTE DE PANTALLA (BLUR iOS 22PX)
+          ==================================================================== */}
+      {/* Menú Lateral Institucional (3 Rayitas) */}
+      <InstitutionalSideDrawer
+        isOpen={isSideMenuOpen}
+        onClose={() => setIsSideMenuOpen(false)}
+        currentUser={currentUser}
+        lightMode={lightMode}
+        onToggleLightMode={() => setLightMode((prev) => !prev)}
+        onNavigateTab={handleChangeMainTab}
+        onOpenAuthPortal={(mode) => setAuthPortalMode(mode || "login")}
+        onOpenVipCardModal={() => setIsVipCardModalOpen(true)}
+        onOpenProShopModal={() => setIsProShopModalOpen(true)}
+        onOpenH2HModal={() =>
+          setH2hModalPair({
+            playerA: currentUser,
+            playerB: rankedPlayers[0],
+          })
+        }
+        onOpenStoryPosterModal={() =>
+          setStoryPosterData({
+            winnerName: currentUser?.name || "Pablo Samaniego",
+            loserName: "Kenji Takahashi",
+            scoreText: "7-5, 6-4",
+            club: currentUser?.club || "Country Club Los Huancas",
+          })
+        }
+        onOpenVisionIaModal={() => setIsVisionIaModalOpen(true)}
+        onOpenVisualRulesModal={() => setIsVisualRulesOpen(true)}
+        onOpenClaimsBookModal={() => setIsClaimsBookOpen(true)}
+        onOpenLegalDocModal={(docType) => setLegalDocModalType(docType)}
+        onSecretAdminTrigger={() => setIsAdminSuiteOpen(true)}
+      />
+
+      {/* Ficha Completa de Jugador al Tocar en el Ranking */}
+      <PublicPlayerProfileModal
+        player={selectedPublicPlayer}
+        currentUser={currentUser}
+        matches={matches}
+        challenges={challenges}
+        lightMode={lightMode}
+        onClose={() => setSelectedPublicPlayer(null)}
+        onChallengePlayer={(opp) => {
+          setSelectedPublicPlayer(null);
+          setLaunchChallengeTarget(opp);
+        }}
+        onCompareH2H={(pA, pB) => {
+          setSelectedPublicPlayer(null);
+          setH2hModalPair({ playerA: pA, playerB: pB });
+        }}
+        onOpenStoryPoster={(data) => {
+          setSelectedPublicPlayer(null);
+          setStoryPosterData(data);
+        }}
+      />
+
+      {/* Lanzador de Desafíos con Sede Personalizada Libre */}
+      <LaunchChallengeModal
+        isOpen={launchChallengeTarget !== undefined}
+        onClose={() => setLaunchChallengeTarget(undefined)}
+        currentUser={currentUser}
+        players={rankedPlayers}
+        sedes={sedes}
+        preselectedOpponent={launchChallengeTarget}
+        lightMode={lightMode}
+        onCreateChallenge={handleCreateChallenge}
+      />
+
+      {/* Reto Entrante Detectado por ID Único */}
+      <IncomingChallengeModal
+        challenge={incomingChallengeModalItem}
+        players={rankedPlayers}
+        sedes={sedes}
+        lightMode={lightMode}
+        onAcceptChallenge={handleAcceptIncomingChallenge}
+        onOpenCounterProposal={(ch) => {
+          setIncomingChallengeModalItem(null);
+          setCounterProposalChallenge(ch);
+        }}
+        onDeclineChallenge={handleDeclineIncomingChallenge}
+        onClose={() => setIncomingChallengeModalItem(null)}
+      />
+
+      {/* Contrapropuesta de Fecha, Hora o Sede por WhatsApp */}
+      <CounterProposalModal
+        challenge={counterProposalChallenge}
+        players={rankedPlayers}
+        sedes={sedes}
+        lightMode={lightMode}
+        onSaveCounterProposal={handleSaveCounterProposal}
+        onClose={() => setCounterProposalChallenge(null)}
+      />
+
+      {/* Modo Árbitro Oficial ITF/ATP con Candado por Set */}
+      <LiveUmpireAndScoreModal
+        challenge={liveUmpireChallenge}
+        players={rankedPlayers}
+        lightMode={lightMode}
+        onConfirmOfficialResult={handleConfirmOfficialMatchResult}
+        onUpdateLiveChallengeScore={(chId, liveScoreObj) => {
+          setChallenges((prev) =>
+            prev.map((c) =>
+              c.id === chId
+                ? { ...c, status: "in_play", liveScore: liveScoreObj }
+                : c
+            )
+          );
+        }}
+        onClose={() => setLiveUmpireChallenge(null)}
+      />
+
+      {/* Comparador Monumental HEAD TO HEAD */}
+      <AtpHeadToHeadModal
+        isOpen={Boolean(h2hModalPair)}
+        onClose={() => setH2hModalPair(null)}
+        initialPlayerA={h2hModalPair?.playerA}
+        initialPlayerB={h2hModalPair?.playerB}
+        players={rankedPlayers}
+        matches={matches}
+        lightMode={lightMode}
+        onChallengePair={(opp) => {
+          setH2hModalPair(null);
+          setLaunchChallengeTarget(opp);
+        }}
+        onOpenStoryFromH2H={(data) => {
+          setH2hModalPair(null);
+          setStoryPosterData(data);
+        }}
+      />
+
+      {/* Estudio Generador de Póster Story 9:16 */}
+      <StoryPosterModal
+        isOpen={Boolean(storyPosterData)}
+        onClose={() => setStoryPosterData(null)}
+        initialData={storyPosterData}
+        players={rankedPlayers}
+        sponsors={sponsors}
+        lightMode={lightMode}
+      />
+
+      {/* Modal Completo de Detalle de Torneo y Llaves con Ronda Consuelo */}
+      <TournamentFullDetailModal
+        tournament={selectedTournamentModal}
+        players={rankedPlayers}
+        currentUser={currentUser}
+        lightMode={lightMode}
+        onClose={() => setSelectedTournamentModal(null)}
+        onSelectPlayerProfile={(p) => {
+          setSelectedTournamentModal(null);
+          setSelectedPublicPlayer(p);
+        }}
+        onOpenDirectPayment={(req) => {
+          setSelectedTournamentModal(null);
+          setDirectPaymentRequest(req);
+        }}
+      />
+
+      {/* Modal Interactivo del Torneo de Maestros (Master Top 8 Finals) */}
+      <MasterTop8FinalsModal
+        isOpen={isMasterTop8ModalOpen}
+        onClose={() => setIsMasterTop8ModalOpen(false)}
+        players={rankedPlayers}
+        lightMode={lightMode}
+        onSelectPlayerProfile={(p) => {
+          setIsMasterTop8ModalOpen(false);
+          setSelectedPublicPlayer(p);
+        }}
+        onOpenDirectPayment={(req) => {
+          setIsMasterTop8ModalOpen(false);
+          setDirectPaymentRequest(req);
+        }}
+      />
+
+      {/* Modal de Sede Oficial y Reporte Climático (+3 Gemas) */}
+      <ClubDetailModal
+        sede={selectedSedeModal}
+        currentUser={currentUser}
+        lightMode={lightMode}
+        onClose={() => setSelectedSedeModal(null)}
+        onReportWeatherState={(sedeId, nextWeather) => {
+          setSedes((prev) =>
+            prev.map((s) =>
+              s.id === sedeId
+                ? {
+                    ...s,
+                    weatherState: nextWeather,
+                    lastWeatherReport: "Reportado hace un instante",
+                  }
+                : s
+            )
+          );
+          setSelectedSedeModal((prev) =>
+            prev && prev.id === sedeId
+              ? {
+                  ...prev,
+                  weatherState: nextWeather,
+                  lastWeatherReport: "Reportado hace un instante",
+                }
+              : prev
+          );
+          handleUpdateCurrentUser({
+            gems: Number(currentUser?.gems || 0) + 3,
+          });
+        }}
+        onLaunchChallengeAtSede={() => setLaunchChallengeTarget(null)}
+      />
+
+      {/* Modal de Entrenador Coach Pro con Turnos Libres */}
+      <CoachProProfileModal
+        coach={selectedCoachModal}
+        currentUser={currentUser}
+        lightMode={lightMode}
+        onClose={() => setSelectedCoachModal(null)}
+        onOpenDirectPayment={(req) => {
+          setSelectedCoachModal(null);
+          setDirectPaymentRequest(req);
+        }}
+      />
+
+      {/* Sala MatchPoint Vision IA */}
+      <MatchPointVisionIaModal
+        isOpen={isVisionIaModalOpen}
+        onClose={() => setIsVisionIaModalOpen(false)}
+        currentUser={currentUser}
+        sedes={sedes}
+        lightMode={lightMode}
+        onOpenDirectPayment={(req) => {
+          setIsVisionIaModalOpen(false);
+          setDirectPaymentRequest(req);
+        }}
+      />
+
+      {/* Carnet Digital Socio VIP Metálico 3D con Giroscopio */}
+      <CarnetDigitalVIPModal
+        isOpen={isVipCardModalOpen}
+        onClose={() => setIsVipCardModalOpen(false)}
+        currentUser={currentUser}
+        sedes={sedes}
+        lightMode={lightMode}
+        onOpenDirectPayment={(req) => {
+          setIsVipCardModalOpen(false);
+          setDirectPaymentRequest(req);
+        }}
+      />
+
+      {/* Tienda Oficial Pro Shop en 3 Escalones */}
+      <ProShopModal
+        isOpen={isProShopModalOpen}
+        onClose={() => setIsProShopModalOpen(false)}
+        currentUser={currentUser}
+        proShopItems={proShopItems}
+        sponsors={sponsors}
+        lightMode={lightMode}
+        onOpenVipModal={() => setIsVipCardModalOpen(true)}
+        onOpenDirectPayment={(req) => {
+          setIsProShopModalOpen(false);
+          setDirectPaymentRequest(req);
+        }}
+        onRedeemShopItemWithGems={(item) => {
+          if (!currentUser) return;
+          const nextGems = Math.max(
+            0,
+            Number(currentUser.gems || 0) - Number(item.costGems || 0)
+          );
+          const updates = { gems: nextGems };
+          if (item.unlocksThemeId) {
+            const currentThemes = currentUser.unlockedThemes || ["finals"];
+            if (!currentThemes.includes(item.unlocksThemeId)) {
+              updates.unlockedThemes = [...currentThemes, item.unlocksThemeId];
+            }
+            updates.surfaceThemeId = item.unlocksThemeId;
+          }
+          if (item.unlocksBadgeId) {
+            const currentBadges = currentUser.unlockedBadges || [];
+            if (!currentBadges.includes(item.unlocksBadgeId)) {
+              updates.unlockedBadges = [...currentBadges, item.unlocksBadgeId];
+            }
+            updates.activeBadgeId = item.unlocksBadgeId;
+          }
+          handleUpdateCurrentUser(updates);
+        }}
+      />
+
+      {/* Modal de Pago Directo Yape/Plin (Blindaje SBS — Cero Billetera Digital) */}
+      <DirectPaymentYapePlinModal
+        paymentRequest={directPaymentRequest}
+        currentUser={currentUser}
+        lightMode={lightMode}
+        onSubmitPaymentVerification={(record) => {
+          setPaymentVerifications((prev) => [record, ...prev]);
+          syncRecordToSupabase("payment_verifications", record).catch(() => {});
+        }}
+        onClose={() => setDirectPaymentRequest(null)}
+      />
+
+      {/* Portal de Acceso Profesional Split-Screen 50/50 (Login, Registro +18 y Recuperación) */}
+      <AuthAndAccountModal
+        isOpen={Boolean(authPortalMode)}
+        onClose={() => setAuthPortalMode(null)}
+        initialMode={authPortalMode || "login"}
+        players={rankedPlayers}
+        sedes={sedes}
+        currentUser={currentUser}
+        onLoginSuccess={(playerId) => setCurrentUserId(playerId)}
+        onRegisterNewPlayer={(newPlayerObj) => {
+          setPlayers((prev) => [...prev, newPlayerObj]);
+          setCurrentUserId(newPlayerObj.id);
+          // Abre automáticamente el Test Inicial de 5 preguntas para su cuenta nueva
+          setTimeout(() => setIsCalibrationWizardOpen(true), 260);
+        }}
+        onResetPlayerPassword={(playerId, newPass) => {
+          setPlayers((prev) =>
+            prev.map((p) =>
+              p.id === playerId ? { ...p, customPassword: newPass } : p
+            )
+          );
+        }}
+        onTriggerAdminSuite={() => setIsAdminSuiteOpen(true)}
+      />
+
+      {/* Test Inicial Didáctico de 5 Preguntas (1 solo uso al registrarse) */}
+      <InitialCalibrationWizardModal
+        isOpen={isCalibrationWizardOpen}
+        onClose={() => setIsCalibrationWizardOpen(false)}
+        currentUser={currentUser}
+        lightMode={lightMode}
+        onCompleteCalibration={({ assignedElo }) => {
+          handleUpdateCurrentUser({
+            elo: assignedElo,
+            hasCompletedTest: true,
+          });
+          setActiveTab("ranking");
+        }}
+      />
+
+      {/* Guía Visual del Circuito */}
+      <VisualRulesModal
+        isOpen={isVisualRulesOpen}
+        onClose={() => setIsVisualRulesOpen(false)}
+        lightMode={lightMode}
+      />
+
+      {/* Libro de Reclamaciones Virtual (Indecopi Perú) */}
+      <VirtualClaimsBookModal
+        isOpen={isClaimsBookOpen}
+        onClose={() => setIsClaimsBookOpen(false)}
+        currentUser={currentUser}
+        claimsHistory={claimsHistory}
+        lightMode={lightMode}
+        onSubmitNewClaim={(claimRecord) =>
+          setClaimsHistory((prev) => [claimRecord, ...prev])
+        }
+      />
+
+      {/* Modales Legales de Términos y Condiciones y Política de Privacidad (Ley N° 29733) */}
+      <LegalTermsAndPrivacyModal
+        isOpen={Boolean(legalDocModalType)}
+        onClose={() => setLegalDocModalType(null)}
+        initialDoc={legalDocModalType || "terms"}
+        currentUser={currentUser}
+        lightMode={lightMode}
+      />
+
+      {/* Reproductor de los 2 Tips Gratuitos Semanales y Academia TV */}
+      <WeeklyFreeTipsPlayerModal
+        isOpen={Boolean(weeklyTipVideoItem)}
+        onClose={() => setWeeklyTipVideoItem(null)}
+        initialClassItem={weeklyTipVideoItem}
+        classesList={WEEKLY_TIPS_AND_CLASSES}
+        unlockedClassIds={unlockedClassIds}
+        currentUser={currentUser}
+        lightMode={lightMode}
+        onUnlockClassWithGems={(cls) => {
+          if (Number(currentUser?.gems || 0) >= cls.costGems) {
+            triggerHaptic("success");
+            handleUpdateCurrentUser({
+              gems: Number(currentUser.gems) - cls.costGems,
+            });
+            setUnlockedClassIds((prev) => [...prev, cls.id]);
+          }
+        }}
+      />
+
+      {/* Centro de Avisos y Noticiero Bento con Fotos Reales */}
+      <BulletinAndNewsModal
+        isOpen={isBulletinOpen}
+        onClose={() => setIsBulletinOpen(false)}
+        announcements={announcements}
+        challenges={challenges}
+        currentUser={currentUser}
+        lightMode={lightMode}
+        onOpenIncomingChallenge={(ch) => setIncomingChallengeModalItem(ch)}
+      />
+
+      {/* Modal de Celebración de Victoria y Gemas */}
+      <CelebrationRewardModal
+        celebrationData={celebrationRewardData}
+        onClose={() => setCelebrationRewardData(null)}
+        onOpenStoryShare={(summary) => {
+          setCelebrationRewardData(null);
+          setStoryPosterData(summary);
+        }}
+      />
+
+      {/* Suite de Administrador CMS Oculta de 7 Pestañas (5 toques en el logo + PIN 1234) */}
+      <HiddenAdminSuiteModal
+        isOpen={isAdminSuiteOpen}
+        onClose={() => setIsAdminSuiteOpen(false)}
+        players={players}
+        setPlayers={setPlayers}
+        challenges={challenges}
+        setChallenges={setChallenges}
+        matches={matches}
+        setMatches={setMatches}
+        sedes={sedes}
+        setSedes={setSedes}
+        coaches={coaches}
+        setCoaches={setCoaches}
+        tournaments={tournaments}
+        setTournaments={setTournaments}
+        proShopItems={proShopItems}
+        setProShopItems={setProShopItems}
+        sponsors={sponsors}
+        setSponsors={setSponsors}
+        paymentVerifications={paymentVerifications}
+        onApprovePaymentVerification={handleApprovePaymentVerification}
+        onRejectPaymentVerification={(id) =>
+          setPaymentVerifications((prev) =>
+            prev.map((pv) =>
+              pv.id === id ? { ...pv, status: "rejected" } : pv
+            )
+          )
+        }
+        claimsHistory={claimsHistory}
+        onMarkClaimResolved={(claimId) =>
+          setClaimsHistory((prev) =>
+            prev.map((c) =>
+              c.id === claimId ? { ...c, status: "atendido" } : c
+            )
+          )
+        }
+        announcements={announcements}
+        onPublishAnnouncement={(newAnn) =>
+          setAnnouncements((prev) => [newAnn, ...prev])
+        }
+        lightMode={lightMode}
+      />
+    </div>
+  );
+}
+
+// === FIN DEL BLOQUE 14 DE 14 (ARCHIVO src/App.jsx COMPLETO) ===
