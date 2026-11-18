@@ -1,0 +1,1241 @@
+/* ==========================================================================
+   TOTAL TENIS · LAYOUT MAESTRO, FÍSICA MÓVIL Y COMPONENTES ARMONIOSOS
+   Consumo directo de src/styles/tokens.css (Garantía Cero Frankenstein)
+   Mobile-First Universal (320px -> 430px) + Adaptación Desktop (768px+)
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. RESET UNIVERSAL, ALTURA REAL MULTI-GENERACIÓN Y RESPUESTA TÁCTIL 0ms
+   -------------------------------------------------------------------------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  width: 100%;
+  height: 100%;
+  height: -webkit-fill-available;
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  background-color: var(--tt-bg-app);
+  color: var(--tt-text-primary);
+  font-family: var(--tt-font-sans);
+  overflow-x: hidden;
+  overscroll-behavior-y: none;
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
+  min-height: 100dvh;
+  min-height: calc(var(--tt-vh, 1vh) * 100);
+  background-color: var(--tt-bg-app);
+  color: var(--tt-text-primary);
+  font-family: var(--tt-font-sans);
+  font-size: var(--tt-text-base);
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  overscroll-behavior-y: none;
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
+  min-height: 100dvh;
+  min-height: calc(var(--tt-vh, 1vh) * 100);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  background-color: var(--tt-bg-app);
+}
+
+/* Respuesta táctil inmediata de 0ms en botones, enlaces e inputs */
+button,
+a,
+input,
+select,
+textarea,
+[role='button'] {
+  touch-action: manipulation;
+  font-family: inherit;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  margin: 0;
+}
+
+button:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+img,
+video,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+/* Prevención de zoom automático en iOS al enfocar inputs (< 16px dispara zoom) */
+input,
+select,
+textarea {
+  font-size: 16px;
+}
+
+/* Ocultar barras de desplazamiento feas en carruseles táctiles */
+.tt-no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.tt-no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* --------------------------------------------------------------------------
+   2. TIPOGRAFÍA DEPORTIVA EDITORIAL (BARLOW CONDENSED + PLUS JAKARTA SANS)
+   -------------------------------------------------------------------------- */
+.tt-display {
+  font-family: var(--tt-font-display);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  line-height: 1.04;
+}
+
+.tt-display-italic {
+  font-family: var(--tt-font-display);
+  font-style: italic;
+  font-weight: 900;
+  letter-spacing: 0.015em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.tt-eyebrow {
+  font-size: var(--tt-text-xs);
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--tt-emerald-500);
+}
+
+.tt-title-xl {
+  font-family: var(--tt-font-display);
+  font-size: var(--tt-text-2xl);
+  font-weight: 800;
+  letter-spacing: 0.015em;
+  text-transform: uppercase;
+  line-height: 1.05;
+  margin: 0;
+}
+
+.tt-title-lg {
+  font-family: var(--tt-font-display);
+  font-size: var(--tt-text-xl);
+  font-weight: 800;
+  letter-spacing: 0.015em;
+  text-transform: uppercase;
+  line-height: 1.08;
+  margin: 0;
+}
+
+.tt-title-md {
+  font-size: var(--tt-text-md);
+  font-weight: 800;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.tt-muted {
+  color: var(--tt-text-muted);
+}
+
+.tt-secondary {
+  color: var(--tt-text-secondary);
+}
+
+/* --------------------------------------------------------------------------
+   3. SHELL PRINCIPAL DE LA APP (SIN FRANJA NEGRA INFERIOR NI CHOQUE NOTCH)
+   -------------------------------------------------------------------------- */
+.tt-app-shell {
+  width: 100%;
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
+  min-height: 100dvh;
+  min-height: calc(var(--tt-vh, 1vh) * 100);
+  display: flex;
+  flex-direction: column;
+  background-color: var(--tt-bg-app);
+  position: relative;
+}
+
+.tt-main-content {
+  flex: 1 0 auto;
+  width: 100%;
+  max-width: var(--tt-container-max);
+  margin: 0 auto;
+  padding-top: calc(var(--tt-header-height) + var(--tt-safe-top) + 14px);
+  padding-left: calc(var(--tt-page-pad) + var(--tt-safe-left));
+  padding-right: calc(var(--tt-page-pad) + var(--tt-safe-right));
+  padding-bottom: calc(var(--tt-dock-height) + var(--tt-safe-bottom) + 28px);
+}
+
+/* Transición de entrada de vistas SIN usar transform persistente (evita romper fixed) */
+.tt-view-fade {
+  animation: ttViewFadeIn var(--tt-dur-base) var(--tt-ease-out) both;
+}
+
+@keyframes ttViewFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Anclaje cuando el teclado virtual está abierto en móvil */
+html[data-keyboard='open'] .tt-bottom-dock {
+  transform: translate3d(0, 120%, 0);
+  pointer-events: none;
+}
+
+/* --------------------------------------------------------------------------
+   4. CABECERA FLOTANTE (HEADER PILL + CINTA SUPERIOR)
+   -------------------------------------------------------------------------- */
+.tt-header-wrap {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: var(--tt-z-header);
+  padding-top: calc(var(--tt-safe-top) + 6px);
+  padding-left: calc(var(--tt-page-pad) + var(--tt-safe-left));
+  padding-right: calc(var(--tt-page-pad) + var(--tt-safe-right));
+  padding-bottom: 8px;
+  background: linear-gradient(
+    to bottom,
+    var(--tt-bg-app) 0%,
+    var(--tt-bg-app) 68%,
+    rgba(30, 7, 52, 0) 100%
+  );
+  pointer-events: none;
+}
+
+html[data-theme='light'] .tt-header-wrap {
+  background: linear-gradient(
+    to bottom,
+    rgba(250, 249, 245, 0.98) 0%,
+    rgba(250, 249, 245, 0.88) 70%,
+    rgba(250, 249, 245, 0) 100%
+  );
+}
+
+.tt-header-bar {
+  max-width: var(--tt-container-max);
+  margin: 0 auto;
+  min-height: 54px;
+  padding: 6px 10px;
+  border-radius: var(--tt-radius-pill);
+  background-color: var(--tt-header-pill-bg);
+  color: var(--tt-header-pill-text);
+  box-shadow: var(--tt-header-pill-shadow);
+  border: 1px solid rgba(30, 7, 52, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.tt-header-left,
+.tt-header-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.tt-header-icon-btn {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  border-radius: var(--tt-radius-pill);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #1e0734;
+  background-color: rgba(30, 7, 52, 0.05);
+  transition: transform var(--tt-dur-fast) var(--tt-ease-spring),
+    background-color var(--tt-dur-fast) ease;
+  position: relative;
+}
+
+.tt-header-icon-btn:active {
+  transform: scale(0.92);
+  background-color: rgba(0, 220, 125, 0.16);
+}
+
+.tt-brand-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 2px 6px 2px 2px;
+  border-radius: var(--tt-radius-pill);
+  user-select: none;
+}
+
+.tt-brand-logo-img {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(30, 7, 52, 0.22);
+}
+
+.tt-brand-wordmark {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-family: var(--tt-font-display);
+  font-style: italic;
+  font-weight: 900;
+  font-size: 1.18rem;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.tt-brand-wordmark .tt-word-total {
+  color: #1e0734;
+}
+
+.tt-brand-wordmark .tt-word-tenis {
+  color: #00b868;
+}
+
+/* En teléfonos compactos (320px-370px) compactamos el wordmark para evitar cortes */
+html[data-screen='compact'] .tt-brand-wordmark {
+  font-size: 0.98rem;
+}
+
+/* Píldora de Gemas (Destino 1: Bóveda Ejecutiva) */
+.tt-gems-pill {
+  height: 36px;
+  padding: 0 11px;
+  border-radius: var(--tt-radius-pill);
+  background: linear-gradient(135deg, #1e0734 0%, #341059 100%);
+  color: #faf9f5;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 800;
+  font-size: 0.82rem;
+  border: 1px solid rgba(0, 220, 125, 0.35);
+  box-shadow: 0 4px 12px rgba(30, 7, 52, 0.22);
+  transition: transform var(--tt-dur-fast) var(--tt-ease-spring);
+  white-space: nowrap;
+}
+
+.tt-gems-pill:active {
+  transform: scale(0.94);
+}
+
+/* Botón Tienda Pro Shop (Destino 2: Catálogo Estilo Amazon) */
+.tt-shop-pill {
+  height: 36px;
+  padding: 0 12px;
+  border-radius: var(--tt-radius-pill);
+  background: var(--tt-grad-mint);
+  color: #120321;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 800;
+  font-size: 0.82rem;
+  box-shadow: 0 4px 14px rgba(0, 220, 125, 0.34);
+  transition: transform var(--tt-dur-fast) var(--tt-ease-spring);
+  white-space: nowrap;
+}
+
+.tt-shop-pill:active {
+  transform: scale(0.94);
+}
+
+html[data-screen='compact'] .tt-shop-pill span.tt-shop-label {
+  display: none;
+}
+
+/* Punto rojo de notificación en Centro de Avisos */
+.tt-notif-dot {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background-color: #ef4444;
+  border: 2px solid #ffffff;
+}
+
+/* --------------------------------------------------------------------------
+   5. BARRA DE NAVEGACIÓN INFERIOR DEFINITIVA (EXACTA A TU CAPTURA image_fffa02)
+   Línea superior luminosa Esmeralda + Halo difuminado + Aumento Icono + Texto
+   -------------------------------------------------------------------------- */
+.tt-bottom-dock {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--tt-z-dock);
+  background-color: var(--tt-dock-bg);
+  border-top: 1px solid var(--tt-dock-border);
+  padding-bottom: var(--tt-safe-bottom);
+  padding-left: var(--tt-safe-left);
+  padding-right: var(--tt-safe-right);
+  backdrop-filter: blur(var(--tt-blur-md));
+  -webkit-backdrop-filter: blur(var(--tt-blur-md));
+  transition: transform var(--tt-dur-base) var(--tt-ease-smooth);
+}
+
+.tt-dock-inner {
+  max-width: var(--tt-container-max);
+  margin: 0 auto;
+  height: var(--tt-dock-height);
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  align-items: stretch;
+}
+
+.tt-dock-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: var(--tt-touch-min);
+  padding: 6px 2px 4px;
+  color: var(--tt-text-muted);
+  transition: color var(--tt-dur-fast) ease;
+  overflow: visible;
+}
+
+/* Línea superior luminosa Verde Esmeralda (Exacta a tu captura) */
+.tt-dock-item::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: 12%;
+  right: 12%;
+  height: 3px;
+  border-radius: 0 0 4px 4px;
+  background-color: var(--tt-emerald-500);
+  box-shadow: 0 0 12px var(--tt-emerald-500), 0 2px 10px rgba(0, 220, 125, 0.55);
+  opacity: 0;
+  transform: scaleX(0.25);
+  transition: opacity var(--tt-dur-base) ease,
+    transform var(--tt-dur-base) var(--tt-ease-spring);
+}
+
+/* Halo / Aura difuminada de luz esmeralda detrás del icono y texto activo */
+.tt-dock-item::after {
+  content: '';
+  position: absolute;
+  inset: 2px 4px;
+  border-radius: 16px;
+  background: radial-gradient(
+    circle at 50% 42%,
+    rgba(0, 220, 125, 0.34) 0%,
+    rgba(0, 220, 125, 0.11) 46%,
+    rgba(0, 220, 125, 0) 76%
+  );
+  opacity: 0;
+  transform: scale(0.7);
+  transition: opacity var(--tt-dur-base) ease,
+    transform var(--tt-dur-base) var(--tt-ease-spring);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.tt-dock-item.is-active {
+  color: var(--tt-emerald-500);
+}
+
+.tt-dock-item.is-active::before {
+  opacity: 1;
+  transform: scaleX(1);
+}
+
+.tt-dock-item.is-active::after {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Contenedor de icono + etiqueta: ambos aumentan suavemente juntos al activarse */
+.tt-dock-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  transform: scale(1) translateY(0);
+  transition: transform var(--tt-dur-base) var(--tt-ease-spring);
+  will-change: transform;
+}
+
+.tt-dock-item.is-active .tt-dock-content {
+  transform: scale(1.14) translateY(-1.5px);
+}
+
+.tt-dock-item:active .tt-dock-content {
+  transform: scale(0.95);
+}
+
+.tt-dock-img {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+  opacity: 0.72;
+  filter: grayscale(0.28) brightness(0.92);
+  transition: filter var(--tt-dur-base) ease, opacity var(--tt-dur-base) ease;
+}
+
+.tt-dock-item.is-active .tt-dock-img {
+  opacity: 1;
+  filter: drop-shadow(0 0 8px rgba(0, 220, 125, 0.72)) brightness(1.12);
+}
+
+.tt-dock-label {
+  font-size: 0.67rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.05;
+  white-space: nowrap;
+  text-align: center;
+  transition: font-weight var(--tt-dur-fast) ease, text-shadow var(--tt-dur-base) ease;
+}
+
+.tt-dock-item.is-active .tt-dock-label {
+  font-weight: 800;
+  color: var(--tt-emerald-500);
+  text-shadow: 0 0 12px rgba(0, 220, 125, 0.42);
+}
+
+html[data-theme='light'] .tt-dock-item.is-active .tt-dock-label {
+  color: #009c57;
+  text-shadow: none;
+}
+
+html[data-screen='compact'] .tt-dock-label {
+  font-size: 0.61rem;
+}
+
+/* --------------------------------------------------------------------------
+   6. MENÚ LATERAL EDITORIAL (DRAWER CON BACKDROP-BLUR PROFUNDO)
+   -------------------------------------------------------------------------- */
+.tt-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--tt-z-drawer-backdrop);
+  background-color: rgba(12, 2, 24, 0.64);
+  backdrop-filter: blur(var(--tt-blur-lg));
+  -webkit-backdrop-filter: blur(var(--tt-blur-lg));
+  animation: ttFadeBackdrop var(--tt-dur-base) ease both;
+}
+
+.tt-drawer-panel {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: var(--tt-z-drawer);
+  width: min(88vw, 370px);
+  background-color: var(--tt-ivory-100);
+  color: #1e0734;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 24px 0 60px rgba(8, 1, 18, 0.55);
+  border-right: 1px solid rgba(30, 7, 52, 0.1);
+  animation: ttDrawerSlideIn var(--tt-dur-slow) var(--tt-ease-spring) both;
+  overflow: hidden;
+}
+
+@keyframes ttDrawerSlideIn {
+  from {
+    transform: translate3d(-100%, 0, 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.tt-drawer-header {
+  background: var(--tt-grad-brand);
+  color: #faf9f5;
+  padding: calc(var(--tt-safe-top) + 16px) 16px 18px;
+  border-bottom: 2px solid rgba(0, 220, 125, 0.32);
+  flex-shrink: 0;
+}
+
+.tt-drawer-scroll {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 14px 14px calc(var(--tt-safe-bottom) + 22px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tt-drawer-item {
+  width: 100%;
+  min-height: 54px;
+  padding: 11px 12px;
+  border-radius: var(--tt-radius-md);
+  background-color: #ffffff;
+  border: 1px solid rgba(30, 7, 52, 0.08);
+  box-shadow: 0 3px 10px rgba(30, 7, 52, 0.05);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  color: #1e0734;
+  transition: transform var(--tt-dur-fast) var(--tt-ease-spring),
+    border-color var(--tt-dur-fast) ease,
+    box-shadow var(--tt-dur-fast) ease;
+}
+
+.tt-drawer-item:active {
+  transform: scale(0.98);
+  border-color: var(--tt-emerald-500);
+}
+
+/* --------------------------------------------------------------------------
+   7. MOTOR UNIVERSAL DE PORTALES (CERO PANTALLAS VACÍAS EN CELULAR)
+   Todos los modales se montan directo en document.body con scrollTop = 0.
+   -------------------------------------------------------------------------- */
+.tt-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--tt-z-modal-backdrop);
+  background-color: rgba(11, 2, 22, 0.78);
+  backdrop-filter: blur(var(--tt-blur-md));
+  -webkit-backdrop-filter: blur(var(--tt-blur-md));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(var(--tt-safe-top) + 12px) 12px calc(var(--tt-safe-bottom) + 12px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  animation: ttFadeBackdrop var(--tt-dur-fast) ease both;
+}
+
+.tt-modal-backdrop.is-top-layer {
+  z-index: var(--tt-z-modal-top);
+}
+
+.tt-modal-backdrop.is-fullscreen {
+  padding: 0;
+  align-items: stretch;
+}
+
+.tt-modal-sheet {
+  position: relative;
+  z-index: var(--tt-z-modal);
+  width: 100%;
+  max-width: 560px;
+  max-height: calc(var(--tt-vh, 1vh) * 90 - var(--tt-safe-top) - var(--tt-safe-bottom));
+  background-color: var(--tt-bg-surface);
+  color: var(--tt-text-primary);
+  border: 1px solid var(--tt-border-medium);
+  border-radius: var(--tt-radius-xl);
+  box-shadow: var(--tt-shadow-lg);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: ttModalPop var(--tt-dur-base) var(--tt-ease-spring) both;
+}
+
+.tt-modal-sheet.is-wide {
+  max-width: 820px;
+}
+
+.tt-modal-backdrop.is-fullscreen .tt-modal-sheet {
+  max-width: 100%;
+  max-height: 100%;
+  height: 100%;
+  border-radius: 0;
+  border: none;
+}
+
+.tt-modal-head {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 16px 14px;
+  border-bottom: 1px solid var(--tt-border-subtle);
+  background-color: var(--tt-bg-surface);
+}
+
+.tt-modal-backdrop.is-fullscreen .tt-modal-head {
+  padding-top: calc(var(--tt-safe-top) + 14px);
+}
+
+.tt-modal-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px;
+}
+
+.tt-modal-backdrop.is-fullscreen .tt-modal-body {
+  padding-bottom: calc(var(--tt-safe-bottom) + 28px);
+}
+
+.tt-modal-close-btn {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  border-radius: var(--tt-radius-pill);
+  background-color: var(--tt-bg-pill);
+  border: 1px solid var(--tt-border-subtle);
+  color: var(--tt-text-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--tt-dur-fast) var(--tt-ease-spring),
+    background-color var(--tt-dur-fast) ease;
+}
+
+.tt-modal-close-btn:active {
+  transform: scale(0.9);
+  background-color: var(--tt-danger-soft);
+}
+
+@keyframes ttFadeBackdrop {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes ttModalPop {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   8. EFECTO SCROLL-REVEAL PROGRESIVO (ESTILO APPLE / CUERPO COMPLETO)
+   Se vincula a la variable --tt-reveal (0 -> 1) o IntersectionObserver.
+   -------------------------------------------------------------------------- */
+.tt-scroll-hero {
+  position: relative;
+  width: 100%;
+  border-radius: var(--tt-radius-xl);
+  overflow: hidden;
+  background-color: var(--tt-purple-950);
+  border: 1px solid var(--tt-border-medium);
+  box-shadow: var(--tt-shadow-md);
+}
+
+.tt-scroll-hero-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(calc(1.08 - var(--tt-reveal, 1) * 0.08));
+  transition: transform 180ms linear;
+  will-change: transform;
+}
+
+.tt-scroll-portrait-wrap {
+  position: relative;
+  overflow: hidden;
+  /* Revelación progresiva suave al bajar la pantalla */
+  clip-path: inset(calc((1 - var(--tt-reveal, 1)) * 26%) 0 0 0);
+  -webkit-clip-path: inset(calc((1 - var(--tt-reveal, 1)) * 26%) 0 0 0);
+  transform: translate3d(0, calc((1 - var(--tt-reveal, 1)) * 22px), 0)
+    scale(calc(0.95 + var(--tt-reveal, 1) * 0.05));
+  opacity: calc(0.35 + var(--tt-reveal, 1) * 0.65);
+  transition: transform 220ms var(--tt-ease-out), opacity 220ms ease;
+  will-change: transform, opacity, clip-path;
+}
+
+.tt-scroll-portrait-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  /* Fusión editorial suave en el borde inferior e izquierdo (cero cortes duros) */
+  -webkit-mask-image: linear-gradient(to top, transparent 0%, #000 18%, #000 100%);
+  mask-image: linear-gradient(to top, transparent 0%, #000 18%, #000 100%);
+}
+
+/* Revelación suave de tarjetas al entrar en pantalla */
+.tt-reveal-item {
+  opacity: 0;
+  transform: translate3d(0, 16px, 0);
+  transition: opacity 420ms var(--tt-ease-out), transform 420ms var(--tt-ease-out);
+}
+
+.tt-reveal-item.is-visible {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+
+html[data-tier='lite'] .tt-scroll-portrait-wrap,
+html[data-tier='lite'] .tt-reveal-item {
+  clip-path: none !important;
+  -webkit-clip-path: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+/* --------------------------------------------------------------------------
+   9. TARJETAS UNIFORMES, PODIO ORO/PLATA/BRONCE, BOTONES Y PÍLDORAS
+   -------------------------------------------------------------------------- */
+.tt-card {
+  background-color: var(--tt-bg-surface);
+  border: 1px solid var(--tt-border-subtle);
+  border-radius: var(--tt-radius-lg);
+  box-shadow: var(--tt-shadow-sm);
+  padding: 16px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color var(--tt-dur-fast) ease, transform var(--tt-dur-fast) var(--tt-ease-spring);
+}
+
+.tt-card-interactive:active {
+  transform: scale(0.985);
+}
+
+/* Tarjetas Metálicas de Podio Ranking (#1 Oro, #2 Plata, #3 Bronce) */
+.tt-podium-1 {
+  border: 1.5px solid var(--tt-podium-gold-border);
+  box-shadow: var(--tt-podium-gold-glow);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.14) 0%, var(--tt-bg-surface) 58%);
+}
+
+.tt-podium-2 {
+  border: 1.5px solid var(--tt-podium-silver-border);
+  box-shadow: var(--tt-podium-silver-glow);
+  background: linear-gradient(135deg, rgba(203, 213, 225, 0.12) 0%, var(--tt-bg-surface) 58%);
+}
+
+.tt-podium-3 {
+  border: 1.5px solid var(--tt-podium-bronze-border);
+  box-shadow: var(--tt-podium-bronze-glow);
+  background: linear-gradient(135deg, rgba(217, 119, 87, 0.13) 0%, var(--tt-bg-surface) 58%);
+}
+
+/* Insignias de Membresía (VIP Dorada vs. Estándar) */
+.tt-badge-vip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: var(--tt-radius-pill);
+  background: var(--tt-podium-gold-grad);
+  color: #1a0d00;
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  box-shadow: 0 2px 10px rgba(245, 158, 11, 0.42);
+}
+
+.tt-badge-standard {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: var(--tt-radius-pill);
+  background-color: rgba(250, 249, 245, 0.14);
+  border: 1px solid rgba(250, 249, 245, 0.28);
+  color: #faf9f5;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Botones Principales (Mínimo táctil 44px) */
+.tt-btn {
+  min-height: var(--tt-touch-min);
+  padding: 10px 18px;
+  border-radius: var(--tt-radius-pill);
+  font-weight: 800;
+  font-size: var(--tt-text-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  letter-spacing: 0.015em;
+  transition: transform var(--tt-dur-fast) var(--tt-ease-spring),
+    box-shadow var(--tt-dur-fast) ease,
+    opacity var(--tt-dur-fast) ease;
+  white-space: nowrap;
+}
+
+.tt-btn:active {
+  transform: scale(0.96);
+}
+
+.tt-btn-primary {
+  background: var(--tt-grad-mint);
+  color: var(--tt-text-on-emerald);
+  box-shadow: 0 8px 22px rgba(0, 220, 125, 0.32);
+}
+
+.tt-btn-gold {
+  background: var(--tt-podium-gold-grad);
+  color: var(--tt-text-on-gold);
+  box-shadow: 0 8px 22px rgba(245, 158, 11, 0.34);
+}
+
+.tt-btn-clay {
+  background: var(--tt-grad-clay);
+  color: #ffffff;
+  box-shadow: 0 8px 20px rgba(200, 90, 50, 0.32);
+}
+
+.tt-btn-ghost {
+  background-color: var(--tt-bg-pill);
+  border: 1px solid var(--tt-border-medium);
+  color: var(--tt-text-primary);
+}
+
+.tt-btn-danger {
+  background-color: var(--tt-danger-soft);
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  color: #fca5a5;
+}
+
+/* Botones Táctiles Gigantes para Marcador en Cancha (+1 Punto) */
+.tt-score-tap-btn {
+  width: 100%;
+  min-height: 62px;
+  padding: 12px 14px;
+  border-radius: var(--tt-radius-md);
+  background: var(--tt-grad-mint);
+  color: #120321;
+  font-weight: 900;
+  font-size: var(--tt-text-base);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  box-shadow: 0 8px 22px rgba(0, 220, 125, 0.32);
+  transition: transform 110ms var(--tt-ease-spring);
+}
+
+.tt-score-tap-btn:active {
+  transform: scale(0.94);
+}
+
+/* Inputs y Selectores Universales */
+.tt-input {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 14px;
+  border-radius: var(--tt-radius-sm);
+  background-color: var(--tt-bg-input);
+  border: 1px solid var(--tt-border-medium);
+  color: var(--tt-text-primary);
+  outline: none;
+  transition: border-color var(--tt-dur-fast) ease, box-shadow var(--tt-dur-fast) ease;
+}
+
+.tt-input:focus {
+  border-color: var(--tt-emerald-500);
+  box-shadow: 0 0 0 3px rgba(0, 220, 125, 0.18);
+}
+
+/* Carruseles Horizontales Táctiles con Scroll-Snap (Clubes, Videos, Filtros) */
+.tt-carousel {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 4px;
+}
+
+.tt-carousel > * {
+  scroll-snap-align: start;
+  flex-shrink: 0;
+}
+
+/* Píldoras de Filtro Limpias (Sin cortes en bordes) */
+.tt-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 2px 2px 6px;
+}
+
+.tt-filter-pill {
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: var(--tt-radius-pill);
+  background-color: var(--tt-bg-pill);
+  border: 1px solid var(--tt-border-subtle);
+  color: var(--tt-text-secondary);
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background-color var(--tt-dur-fast) ease, color var(--tt-dur-fast) ease,
+    border-color var(--tt-dur-fast) ease;
+}
+
+.tt-filter-pill.is-active {
+  background: var(--tt-grad-mint);
+  border-color: transparent;
+  color: #120321;
+  font-weight: 800;
+  box-shadow: 0 4px 14px rgba(0, 220, 125, 0.28);
+}
+
+/* --------------------------------------------------------------------------
+   10. CARNET DIGITAL 3D (SOCIO VIP DORADO vs. ESTÁNDAR PÚRPURA)
+   -------------------------------------------------------------------------- */
+.tt-card3d-scene {
+  perspective: 1100px;
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+}
+
+.tt-card3d-inner {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1.586 / 1; /* Proporción oficial tarjeta bancaria / credencial */
+  transform-style: preserve-3d;
+  transition: transform 640ms var(--tt-ease-spring);
+}
+
+.tt-card3d-inner.is-flipped {
+  transform: rotateY(180deg);
+}
+
+.tt-card3d-face {
+  position: absolute;
+  inset: 0;
+  border-radius: 20px;
+  overflow: hidden;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+}
+
+.tt-card3d-back {
+  transform: rotateY(180deg);
+}
+
+.tt-card3d-vip {
+  background: var(--tt-vip-card-grad);
+  border: 1.5px solid var(--tt-vip-card-border);
+  color: #1e1202;
+}
+
+.tt-card3d-standard {
+  background: var(--tt-std-card-grad);
+  border: 1.5px solid var(--tt-std-card-border);
+  color: #faf9f5;
+}
+
+/* --------------------------------------------------------------------------
+   11. ESCAPARATE TIENDA PRO SHOP ESTILO AMAZON (FONDO BLANCO PURO #FFFFFF)
+   -------------------------------------------------------------------------- */
+.tt-proshop-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.tt-proshop-card {
+  background-color: var(--tt-bg-surface);
+  border: 1px solid var(--tt-border-subtle);
+  border-radius: var(--tt-radius-lg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--tt-shadow-sm);
+  transition: transform var(--tt-dur-fast) var(--tt-ease-spring),
+    border-color var(--tt-dur-fast) ease;
+}
+
+.tt-proshop-card:active {
+  transform: scale(0.98);
+  border-color: var(--tt-emerald-500);
+}
+
+.tt-proshop-studio-box {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  background-color: #ffffff; /* Blanco puro estilo Amazon */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+  position: relative;
+  overflow: hidden;
+}
+
+.tt-proshop-studio-box img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* --------------------------------------------------------------------------
+   12. PULSO EN VIVO, SPLASH SCREEN Y TOASTS
+   -------------------------------------------------------------------------- */
+.tt-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--tt-emerald-500);
+  box-shadow: 0 0 0 0 rgba(0, 220, 125, 0.7);
+  animation: ttLivePulse 1.6s infinite;
+  flex-shrink: 0;
+}
+
+@keyframes ttLivePulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(0, 220, 125, 0.72);
+  }
+  70% {
+    box-shadow: 0 0 0 9px rgba(0, 220, 125, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(0, 220, 125, 0);
+  }
+}
+
+.tt-splash-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--tt-z-splash);
+  background-color: #140424;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  transition: opacity 420ms ease, transform 420ms var(--tt-ease-out);
+}
+
+.tt-splash-overlay.is-exiting {
+  opacity: 0;
+  transform: scale(1.04);
+  pointer-events: none;
+}
+
+.tt-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--tt-dock-height) + var(--tt-safe-bottom) + 18px);
+  transform: translateX(-50%);
+  z-index: var(--tt-z-toast);
+  max-width: min(92vw, 440px);
+  padding: 12px 18px;
+  border-radius: var(--tt-radius-pill);
+  background-color: #140424;
+  color: #faf9f5;
+  border: 1.5px solid var(--tt-emerald-500);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.55);
+  font-size: 0.84rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  animation: ttToastUp 260ms var(--tt-ease-spring) both;
+}
+
+@keyframes ttToastUp {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 16px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   13. ADAPTACIÓN DESKTOP (SECUNDARIA, AMPLIA Y PROPORCIONADA >= 768px)
+   -------------------------------------------------------------------------- */
+@media (min-width: 768px) {
+  .tt-proshop-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .tt-brand-logo-img {
+    width: 40px;
+    height: 40px;
+  }
+
+  .tt-brand-wordmark {
+    font-size: 1.42rem;
+  }
+
+  .tt-dock-inner {
+    max-width: 640px;
+  }
+
+  .tt-dock-img {
+    width: 28px;
+    height: 28px;
+  }
+
+  .tt-dock-label {
+    font-size: 0.74rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .tt-proshop-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
