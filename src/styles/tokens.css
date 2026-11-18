@@ -1,0 +1,300 @@
+/* ==========================================================================
+   TOTAL TENIS · SISTEMA MAESTRO DE TOKENS DE DISEÑO (ADN VISUAL ÚNICO)
+   Garantía "Cero Frankenstein": todos los 26 módulos consumen estas variables.
+   Compatibilidad Universal: iOS 12+ / Android 8+ (2018) hasta Flagships 120Hz (2026)
+   ========================================================================== */
+
+:root {
+  /* ------------------------------------------------------------------------
+     1. PALETA DE MARCA INMUTABLE (TOTAL TENIS)
+     ------------------------------------------------------------------------ */
+  --tt-purple-950: #120321;
+  --tt-purple-900: #1e0734; /* Púrpura Noche Base */
+  --tt-purple-850: #23083c; /* Superficie Elevada */
+  --tt-purple-800: #290c46; /* Tarjeta Estándar Oscura */
+  --tt-purple-700: #391460; /* Borde / Hover Oscuro */
+  --tt-purple-600: #4f2080;
+
+  --tt-emerald-500: #00dc7d; /* Verde Esmeralda Firma */
+  --tt-emerald-400: #1ae68a;
+  --tt-emerald-300: #6ef2b5; /* Menta Luminoso */
+  --tt-emerald-200: #7cf5c0;
+  --tt-emerald-600: #00b365;
+  --tt-emerald-700: #008a4d;
+  --tt-emerald-glow: rgba(0, 220, 125, 0.38);
+  --tt-emerald-soft: rgba(0, 220, 125, 0.14);
+
+  --tt-ivory-50: #ffffff;   /* Blanco Puro (Pro Shop Amazon & Píldoras) */
+  --tt-ivory-100: #faf9f5;  /* Marfil Editorial */
+  --tt-ivory-200: #f1efe7;
+  --tt-ivory-300: #e3dfd2;
+
+  /* Acentos del Nuevo Logotipo TOTAL TENIS */
+  --tt-amber-400: #fbbf24;
+  --tt-amber-500: #f59e0b;  /* Ámbar Dorado / VIP */
+  --tt-amber-600: #d97706;  /* Oro Campeón */
+  --tt-gold-metal: #d4af37;
+
+  --tt-clay-500: #d96b43;   /* Terracota Arcilla del Logo */
+  --tt-clay-600: #c85a32;   /* Polvo de Ladrillo */
+  --tt-clay-400: #e07a5f;   /* Arena Cálida */
+
+  /* Estados Semánticos */
+  --tt-danger: #ef4444;
+  --tt-danger-soft: rgba(239, 68, 68, 0.15);
+  --tt-warning: #f59e0b;
+  --tt-warning-soft: rgba(245, 158, 11, 0.16);
+  --tt-info: #38bdf8;
+  --tt-info-soft: rgba(56, 189, 248, 0.16);
+  --tt-success: #00dc7d;
+  --tt-success-soft: rgba(0, 220, 125, 0.15);
+
+  /* ------------------------------------------------------------------------
+     2. PODIO METÁLICO (#1 ORO, #2 PLATA, #3 BRONCE) Y DOBLE CARNET
+     ------------------------------------------------------------------------ */
+  --tt-podium-gold-border: rgba(245, 158, 11, 0.72);
+  --tt-podium-gold-glow: 0 0 24px rgba(245, 158, 11, 0.24);
+  --tt-podium-gold-grad: linear-gradient(135deg, #ffe082 0%, #f59e0b 48%, #b45309 100%);
+
+  --tt-podium-silver-border: rgba(203, 213, 225, 0.68);
+  --tt-podium-silver-glow: 0 0 20px rgba(203, 213, 225, 0.18);
+  --tt-podium-silver-grad: linear-gradient(135deg, #f8fafc 0%, #cbd5e1 52%, #64748b 100%);
+
+  --tt-podium-bronze-border: rgba(217, 119, 87, 0.68);
+  --tt-podium-bronze-glow: 0 0 20px rgba(217, 119, 87, 0.2);
+  --tt-podium-bronze-grad: linear-gradient(135deg, #f3bfa3 0%, #d97757 52%, #8c3f23 100%);
+
+  /* Carnet VIP Dorado Metálico vs. Carnet Estándar Púrpura */
+  --tt-vip-card-grad: linear-gradient(135deg, #2f1f04 0%, #6b490c 26%, #d4af37 54%, #fce38a 70%, #8a5e10 100%);
+  --tt-vip-card-border: rgba(252, 227, 138, 0.75);
+  --tt-std-card-grad: linear-gradient(135deg, #160428 0%, #290c46 52%, #3d1566 100%);
+  --tt-std-card-border: rgba(250, 249, 245, 0.22);
+
+  /* Degradados Firma */
+  --tt-grad-mint: linear-gradient(135deg, #00dc7d 0%, #1ae68a 52%, #7cf5c0 100%);
+  --tt-grad-brand: linear-gradient(135deg, #1e0734 0%, #2f0e52 60%, #160428 100%);
+  --tt-grad-clay: linear-gradient(135deg, #c85a32 0%, #d96b43 55%, #e07a5f 100%);
+  --tt-grad-gold: linear-gradient(135deg, #f59e0b 0%, #fbbf24 50%, #d97706 100%);
+
+  /* ------------------------------------------------------------------------
+     3. TOKENS SEMÁNTICOS · MODO OSCURO (POR DEFECTO)
+     ------------------------------------------------------------------------ */
+  --tt-bg-app: #1e0734;
+  --tt-bg-deep: #140424;
+  --tt-bg-surface: #270b42;
+  --tt-bg-surface-2: #311052;
+  --tt-bg-elevated: #38145d;
+  --tt-bg-glass: rgba(30, 7, 52, 0.84);
+  --tt-bg-glass-strong: rgba(20, 4, 36, 0.92);
+  --tt-bg-pill: rgba(250, 249, 245, 0.08);
+  --tt-bg-input: rgba(18, 3, 33, 0.72);
+
+  --tt-text-primary: #faf9f5;
+  --tt-text-secondary: rgba(250, 249, 245, 0.78);
+  --tt-text-muted: rgba(250, 249, 245, 0.56);
+  --tt-text-on-emerald: #120321;
+  --tt-text-on-gold: #1a0d00;
+  --tt-text-on-light: #1e0734;
+
+  --tt-border-subtle: rgba(250, 249, 245, 0.11);
+  --tt-border-medium: rgba(250, 249, 245, 0.2);
+  --tt-border-accent: rgba(0, 220, 125, 0.45);
+  --tt-border-gold: rgba(245, 158, 11, 0.52);
+
+  /* Cabecera Flotante & Dock */
+  --tt-header-pill-bg: #ffffff;
+  --tt-header-pill-text: #1e0734;
+  --tt-header-pill-shadow: 0 10px 28px rgba(10, 2, 18, 0.42);
+  --tt-dock-bg: rgba(20, 4, 36, 0.94);
+  --tt-dock-border: rgba(250, 249, 245, 0.12);
+
+  /* Sombras & Blur */
+  --tt-shadow-sm: 0 4px 12px rgba(9, 1, 18, 0.28);
+  --tt-shadow-md: 0 12px 30px rgba(9, 1, 18, 0.42);
+  --tt-shadow-lg: 0 22px 54px rgba(6, 1, 12, 0.62);
+  --tt-blur-sm: 12px;
+  --tt-blur-md: 20px;
+  --tt-blur-lg: 28px;
+
+  /* ------------------------------------------------------------------------
+     4. TIPOGRAFÍA FLUIDA (ESCALADO UNIVERSAL 320px -> 1440px)
+     ------------------------------------------------------------------------ */
+  --tt-font-display: 'Barlow Condensed', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --tt-font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+  --tt-text-xs: clamp(0.6875rem, 2.6vw, 0.75rem);     /* 11px -> 12px */
+  --tt-text-sm: clamp(0.78125rem, 3.1vw, 0.875rem);   /* 12.5px -> 14px */
+  --tt-text-base: clamp(0.875rem, 3.5vw, 0.96875rem); /* 14px -> 15.5px */
+  --tt-text-md: clamp(0.96875rem, 3.9vw, 1.09375rem); /* 15.5px -> 17.5px */
+  --tt-text-lg: clamp(1.125rem, 4.6vw, 1.375rem);     /* 18px -> 22px */
+  --tt-text-xl: clamp(1.375rem, 5.8vw, 1.75rem);      /* 22px -> 28px */
+  --tt-text-2xl: clamp(1.75rem, 7.2vw, 2.35rem);      /* 28px -> 37.6px */
+  --tt-text-hero: clamp(2.05rem, 8.6vw, 3rem);        /* 32.8px -> 48px */
+
+  /* ------------------------------------------------------------------------
+     5. ESPACIADO, RADIOS, ZONAS SEGURAS IPHONE Y CURVAS 120Hz
+     ------------------------------------------------------------------------ */
+  --tt-safe-top: env(safe-area-inset-top, 0px);
+  --tt-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --tt-safe-left: env(safe-area-inset-left, 0px);
+  --tt-safe-right: env(safe-area-inset-right, 0px);
+
+  --tt-vh: 1vh;
+  --tt-app-height: 100dvh;
+  --tt-page-pad: 14px;
+  --tt-container-max: 1120px;
+  --tt-header-height: 76px;
+  --tt-dock-height: 68px;
+  --tt-touch-min: 44px; /* Regla Apple/Google: área táctil mínima 44x44px */
+
+  --tt-radius-xs: 8px;
+  --tt-radius-sm: 12px;
+  --tt-radius-md: 18px;
+  --tt-radius-lg: 24px;
+  --tt-radius-xl: 30px;
+  --tt-radius-pill: 9999px;
+
+  /* Curvas físicas suaves estilo iOS / Apple 120Hz */
+  --tt-ease-spring: cubic-bezier(0.22, 1.24, 0.36, 1);
+  --tt-ease-smooth: cubic-bezier(0.22, 1, 0.36, 1);
+  --tt-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --tt-dur-fast: 160ms;
+  --tt-dur-base: 260ms;
+  --tt-dur-slow: 420ms;
+
+  /* ------------------------------------------------------------------------
+     6. ARQUITECTURA ESTRICTA DE CAPAS (Z-INDEX)
+     Garantía: ningún modal queda atrapado debajo de la cabecera ni del dock.
+     ------------------------------------------------------------------------ */
+  --tt-z-base: 1;
+  --tt-z-sticky: 30;
+  --tt-z-header: 60;
+  --tt-z-dock: 70;
+  --tt-z-drawer-backdrop: 900;
+  --tt-z-drawer: 910;
+  --tt-z-modal-backdrop: 1000;
+  --tt-z-modal: 1010;
+  --tt-z-modal-top: 1050;  /* Modales secundarios / Confirmaciones */
+  --tt-z-toast: 1200;
+  --tt-z-splash: 1500;
+}
+
+/* ==========================================================================
+   MODO CLARO EDITORIAL (MARFIL #FAF9F5 + PÚRPURA NOCHE + ESMERALDA)
+   ========================================================================== */
+html[data-theme='light'] {
+  --tt-bg-app: #faf9f5;
+  --tt-bg-deep: #f1efe7;
+  --tt-bg-surface: #ffffff;
+  --tt-bg-surface-2: #f4f2ea;
+  --tt-bg-elevated: #ffffff;
+  --tt-bg-glass: rgba(250, 249, 245, 0.88);
+  --tt-bg-glass-strong: rgba(255, 255, 255, 0.96);
+  --tt-bg-pill: rgba(30, 7, 52, 0.06);
+  --tt-bg-input: #f5f3ec;
+
+  --tt-text-primary: #1e0734;
+  --tt-text-secondary: rgba(30, 7, 52, 0.78);
+  --tt-text-muted: rgba(30, 7, 52, 0.56);
+
+  --tt-border-subtle: rgba(30, 7, 52, 0.1);
+  --tt-border-medium: rgba(30, 7, 52, 0.18);
+  --tt-border-accent: rgba(0, 179, 101, 0.45);
+  --tt-border-gold: rgba(217, 119, 6, 0.48);
+
+  --tt-header-pill-bg: #ffffff;
+  --tt-header-pill-text: #1e0734;
+  --tt-header-pill-shadow: 0 10px 28px rgba(30, 7, 52, 0.12);
+  --tt-dock-bg: rgba(255, 255, 255, 0.96);
+  --tt-dock-border: rgba(30, 7, 52, 0.1);
+
+  --tt-shadow-sm: 0 4px 12px rgba(30, 7, 52, 0.07);
+  --tt-shadow-md: 0 12px 28px rgba(30, 7, 52, 0.11);
+  --tt-shadow-lg: 0 22px 48px rgba(30, 7, 52, 0.16);
+}
+
+/* ==========================================================================
+   MODO SOL INTENSO EN CANCHA (ALTO CONTRASTE AL MEDIODÍA)
+   ========================================================================== */
+html[data-sunlight='true'] {
+  --tt-border-subtle: rgba(255, 255, 255, 0.32);
+  --tt-border-medium: rgba(255, 255, 255, 0.52);
+  --tt-text-secondary: rgba(255, 255, 255, 0.95);
+  --tt-text-muted: rgba(255, 255, 255, 0.82);
+}
+
+html[data-theme='light'][data-sunlight='true'] {
+  --tt-bg-app: #ffffff;
+  --tt-bg-surface: #ffffff;
+  --tt-border-subtle: rgba(30, 7, 52, 0.28);
+  --tt-border-medium: rgba(30, 7, 52, 0.48);
+  --tt-text-primary: #120321;
+  --tt-text-secondary: #1e0734;
+  --tt-text-muted: #391460;
+}
+
+/* ==========================================================================
+   PERFILES AUTOMÁTICOS DE PANTALLA (320px COMPACTO -> XL -> DESKTOP)
+   ========================================================================== */
+html[data-screen='compact'] {
+  --tt-page-pad: 10px;
+  --tt-header-height: 68px;
+  --tt-dock-height: 64px;
+  --tt-radius-md: 15px;
+  --tt-radius-lg: 20px;
+}
+
+html[data-screen='large'] {
+  --tt-page-pad: 16px;
+  --tt-header-height: 78px;
+  --tt-dock-height: 70px;
+}
+
+html[data-screen='desktop'] {
+  --tt-page-pad: 24px;
+  --tt-header-height: 84px;
+  --tt-dock-height: 72px;
+}
+
+/* ==========================================================================
+   MOTOR ADAPTATIVO POR GAMA DE CELULAR (CERO LAG EN EQUIPOS 2018-2020)
+   Desactiva blurs GPU pesados y sombras multicapa cuando se detecta <= 3GB RAM.
+   ========================================================================== */
+html[data-tier='lite'] {
+  --tt-blur-sm: 0px;
+  --tt-blur-md: 0px;
+  --tt-blur-lg: 0px;
+  --tt-bg-glass: #1e0734;
+  --tt-bg-glass-strong: #140424;
+  --tt-dock-bg: #140424;
+  --tt-shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.25);
+  --tt-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.32);
+  --tt-shadow-lg: 0 8px 20px rgba(0, 0, 0, 0.42);
+  --tt-dur-fast: 100ms;
+  --tt-dur-base: 150ms;
+  --tt-dur-slow: 220ms;
+}
+
+html[data-theme='light'][data-tier='lite'] {
+  --tt-bg-glass: #faf9f5;
+  --tt-bg-glass-strong: #ffffff;
+  --tt-dock-bg: #ffffff;
+}
+
+/* ==========================================================================
+   BLINDAJE PERMANENTE DE CONTRASTE PARA SUITE MAESTRA ADMIN
+   Siempre legible en Púrpura Noche + Marfil + Esmeralda incluso en Modo Claro.
+   ========================================================================== */
+.tt-admin-force-dark {
+  --tt-bg-app: #140424;
+  --tt-bg-surface: #1e0734;
+  --tt-bg-surface-2: #2a0d48;
+  --tt-bg-input: #11031e;
+  --tt-text-primary: #faf9f5;
+  --tt-text-secondary: rgba(250, 249, 245, 0.84);
+  --tt-text-muted: rgba(250, 249, 245, 0.62);
+  --tt-border-subtle: rgba(250, 249, 245, 0.16);
+  --tt-border-medium: rgba(0, 220, 125, 0.36);
+  background-color: #140424 !important;
+  color: #faf9f5 !important;
+}
