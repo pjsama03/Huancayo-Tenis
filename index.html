@@ -1,24 +1,155 @@
-<!DOCTYPE html>
-<html lang="es">
+<!doctype html>
+<html lang="es" data-theme="dark" data-tier="ultra" data-screen="standard" data-sunlight="false">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <title>MatchPoint - Tenis Huancayo</title>
 
-    <!-- Tailwind CSS (Restaura todo el diseño oscuro, tarjetas y estilos) -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inmersión nativa de borde a borde (iPhone 7/8/X hasta Pro Max 2026 y Android 8+) -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
 
-    <!-- Configuración para iPhone / iOS -->
+    <!-- Identidad Oficial TOTAL TENIS -->
+    <title>TOTAL TENIS · Circuito Oficial de Competencia</title>
+    <meta
+      name="description"
+      content="TOTAL TENIS: Ranking oficial por desempeño, retos en cancha, torneos, sedes aliadas, coaches certificados y Pro Shop."
+    />
+
+    <!-- Modo App Nativa iOS & Android (PWA) -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Tenis HYO" />
-    <link rel="apple-touch-icon" href="/icon.png" />
+    <meta name="apple-mobile-web-app-title" content="TOTAL TENIS" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="theme-color" content="#1E0734" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#FAF9F5" media="(prefers-color-scheme: light)" />
 
-    <!-- Configuración para Android / PWA -->
-    <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#141414" />
+    <!-- Ícono Oficial TOTAL TENIS -->
+    <link rel="icon" type="image/png" href="/assets/logo-total-tenis.png" />
+    <link rel="apple-touch-icon" href="/assets/logo-total-tenis.png" />
+
+    <!-- Precarga de tipografías editoriales deportivas (Cero font-mono) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;0,900;1,700;1,800;1,900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Calibrador Universal Pre-Render (Cero parpadeos, Detección de Gama 2018-2026 y Altura Real) -->
+    <script>
+      (function () {
+        var root = document.documentElement;
+
+        // 1. Restaurar tema guardado (Oscuro por defecto)
+        try {
+          var savedTheme = localStorage.getItem('tt_theme') || localStorage.getItem('mp_theme');
+          if (savedTheme === 'light' || savedTheme === 'dark') {
+            root.setAttribute('data-theme', savedTheme);
+          }
+          var savedSunlight = localStorage.getItem('tt_sunlight');
+          if (savedSunlight === 'true') {
+            root.setAttribute('data-sunlight', 'true');
+          }
+        } catch (e) {}
+
+        // 2. Motor de Rendimiento Adaptativo por Gama de Celular (2018-2026)
+        try {
+          var forcedQuality = localStorage.getItem('tt_quality_mode'); // 'auto' | 'ultra' | 'lite'
+          var detectedTier = 'balanced';
+          if (forcedQuality === 'ultra' || forcedQuality === 'lite') {
+            detectedTier = forcedQuality;
+          } else {
+            var ram = navigator.deviceMemory || 4;
+            var cores = navigator.hardwareConcurrency || 4;
+            var reducedMotion =
+              window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            var dpr = window.devicePixelRatio || 1;
+
+            if (reducedMotion || ram <= 3 || cores <= 4) {
+              detectedTier = 'lite'; // Modo Cero Lag (Equipos 2018-2020 / 2-3 GB RAM)
+            } else if (ram >= 6 || (cores >= 6 && dpr >= 2.5)) {
+              detectedTier = 'ultra'; // Modo 120Hz Retina / ProMotion / Flagships
+            } else {
+              detectedTier = 'balanced';
+            }
+          }
+          root.setAttribute('data-tier', detectedTier);
+        } catch (e) {
+          root.setAttribute('data-tier', 'balanced');
+        }
+
+        // 3. Calibración de Pantalla Real (Compacto 320px / Estándar / XL / Desktop) y Teclado Virtual
+        function syncViewportMetrics() {
+          var vv = window.visualViewport;
+          var width = vv ? vv.width : window.innerWidth;
+          var height = vv ? vv.height : window.innerHeight;
+
+          // Unidad exacta de altura útil (resuelve barras de Safari, Chrome y navegadores de WhatsApp/IG)
+          root.style.setProperty('--tt-vh', (height * 0.01).toFixed(3) + 'px');
+          root.style.setProperty('--tt-vw', (width * 0.01).toFixed(3) + 'px');
+          root.style.setProperty('--tt-app-height', Math.round(height) + 'px');
+
+          // Perfil de proporción automática
+          var screenProfile = 'standard';
+          if (width <= 370) {
+            screenProfile = 'compact';
+          } else if (width >= 768) {
+            screenProfile = 'desktop';
+          } else if (width >= 416) {
+            screenProfile = 'large';
+          }
+          root.setAttribute('data-screen', screenProfile);
+
+          // Detección de teclado virtual abierto para anclar cabeceras sin deformar el marco
+          var keyboardOpen = window.innerHeight - height > 140;
+          root.setAttribute('data-keyboard', keyboardOpen ? 'open' : 'closed');
+        }
+
+        syncViewportMetrics();
+        window.addEventListener('resize', syncViewportMetrics, { passive: true });
+        window.addEventListener('orientationchange', function () {
+          setTimeout(syncViewportMetrics, 120);
+        });
+        if (window.visualViewport) {
+          window.visualViewport.addEventListener('resize', syncViewportMetrics, { passive: true });
+        }
+
+        // 4. Sincronizar color de barra de estado del celular con el tema actual
+        function syncThemeMeta() {
+          var isLight = root.getAttribute('data-theme') === 'light';
+          var color = isLight ? '#FAF9F5' : '#1E0734';
+          var metas = document.querySelectorAll('meta[name="theme-color"]');
+          for (var i = 0; i < metas.length; i++) {
+            metas[i].setAttribute('content', color);
+          }
+        }
+        syncThemeMeta();
+        window.__TT_SYNC_THEME_META__ = syncThemeMeta;
+        window.__TT_SYNC_VIEWPORT__ = syncViewportMetrics;
+      })();
+    </script>
+
+    <!-- Fondo base instantáneo anti-destello blanco al abrir la app -->
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background-color: #1e0734;
+        color: #faf9f5;
+        overscroll-behavior-y: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      html[data-theme='light'],
+      html[data-theme='light'] body {
+        background-color: #faf9f5;
+        color: #1e0734;
+      }
+    </style>
   </head>
-  <body class="bg-[#141414] text-[#F2EFEB] select-none antialiased">
+  <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
