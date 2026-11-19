@@ -1,17 +1,27 @@
 {
-  "short_name": "Tenis HYO",
-  "name": "MatchPoint - Tenis Huancayo",
+  "name": "TOTAL TENIS · Circuito Oficial",
+  "short_name": "TOTAL TENIS",
+  "description": "Ranking oficial, retos en cancha, torneos, sedes y entrenadores en TOTAL TENIS.",
+  "lang": "es-PE",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1E0734",
+  "theme_color": "#1E0734",
+  "categories": ["sports", "lifestyle"],
   "icons": [
     {
-      "src": "/icon.png",
+      "src": "/assets/logo-total-tenis.png",
+      "sizes": "192x192",
       "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/assets/logo-total-tenis.png",
       "sizes": "512x512",
+      "type": "image/png",
       "purpose": "any maskable"
     }
-  ],
-  "start_url": "/",
-  "background_color": "#141414",
-  "theme_color": "#1C1B1A",
-  "display": "standalone",
-  "orientation": "portrait"
+  ]
 }
