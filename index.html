@@ -1,153 +1,94 @@
-<!doctype html>
-<html lang="es" data-theme="dark" data-tier="ultra" data-screen="standard" data-sunlight="false">
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
-
-    <!-- Inmersión nativa de borde a borde (iPhone 7/8/X hasta Pro Max 2026 y Android 8+) -->
+    <!-- Inmersión nativa de borde a borde en iPhone (Isla Dinámica + barra gestual) y Android -->
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
 
-    <!-- Identidad Oficial TOTAL TENIS -->
-    <title>TOTAL TENIS · Circuito Oficial de Competencia</title>
+    <!-- Identidad Oficial TOTAL TENIS (Editable en 1 línea) -->
+    <title>TOTAL TENIS · Circuito Oficial</title>
     <meta
       name="description"
-      content="TOTAL TENIS: Ranking oficial por desempeño, retos en cancha, torneos, sedes aliadas, coaches certificados y Pro Shop."
+      content="Ranking oficial, retos en cancha, torneos, sedes con clima en vivo y ecosistema de entrenadores en TOTAL TENIS."
     />
 
-    <!-- Modo App Nativa iOS & Android (PWA) -->
+    <!-- Color de barra del sistema (se sincroniza dinámicamente entre Oscuro y Claro) -->
+    <meta name="theme-color" content="#1E0734" />
+    <meta name="color-scheme" content="dark light" />
+
+    <!-- Metadatos PWA para instalación en iPhone (Safari -> Agregar a pantalla de inicio) -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="TOTAL TENIS" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="format-detection" content="telephone=no" />
-    <meta name="theme-color" content="#1E0734" media="(prefers-color-scheme: dark)" />
-    <meta name="theme-color" content="#FAF9F5" media="(prefers-color-scheme: light)" />
 
-    <!-- Ícono Oficial TOTAL TENIS -->
+    <!-- Ícono oficial y Manifiesto PWA -->
+    <link rel="manifest" href="/manifest.json" />
     <link rel="icon" type="image/png" href="/assets/logo-total-tenis.png" />
     <link rel="apple-touch-icon" href="/assets/logo-total-tenis.png" />
 
-    <!-- Precarga de tipografías editoriales deportivas (Cero font-mono) -->
+    <!-- Tipografías Oficiales (Antonio condensada + Outfit Black + Plus Jakarta Sans) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;0,900;1,700;1,800;1,900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Antonio:wght@700&family=Outfit:wght@700;800;900&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap"
       rel="stylesheet"
     />
 
-    <!-- Calibrador Universal Pre-Render (Cero parpadeos, Detección de Gama 2018-2026 y Altura Real) -->
-    <script>
-      (function () {
-        var root = document.documentElement;
-
-        // 1. Restaurar tema guardado (Oscuro por defecto)
-        try {
-          var savedTheme = localStorage.getItem('tt_theme') || localStorage.getItem('mp_theme');
-          if (savedTheme === 'light' || savedTheme === 'dark') {
-            root.setAttribute('data-theme', savedTheme);
-          }
-          var savedSunlight = localStorage.getItem('tt_sunlight');
-          if (savedSunlight === 'true') {
-            root.setAttribute('data-sunlight', 'true');
-          }
-        } catch (e) {}
-
-        // 2. Motor de Rendimiento Adaptativo por Gama de Celular (2018-2026)
-        try {
-          var forcedQuality = localStorage.getItem('tt_quality_mode'); // 'auto' | 'ultra' | 'lite'
-          var detectedTier = 'balanced';
-          if (forcedQuality === 'ultra' || forcedQuality === 'lite') {
-            detectedTier = forcedQuality;
-          } else {
-            var ram = navigator.deviceMemory || 4;
-            var cores = navigator.hardwareConcurrency || 4;
-            var reducedMotion =
-              window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-            var dpr = window.devicePixelRatio || 1;
-
-            if (reducedMotion || ram <= 3 || cores <= 4) {
-              detectedTier = 'lite'; // Modo Cero Lag (Equipos 2018-2020 / 2-3 GB RAM)
-            } else if (ram >= 6 || (cores >= 6 && dpr >= 2.5)) {
-              detectedTier = 'ultra'; // Modo 120Hz Retina / ProMotion / Flagships
-            } else {
-              detectedTier = 'balanced';
-            }
-          }
-          root.setAttribute('data-tier', detectedTier);
-        } catch (e) {
-          root.setAttribute('data-tier', 'balanced');
-        }
-
-        // 3. Calibración de Pantalla Real (Compacto 320px / Estándar / XL / Desktop) y Teclado Virtual
-        function syncViewportMetrics() {
-          var vv = window.visualViewport;
-          var width = vv ? vv.width : window.innerWidth;
-          var height = vv ? vv.height : window.innerHeight;
-
-          // Unidad exacta de altura útil (resuelve barras de Safari, Chrome y navegadores de WhatsApp/IG)
-          root.style.setProperty('--tt-vh', (height * 0.01).toFixed(3) + 'px');
-          root.style.setProperty('--tt-vw', (width * 0.01).toFixed(3) + 'px');
-          root.style.setProperty('--tt-app-height', Math.round(height) + 'px');
-
-          // Perfil de proporción automática
-          var screenProfile = 'standard';
-          if (width <= 370) {
-            screenProfile = 'compact';
-          } else if (width >= 768) {
-            screenProfile = 'desktop';
-          } else if (width >= 416) {
-            screenProfile = 'large';
-          }
-          root.setAttribute('data-screen', screenProfile);
-
-          // Detección de teclado virtual abierto para anclar cabeceras sin deformar el marco
-          var keyboardOpen = window.innerHeight - height > 140;
-          root.setAttribute('data-keyboard', keyboardOpen ? 'open' : 'closed');
-        }
-
-        syncViewportMetrics();
-        window.addEventListener('resize', syncViewportMetrics, { passive: true });
-        window.addEventListener('orientationchange', function () {
-          setTimeout(syncViewportMetrics, 120);
-        });
-        if (window.visualViewport) {
-          window.visualViewport.addEventListener('resize', syncViewportMetrics, { passive: true });
-        }
-
-        // 4. Sincronizar color de barra de estado del celular con el tema actual
-        function syncThemeMeta() {
-          var isLight = root.getAttribute('data-theme') === 'light';
-          var color = isLight ? '#FAF9F5' : '#1E0734';
-          var metas = document.querySelectorAll('meta[name="theme-color"]');
-          for (var i = 0; i < metas.length; i++) {
-            metas[i].setAttribute('content', color);
-          }
-        }
-        syncThemeMeta();
-        window.__TT_SYNC_THEME_META__ = syncThemeMeta;
-        window.__TT_SYNC_VIEWPORT__ = syncViewportMetrics;
-      })();
-    </script>
-
-    <!-- Fondo base instantáneo anti-destello blanco al abrir la app -->
+    <!-- CSS Crítico de Arranque: elimina la franja negra inferior y evita saltos antes de React -->
     <style>
+      :root {
+        --tt-font-display: 'Antonio', 'Outfit', system-ui, -apple-system, sans-serif;
+        --tt-font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+        --tt-safe-top: env(safe-area-inset-top, 0px);
+        --tt-safe-bottom: env(safe-area-inset-bottom, 0px);
+        --tt-safe-left: env(safe-area-inset-left, 0px);
+        --tt-safe-right: env(safe-area-inset-right, 0px);
+      }
+
       html,
-      body {
+      body,
+      #root {
         margin: 0;
         padding: 0;
-        background-color: #1e0734;
-        color: #faf9f5;
-        overscroll-behavior-y: none;
+        width: 100%;
+        height: 100%;
+        min-height: 100dvh;
+        overflow: hidden;
+        font-family: var(--tt-font-sans);
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
         -webkit-tap-highlight-color: transparent;
+        overscroll-behavior: none;
+        background-color: #1E0734;
+        color: #FAF9F5;
       }
+
       html[data-theme='light'],
-      html[data-theme='light'] body {
-        background-color: #faf9f5;
-        color: #1e0734;
+      html[data-theme='light'] body,
+      html[data-theme='light'] #root {
+        background-color: #FAF9F5;
+        color: #1E0734;
       }
     </style>
+
+    <!-- Escudo Anti-Destello: aplica el tema guardado ANTES de pintar el primer píxel -->
+    <script>
+      (function () {
+        try {
+          var saved = window.localStorage.getItem('tt_theme_pref_v2');
+          var theme = saved === 'light' ? 'light' : 'dark';
+          document.documentElement.setAttribute('data-theme', theme);
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) {
+            meta.setAttribute('content', theme === 'light' ? '#FAF9F5' : '#1E0734');
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
