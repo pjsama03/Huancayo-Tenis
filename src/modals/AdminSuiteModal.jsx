@@ -12,10 +12,42 @@ import {
   INITIAL_CLUBS,
   getCategoryByPoints,
 } from '../data/playersAndClubsData';
-import {
-  buildWhatsAppLink,
-  closeSeasonSnapshot,
-} from '../utils/tenisEngine';
+import * as TenisEngine from '../utils/tenisEngine';
+
+const { buildWhatsAppLink } = TenisEngine;
+
+function closeSeasonSnapshot(seasonSnapshots, players = []) {
+  if (typeof TenisEngine.closeSeasonSnapshot === 'function') {
+    return TenisEngine.closeSeasonSnapshot(seasonSnapshots, players);
+  }
+  const year = seasonSnapshots?.year || new Date().getFullYear();
+  const current = Number(seasonSnapshots?.currentSeason) || 1;
+  const frozenScores = {};
+  (players || []).forEach((p) => {
+    frozenScores[p.id] = Number(p.points) || 0;
+  });
+
+  const existing = Array.isArray(seasonSnapshots?.seasons)
+    ? seasonSnapshots.seasons
+    : [1, 2, 3, 4].map((n) => ({
+        number: n,
+        label: `T${n}`,
+        locked: false,
+        scores: {},
+      }));
+
+  const updatedSeasons = existing.map((s) =>
+    s.number === current
+      ? { ...s, locked: true, closedAt: new Date().toISOString(), scores: frozenScores }
+      : s
+  );
+
+  return {
+    year: current >= 4 ? year + 1 : year,
+    currentSeason: current >= 4 ? 1 : current + 1,
+    seasons: updatedSeasons,
+  };
+}
 
 /* ==========================================================================
    ZONA DE EDICIÓN RÁPIDA (PIN MAESTRO, CAPACIDAD 10,000 Y UMBRAL DE MEMORIA)
