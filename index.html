@@ -30,6 +30,21 @@
     <link rel="icon" type="image/png" href="/assets/logo-total-tenis.png" />
     <link rel="apple-touch-icon" href="/assets/logo-total-tenis.png" />
 
+  <!-- OneSignal Web Push SDK v16 (TOTAL TENIS) -->
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+  <script>
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    OneSignalDeferred.push(async function(OneSignal) {
+      await OneSignal.init({
+        appId: "48f44cfa-0872-4a85-aded-bb1e235daea7",
+        serviceWorkerParam: { scope: "/" },
+        serviceWorkerPath: "/OneSignalSDKWorker.js",
+        allowLocalhostAsSecureOrigin: true
+      });
+    });
+  </script>
+    <link rel="apple-touch-icon" href="/assets/logo-total-tenis.png" />
+
     <!-- Tipografías Oficiales (Antonio condensada + Outfit Black + Plus Jakarta Sans) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
