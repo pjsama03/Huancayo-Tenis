@@ -1,7 +1,7 @@
 /* ==========================================================================
    TOTAL TENIS · SISTEMA MAESTRO DE TOKENS DE DISEÑO (ADN VISUAL ÚNICO)
-   Garantía "Cero Frankenstein": todos los 26 módulos consumen estas variables.
-   Compatibilidad Universal: iOS 12+ / Android 8+ (2018) hasta Flagships 120Hz (2026)
+   Modo Oscuro (Púrpura Noche) + Modo Claro Editorial Real (Marfil #FAF9F5)
+   Compatibilidad Universal: iOS 12+ / Android 8+ hasta Flagships 120Hz
    ========================================================================== */
 
 :root {
@@ -21,21 +21,22 @@
   --tt-emerald-200: #7cf5c0;
   --tt-emerald-600: #00b365;
   --tt-emerald-700: #008a4d;
+  --tt-emerald-text: #00dc7d;
   --tt-emerald-glow: rgba(0, 220, 125, 0.38);
   --tt-emerald-soft: rgba(0, 220, 125, 0.14);
 
-  --tt-ivory-50: #ffffff;   /* Blanco Puro (Pro Shop Amazon & Píldoras) */
+  --tt-ivory-50: #ffffff;   /* Blanco Puro */
   --tt-ivory-100: #faf9f5;  /* Marfil Editorial */
   --tt-ivory-200: #f1efe7;
   --tt-ivory-300: #e3dfd2;
 
-  /* Acentos del Nuevo Logotipo TOTAL TENIS */
+  /* Acentos Oficiales */
   --tt-amber-400: #fbbf24;
   --tt-amber-500: #f59e0b;  /* Ámbar Dorado / VIP */
   --tt-amber-600: #d97706;  /* Oro Campeón */
   --tt-gold-metal: #d4af37;
 
-  --tt-clay-500: #d96b43;   /* Terracota Arcilla del Logo */
+  --tt-clay-500: #d96b43;   /* Terracota Arcilla */
   --tt-clay-600: #c85a32;   /* Polvo de Ladrillo */
   --tt-clay-400: #e07a5f;   /* Arena Cálida */
 
@@ -78,27 +79,33 @@
 
   /* ------------------------------------------------------------------------
      3. TOKENS SEMÁNTICOS · MODO OSCURO (POR DEFECTO)
+     (Incluye alias cortos --tt-bg / --tt-surface / --tt-text / --tt-border)
      ------------------------------------------------------------------------ */
   --tt-bg-app: #1e0734;
+  --tt-bg: #1e0734;
   --tt-bg-deep: #140424;
   --tt-bg-surface: #270b42;
+  --tt-surface: #270b42;
   --tt-bg-surface-2: #311052;
+  --tt-surface-2: #311052;
   --tt-bg-elevated: #38145d;
-  --tt-bg-glass: rgba(30, 7, 52, 0.84);
-  --tt-bg-glass-strong: rgba(20, 4, 36, 0.92);
+  --tt-bg-glass: rgba(30, 7, 52, 0.86);
+  --tt-bg-glass-strong: rgba(20, 4, 36, 0.94);
   --tt-bg-pill: rgba(250, 249, 245, 0.08);
   --tt-bg-input: rgba(18, 3, 33, 0.72);
 
   --tt-text-primary: #faf9f5;
-  --tt-text-secondary: rgba(250, 249, 245, 0.78);
-  --tt-text-muted: rgba(250, 249, 245, 0.56);
+  --tt-text: #faf9f5;
+  --tt-text-secondary: rgba(250, 249, 245, 0.82);
+  --tt-text-muted: rgba(250, 249, 245, 0.62);
   --tt-text-on-emerald: #120321;
   --tt-text-on-gold: #1a0d00;
   --tt-text-on-light: #1e0734;
 
-  --tt-border-subtle: rgba(250, 249, 245, 0.11);
-  --tt-border-medium: rgba(250, 249, 245, 0.2);
-  --tt-border-accent: rgba(0, 220, 125, 0.45);
+  --tt-border-subtle: rgba(250, 249, 245, 0.12);
+  --tt-border: rgba(250, 249, 245, 0.14);
+  --tt-border-medium: rgba(250, 249, 245, 0.22);
+  --tt-border-accent: rgba(0, 220, 125, 0.48);
   --tt-border-gold: rgba(245, 158, 11, 0.52);
 
   /* Cabecera Flotante & Dock */
@@ -122,14 +129,14 @@
   --tt-font-display: 'Barlow Condensed', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --tt-font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 
-  --tt-text-xs: clamp(0.6875rem, 2.6vw, 0.75rem);     /* 11px -> 12px */
-  --tt-text-sm: clamp(0.78125rem, 3.1vw, 0.875rem);   /* 12.5px -> 14px */
-  --tt-text-base: clamp(0.875rem, 3.5vw, 0.96875rem); /* 14px -> 15.5px */
-  --tt-text-md: clamp(0.96875rem, 3.9vw, 1.09375rem); /* 15.5px -> 17.5px */
-  --tt-text-lg: clamp(1.125rem, 4.6vw, 1.375rem);     /* 18px -> 22px */
-  --tt-text-xl: clamp(1.375rem, 5.8vw, 1.75rem);      /* 22px -> 28px */
-  --tt-text-2xl: clamp(1.75rem, 7.2vw, 2.35rem);      /* 28px -> 37.6px */
-  --tt-text-hero: clamp(2.05rem, 8.6vw, 3rem);        /* 32.8px -> 48px */
+  --tt-text-xs: clamp(0.6875rem, 2.6vw, 0.75rem);
+  --tt-text-sm: clamp(0.78125rem, 3.1vw, 0.875rem);
+  --tt-text-base: clamp(0.875rem, 3.5vw, 0.96875rem);
+  --tt-text-md: clamp(0.96875rem, 3.9vw, 1.09375rem);
+  --tt-text-lg: clamp(1.125rem, 4.6vw, 1.375rem);
+  --tt-text-xl: clamp(1.375rem, 5.8vw, 1.75rem);
+  --tt-text-2xl: clamp(1.75rem, 7.2vw, 2.35rem);
+  --tt-text-hero: clamp(2.05rem, 8.6vw, 3rem);
 
   /* ------------------------------------------------------------------------
      5. ESPACIADO, RADIOS, ZONAS SEGURAS IPHONE Y CURVAS 120Hz
@@ -145,7 +152,7 @@
   --tt-container-max: 1120px;
   --tt-header-height: 76px;
   --tt-dock-height: 68px;
-  --tt-touch-min: 44px; /* Regla Apple/Google: área táctil mínima 44x44px */
+  --tt-touch-min: 44px;
 
   --tt-radius-xs: 8px;
   --tt-radius-sm: 12px;
@@ -154,7 +161,6 @@
   --tt-radius-xl: 30px;
   --tt-radius-pill: 9999px;
 
-  /* Curvas físicas suaves estilo iOS / Apple 120Hz */
   --tt-ease-spring: cubic-bezier(0.22, 1.24, 0.36, 1);
   --tt-ease-smooth: cubic-bezier(0.22, 1, 0.36, 1);
   --tt-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
@@ -164,7 +170,6 @@
 
   /* ------------------------------------------------------------------------
      6. ARQUITECTURA ESTRICTA DE CAPAS (Z-INDEX)
-     Garantía: ningún modal queda atrapado debajo de la cabecera ni del dock.
      ------------------------------------------------------------------------ */
   --tt-z-base: 1;
   --tt-z-sticky: 30;
@@ -174,63 +179,49 @@
   --tt-z-drawer: 910;
   --tt-z-modal-backdrop: 1000;
   --tt-z-modal: 1010;
-  --tt-z-modal-top: 1050;  /* Modales secundarios / Confirmaciones */
+  --tt-z-modal-top: 1050;
   --tt-z-toast: 1200;
   --tt-z-splash: 1500;
 }
 
 /* ==========================================================================
-   MODO CLARO EDITORIAL (MARFIL #FAF9F5 + PÚRPURA NOCHE + ESMERALDA)
+   MODO CLARO REAL (ALTO CONTRASTE EDITORIAL SOBRE MARFIL #FAF9F5 Y #FFFFFF)
    ========================================================================== */
 html[data-theme='light'] {
   --tt-bg-app: #faf9f5;
-  --tt-bg-deep: #f1efe7;
+  --tt-bg: #faf9f5;
+  --tt-bg-deep: #efece3;
   --tt-bg-surface: #ffffff;
-  --tt-bg-surface-2: #f4f2ea;
+  --tt-surface: #ffffff;
+  --tt-bg-surface-2: #f3f0e8;
+  --tt-surface-2: #f3f0e8;
   --tt-bg-elevated: #ffffff;
-  --tt-bg-glass: rgba(250, 249, 245, 0.88);
-  --tt-bg-glass-strong: rgba(255, 255, 255, 0.96);
-  --tt-bg-pill: rgba(30, 7, 52, 0.06);
-  --tt-bg-input: #f5f3ec;
+  --tt-bg-glass: rgba(250, 249, 245, 0.94);
+  --tt-bg-glass-strong: rgba(255, 255, 255, 0.98);
+  --tt-bg-pill: rgba(30, 7, 52, 0.07);
+  --tt-bg-input: #f7f5ef;
 
   --tt-text-primary: #1e0734;
-  --tt-text-secondary: rgba(30, 7, 52, 0.78);
-  --tt-text-muted: rgba(30, 7, 52, 0.56);
+  --tt-text: #1e0734;
+  --tt-text-secondary: #371e52;
+  --tt-text-muted: #5d4773;
+  --tt-emerald-text: #007a44;
 
-  --tt-border-subtle: rgba(30, 7, 52, 0.1);
-  --tt-border-medium: rgba(30, 7, 52, 0.18);
-  --tt-border-accent: rgba(0, 179, 101, 0.45);
-  --tt-border-gold: rgba(217, 119, 6, 0.48);
+  --tt-border-subtle: rgba(30, 7, 52, 0.13);
+  --tt-border: rgba(30, 7, 52, 0.15);
+  --tt-border-medium: rgba(30, 7, 52, 0.24);
+  --tt-border-accent: rgba(0, 148, 82, 0.5);
+  --tt-border-gold: rgba(180, 83, 9, 0.48);
 
   --tt-header-pill-bg: #ffffff;
   --tt-header-pill-text: #1e0734;
-  --tt-header-pill-shadow: 0 10px 28px rgba(30, 7, 52, 0.12);
-  --tt-dock-bg: rgba(255, 255, 255, 0.96);
-  --tt-dock-border: rgba(30, 7, 52, 0.1);
+  --tt-header-pill-shadow: 0 8px 24px rgba(30, 7, 52, 0.12);
+  --tt-dock-bg: rgba(255, 255, 255, 0.97);
+  --tt-dock-border: rgba(30, 7, 52, 0.12);
 
-  --tt-shadow-sm: 0 4px 12px rgba(30, 7, 52, 0.07);
-  --tt-shadow-md: 0 12px 28px rgba(30, 7, 52, 0.11);
-  --tt-shadow-lg: 0 22px 48px rgba(30, 7, 52, 0.16);
-}
-
-/* ==========================================================================
-   MODO SOL INTENSO EN CANCHA (ALTO CONTRASTE AL MEDIODÍA)
-   ========================================================================== */
-html[data-sunlight='true'] {
-  --tt-border-subtle: rgba(255, 255, 255, 0.32);
-  --tt-border-medium: rgba(255, 255, 255, 0.52);
-  --tt-text-secondary: rgba(255, 255, 255, 0.95);
-  --tt-text-muted: rgba(255, 255, 255, 0.82);
-}
-
-html[data-theme='light'][data-sunlight='true'] {
-  --tt-bg-app: #ffffff;
-  --tt-bg-surface: #ffffff;
-  --tt-border-subtle: rgba(30, 7, 52, 0.28);
-  --tt-border-medium: rgba(30, 7, 52, 0.48);
-  --tt-text-primary: #120321;
-  --tt-text-secondary: #1e0734;
-  --tt-text-muted: #391460;
+  --tt-shadow-sm: 0 3px 10px rgba(30, 7, 52, 0.08);
+  --tt-shadow-md: 0 10px 26px rgba(30, 7, 52, 0.12);
+  --tt-shadow-lg: 0 20px 44px rgba(30, 7, 52, 0.18);
 }
 
 /* ==========================================================================
@@ -258,7 +249,6 @@ html[data-screen='desktop'] {
 
 /* ==========================================================================
    MOTOR ADAPTATIVO POR GAMA DE CELULAR (CERO LAG EN EQUIPOS 2018-2020)
-   Desactiva blurs GPU pesados y sombras multicapa cuando se detecta <= 3GB RAM.
    ========================================================================== */
 html[data-tier='lite'] {
   --tt-blur-sm: 0px;
@@ -283,17 +273,21 @@ html[data-theme='light'][data-tier='lite'] {
 
 /* ==========================================================================
    BLINDAJE PERMANENTE DE CONTRASTE PARA SUITE MAESTRA ADMIN
-   Siempre legible en Púrpura Noche + Marfil + Esmeralda incluso en Modo Claro.
    ========================================================================== */
 .tt-admin-force-dark {
   --tt-bg-app: #140424;
+  --tt-bg: #140424;
   --tt-bg-surface: #1e0734;
+  --tt-surface: #1e0734;
   --tt-bg-surface-2: #2a0d48;
+  --tt-surface-2: #2a0d48;
   --tt-bg-input: #11031e;
   --tt-text-primary: #faf9f5;
+  --tt-text: #faf9f5;
   --tt-text-secondary: rgba(250, 249, 245, 0.84);
-  --tt-text-muted: rgba(250, 249, 245, 0.62);
+  --tt-text-muted: rgba(250, 249, 245, 0.64);
   --tt-border-subtle: rgba(250, 249, 245, 0.16);
+  --tt-border: rgba(250, 249, 245, 0.16);
   --tt-border-medium: rgba(0, 220, 125, 0.36);
   background-color: #140424 !important;
   color: #faf9f5 !important;
