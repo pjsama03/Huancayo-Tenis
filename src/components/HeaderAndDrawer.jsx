@@ -1,765 +1,789 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ASSETS, IconBadge, SmartImage, TTIcon, triggerHaptic } from './AppIcons';
-import { APP_CONFIG, getCategoryByPoints } from '../data/playersAndClubsData';
+import {
+  ASSETS,
+  SmartImage,
+  TTIcon,
+  triggerHaptic,
+} from './AppIcons';
+import { getCategoryByPoints } from '../data/playersAndClubsData';
 
 /* ==========================================================================
-   TOTAL TENIS · CABECERA FLOTANTE + MENÚ LATERAL EDITORIAL (3 RAYITAS)
-   - Destinos separados en cabecera: 💎 Bóveda de Gemas | 🛍️ Tienda Pro Shop
-   - Gesto secreto oculto (5 toques en el logo) para Suite Maestra Admin
-   - Drawer en Portal con backdrop-blur profundo y respeto total a Safe Area
+   HEADER FLOTANTE PROPORCIONADO + MENÚ LATERAL EN PORTAL (createPortal)
+   - Ocupa su espacio real en Flexbox: jamás tapa Perfil, Sedes ni Retos.
+   - Ancho calculado (~320px) para iPhone SE / 14 / 15 / 16 y Android sin cortes.
+   - Menú ☰ montado en document.body (z-index 9990): abre desde cualquier vista.
    ========================================================================== */
 export default function HeaderAndDrawer({
-  currentUser,
-  partnerSession,
-  isDrawerOpen,
-  onOpenDrawer,
-  onCloseDrawer,
-  unreadNoticesCount = 0,
+  currentUser = null,
   theme = 'dark',
-  onToggleTheme,
   sunlightMode = false,
+  activeTab = 'retos',
+  unreadNoticesCount = 0,
+  sponsorsConfig = null,
+  onToggleTheme,
   onToggleSunlight,
-  qualityMode = 'auto',
-  onChangeQualityMode,
-  onOpenGemsVault,
+  onNavigateTab,
   onOpenProShop,
+  onOpenShop,
+  onOpenGemsVault,
+  onOpenVault,
   onOpenNotices,
+  onOpenVipScale,
   onOpenStories,
-  onOpenVipCard,
-  onOpenScaleRules,
-  onOpenPartnerPortal,
-  onOpenClaimsBook,
-  onOpenLegalTerms,
   onOpenAuth,
-  onOpenProfileSettings,
-  onLogout,
+  onOpenPartnerPortal,
+  onOpenLegal,
+  onOpenTutorial,
   onSecretAdminTrigger,
-  onGoHome,
+  onLogout,
 }) {
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const tapCountRef = useRef(0);
   const tapTimerRef = useRef(null);
 
-  // Bloqueo limpio de scroll trasero y cierre con tecla Escape cuando el Drawer está abierto
+  const gemsBalance = Number(currentUser?.gems) || 0;
+  const isVip = Boolean(currentUser?.isVip);
+  const sponsorName =
+    sponsorsConfig?.titleSponsorActive && sponsorsConfig?.titleSponsorName
+      ? sponsorsConfig.titleSponsorName
+      : '';
+
   useEffect(() => {
-    if (!isDrawerOpen || typeof document === 'undefined') return undefined;
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    const onKeyDown = (e) => {
-      if (e.key === 'Escape' && onCloseDrawer) onCloseDrawer();
+    if (!drawerOpen) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape') setDrawerOpen(false);
     };
-    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [drawerOpen]);
 
-    return () => {
-      document.body.style.overflow = prevOverflow || '';
-      window.removeEventListener('keydown', onKeyDown);
-    };
-  }, [isDrawerOpen, onCloseDrawer]);
-
-  // Gesto secreto de 5 toques en el logo (2.4 s) para abrir Suite Maestra Admin
-  const handleBrandTap = () => {
+  // Disparador oculto de Suite Maestra Admin (5 toques rápidos al logotipo)
+  const handleLogoTap = () => {
     triggerHaptic('light');
     tapCountRef.current += 1;
-
-    if (tapTimerRef.current) {
-      window.clearTimeout(tapTimerRef.current);
-    }
+    if (tapTimerRef.current) window.clearTimeout(tapTimerRef.current);
 
     if (tapCountRef.current >= 5) {
       tapCountRef.current = 0;
       triggerHaptic('success');
-      if (typeof onSecretAdminTrigger === 'function') {
-        onSecretAdminTrigger();
-      }
+      if (onSecretAdminTrigger) onSecretAdminTrigger();
       return;
     }
 
     tapTimerRef.current = window.setTimeout(() => {
-      if (tapCountRef.current === 1 && typeof onGoHome === 'function') {
-        onGoHome();
-      }
       tapCountRef.current = 0;
-    }, 520);
+    }, 1500);
   };
 
-  const userCategory = currentUser ? getCategoryByPoints(currentUser.points) : null;
-  const userGems = Number(currentUser?.gems) || 0;
+  const openShopAction = () => {
+    triggerHaptic('light');
+    if (onOpenProShop) onOpenProShop();
+    else if (onOpenShop) onOpenShop();
+  };
+
+  const openVaultAction = () => {
+    triggerHaptic('light');
+    if (onOpenGemsVault) onOpenGemsVault();
+    else if (onOpenVault) onOpenVault();
+  };
 
   const runDrawerAction = (fn) => {
     triggerHaptic('light');
-    if (onCloseDrawer) onCloseDrawer();
-    if (typeof fn === 'function') {
-      // Pequeña espera para que el Portal del modal entre limpio sin solapar el cierre
-      window.setTimeout(() => fn(), 40);
-    }
+    setDrawerOpen(false);
+    if (fn) fn();
   };
-
-  const drawerContent =
-    isDrawerOpen && typeof document !== 'undefined'
-      ? createPortal(
-          <>
-            {/* Fondo difuminado profundo */}
-            <div
-              className="tt-drawer-backdrop"
-              onClick={() => {
-                triggerHaptic('light');
-                if (onCloseDrawer) onCloseDrawer();
-              }}
-              aria-hidden="true"
-            />
-
-            {/* Panel Lateral Editorial */}
-            <aside
-              className="tt-drawer-panel"
-              role="dialog"
-              aria-modal="true"
-              aria-label="Menú principal TOTAL TENIS"
-            >
-              {/* 1. CABECERA DEL MENÚ EN PÚRPURA NOCHE (SEGURO BAJO ISLA DINÁMICA) */}
-              <div className="tt-drawer-header">
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 10,
-                    marginBottom: 14,
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                    <SmartImage
-                      src={ASSETS.logo}
-                      alt="TOTAL TENIS"
-                      priority
-                      style={{
-                        width: 38,
-                        height: 38,
-                        borderRadius: '50%',
-                        objectFit: 'cover',
-                        border: '1.5px solid rgba(245, 158, 11, 0.72)',
-                      }}
-                    />
-                    <div>
-                      <div
-                        className="tt-display-italic"
-                        style={{ fontSize: '1.3rem', display: 'flex', gap: 5, lineHeight: 1 }}
-                      >
-                        <span style={{ color: '#FAF9F5' }}>TOTAL</span>
-                        <span style={{ color: '#00DC7D' }}>TENIS</span>
-                      </div>
-                      <span
-                        style={{
-                          fontSize: '0.66rem',
-                          fontWeight: 700,
-                          letterSpacing: '0.1em',
-                          textTransform: 'uppercase',
-                          color: 'rgba(250, 249, 245, 0.62)',
-                        }}
-                      >
-                        Circuito Oficial
-                      </span>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    aria-label="Cerrar menú"
-                    onClick={() => {
-                      triggerHaptic('light');
-                      if (onCloseDrawer) onCloseDrawer();
-                    }}
-                    style={{
-                      width: 38,
-                      height: 38,
-                      borderRadius: '50%',
-                      backgroundColor: 'rgba(250, 249, 245, 0.12)',
-                      border: '1px solid rgba(250, 249, 245, 0.2)',
-                      color: '#FAF9F5',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <TTIcon name="close" size={18} />
-                  </button>
-                </div>
-
-                {/* Tarjeta del Jugador o Invitado en la cabecera */}
-                {currentUser ? (
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 12,
-                      padding: '10px 12px',
-                      borderRadius: 16,
-                      backgroundColor: 'rgba(250, 249, 245, 0.08)',
-                      border: '1px solid rgba(250, 249, 245, 0.14)',
-                    }}
-                  >
-                    <SmartImage
-                      src={currentUser.avatar}
-                      alt={currentUser.name}
-                      initials={currentUser.name}
-                      style={{
-                        width: 48,
-                        height: 48,
-                        borderRadius: '50%',
-                        objectFit: 'cover',
-                        objectPosition: 'center top',
-                        border: currentUser.isVip
-                          ? '2px solid #F59E0B'
-                          : '2px solid rgba(0, 220, 125, 0.65)',
-                        flexShrink: 0,
-                      }}
-                    />
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 6,
-                          flexWrap: 'wrap',
-                        }}
-                      >
-                        <strong
-                          style={{
-                            fontSize: '0.95rem',
-                            color: '#FAF9F5',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            maxWidth: 150,
-                          }}
-                        >
-                          {currentUser.name}
-                        </strong>
-                        {currentUser.isVip ? (
-                          <span className="tt-badge-vip">VIP</span>
-                        ) : (
-                          <span className="tt-badge-standard">ESTÁNDAR</span>
-                        )}
-                      </div>
-                      <div
-                        style={{
-                          marginTop: 3,
-                          fontSize: '0.75rem',
-                          color: 'rgba(250, 249, 245, 0.74)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 8,
-                        }}
-                      >
-                        <span>{userCategory?.name}</span>
-                        <span>·</span>
-                        <span style={{ color: '#00DC7D', fontWeight: 800 }}>
-                          {Number(currentUser.points || 0).toLocaleString('es-PE')} PTS
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    className="tt-btn tt-btn-primary"
-                    style={{ width: '100%' }}
-                    onClick={() => runDrawerAction(() => onOpenAuth && onOpenAuth('register'))}
-                  >
-                    Crear Cuenta Oficial (+18)
-                  </button>
-                )}
-              </div>
-
-              {/* 2. CUERPO EDITORIAL MARFIL CON ACCESOS MOTIVADORES Y CLAROS */}
-              <div className="tt-drawer-scroll">
-                <span
-                  style={{
-                    fontSize: '0.68rem',
-                    fontWeight: 800,
-                    letterSpacing: '0.1em',
-                    textTransform: 'uppercase',
-                    color: 'rgba(30, 7, 52, 0.56)',
-                    padding: '4px 4px 0',
-                  }}
-                >
-                  Tu Circuito TOTAL TENIS
-                </span>
-
-                <button
-                  type="button"
-                  className="tt-drawer-item"
-                  onClick={() => runDrawerAction(onOpenStories)}
-                >
-                  <IconBadge name="stories" variant="emerald" size={40} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#1E0734' }}>
-                      Publica tus victorias en Stories
-                    </div>
-                    <div style={{ fontSize: '0.73rem', color: 'rgba(30, 7, 52, 0.64)' }}>
-                      Plantillas oficiales listas para Instagram y WhatsApp
-                    </div>
-                  </div>
-                  <TTIcon name="chevronRight" size={18} style={{ color: 'rgba(30, 7, 52, 0.4)' }} />
-                </button>
-
-                <button
-                  type="button"
-                  className="tt-drawer-item"
-                  onClick={() => runDrawerAction(onOpenVipCard)}
-                >
-                  <IconBadge name="crown" variant="gold" size={40} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#1E0734' }}>
-                      Carnet Digital Socio VIP & Ahorro
-                    </div>
-                    <div style={{ fontSize: '0.73rem', color: 'rgba(30, 7, 52, 0.64)' }}>
-                      Credencial oficial, descuentos en cancha y +200 Gemas/mes
-                    </div>
-                  </div>
-                  <TTIcon name="chevronRight" size={18} style={{ color: 'rgba(30, 7, 52, 0.4)' }} />
-                </button>
-
-                <button
-                  type="button"
-                  className="tt-drawer-item"
-                  onClick={() => runDrawerAction(onOpenGemsVault)}
-                >
-                  <IconBadge name="gem" variant="purple" size={40} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#1E0734' }}>
-                      Bóveda y Bitácora de Gemas
-                    </div>
-                    <div style={{ fontSize: '0.73rem', color: 'rgba(30, 7, 52, 0.64)' }}>
-                      Saldo: {userGems.toLocaleString('es-PE')} Gemas · 20 Gemas = S/ 1.00
-                    </div>
-                  </div>
-                  <TTIcon name="chevronRight" size={18} style={{ color: 'rgba(30, 7, 52, 0.4)' }} />
-                </button>
-
-                <button
-                  type="button"
-                  className="tt-drawer-item"
-                  onClick={() => runDrawerAction(onOpenProShop)}
-                >
-                  <IconBadge name="shop" variant="emerald" size={40} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#1E0734' }}>
-                      Tienda Oficial Pro Shop
-                    </div>
-                    <div style={{ fontSize: '0.73rem', color: 'rgba(30, 7, 52, 0.64)' }}>
-                      Pelotas, encordados, escenarios de perfil y distintivos
-                    </div>
-                  </div>
-                  <TTIcon name="chevronRight" size={18} style={{ color: 'rgba(30, 7, 52, 0.4)' }} />
-                </button>
-
-                <button
-                  type="button"
-                  className="tt-drawer-item"
-                  onClick={() => runDrawerAction(onOpenScaleRules)}
-                >
-                  <IconBadge name="chart" variant="clay" size={40} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#1E0734' }}>
-                      Escala de Categorías y Reglamento
-                    </div>
-                    <div style={{ fontSize: '0.73rem', color: 'rgba(30, 7, 52, 0.64)' }}>
-                      De 5ª P a 2ª Libre, 4 Temporadas y Master Top 8
-                    </div>
-                  </div>
-                  <TTIcon name="chevronRight" size={18} style={{ color: 'rgba(30, 7, 52, 0.4)' }} />
-                </button>
-
-                <button
-                  type="button"
-                  className="tt-drawer-item"
-                  onClick={() => runDrawerAction(onOpenPartnerPortal)}
-                >
-                  <IconBadge name="users" variant="purple" size={40} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#1E0734' }}>
-                      {partnerSession
-                        ? `Mi Estudio Aliado (${partnerSession.role === 'coach' ? 'Coach' : 'Club'})`
-                        : 'Portal Aliados (Clubes & Coaches)'}
-                    </div>
-                    <div style={{ fontSize: '0.73rem', color: 'rgba(30, 7, 52, 0.64)' }}>
-                      Gestiona videos en cancha, cupos grupales y promos valle
-                    </div>
-                  </div>
-                  <TTIcon name="chevronRight" size={18} style={{ color: 'rgba(30, 7, 52, 0.4)' }} />
-                </button>
-
-                {currentUser && (
-                  <button
-                    type="button"
-                    className="tt-drawer-item"
-                    onClick={() => runDrawerAction(onOpenProfileSettings)}
-                  >
-                    <IconBadge name="settings" variant="purple" size={40} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#1E0734' }}>
-                        Ajustes de Perfil y Privacidad
-                      </div>
-                      <div style={{ fontSize: '0.73rem', color: 'rgba(30, 7, 52, 0.64)' }}>
-                        Club sede, visibilidad de WhatsApp y foto de portada
-                      </div>
-                    </div>
-                    <TTIcon name="chevronRight" size={18} style={{ color: 'rgba(30, 7, 52, 0.4)' }} />
-                  </button>
-                )}
-
-                {/* 3. APARIENCIA Y RENDIMIENTO ADAPTATIVO EN CANCHA */}
-                <span
-                  style={{
-                    fontSize: '0.68rem',
-                    fontWeight: 800,
-                    letterSpacing: '0.1em',
-                    textTransform: 'uppercase',
-                    color: 'rgba(30, 7, 52, 0.56)',
-                    padding: '10px 4px 0',
-                  }}
-                >
-                  Pantalla y Rendimiento Móvil
-                </span>
-
-                <div
-                  style={{
-                    backgroundColor: '#FFFFFF',
-                    borderRadius: 18,
-                    border: '1px solid rgba(30, 7, 52, 0.08)',
-                    padding: 12,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 10,
-                  }}
-                >
-                  {/* Conmutador Tema Oscuro / Claro */}
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: 10,
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                      <TTIcon
-                        name={theme === 'dark' ? 'moon' : 'sun'}
-                        size={19}
-                        style={{ color: '#1E0734' }}
-                      />
-                      <div>
-                        <div style={{ fontWeight: 800, fontSize: '0.83rem', color: '#1E0734' }}>
-                          Tema Visual
-                        </div>
-                        <div style={{ fontSize: '0.71rem', color: 'rgba(30, 7, 52, 0.6)' }}>
-                          {theme === 'dark' ? 'Púrpura Noche (Oscuro)' : 'Marfil Editorial (Claro)'}
-                        </div>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        triggerHaptic('light');
-                        if (onToggleTheme) onToggleTheme();
-                      }}
-                      style={{
-                        padding: '7px 12px',
-                        borderRadius: 999,
-                        backgroundColor: '#1E0734',
-                        color: '#00DC7D',
-                        fontWeight: 800,
-                        fontSize: '0.75rem',
-                      }}
-                    >
-                      {theme === 'dark' ? 'Cambiar a Claro' : 'Cambiar a Oscuro'}
-                    </button>
-                  </div>
-
-                  {/* Conmutador Sol Intenso */}
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: 10,
-                      paddingTop: 8,
-                      borderTop: '1px solid rgba(30, 7, 52, 0.07)',
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontWeight: 800, fontSize: '0.82rem', color: '#1E0734' }}>
-                        Modo Sol Intenso en Cancha
-                      </div>
-                      <div style={{ fontSize: '0.7rem', color: 'rgba(30, 7, 52, 0.6)' }}>
-                        Refuerza el contraste al mediodía
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        triggerHaptic('light');
-                        if (onToggleSunlight) onToggleSunlight();
-                      }}
-                      style={{
-                        padding: '6px 12px',
-                        borderRadius: 999,
-                        backgroundColor: sunlightMode ? '#00DC7D' : 'rgba(30, 7, 52, 0.08)',
-                        color: '#1E0734',
-                        fontWeight: 800,
-                        fontSize: '0.74rem',
-                      }}
-                    >
-                      {sunlightMode ? 'Activo' : 'Desactivado'}
-                    </button>
-                  </div>
-
-                  {/* Selector Calidad Visual (Auto / Ultra 120Hz / Cero Lag) */}
-                  <div
-                    style={{
-                      paddingTop: 8,
-                      borderTop: '1px solid rgba(30, 7, 52, 0.07)',
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontWeight: 800,
-                        fontSize: '0.8rem',
-                        color: '#1E0734',
-                        marginBottom: 6,
-                      }}
-                    >
-                      Calidad Gráfica del Celular
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
-                      {[
-                        { id: 'auto', label: 'Automático' },
-                        { id: 'ultra', label: 'Ultra 120Hz' },
-                        { id: 'lite', label: 'Cero Lag' },
-                      ].map((opt) => {
-                        const active = qualityMode === opt.id;
-                        return (
-                          <button
-                            key={opt.id}
-                            type="button"
-                            onClick={() => {
-                              triggerHaptic('light');
-                              if (onChangeQualityMode) onChangeQualityMode(opt.id);
-                            }}
-                            style={{
-                              padding: '7px 4px',
-                              borderRadius: 10,
-                              fontSize: '0.72rem',
-                              fontWeight: 800,
-                              backgroundColor: active ? '#1E0734' : 'rgba(30, 7, 52, 0.06)',
-                              color: active ? '#00DC7D' : '#1E0734',
-                            }}
-                          >
-                            {opt.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-
-                {/* 4. BLOQUE LEGAL PERÚ OBLIGATORIO (INDECOPI & LEY N° 29733) */}
-                <span
-                  style={{
-                    fontSize: '0.68rem',
-                    fontWeight: 800,
-                    letterSpacing: '0.1em',
-                    textTransform: 'uppercase',
-                    color: 'rgba(30, 7, 52, 0.56)',
-                    padding: '10px 4px 0',
-                  }}
-                >
-                  Respaldo Legal · Perú
-                </span>
-
-                <button
-                  type="button"
-                  className="tt-drawer-item"
-                  onClick={() => runDrawerAction(onOpenClaimsBook)}
-                >
-                  <IconBadge name="claimsBook" variant="clay" size={40} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 800, fontSize: '0.86rem', color: '#1E0734' }}>
-                      Libro de Reclamaciones Virtual
-                    </div>
-                    <div style={{ fontSize: '0.72rem', color: 'rgba(30, 7, 52, 0.64)' }}>
-                      Código de Protección al Consumidor · Indecopi
-                    </div>
-                  </div>
-                  <TTIcon name="chevronRight" size={18} style={{ color: 'rgba(30, 7, 52, 0.4)' }} />
-                </button>
-
-                <button
-                  type="button"
-                  className="tt-drawer-item"
-                  onClick={() => runDrawerAction(onOpenLegalTerms)}
-                >
-                  <IconBadge name="shield" variant="purple" size={40} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 800, fontSize: '0.86rem', color: '#1E0734' }}>
-                      Términos y Política de Privacidad
-                    </div>
-                    <div style={{ fontSize: '0.72rem', color: 'rgba(30, 7, 52, 0.64)' }}>
-                      Protección de Datos Personales · Ley N° 29733
-                    </div>
-                  </div>
-                  <TTIcon name="chevronRight" size={18} style={{ color: 'rgba(30, 7, 52, 0.4)' }} />
-                </button>
-
-                {/* 5. ACCIÓN DE SESIÓN Y PIE DE MARCA */}
-                <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {currentUser ? (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                      <button
-                        type="button"
-                        onClick={() => runDrawerAction(() => onOpenAuth && onOpenAuth('login'))}
-                        style={{
-                          minHeight: 42,
-                          borderRadius: 12,
-                          backgroundColor: 'rgba(30, 7, 52, 0.08)',
-                          color: '#1E0734',
-                          fontWeight: 800,
-                          fontSize: '0.78rem',
-                        }}
-                      >
-                        Cambiar Cuenta
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => runDrawerAction(onLogout)}
-                        style={{
-                          minHeight: 42,
-                          borderRadius: 12,
-                          backgroundColor: 'rgba(239, 68, 68, 0.12)',
-                          color: '#B91C1C',
-                          fontWeight: 800,
-                          fontSize: '0.78rem',
-                        }}
-                      >
-                        Cerrar Sesión
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      className="tt-btn tt-btn-primary"
-                      style={{ width: '100%' }}
-                      onClick={() => runDrawerAction(() => onOpenAuth && onOpenAuth('login'))}
-                    >
-                      Iniciar Sesión en TOTAL TENIS
-                    </button>
-                  )}
-
-                  <p
-                    style={{
-                      margin: '6px 0 0',
-                      textAlign: 'center',
-                      fontSize: '0.68rem',
-                      color: 'rgba(30, 7, 52, 0.52)',
-                      lineHeight: 1.4,
-                    }}
-                  >
-                    {APP_CONFIG.copyright}
-                    <br />
-                    Versión {APP_CONFIG.version} · Motor Adaptativo Universal
-                  </p>
-                </div>
-              </div>
-            </aside>
-          </>,
-          document.body
-        )
-      : null;
 
   return (
     <>
-      {/* CABECERA FLOTANTE PRINCIPAL */}
-      <header className="tt-header-wrap">
-        <div className="tt-header-bar">
-          {/* Izquierda: Menú 3 Rayitas + Logo TOTAL TENIS (con gesto secreto Admin) */}
-          <div className="tt-header-left">
+      <header
+        className={`tt-hdr-shell ${theme === 'light' ? 'is-light' : 'is-dark'}`}
+        aria-label="Barra superior TOTAL TENIS"
+      >
+        <div className="tt-hdr-pill">
+          {/* Izquierda: Menú ☰ + Logotipo + Marca íntegra sin recortes */}
+          <div className="tt-hdr-left">
             <button
               type="button"
-              className="tt-header-icon-btn"
-              aria-label="Abrir menú lateral"
+              className="tt-hdr-icon-btn"
+              aria-label="Abrir menú principal"
+              aria-expanded={drawerOpen}
               onClick={() => {
                 triggerHaptic('light');
-                if (onOpenDrawer) onOpenDrawer();
+                setDrawerOpen(true);
               }}
             >
-              <TTIcon name="menu" size={21} />
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path
+                  d="M4 7H20M4 12H20M4 17H15"
+                  stroke="currentColor"
+                  strokeWidth="2.3"
+                  strokeLinecap="round"
+                />
+              </svg>
             </button>
 
             <button
               type="button"
-              className="tt-brand-trigger"
-              onClick={handleBrandTap}
-              aria-label="TOTAL TENIS Inicio"
+              className="tt-hdr-brand-btn"
+              onClick={handleLogoTap}
+              aria-label="TOTAL TENIS"
             >
               <SmartImage
                 src={ASSETS.logo}
                 alt="TOTAL TENIS"
-                priority
-                className="tt-brand-logo-img"
+                className="tt-hdr-logo"
               />
-              <span className="tt-brand-wordmark">
-                <span className="tt-word-total">TOTAL</span>
-                <span className="tt-word-tenis">TENIS</span>
+              <span className="tt-hdr-wordmark">
+                TOTAL <em>TENIS</em>
               </span>
             </button>
           </div>
 
-          {/* Derecha: Destinos Separados (💎 Bóveda | Tienda Pro Shop | Campana Avisos) */}
-          <div className="tt-header-right">
+          {/* Derecha: Gemas + Tienda + Campana (todo proporcional en 1 fila) */}
+          <div className="tt-hdr-right">
             <button
               type="button"
-              className="tt-gems-pill"
-              aria-label="Abrir Bóveda y Bitácora de Gemas"
-              onClick={() => {
-                triggerHaptic('light');
-                if (onOpenGemsVault) onOpenGemsVault();
-              }}
+              className="tt-hdr-gems-pill"
+              onClick={openVaultAction}
+              aria-label={`Bóveda de Gemas: ${gemsBalance}`}
             >
-              <TTIcon name="gem" size={16} />
-              <span>{userGems.toLocaleString('es-PE')}</span>
+              <span className="tt-hdr-gem-diamond" aria-hidden="true">◆</span>
+              <span>{gemsBalance}</span>
             </button>
 
             <button
               type="button"
-              className="tt-shop-pill"
-              aria-label="Abrir Tienda Oficial Pro Shop"
-              onClick={() => {
-                triggerHaptic('light');
-                if (onOpenProShop) onOpenProShop();
-              }}
+              className="tt-hdr-shop-pill"
+              onClick={openShopAction}
+              aria-label="Abrir Tienda Pro Shop"
             >
-              <TTIcon name="shop" size={16} />
-              <span className="tt-shop-label">Tienda</span>
+              <TTIcon name="shop" size={13} />
+              <span>Tienda</span>
             </button>
 
             <button
               type="button"
-              className="tt-header-icon-btn"
-              aria-label="Abrir Centro de Avisos y Noticias en Vivo"
+              className="tt-hdr-icon-btn is-bell"
+              aria-label="Notificaciones y actualidad"
               onClick={() => {
                 triggerHaptic('light');
-                if (onOpenNotices) onOpenNotices();
+                if (onOpenNotices) onOpenNotices('notificaciones');
               }}
             >
-              <TTIcon name="bell" size={19} />
-              {unreadNoticesCount > 0 && <span className="tt-notif-dot" />}
+              <TTIcon name="bell" size={17} />
+              {unreadNoticesCount > 0 && (
+                <span className="tt-hdr-bell-badge">
+                  {unreadNoticesCount > 9 ? '9+' : unreadNoticesCount}
+                </span>
+              )}
             </button>
           </div>
         </div>
+
+        {sponsorName && (
+          <div className="tt-hdr-sponsor-strip">
+            <span>TOTAL TENIS</span>
+            <i>|</i>
+            <strong>{sponsorName}</strong>
+          </div>
+        )}
       </header>
 
-      {drawerContent}
+      {/* MENÚ LATERAL (3 RAYITAS) EN PORTAL GLOBAL */}
+      {drawerOpen &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            className="tt-drw-backdrop"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Menú lateral TOTAL TENIS"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setDrawerOpen(false);
+            }}
+          >
+            <aside className={`tt-drw-panel ${theme === 'light' ? 'is-light' : 'is-dark'}`}>
+              <div className="tt-drw-head">
+                <div className="tt-drw-brand">
+                  <SmartImage
+                    src={ASSETS.logo}
+                    alt="TOTAL TENIS"
+                    style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover' }}
+                  />
+                  <div>
+                    <strong>TOTAL TENIS</strong>
+                    <small>Circuito Oficial</small>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  className="tt-drw-close"
+                  aria-label="Cerrar menú"
+                  onClick={() => {
+                    triggerHaptic('light');
+                    setDrawerOpen(false);
+                  }}
+                >
+                  <TTIcon name="close" size={18} />
+                </button>
+              </div>
+
+              {currentUser ? (
+                <div className="tt-drw-user-card">
+                  <SmartImage
+                    src={currentUser.avatar}
+                    alt={currentUser.name}
+                    initials={currentUser.name}
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: '50%',
+                      objectFit: 'cover',
+                      objectPosition: 'center top',
+                      border: isVip ? '2px solid #F59E0B' : '2px solid #00DC7D',
+                      flexShrink: 0,
+                    }}
+                  />
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <strong>{currentUser.name}</strong>
+                    <small>
+                      {getCategoryByPoints(currentUser.points).name} ·{' '}
+                      {Number(currentUser.points || 0).toLocaleString('es-PE')} pts
+                    </small>
+                  </div>
+                  {isVip && <span className="tt-drw-vip-tag">VIP</span>}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="tt-drw-login-cta"
+                  onClick={() => runDrawerAction(() => onOpenAuth && onOpenAuth('login'))}
+                >
+                  Iniciar Sesión / Crear Cuenta Gratis
+                </button>
+              )}
+
+              <div className="tt-drw-toggles">
+                <button
+                  type="button"
+                  className={`tt-drw-toggle-pill ${theme === 'light' ? 'is-on' : ''}`}
+                  onClick={() => {
+                    triggerHaptic('light');
+                    if (onToggleTheme) onToggleTheme();
+                  }}
+                >
+                  <span>{theme === 'light' ? '☀️ Modo Claro' : '🌙 Modo Oscuro'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  className={`tt-drw-toggle-pill ${sunlightMode ? 'is-on' : ''}`}
+                  onClick={() => {
+                    triggerHaptic('light');
+                    if (onToggleSunlight) onToggleSunlight();
+                  }}
+                >
+                  <span>{sunlightMode ? '🕶️ Sol Intenso ON' : '🕶️ Sol Intenso'}</span>
+                </button>
+              </div>
+
+              <div className="tt-drw-scroll">
+                <span className="tt-drw-section-lbl">EXPLORAR CIRCUITO</span>
+                <div className="tt-drw-list">
+                  <button
+                    type="button"
+                    className={activeTab === 'retos' ? 'is-current' : ''}
+                    onClick={() => runDrawerAction(() => onNavigateTab && onNavigateTab('retos'))}
+                  >
+                    <TTIcon name="challenge" size={17} />
+                    <span>Retos y Cartelera</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => runDrawerAction(() => onOpenVipScale && onOpenVipScale('vip'))}
+                  >
+                    <TTIcon name="crown" size={17} />
+                    <span>Pase Socio VIP & Carnet 3D</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => runDrawerAction(() => onOpenVipScale && onOpenVipScale('escala'))}
+                  >
+                    <TTIcon name="chart" size={17} />
+                    <span>Categorías y Reglas</span>
+                  </button>
+                  <button type="button" onClick={() => runDrawerAction(openShopAction)}>
+                    <TTIcon name="shop" size={17} />
+                    <span>Tienda Oficial Pro Shop</span>
+                  </button>
+                  <button type="button" onClick={() => runDrawerAction(openVaultAction)}>
+                    <TTIcon name="trophy" size={17} />
+                    <span>Mi Bóveda de Gemas ({gemsBalance})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => runDrawerAction(() => onOpenStories && onOpenStories(null))}
+                  >
+                    <TTIcon name="share" size={17} />
+                    <span>Publicar Victoria (Stories 9:16)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => runDrawerAction(() => onOpenNotices && onOpenNotices('actualidad'))}
+                  >
+                    <TTIcon name="news" size={17} />
+                    <span>Actualidad Tenis y Marcadores</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => runDrawerAction(() => onOpenPartnerPortal && onOpenPartnerPortal())}
+                  >
+                    <TTIcon name="users" size={17} />
+                    <span>Portal Aliados (Clubes y Coaches)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => runDrawerAction(() => onOpenTutorial && onOpenTutorial())}
+                  >
+                    <TTIcon name="check" size={17} />
+                    <span>Guía Rápida en 4 Pasos</span>
+                  </button>
+                </div>
+
+                <span className="tt-drw-section-lbl" style={{ marginTop: 14 }}>
+                  INFORMACIÓN LEGAL (PERÚ)
+                </span>
+                <div className="tt-drw-list">
+                  <button
+                    type="button"
+                    className="is-legal-book"
+                    onClick={() => runDrawerAction(() => onOpenLegal && onOpenLegal('reclamaciones'))}
+                  >
+                    <TTIcon name="shield" size={17} />
+                    <span>Libro de Reclamaciones Virtual</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => runDrawerAction(() => onOpenLegal && onOpenLegal('terms'))}
+                  >
+                    <TTIcon name="news" size={17} />
+                    <span>Términos y Condiciones</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => runDrawerAction(() => onOpenLegal && onOpenLegal('privacy'))}
+                  >
+                    <TTIcon name="shield" size={17} />
+                    <span>Política de Privacidad (Ley N° 29733)</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="tt-drw-foot">
+                {currentUser && onLogout && (
+                  <button
+                    type="button"
+                    className="tt-drw-logout"
+                    onClick={() => runDrawerAction(onLogout)}
+                  >
+                    Cerrar sesión
+                  </button>
+                )}
+                <small>© {new Date().getFullYear()} TOTAL TENIS. Todos los derechos reservados.</small>
+              </div>
+            </aside>
+          </div>,
+          document.body
+        )}
+
+      <style>{`
+        /* FLUJO REAL EN FLEXBOX (NUNCA SE MONTA ENCIMA DE PERFIL, SEDES NI RETOS) */
+        .tt-hdr-shell {
+          position: relative !important;
+          top: auto !important;
+          left: auto !important;
+          right: auto !important;
+          z-index: 40;
+          flex-shrink: 0;
+          width: 100%;
+          padding: calc(env(safe-area-inset-top, 0px) + 8px) 8px 6px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 4px;
+          background: transparent;
+        }
+        .tt-hdr-pill {
+          width: 100%;
+          max-width: var(--tt-container-max, 760px);
+          min-height: 48px;
+          padding: 4px 6px;
+          border-radius: 999px;
+          background: #FFFFFF;
+          color: #1E0734;
+          border: 1px solid rgba(30, 7, 52, 0.1);
+          box-shadow: 0 8px 22px rgba(10, 2, 20, 0.3);
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 4px;
+          box-sizing: border-box;
+        }
+
+        .tt-hdr-left {
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          min-width: 0;
+          flex: 1 1 auto;
+        }
+        .tt-hdr-icon-btn {
+          position: relative;
+          z-index: 2;
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          background: rgba(30, 7, 52, 0.06);
+          color: #1E0734;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          cursor: pointer;
+          touch-action: manipulation;
+          transition: transform 120ms ease;
+        }
+        .tt-hdr-icon-btn:active {
+          transform: scale(0.92);
+        }
+        .tt-hdr-brand-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          min-width: 0;
+          padding: 2px 0;
+          flex-shrink: 0;
+          cursor: pointer;
+          touch-action: manipulation;
+        }
+        .tt-hdr-logo {
+          width: 28px;
+          height: 28px;
+          border-radius: 50%;
+          object-fit: cover;
+          flex-shrink: 0;
+        }
+        .tt-hdr-wordmark {
+          font-family: var(--tt-font-display);
+          font-style: italic;
+          font-weight: 900;
+          font-size: clamp(0.84rem, 3.3vw, 1.08rem);
+          letter-spacing: 0.015em;
+          line-height: 1;
+          color: #1E0734;
+          white-space: nowrap;
+        }
+        .tt-hdr-wordmark em {
+          font-style: italic;
+          color: #00A859;
+        }
+
+        /* CONTROLES DERECHOS COMPACTOS (CERO DESBORDES EN 360px-430px) */
+        .tt-hdr-right {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          flex-shrink: 0;
+        }
+        .tt-hdr-gems-pill {
+          height: 30px;
+          padding: 0 7px;
+          border-radius: 999px;
+          background: #1E0734;
+          color: #FAF9F5;
+          font-size: 0.7rem;
+          font-weight: 900;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 3px;
+          white-space: nowrap;
+          flex-shrink: 0;
+        }
+        .tt-hdr-gem-diamond {
+          color: #00DC7D;
+          font-size: 0.68rem;
+          line-height: 1;
+        }
+        .tt-hdr-shop-pill {
+          height: 30px;
+          padding: 0 8px;
+          border-radius: 999px;
+          background: linear-gradient(135deg, #00DC7D 0%, #00B868 100%);
+          color: #120321;
+          font-size: 0.7rem;
+          font-weight: 900;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 3px;
+          white-space: nowrap;
+          flex-shrink: 0;
+          overflow: hidden;
+        }
+        .tt-hdr-bell-badge {
+          position: absolute;
+          top: -2px;
+          right: -2px;
+          min-width: 16px;
+          height: 16px;
+          padding: 0 4px;
+          border-radius: 999px;
+          background: #C85A32;
+          color: #FFFFFF;
+          font-size: 0.58rem;
+          font-weight: 900;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border: 2px solid #FFFFFF;
+        }
+        .tt-hdr-sponsor-strip {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 0.64rem;
+          letter-spacing: 0.08em;
+          color: rgba(250, 249, 245, 0.76);
+        }
+        .tt-hdr-shell.is-light .tt-hdr-sponsor-strip {
+          color: rgba(30, 7, 52, 0.72);
+        }
+
+        /* MENÚ LATERAL MONTADO EN document.body (z-index 9990) */
+        .tt-drw-backdrop {
+          position: fixed;
+          inset: 0;
+          z-index: 9990;
+          background: rgba(10, 2, 20, 0.72);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
+          display: flex;
+          justify-content: flex-start;
+        }
+        .tt-drw-panel {
+          width: min(84vw, 330px);
+          height: 100%;
+          padding: calc(env(safe-area-inset-top, 0px) + 14px) 16px calc(env(safe-area-inset-bottom, 0px) + 16px);
+          background: linear-gradient(180deg, #1E0734 0%, #120321 100%);
+          color: #FAF9F5;
+          border-right: 1px solid rgba(250, 249, 245, 0.14);
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          box-shadow: 16px 0 40px rgba(0, 0, 0, 0.48);
+          animation: ttDrwSlide 200ms cubic-bezier(0.22, 1, 0.36, 1);
+          box-sizing: border-box;
+        }
+        .tt-drw-panel.is-light {
+          background: #FAF9F5;
+          color: #1E0734;
+          border-right-color: rgba(30, 7, 52, 0.12);
+        }
+        @keyframes ttDrwSlide {
+          from { transform: translateX(-100%); }
+          to { transform: translateX(0); }
+        }
+        .tt-drw-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+        }
+        .tt-drw-brand {
+          display: flex;
+          align-items: center;
+          gap: 9px;
+        }
+        .tt-drw-brand strong {
+          display: block;
+          font-family: var(--tt-font-display);
+          font-style: italic;
+          font-size: 1.16rem;
+          line-height: 1;
+        }
+        .tt-drw-brand small {
+          font-size: 0.66rem;
+          opacity: 0.68;
+        }
+        .tt-drw-close {
+          width: 34px;
+          height: 34px;
+          border-radius: 50%;
+          background: rgba(250, 249, 245, 0.12);
+          color: inherit;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .tt-drw-panel.is-light .tt-drw-close {
+          background: rgba(30, 7, 52, 0.08);
+        }
+
+        .tt-drw-user-card {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 10px 11px;
+          border-radius: 15px;
+          background: rgba(250, 249, 245, 0.08);
+          border: 1px solid rgba(250, 249, 245, 0.12);
+        }
+        .tt-drw-panel.is-light .tt-drw-user-card {
+          background: #FFFFFF;
+          border-color: rgba(30, 7, 52, 0.1);
+        }
+        .tt-drw-user-card strong {
+          display: block;
+          font-size: 0.86rem;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .tt-drw-user-card small {
+          display: block;
+          font-size: 0.7rem;
+          opacity: 0.72;
+        }
+        .tt-drw-vip-tag {
+          padding: 3px 8px;
+          border-radius: 999px;
+          background: #F59E0B;
+          color: #1E1102;
+          font-size: 0.62rem;
+          font-weight: 900;
+        }
+        .tt-drw-login-cta {
+          min-height: 42px;
+          border-radius: 13px;
+          background: linear-gradient(135deg, #00DC7D 0%, #00B868 100%);
+          color: #120321;
+          font-size: 0.8rem;
+          font-weight: 900;
+        }
+
+        .tt-drw-toggles {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 7px;
+        }
+        .tt-drw-toggle-pill {
+          min-height: 36px;
+          padding: 0 8px;
+          border-radius: 11px;
+          background: rgba(250, 249, 245, 0.08);
+          border: 1px solid rgba(250, 249, 245, 0.12);
+          color: inherit;
+          font-size: 0.72rem;
+          font-weight: 800;
+        }
+        .tt-drw-panel.is-light .tt-drw-toggle-pill {
+          background: #FFFFFF;
+          border-color: rgba(30, 7, 52, 0.12);
+        }
+        .tt-drw-toggle-pill.is-on {
+          border-color: #00DC7D;
+          color: #00DC7D;
+        }
+        .tt-drw-panel.is-light .tt-drw-toggle-pill.is-on {
+          background: #1E0734;
+          color: #00DC7D;
+        }
+
+        .tt-drw-scroll {
+          flex: 1;
+          min-height: 0;
+          overflow-y: auto;
+          padding-right: 2px;
+          -webkit-overflow-scrolling: touch;
+        }
+        .tt-drw-section-lbl {
+          display: block;
+          font-size: 0.6rem;
+          font-weight: 900;
+          letter-spacing: 0.1em;
+          color: #00DC7D;
+          margin-bottom: 6px;
+        }
+        .tt-drw-panel.is-light .tt-drw-section-lbl {
+          color: #008A4E;
+        }
+        .tt-drw-list {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+        .tt-drw-list button {
+          width: 100%;
+          min-height: 40px;
+          padding: 0 11px;
+          border-radius: 12px;
+          color: inherit;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          font-size: 0.8rem;
+          font-weight: 700;
+          text-align: left;
+        }
+        .tt-drw-list button:hover,
+        .tt-drw-list button.is-current {
+          background: rgba(0, 220, 125, 0.14);
+          color: #00DC7D;
+        }
+        .tt-drw-panel.is-light .tt-drw-list button:hover,
+        .tt-drw-panel.is-light .tt-drw-list button.is-current {
+          background: rgba(30, 7, 52, 0.08);
+          color: #1E0734;
+        }
+        .tt-drw-list button.is-legal-book {
+          background: rgba(245, 158, 11, 0.14);
+          color: #FDE68A;
+        }
+        .tt-drw-panel.is-light .tt-drw-list button.is-legal-book {
+          background: rgba(245, 158, 11, 0.18);
+          color: #92400E;
+        }
+
+        .tt-drw-foot {
+          padding-top: 10px;
+          border-top: 1px solid rgba(250, 249, 245, 0.12);
+          display: flex;
+          flex-direction: column;
+          gap: 7px;
+        }
+        .tt-drw-panel.is-light .tt-drw-foot {
+          border-top-color: rgba(30, 7, 52, 0.1);
+        }
+        .tt-drw-logout {
+          min-height: 38px;
+          border-radius: 11px;
+          background: rgba(248, 113, 113, 0.16);
+          color: #FCA5A5;
+          font-size: 0.78rem;
+          font-weight: 800;
+        }
+        .tt-drw-panel.is-light .tt-drw-logout {
+          color: #B91C1C;
+        }
+        .tt-drw-foot small {
+          font-size: 0.65rem;
+          opacity: 0.6;
+          text-align: center;
+        }
+      `}</style>
     </>
   );
 }
