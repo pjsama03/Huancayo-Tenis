@@ -3,6 +3,42 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as PlayersData from './data/playersAndClubsData';
 import * as StoreData from './data/storeAndTournamentsData';
 import * as Engine from './utils/tenisEngine';
+import {
+  buildWhatsappLink,
+  dbToChallenge,
+  dbToClub,
+  dbToCoach,
+  dbToPlayer,
+  dbToProduct,
+  dbToTournament,
+  deleteCloudChallenge,
+  deleteCloudPlayer,
+  fetchAllCloudState,
+  fetchPlayerGemLedger,
+  formatPeruDate,
+  getCloudSession,
+  hoursLeftForAutoConfirm,
+  insertGemLedgerEntry,
+  isCloudReady,
+  isScoreReadyForAutoConfirm,
+  linkOneSignalUser,
+  normalizePeruPhone,
+  onCloudAuthStateChange,
+  purgeDemoPlayers,
+  requestPushPermission,
+  runWithLock,
+  saveCloudSetting,
+  sendPushNotification,
+  signOutCloudAccount,
+  submitOfficialComplaintRpc,
+  submitWeatherReportRpc,
+  subscribeToCloudRealtime,
+  uploadCompressedMedia,
+  upsertCloudChallenge,
+  upsertCloudClub,
+  upsertCloudPlayer,
+  upsertCloudTournament,
+} from './utils/cloudService';
 
 import {
   IconBadge,
@@ -39,16 +75,15 @@ import OnboardingTutorialModal, {
    ZONA DE EDICIÓN RÁPIDA (CONFIGURACIÓN GLOBAL DEL MOTOR DE LA APP)
    ========================================================================== */
 export const APP_RUNTIME_CONFIG = {
-  storageKey: 'tt_total_tenis_state_v2',
   themeStorageKey: 'tt_theme_pref_v2',
   firstVisitKey: 'tt_visited_before_v2',
   defaultTab: 'retos',
-  toastDurationMs: 3600,
+  toastDurationMs: 3800,
   tickerMessages: [
     { id: 'tk-1', text: 'Tips gratis de la semana en cancha → Ver ahora', action: 'sedes' },
-    { id: 'tk-2', text: 'Top 8 del Ranking van al Master Top 8', action: 'master' },
-    { id: 'tk-3', text: 'Reporta el estado de tu sede y suma +5 Gemas', action: 'sedes' },
-    { id: 'tk-4', text: 'Canjea tus Gemas en el Pro Shop (20 💎 = S/ 1.00)', action: 'shop' },
+    { id: 'tk-2', text: 'Top 8 del Ranking clasifican al Master Top 8', action: 'master' },
+    { id: 'tk-3', text: 'Reporta el estado dentro de tu sede y suma +3 Gemas', action: 'sedes' },
+    { id: 'tk-4', text: 'Canjea tus Gemas por beneficios y stock en el Pro Shop', action: 'shop' },
   ],
 };
 
@@ -90,7 +125,7 @@ function SlimTickerBar({ onSelectTab, onOpenMaster, onOpenShop }) {
 }
 
 /* ==========================================================================
-   RESPALDOS SEGUROS DE ESTADO INICIAL
+   SEMILLAS DE RESPALDO (SOLO SI UNA TABLA EN SUPABASE ESTÁ VACÍA AL ARRANCAR)
    ========================================================================== */
 function buildInitialPlayers() {
   const src = PlayersData.INITIAL_PLAYERS || PlayersData.DEMO_PLAYERS || [];
@@ -106,12 +141,16 @@ function buildInitialClubs() {
   return PlayersData.INITIAL_CLUBS || [];
 }
 
-function buildInitialChallenges() {
-  return PlayersData.INITIAL_CHALLENGES || StoreData.INITIAL_CHALLENGES || [];
+function buildInitialCoaches() {
+  return PlayersData.INITIAL_COACHES || StoreData.INITIAL_COACHES || [];
 }
 
 function buildInitialTournaments() {
   return StoreData.INITIAL_TOURNAMENTS || StoreData.TOURNAMENTS_CATALOG || [];
+}
+
+function buildInitialProducts() {
+  return StoreData.PROSHOP_PRODUCTS || StoreData.INITIAL_PRODUCTS || [];
 }
 
 function buildInitialSnapshots(playersList) {
@@ -140,77 +179,64 @@ function buildInitialSnapshots(playersList) {
   };
 }
 
-function loadPersistedBundle() {
-  try {
-    const raw = window.localStorage.getItem(APP_RUNTIME_CONFIG.storageKey);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!parsed || !Array.isArray(parsed.players) || parsed.players.length === 0) {
-      return null;
-    }
-    const migratedPlayers = parsed.players.map((p) => ({
-      ...p,
-      gems: p.gems === 0 && (p.wins || 0) > 0 ? (p.isVip ? 220 : 35) : Number(p.gems) || 0,
-    }));
-    return { ...parsed, players: migratedPlayers };
-  } catch (e) {
-    return null;
+function mergeListById(prevList, nextItem, prepend = true) {
+  if (!nextItem?.id) return prevList;
+  const exists = prevList.some((item) => item.id === nextItem.id);
+  if (exists) {
+    return prevList.map((item) => (item.id === nextItem.id ? { ...item, ...nextItem } : item));
   }
+  return prepend ? [nextItem, ...prevList] : [...prevList, nextItem];
 }
 
 /* ==========================================================================
-   COMPONENTE RAÍZ MAESTRO: App
+   COMPONENTE RAÍZ MAESTRO: App (CONECTADO EN VIVO A SUPABASE + ONESIGNAL)
    ========================================================================== */
 export default function App() {
   const scrollContainerRef = useRef(null);
   const toastTimerRef = useRef(null);
+  const playersRef = useRef([]);
 
-  const initialBundle = useMemo(() => {
-    const saved = typeof window !== 'undefined' ? loadPersistedBundle() : null;
-    const basePlayers = saved?.players || buildInitialPlayers();
+  const defaultSeeds = useMemo(() => {
+    const seededPlayers = buildInitialPlayers();
     return {
-      players: basePlayers,
-      clubs: saved?.clubs?.length ? saved.clubs : buildInitialClubs(),
-      challenges: saved?.challenges || buildInitialChallenges(),
-      tournaments: saved?.tournaments || buildInitialTournaments(),
-      seasonSnapshots: saved?.seasonSnapshots || buildInitialSnapshots(basePlayers),
-      currentUserId:
-        saved?.currentUserId !== undefined
-          ? saved.currentUserId
-          : basePlayers[0]?.id || null,
-      gemLedger: saved?.gemLedger || [],
-      complaints: saved?.complaints || [],
-      notices: saved?.notices || [],
-      sponsorsConfig: saved?.sponsorsConfig || null,
+      players: seededPlayers,
+      clubs: buildInitialClubs(),
+      coaches: buildInitialCoaches(),
+      tournaments: buildInitialTournaments(),
+      products: buildInitialProducts(),
+      seasonSnapshots: buildInitialSnapshots(seededPlayers),
     };
   }, []);
 
-  const [players, setPlayers] = useState(initialBundle.players);
-  const [clubs, setClubs] = useState(initialBundle.clubs);
-  const [challenges, setChallenges] = useState(initialBundle.challenges);
-  const [tournaments, setTournaments] = useState(initialBundle.tournaments);
-  const [seasonSnapshots, setSeasonSnapshots] = useState(initialBundle.seasonSnapshots);
-  const [currentUserId, setCurrentUserId] = useState(initialBundle.currentUserId);
-  const [gemLedger, setGemLedger] = useState(initialBundle.gemLedger);
-  const [complaints, setComplaints] = useState(initialBundle.complaints);
-  const [notices, setNotices] = useState(initialBundle.notices);
-  const [sponsorsConfig, setSponsorsConfig] = useState(initialBundle.sponsorsConfig);
+  const [players, setPlayers] = useState(defaultSeeds.players);
+  const [clubs, setClubs] = useState(defaultSeeds.clubs);
+  const [coaches, setCoaches] = useState(defaultSeeds.coaches);
+  const [challenges, setChallenges] = useState([]);
+  const [tournaments, setTournaments] = useState(defaultSeeds.tournaments);
+  const [products, setProducts] = useState(defaultSeeds.products);
+  const [seasonSnapshots, setSeasonSnapshots] = useState(defaultSeeds.seasonSnapshots);
+  const [currentUserId, setCurrentUserId] = useState(null);
+  const [gemLedger, setGemLedger] = useState([]);
+  const [complaints, setComplaints] = useState([]);
+  const [notices, setNotices] = useState([]);
+  const [sponsorsConfig, setSponsorsConfig] = useState(null);
+  const [cloudSynced, setCloudSynced] = useState(false);
 
   const [theme, setTheme] = useState(() => {
     try {
       return window.localStorage.getItem(APP_RUNTIME_CONFIG.themeStorageKey) || 'dark';
-    } catch (e) {
+    } catch {
       return 'dark';
     }
   });
-  const [sunlightMode, setSunlightMode] = useState(false);
+  const sunlightMode = false;
   const [performanceTier, setPerformanceTier] = useState('standard');
 
   const [showSplash, setShowSplash] = useState(true);
   const [isFirstVisit] = useState(() => {
     try {
       return !window.localStorage.getItem(APP_RUNTIME_CONFIG.firstVisitKey);
-    } catch (e) {
+    } catch {
       return false;
     }
   });
@@ -234,7 +260,13 @@ export default function App() {
 
   const [inspectPlayerId, setInspectPlayerId] = useState(null);
   const [dismissedIncomingIds, setDismissedIncomingIds] = useState([]);
+  const [dismissedScoreIds, setDismissedScoreIds] = useState([]);
+  const [busyActionId, setBusyActionId] = useState(null);
   const [toast, setToast] = useState(null);
+
+  useEffect(() => {
+    playersRef.current = players;
+  }, [players]);
 
   const showToast = useCallback((message, type = 'info') => {
     if (!message) return;
@@ -245,11 +277,14 @@ export default function App() {
     }, APP_RUNTIME_CONFIG.toastDurationMs);
   }, []);
 
+  /* ------------------------------------------------------------------------
+     1. TEMA Y RENDIMIENTO ADAPTATIVO POR GAMA DE CELULAR
+     ------------------------------------------------------------------------ */
   useEffect(() => {
     if (typeof document === 'undefined') return;
     const html = document.documentElement;
     html.setAttribute('data-theme', theme);
-    html.setAttribute('data-sunlight', sunlightMode ? 'true' : 'false');
+    html.setAttribute('data-sunlight', 'false');
     html.setAttribute('data-tier', performanceTier);
 
     const metaTheme = document.querySelector('meta[name="theme-color"]');
@@ -259,10 +294,10 @@ export default function App() {
 
     try {
       window.localStorage.setItem(APP_RUNTIME_CONFIG.themeStorageKey, theme);
-    } catch (e) {
+    } catch {
       // continuar
     }
-  }, [theme, sunlightMode, performanceTier]);
+  }, [theme, performanceTier]);
 
   useEffect(() => {
     if (typeof navigator === 'undefined') return;
@@ -275,43 +310,188 @@ export default function App() {
     }
   }, []);
 
-  useEffect(() => {
-    try {
-      const payload = {
-        players,
-        clubs,
-        challenges,
-        tournaments,
-        seasonSnapshots,
-        currentUserId,
-        gemLedger: gemLedger.slice(0, 60),
-        complaints: complaints.slice(0, 100),
-        notices: notices.slice(0, 40),
-        sponsorsConfig,
-        savedAt: new Date().toISOString(),
-      };
-      window.localStorage.setItem(APP_RUNTIME_CONFIG.storageKey, JSON.stringify(payload));
-    } catch (e) {
-      // continuar
-    }
-  }, [
-    players,
-    clubs,
-    challenges,
-    tournaments,
-    seasonSnapshots,
-    currentUserId,
-    gemLedger,
-    complaints,
-    notices,
-    sponsorsConfig,
-  ]);
+  /* ------------------------------------------------------------------------
+     2. SINCRONIZACIÓN INICIAL SUPABASE + SESIÓN REAL + SUSCRIPCIÓN REALTIME
+     ------------------------------------------------------------------------ */
+  const resolveSessionPlayer = useCallback((session, list) => {
+    if (!session?.user) return null;
+    const authId = session.user.id;
+    const email = String(session.user.email || '').trim().toLowerCase();
+    return (
+      (list || []).find((p) => p.authId && p.authId === authId) ||
+      (list || []).find((p) => p.email && p.email.toLowerCase() === email) ||
+      null
+    );
+  }, []);
 
+  useEffect(() => {
+    let mounted = true;
+    if (!isCloudReady) {
+      setCloudSynced(true);
+      return undefined;
+    }
+
+    (async () => {
+      try {
+        const [cloudData, session] = await Promise.all([
+          fetchAllCloudState(defaultSeeds),
+          getCloudSession(),
+        ]);
+
+        if (!mounted) return;
+
+        let loadedPlayers = defaultSeeds.players;
+        if (cloudData) {
+          if (cloudData.players?.length) {
+            loadedPlayers = cloudData.players;
+            setPlayers(cloudData.players);
+          }
+          if (cloudData.clubs?.length) setClubs(cloudData.clubs);
+          if (cloudData.coaches?.length) setCoaches(cloudData.coaches);
+          if (Array.isArray(cloudData.challenges)) setChallenges(cloudData.challenges);
+          if (cloudData.tournaments?.length) setTournaments(cloudData.tournaments);
+          if (cloudData.products?.length) setProducts(cloudData.products);
+          if (Array.isArray(cloudData.complaints)) setComplaints(cloudData.complaints);
+          if (cloudData.seasonSnapshots?.seasons?.length) {
+            setSeasonSnapshots(cloudData.seasonSnapshots);
+          }
+          if (cloudData.sponsorsConfig) setSponsorsConfig(cloudData.sponsorsConfig);
+        }
+
+        const matched = resolveSessionPlayer(session, loadedPlayers);
+        if (matched) {
+          setCurrentUserId(matched.id);
+          setIsAdminSession(Boolean(matched.isAdmin));
+          linkOneSignalUser(matched.id);
+        }
+      } catch (err) {
+        console.error('[TOTAL TENIS] Error en carga inicial cloud:', err);
+      } finally {
+        if (mounted) setCloudSynced(true);
+      }
+    })();
+
+    const unsubscribeAuth = onCloudAuthStateChange((event, session) => {
+      if (!mounted) return;
+      if (event === 'SIGNED_OUT' || !session?.user) {
+        setCurrentUserId(null);
+        setIsAdminSession(false);
+        return;
+      }
+      const matched = resolveSessionPlayer(session, playersRef.current);
+      if (matched) {
+        setCurrentUserId(matched.id);
+        setIsAdminSession(Boolean(matched.isAdmin));
+        linkOneSignalUser(matched.id);
+      }
+    });
+
+    const unsubscribeRealtime = subscribeToCloudRealtime({
+      onProfileChange: (payload) => {
+        if (!mounted) return;
+        if (payload.eventType === 'DELETE') {
+          const oldId = payload.old?.id;
+          if (oldId) setPlayers((prev) => prev.filter((p) => p.id !== oldId));
+          return;
+        }
+        const next = dbToPlayer(payload.new);
+        if (!next) return;
+        setPlayers((prev) =>
+          mergeListById(prev, next, false).sort((a, b) => (Number(b.points) || 0) - (Number(a.points) || 0))
+        );
+      },
+      onChallengeChange: (payload) => {
+        if (!mounted) return;
+        if (payload.eventType === 'DELETE') {
+          const oldId = payload.old?.id;
+          if (oldId) setChallenges((prev) => prev.filter((c) => c.id !== oldId));
+          return;
+        }
+        const next = dbToChallenge(payload.new);
+        if (next) setChallenges((prev) => mergeListById(prev, next, true));
+      },
+      onTournamentChange: (payload) => {
+        if (!mounted) return;
+        if (payload.eventType === 'DELETE') {
+          const oldId = payload.old?.id;
+          if (oldId) setTournaments((prev) => prev.filter((t) => t.id !== oldId));
+          return;
+        }
+        const next = dbToTournament(payload.new);
+        if (next) setTournaments((prev) => mergeListById(prev, next, true));
+      },
+      onClubChange: (payload) => {
+        if (!mounted) return;
+        const next = dbToClub(payload.new);
+        if (next) setClubs((prev) => mergeListById(prev, next, false));
+      },
+      onCoachChange: (payload) => {
+        if (!mounted) return;
+        const next = dbToCoach(payload.new);
+        if (next) setCoaches((prev) => mergeListById(prev, next, false));
+      },
+      onProductChange: (payload) => {
+        if (!mounted) return;
+        if (payload.eventType === 'DELETE') {
+          const oldId = payload.old?.id;
+          if (oldId) setProducts((prev) => prev.filter((p) => p.id !== oldId));
+          return;
+        }
+        const next = dbToProduct(payload.new);
+        if (next) {
+          setProducts((prev) =>
+            mergeListById(prev, next, false).sort((a, b) => (a.sortOrder || 10) - (b.sortOrder || 10))
+          );
+        }
+      },
+      onSettingChange: (payload) => {
+        if (!mounted || !payload?.new) return;
+        if (payload.new.key === 'season_snapshots' && payload.new.value) {
+          setSeasonSnapshots(payload.new.value);
+        }
+        if (payload.new.key === 'sponsors_config') {
+          setSponsorsConfig(payload.new.value || null);
+        }
+      },
+    });
+
+    return () => {
+      mounted = false;
+      unsubscribeAuth();
+      unsubscribeRealtime();
+    };
+  }, [defaultSeeds, resolveSessionPlayer]);
+
+  /* Cargar historial de Gemas real + vincular Push cuando cambia el usuario */
+  useEffect(() => {
+    if (!currentUserId) {
+      setGemLedger([]);
+      return;
+    }
+    linkOneSignalUser(currentUserId);
+    const activeObj = playersRef.current.find((p) => p.id === currentUserId);
+    if (activeObj?.isAdmin) setIsAdminSession(true);
+
+    let alive = true;
+    fetchPlayerGemLedger(currentUserId)
+      .then((rows) => {
+        if (alive && Array.isArray(rows)) setGemLedger(rows);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [currentUserId]);
+
+  /* ------------------------------------------------------------------------
+     3. DERIVADOS DE ESTADO Y DETECCIÓN MULTIUSUARIO (RETOS Y CONFIRMACIÓN)
+     ------------------------------------------------------------------------ */
   const currentUser = useMemo(
     () => players.find((p) => p.id === currentUserId) || null,
     [players, currentUserId]
   );
 
+  const effectiveIsAdmin = Boolean(isAdminSession || currentUser?.isAdmin);
   const activePlayers = useMemo(() => players.filter((p) => !p.isPaused), [players]);
   const activeClubs = useMemo(() => clubs.filter((c) => c.active !== false), [clubs]);
   const inspectedPlayer = useMemo(
@@ -329,10 +509,34 @@ export default function App() {
     return challenges.filter((c) => c.status === 'PENDING' && c.playerBId === currentUser.id);
   }, [challenges, currentUser?.id]);
 
+  const pendingScoreConfirmations = useMemo(() => {
+    if (!currentUser?.id) return [];
+    return challenges.filter((c) => {
+      if (c.status !== 'SCORE_PROPOSED') return false;
+      const isParticipant = c.playerAId === currentUser.id || c.playerBId === currentUser.id;
+      if (!isParticipant) return false;
+      // Le aparece al rival para confirmar, o al proponente si ya pasaron 24h sin respuesta
+      if (c.proposedBy !== currentUser.id) return true;
+      return isScoreReadyForAutoConfirm(c);
+    });
+  }, [challenges, currentUser?.id]);
+
   const popupChallenge = useMemo(() => {
     if (showSplash || authModal.open || !currentUser?.id) return null;
     return incomingPendingChallenges.find((c) => !dismissedIncomingIds.includes(c.id)) || null;
   }, [showSplash, authModal.open, currentUser?.id, incomingPendingChallenges, dismissedIncomingIds]);
+
+  const scoreConfirmChallenge = useMemo(() => {
+    if (showSplash || authModal.open || popupChallenge || !currentUser?.id) return null;
+    return pendingScoreConfirmations.find((c) => !dismissedScoreIds.includes(c.id)) || null;
+  }, [
+    showSplash,
+    authModal.open,
+    popupChallenge,
+    currentUser?.id,
+    pendingScoreConfirmations,
+    dismissedScoreIds,
+  ]);
 
   const activeTournamentsCount = useMemo(
     () => tournaments.filter((t) => t.status === 'OPEN' || t.status === 'IN_PLAY').length,
@@ -341,8 +545,8 @@ export default function App() {
 
   const unreadNoticesCount = useMemo(() => {
     const unreadCustom = notices.filter((n) => !n.read).length;
-    return incomingPendingChallenges.length + unreadCustom;
-  }, [incomingPendingChallenges.length, notices]);
+    return incomingPendingChallenges.length + pendingScoreConfirmations.length + unreadCustom;
+  }, [incomingPendingChallenges.length, pendingScoreConfirmations.length, notices]);
 
   const scrollMainToTop = useCallback(() => {
     if (scrollContainerRef.current) {
@@ -373,89 +577,408 @@ export default function App() {
     setShowSplash(false);
     try {
       window.localStorage.setItem(APP_RUNTIME_CONFIG.firstVisitKey, '1');
-    } catch (e) {
+    } catch {
       // continuar
     }
   }, []);
 
-  const appendGemLedger = useCallback((entry) => {
-    setGemLedger((prev) => [{ id: `lg-${Date.now()}`, ...entry }, ...prev]);
-  }, []);
+  /* ------------------------------------------------------------------------
+     4. ACCIONES CONECTADAS A SUPABASE + STORAGE + PUSH + CANDADO 4G
+     ------------------------------------------------------------------------ */
+  const appendGemLedger = useCallback(
+    async (entry, targetPlayerId = currentUserId) => {
+      const localEntry = {
+        id: `lg-${Date.now()}`,
+        date: entry.date || formatPeruDate(new Date(), false) || 'Hoy',
+        ...entry,
+      };
+      if (!targetPlayerId || targetPlayerId === currentUserId) {
+        setGemLedger((prev) => [localEntry, ...prev]);
+      }
+      if (targetPlayerId) {
+        try {
+          await insertGemLedgerEntry({
+            playerId: targetPlayerId,
+            type: entry.type || 'credit',
+            amount: Number(entry.amount) || 0,
+            title: entry.title || 'Movimiento de Gemas',
+            detail: entry.detail || '',
+          });
+        } catch {
+          // no bloquear UI
+        }
+      }
+    },
+    [currentUserId]
+  );
 
-  const handleUpdatePlayer = useCallback((playerId, patch) => {
-    setPlayers((prev) => prev.map((p) => (p.id === playerId ? { ...p, ...patch } : p)));
-  }, []);
+  const handleUpdatePlayer = useCallback(
+    async (playerId, patch) => {
+      if (!playerId || !patch) return;
+      const finalPatch = { ...patch };
 
-  const handleCreateChallenge = useCallback((newChallenge) => {
-    setChallenges((prev) => [newChallenge, ...prev]);
-  }, []);
+      if (finalPatch.whatsapp !== undefined) {
+        finalPatch.whatsapp = normalizePeruPhone(finalPatch.whatsapp);
+      }
 
-  const handleUpdateChallenge = useCallback((challengeId, patch) => {
-    setChallenges((prev) => prev.map((c) => (c.id === challengeId ? { ...c, ...patch } : c)));
-  }, []);
+      // Compresión automática 800px + subida a Supabase Storage 'media'
+      if (
+        finalPatch.avatar &&
+        (String(finalPatch.avatar).startsWith('data:image/') || finalPatch.avatar instanceof Blob)
+      ) {
+        try {
+          const uploadedUrl = await uploadCompressedMedia(finalPatch.avatar, 'avatars', playerId);
+          if (uploadedUrl) finalPatch.avatar = uploadedUrl;
+        } catch (err) {
+          console.error('[TOTAL TENIS] Error subiendo foto a media:', err);
+          showToast('No se pudo subir la foto a la nube. Intenta con otra imagen.', 'warning');
+          return;
+        }
+      }
 
-  const handleFinalizeMatch = useCallback(
-    ({ challenge, eloResult, liveScore }) => {
-      if (!challenge || !eloResult?.ok) return;
-      const winnerId = eloResult.winnerSide === 'A' ? challenge.playerAId : challenge.playerBId;
+      const existing = playersRef.current.find((p) => p.id === playerId);
+      const merged = existing ? { ...existing, ...finalPatch } : { id: playerId, ...finalPatch };
 
-      setChallenges((prev) =>
-        prev.map((c) =>
-          c.id === challenge.id
-            ? {
-                ...c,
-                status: 'FINISHED',
-                liveScore,
-                winnerId,
-                scoreSummary: eloResult.summary,
-                eloDeltaA: eloResult.deltaA,
-                eloDeltaB: eloResult.deltaB,
-                finishedAt: new Date().toISOString(),
-              }
-            : c
-        )
-      );
+      setPlayers((prev) => prev.map((p) => (p.id === playerId ? merged : p)));
 
-      setPlayers((prev) =>
-        prev.map((p) => {
-          if (p.id === challenge.playerAId || p.id === challenge.playerBId) {
-            const isA = p.id === challenge.playerAId;
-            const won = p.id === winnerId;
-            const nextPoints = isA ? eloResult.newPointsA : eloResult.newPointsB;
-            const nextStreak = won ? (Number(p.streak) || 0) + 1 : 0;
-            const nextCalib = Math.min(
-              Engine.ELO_CONFIG?.CALIBRATION_MATCHES || 5,
-              (Number(p.calibrationPlayed) || 0) + 1
-            );
-            let bonusGems = 0;
-            if (won && nextStreak >= 3) bonusGems = p.isVip ? 13 : 5;
+      try {
+        await upsertCloudPlayer(merged);
+      } catch (err) {
+        console.error('[TOTAL TENIS] Error guardando perfil:', err);
+        showToast('No se pudieron guardar los cambios en la nube.', 'warning');
+      }
+    },
+    [showToast]
+  );
 
-            return {
+  const handleCreateChallenge = useCallback(
+    async (newChallenge) => {
+      if (!newChallenge?.id) return;
+      const res = await runWithLock(`create-challenge-${newChallenge.id}`, async () => {
+        setChallenges((prev) => mergeListById(prev, newChallenge, true));
+        await upsertCloudChallenge(newChallenge);
+
+        const challenger = playersRef.current.find((p) => p.id === newChallenge.playerAId);
+        if (newChallenge.playerBId) {
+          sendPushNotification({
+            targetPlayerIds: [newChallenge.playerBId],
+            title: '¡Nuevo desafío en TOTAL TENIS!',
+            message: `${challenger?.name || 'Un jugador'} te retó en ${
+              newChallenge.clubName || 'cancha'
+            } (${newChallenge.dateLabel || ''} ${newChallenge.timeLabel || ''}).`,
+            path: '/',
+          });
+        }
+        requestPushPermission();
+      });
+
+      if (res.locked) return;
+    },
+    []
+  );
+
+  const handleUpdateChallenge = useCallback(
+    async (challengeId, patch) => {
+      if (!challengeId || !patch) return;
+      const current = challenges.find((c) => c.id === challengeId);
+      if (!current) return;
+
+      // Seguridad multiusuario: solo contendientes o admin pueden editar un reto
+      const isParticipant =
+        currentUser?.id &&
+        (current.playerAId === currentUser.id || current.playerBId === currentUser.id);
+      if (!isParticipant && !effectiveIsAdmin) {
+        showToast('Solo los contendientes pueden modificar este encuentro.', 'warning');
+        return;
+      }
+
+      const updated = { ...current, ...patch };
+      await runWithLock(`update-challenge-${challengeId}`, async () => {
+        setChallenges((prev) => prev.map((c) => (c.id === challengeId ? updated : c)));
+        try {
+          await upsertCloudChallenge(updated);
+        } catch (err) {
+          console.error('[TOTAL TENIS] Error actualizando reto:', err);
+          showToast('Error sincronizando el reto. Intenta de nuevo.', 'warning');
+          return;
+        }
+
+        if (patch.status === 'SCHEDULED' && current.status !== 'SCHEDULED') {
+          const acceptor = playersRef.current.find((p) => p.id === current.playerBId);
+          sendPushNotification({
+            targetPlayerIds: [current.playerAId],
+            title: '¡Desafío aceptado!',
+            message: `${acceptor?.name || 'Tu rival'} aceptó el partido en ${current.clubName}.`,
+            path: '/',
+          });
+        } else if (patch.status === 'DECLINED' && current.status !== 'DECLINED') {
+          const targetId =
+            currentUser?.id === current.playerAId ? current.playerBId : current.playerAId;
+          sendPushNotification({
+            targetPlayerIds: [targetId],
+            title: 'Desafío cancelado',
+            message: `El reto programado en ${current.clubName} fue cancelado.`,
+            path: '/',
+          });
+        }
+      });
+    },
+    [challenges, currentUser?.id, effectiveIsAdmin, showToast]
+  );
+
+  /* Confirmación definitiva de puntos (ejecutada UNA sola vez con candado 4G) */
+  const applyOfficialMatchResult = useCallback(
+    async ({ challenge, winnerSide, summary, deltaA, deltaB, newPointsA, newPointsB, liveScore }) => {
+      if (!challenge?.id) return;
+
+      const lockRes = await runWithLock(`apply-result-${challenge.id}`, async () => {
+        setBusyActionId(challenge.id);
+        const winnerId = winnerSide === 'A' ? challenge.playerAId : challenge.playerBId;
+        const finishedChallenge = {
+          ...challenge,
+          status: 'FINISHED',
+          liveScore: liveScore || challenge.liveScore || {},
+          winnerId,
+          scoreSummary: summary || challenge.scoreSummary || '',
+          eloDeltaA: Number(deltaA) || 0,
+          eloDeltaB: Number(deltaB) || 0,
+          finishedAt: new Date().toISOString(),
+        };
+
+        const playerA = playersRef.current.find((p) => p.id === challenge.playerAId);
+        const playerB = playersRef.current.find((p) => p.id === challenge.playerBId);
+
+        const buildUpdatedPlayer = (p, isA) => {
+          if (!p) return null;
+          const won = p.id === winnerId;
+          const computedPoints = isA
+            ? Number.isFinite(Number(newPointsA))
+              ? Number(newPointsA)
+              : Math.max(0, (Number(p.points) || 1200) + (Number(deltaA) || 0))
+            : Number.isFinite(Number(newPointsB))
+              ? Number(newPointsB)
+              : Math.max(0, (Number(p.points) || 1200) + (Number(deltaB) || 0));
+
+          const nextStreak = won ? (Number(p.streak) || 0) + 1 : 0;
+          const nextCalib = Math.min(
+            Engine.ELO_CONFIG?.CALIBRATION_MATCHES || 5,
+            (Number(p.calibrationPlayed) || 0) + 1
+          );
+          let bonusGems = 0;
+          if (won && nextStreak >= 3) bonusGems = p.isVip ? 13 : 5;
+
+          return {
+            updated: {
               ...p,
-              points: nextPoints,
+              points: computedPoints,
               wins: (Number(p.wins) || 0) + (won ? 1 : 0),
               losses: (Number(p.losses) || 0) + (won ? 0 : 1),
               streak: nextStreak,
               calibrationPlayed: nextCalib,
               rankTrend: won ? Math.max(1, (Number(p.rankTrend) || 0) + 1) : -1,
               gems: (Number(p.gems) || 0) + bonusGems,
-            };
-          }
-          return p;
-        })
-      );
+            },
+            bonusGems,
+          };
+        };
 
-      if (winnerId === currentUserId) {
-        appendGemLedger({
-          type: 'credit',
-          amount: 5,
-          title: 'Partido oficial completado',
-          date: 'Hoy',
-          detail: `Marcador ${eloResult.summary}`,
+        const resA = buildUpdatedPlayer(playerA, true);
+        const resB = buildUpdatedPlayer(playerB, false);
+
+        setChallenges((prev) =>
+          prev.map((c) => (c.id === challenge.id ? finishedChallenge : c))
+        );
+        setPlayers((prev) =>
+          prev
+            .map((p) => {
+              if (resA && p.id === resA.updated.id) return resA.updated;
+              if (resB && p.id === resB.updated.id) return resB.updated;
+              return p;
+            })
+            .sort((a, b) => (Number(b.points) || 0) - (Number(a.points) || 0))
+        );
+
+        await Promise.all([
+          upsertCloudChallenge(finishedChallenge),
+          resA ? upsertCloudPlayer(resA.updated) : Promise.resolve(),
+          resB ? upsertCloudPlayer(resB.updated) : Promise.resolve(),
+        ]);
+
+        if (resA?.bonusGems > 0) {
+          appendGemLedger(
+            {
+              type: 'credit',
+              amount: resA.bonusGems,
+              title: 'Bono por racha ganadora',
+              detail: `Marcador ${finishedChallenge.scoreSummary}`,
+            },
+            resA.updated.id
+          );
+        }
+        if (resB?.bonusGems > 0) {
+          appendGemLedger(
+            {
+              type: 'credit',
+              amount: resB.bonusGems,
+              title: 'Bono por racha ganadora',
+              detail: `Marcador ${finishedChallenge.scoreSummary}`,
+            },
+            resB.updated.id
+          );
+        }
+
+        sendPushNotification({
+          targetPlayerIds: [challenge.playerAId, challenge.playerBId],
+          title: 'Marcador oficial confirmado',
+          message: `Resultado final ${finishedChallenge.scoreSummary}. Tu puntaje en el ranking ya se actualizó.`,
+          path: '/',
         });
+
+        setDismissedScoreIds((prev) => prev.filter((id) => id !== challenge.id));
+        setBusyActionId(null);
+      });
+
+      if (lockRes.locked) {
+        showToast('Ya estamos procesando este marcador, espera un segundo...', 'info');
       }
     },
-    [currentUserId, appendGemLedger]
+    [appendGemLedger, showToast]
+  );
+
+  /* Doble confirmación de marcador (Punto 3) */
+  const handleFinalizeMatch = useCallback(
+    async ({ challenge, eloResult, liveScore }) => {
+      if (!challenge || !eloResult?.ok) return;
+
+      const isParticipant =
+        currentUser?.id &&
+        (challenge.playerAId === currentUser.id || challenge.playerBId === currentUser.id);
+
+      if (!isParticipant && !effectiveIsAdmin) {
+        showToast('Solo los contendientes o el Comité pueden cargar resultados.', 'warning');
+        return;
+      }
+
+      // Si es Admin o el rival ya había propuesto el score, se aplica oficialmente
+      const canFinalizeImmediately =
+        effectiveIsAdmin ||
+        (challenge.status === 'SCORE_PROPOSED' &&
+          challenge.proposedBy &&
+          challenge.proposedBy !== currentUser?.id);
+
+      if (canFinalizeImmediately) {
+        await applyOfficialMatchResult({
+          challenge,
+          winnerSide: eloResult.winnerSide,
+          summary: eloResult.summary,
+          deltaA: eloResult.deltaA,
+          deltaB: eloResult.deltaB,
+          newPointsA: eloResult.newPointsA,
+          newPointsB: eloResult.newPointsB,
+          liveScore,
+        });
+        showToast('Marcador confirmado y puntos actualizados en vivo.', 'success');
+        return;
+      }
+
+      // Primer envío: queda en SCORE_PROPOSED esperando confirmación del rival
+      await runWithLock(`propose-score-${challenge.id}`, async () => {
+        const winnerId = eloResult.winnerSide === 'A' ? challenge.playerAId : challenge.playerBId;
+        const proposedChallenge = {
+          ...challenge,
+          status: 'SCORE_PROPOSED',
+          proposedBy: currentUser?.id || '',
+          winnerId,
+          scoreSummary: eloResult.summary,
+          eloDeltaA: eloResult.deltaA,
+          eloDeltaB: eloResult.deltaB,
+          liveScore: {
+            ...(liveScore || challenge.liveScore || {}),
+            _meta: {
+              proposedAt: new Date().toISOString(),
+              proposedBy: currentUser?.id || '',
+              winnerSide: eloResult.winnerSide,
+              newPointsA: eloResult.newPointsA,
+              newPointsB: eloResult.newPointsB,
+            },
+          },
+        };
+
+        setChallenges((prev) =>
+          prev.map((c) => (c.id === challenge.id ? proposedChallenge : c))
+        );
+        await upsertCloudChallenge(proposedChallenge);
+
+        const rivalId =
+          currentUser?.id === challenge.playerAId ? challenge.playerBId : challenge.playerAId;
+        sendPushNotification({
+          targetPlayerIds: [rivalId],
+          title: 'Confirma tu marcador en TOTAL TENIS',
+          message: `${currentUser?.name || 'Tu rival'} registró ${eloResult.summary}. Ábrelo para confirmar o impugnar.`,
+          path: '/',
+        });
+
+        showToast(
+          'Marcador enviado a tu rival. Cuando lo confirme (o tras 24h) se actualizarán los puntos.',
+          'success'
+        );
+      });
+    },
+    [currentUser, effectiveIsAdmin, applyOfficialMatchResult, showToast]
+  );
+
+  const handleConfirmProposedScore = useCallback(
+    async (ch) => {
+      if (!ch || ch.status !== 'SCORE_PROPOSED') return;
+      const meta = ch.liveScore?._meta || {};
+      const winnerSide =
+        meta.winnerSide || (ch.winnerId === ch.playerAId ? 'A' : 'B');
+
+      await applyOfficialMatchResult({
+        challenge: ch,
+        winnerSide,
+        summary: ch.scoreSummary,
+        deltaA: ch.eloDeltaA,
+        deltaB: ch.eloDeltaB,
+        newPointsA: meta.newPointsA,
+        newPointsB: meta.newPointsB,
+        liveScore: ch.liveScore,
+      });
+      triggerHaptic('success');
+      showToast('¡Marcador confirmado oficialmente! El ranking ya se actualizó.', 'success');
+    },
+    [applyOfficialMatchResult, showToast]
+  );
+
+  const handleDisputeProposedScore = useCallback(
+    async (ch) => {
+      if (!ch) return;
+      await runWithLock(`dispute-score-${ch.id}`, async () => {
+        const updated = {
+          ...ch,
+          status: 'DISPUTED',
+          disputeNote: `Impugnado por ${currentUser?.name || 'el rival'} el ${formatPeruDate(
+            new Date(),
+            true
+          )}`,
+        };
+        setChallenges((prev) => prev.map((c) => (c.id === ch.id ? updated : c)));
+        setDismissedScoreIds((prev) => [...prev, ch.id]);
+        await upsertCloudChallenge(updated);
+
+        const otherId =
+          currentUser?.id === ch.playerAId ? ch.playerBId : ch.playerAId;
+        sendPushNotification({
+          targetPlayerIds: [otherId],
+          title: 'Marcador en revisión',
+          message: `${currentUser?.name || 'Tu rival'} observó el resultado ${ch.scoreSummary}. El Comité revisará el caso.`,
+          path: '/',
+        });
+
+        showToast('Marcador impugnado. El Comité revisará el partido sin mover tus puntos.', 'warning');
+      });
+    },
+    [currentUser, showToast]
   );
 
   const handleQuickChallengeFromAnywhere = useCallback(
@@ -469,109 +992,173 @@ export default function App() {
       setActiveTab('retos');
       scrollMainToTop();
       showToast(
-        `Ve a "Lanzar Reto" para pactar horario y sede con ${rival?.name || 'tu rival'}.`,
+        `Toca "Lanzar un reto" para pactar horario y sede con ${rival?.name || 'tu rival'}.`,
         'info'
       );
     },
     [currentUser, scrollMainToTop, showToast]
   );
 
-  const handleRequestTournamentInscription = useCallback(({ tournamentId, playerId }) => {
-    setTournaments((prev) =>
-      prev.map((t) =>
-        t.id === tournamentId
-          ? {
-              ...t,
-              pendingPaymentIds: Array.from(new Set([...(t.pendingPaymentIds || []), playerId])),
-            }
-          : t
-      )
-    );
-  }, []);
-
-  const handleAdminApproveTournamentPayment = useCallback(
-    (tournamentId, playerId) => {
-      setTournaments((prev) =>
-        prev.map((t) => {
-          if (t.id !== tournamentId) return t;
-          return {
-            ...t,
-            pendingPaymentIds: (t.pendingPaymentIds || []).filter((id) => id !== playerId),
-            participantsIds: Array.from(new Set([...(t.participantsIds || []), playerId])),
-          };
-        })
-      );
-      showToast('Pago validado. El jugador ya figura inscrito oficialmente en el cuadro.', 'success');
-    },
-    [showToast]
-  );
-
-  const handleAdminUpdateBracketResult = useCallback((tournamentId, matchId, resultObj) => {
-    setTournaments((prev) =>
-      prev.map((t) =>
-        t.id === tournamentId
-          ? { ...t, bracketResults: { ...(t.bracketResults || {}), [matchId]: resultObj } }
-          : t
-      )
-    );
-  }, []);
-
-  const handleReportClubWeather = useCallback(
-    ({ clubId, conditionKey, rewardGems = 5 }) => {
-      setClubs((prev) =>
-        prev.map((c) =>
-          c.id === clubId
-            ? { ...c, climaBase: { ...(c.climaBase || {}), conditionKey } }
-            : c
-        )
-      );
-
-      if (currentUserId && rewardGems > 0) {
-        setPlayers((prev) =>
-          prev.map((p) =>
-            p.id === currentUserId
-              ? {
-                  ...p,
-                  gems: (Number(p.gems) || 0) + rewardGems,
-                  weeklyGemsEarned: (Number(p.weeklyGemsEarned) || 0) + rewardGems,
-                }
-              : p
-          )
-        );
-        appendGemLedger({
-          type: 'credit',
-          amount: rewardGems,
-          title: 'Reporte de estado en sede',
-          date: 'Hoy',
-          detail: `Estado actualizado (${conditionKey})`,
-        });
+  const handleRequestTournamentInscription = useCallback(
+    async ({ tournamentId, playerId }) => {
+      const target = tournaments.find((t) => t.id === tournamentId);
+      if (!target || !playerId) return;
+      const updated = {
+        ...target,
+        pendingPaymentIds: Array.from(new Set([...(target.pendingPaymentIds || []), playerId])),
+      };
+      setTournaments((prev) => prev.map((t) => (t.id === tournamentId ? updated : t)));
+      try {
+        await upsertCloudTournament(updated);
+      } catch (err) {
+        console.error('[TOTAL TENIS] Error guardando preinscripción:', err);
       }
     },
-    [currentUserId, appendGemLedger]
+    [tournaments]
+  );
+
+  const handleAdminApproveTournamentPayment = useCallback(
+    async (tournamentId, playerId) => {
+      const target = tournaments.find((t) => t.id === tournamentId);
+      if (!target) return;
+      const updated = {
+        ...target,
+        pendingPaymentIds: (target.pendingPaymentIds || []).filter((id) => id !== playerId),
+        participantsIds: Array.from(new Set([...(target.participantsIds || []), playerId])),
+      };
+      setTournaments((prev) => prev.map((t) => (t.id === tournamentId ? updated : t)));
+      try {
+        await upsertCloudTournament(updated);
+        sendPushNotification({
+          targetPlayerIds: [playerId],
+          title: '¡Cupo de torneo confirmado!',
+          message: `Tu inscripción en ${target.name} fue validada. Ya figuras en el cuadro oficial.`,
+          path: '/',
+        });
+      } catch (err) {
+        console.error('[TOTAL TENIS] Error aprobando torneo:', err);
+      }
+      showToast('Pago validado. El jugador ya figura inscrito oficialmente en el cuadro.', 'success');
+    },
+    [tournaments, showToast]
+  );
+
+  const handleAdminUpdateBracketResult = useCallback(
+    async (tournamentId, matchId, resultObj) => {
+      const target = tournaments.find((t) => t.id === tournamentId);
+      if (!target) return;
+      const updated = {
+        ...target,
+        bracketResults: { ...(target.bracketResults || {}), [matchId]: resultObj },
+      };
+      setTournaments((prev) => prev.map((t) => (t.id === tournamentId ? updated : t)));
+      try {
+        await upsertCloudTournament(updated);
+      } catch (err) {
+        console.error('[TOTAL TENIS] Error guardando llave:', err);
+      }
+    },
+    [tournaments]
+  );
+
+  /* Reporte climático anti-farmeo (Punto 10: +3 Gemas, 1/24h usuario, 3h sede) */
+  const handleReportClubWeather = useCallback(
+    async ({ clubId, conditionKey }) => {
+      if (!clubId || !conditionKey) return;
+
+      await runWithLock(`weather-${clubId}`, async () => {
+        setClubs((prev) =>
+          prev.map((c) =>
+            c.id === clubId
+              ? {
+                  ...c,
+                  climaBase: {
+                    ...(c.climaBase || {}),
+                    conditionKey,
+                    updatedAt: new Date().toISOString(),
+                  },
+                }
+              : c
+          )
+        );
+
+        try {
+          const rpcRes = await submitWeatherReportRpc({
+            playerId: currentUserId,
+            clubId,
+            conditionKey,
+          });
+
+          const awarded = Number(rpcRes?.gems_awarded) || 0;
+          if (currentUserId && awarded > 0) {
+            setPlayers((prev) =>
+              prev.map((p) =>
+                p.id === currentUserId
+                  ? { ...p, gems: (Number(p.gems) || 0) + awarded }
+                  : p
+              )
+            );
+            setGemLedger((prev) => [
+              {
+                id: `lg-${Date.now()}`,
+                type: 'credit',
+                amount: awarded,
+                title: 'Reporte de estado en sede',
+                date: formatPeruDate(new Date(), false) || 'Hoy',
+                detail: `Estado actualizado (${conditionKey})`,
+              },
+              ...prev,
+            ]);
+          }
+          if (rpcRes?.message) {
+            showToast(rpcRes.message, awarded > 0 ? 'success' : 'info');
+          }
+        } catch (err) {
+          console.error('[TOTAL TENIS] Error en reporte de clima:', err);
+          const clubObj = clubs.find((c) => c.id === clubId);
+          if (clubObj) {
+            upsertCloudClub({
+              ...clubObj,
+              climaBase: { ...(clubObj.climaBase || {}), conditionKey },
+            }).catch(() => {});
+          }
+          showToast('Estado de cancha actualizado.', 'info');
+        }
+      });
+    },
+    [currentUserId, clubs, showToast]
   );
 
   const handleDeductGemsForUnlock = useCallback(
-    ({ gemsCost, patchPlayer, ledgerTitle, ledgerDetail }) => {
+    async ({ gemsCost, patchPlayer, ledgerTitle, ledgerDetail }) => {
       if (!currentUserId) return;
-      setPlayers((prev) =>
-        prev.map((p) => {
-          if (p.id !== currentUserId) return p;
-          const nextGems = Math.max(0, (Number(p.gems) || 0) - (Number(gemsCost) || 0));
-          return {
-            ...p,
-            gems: nextGems,
-            ...(typeof patchPlayer === 'function' ? patchPlayer(p) : patchPlayer),
-          };
-        })
-      );
-      if (gemsCost > 0) {
-        appendGemLedger({
-          type: 'debit',
-          amount: gemsCost,
-          title: ledgerTitle,
-          date: 'Ahora mismo',
-          detail: ledgerDetail,
-        });
+      const target = playersRef.current.find((p) => p.id === currentUserId);
+      if (!target) return;
+
+      const cost = Math.max(0, Number(gemsCost) || 0);
+      const nextGems = Math.max(0, (Number(target.gems) || 0) - cost);
+      const extraPatch =
+        typeof patchPlayer === 'function' ? patchPlayer(target) : patchPlayer || {};
+      const updated = { ...target, gems: nextGems, ...extraPatch };
+
+      setPlayers((prev) => prev.map((p) => (p.id === currentUserId ? updated : p)));
+
+      try {
+        await upsertCloudPlayer(updated);
+      } catch (err) {
+        console.error('[TOTAL TENIS] Error guardando canje de gemas:', err);
+      }
+
+      if (cost > 0) {
+        appendGemLedger(
+          {
+            type: 'debit',
+            amount: cost,
+            title: ledgerTitle,
+            detail: ledgerDetail,
+          },
+          currentUserId
+        );
       }
     },
     [currentUserId, appendGemLedger]
@@ -585,51 +1172,130 @@ export default function App() {
   );
 
   const handleAdminApproveVip = useCallback(
-    (playerId, enableVip, bonusGems = 0) => {
-      setPlayers((prev) =>
-        prev.map((p) => {
-          if (p.id !== playerId) return p;
-          return {
-            ...p,
-            isVip: enableVip,
-            vipStatus: enableVip ? 'ACTIVE' : 'STANDARD',
-            gems: (Number(p.gems) || 0) + (enableVip ? bonusGems : 0),
-          };
-        })
-      );
+    async (playerId, enableVip, bonusGems = 0) => {
+      const target = playersRef.current.find((p) => p.id === playerId);
+      if (!target) return;
+
+      const updated = {
+        ...target,
+        isVip: enableVip,
+        vipStatus: enableVip ? 'ACTIVE' : 'STANDARD',
+        gems: (Number(target.gems) || 0) + (enableVip ? bonusGems : 0),
+      };
+      setPlayers((prev) => prev.map((p) => (p.id === playerId ? updated : p)));
+
+      try {
+        await upsertCloudPlayer(updated);
+        if (enableVip && bonusGems > 0) {
+          appendGemLedger(
+            {
+              type: 'credit',
+              amount: bonusGems,
+              title: 'Activación Pase Socio VIP',
+              detail: 'Bono mensual acreditado',
+            },
+            playerId
+          );
+        }
+        sendPushNotification({
+          targetPlayerIds: [playerId],
+          title: enableVip ? '¡Bienvenido a Socio VIP!' : 'Actualización de membresía',
+          message: enableVip
+            ? `Tu Pase Socio VIP está activo con +${bonusGems} Gemas acreditadas.`
+            : 'Tu membresía VIP fue actualizada por el Comité.',
+          path: '/',
+        });
+      } catch (err) {
+        console.error('[TOTAL TENIS] Error aprobando VIP:', err);
+      }
+
       showToast(
         enableVip
-          ? `Pase Socio VIP activado (+${bonusGems} Gemas mensuales acreditadas).`
+          ? `Pase Socio VIP activado (+${bonusGems} Gemas acreditadas).`
           : 'Membresía VIP desactivada.',
         'success'
       );
     },
-    [showToast]
+    [appendGemLedger, showToast]
   );
 
-  const handleRegisterComplete = useCallback((newPlayer) => {
-    setPlayers((prev) => [newPlayer, ...prev]);
-    setCurrentUserId(newPlayer.id);
-    setActiveTab('perfil');
-    try {
-      if (!window.localStorage.getItem(TUTORIAL_STORAGE_KEY)) {
-        window.setTimeout(() => setTutorialOpen(true), 650);
+  const handleRegisterComplete = useCallback(
+    async (newPlayer) => {
+      if (!newPlayer?.id) return;
+      const cleanPlayer = {
+        ...newPlayer,
+        whatsapp: normalizePeruPhone(newPlayer.whatsapp || ''),
+        isDemo: false,
+      };
+      setPlayers((prev) =>
+        mergeListById(prev, cleanPlayer, true).sort(
+          (a, b) => (Number(b.points) || 0) - (Number(a.points) || 0)
+        )
+      );
+      setCurrentUserId(cleanPlayer.id);
+      setIsAdminSession(Boolean(cleanPlayer.isAdmin));
+      setActiveTab('perfil');
+      linkOneSignalUser(cleanPlayer.id);
+      requestPushPermission();
+
+      try {
+        await upsertCloudPlayer(cleanPlayer);
+        if (Number(cleanPlayer.gems) > 0) {
+          appendGemLedger(
+            {
+              type: 'credit',
+              amount: Number(cleanPlayer.gems),
+              title: 'Bono de bienvenida',
+              detail: 'Registro en TOTAL TENIS',
+            },
+            cleanPlayer.id
+          );
+        }
+      } catch (err) {
+        console.error('[TOTAL TENIS] Error guardando nuevo jugador:', err);
       }
-    } catch (e) {
-      // continuar
-    }
-  }, []);
+
+      try {
+        if (!window.localStorage.getItem(TUTORIAL_STORAGE_KEY)) {
+          window.setTimeout(() => setTutorialOpen(true), 650);
+        }
+      } catch {
+        // continuar
+      }
+    },
+    [appendGemLedger]
+  );
+
+  /* Cierre de sesión limpio sin pantalla colgada ("Ajustando la cancha...") */
+  const handleLogout = useCallback(async () => {
+    triggerHaptic('medium');
+    await signOutCloudAccount();
+    setCurrentUserId(null);
+    setIsAdminSession(false);
+    setActivePartner(null);
+    setGemLedger([]);
+    setDismissedIncomingIds([]);
+    setDismissedScoreIds([]);
+    setInspectPlayerId(null);
+    setAdminModalOpen(false);
+    setPartnerModalOpen(false);
+    setActiveTab((prev) => (prev === 'perfil' ? 'retos' : prev));
+    showToast('Sesión cerrada. Puedes volver a entrar cuando quieras.', 'info');
+  }, [showToast]);
 
   const popupChallenger = popupChallenge
     ? players.find((p) => p.id === popupChallenge.playerAId)
     : null;
 
+  const scoreProposer = scoreConfirmChallenge
+    ? players.find((p) => p.id === scoreConfirmChallenge.proposedBy)
+    : null;
+  const scoreWinner = scoreConfirmChallenge
+    ? players.find((p) => p.id === scoreConfirmChallenge.winnerId)
+    : null;
+
   return (
-    <div
-      className={`tt-app-viewport ${theme === 'light' ? 'is-light' : 'is-dark'} ${
-        sunlightMode ? 'is-sunlight' : ''
-      }`}
-    >
+    <div className={`tt-app-viewport ${theme === 'light' ? 'is-light' : 'is-dark'}`}>
       {/* 1. SPLASH SCREEN / BIENVENIDA */}
       {showSplash && (
         <SplashScreen
@@ -651,7 +1317,7 @@ export default function App() {
         unreadNoticesCount={unreadNoticesCount}
         sponsorsConfig={sponsorsConfig}
         onToggleTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
-        onToggleSunlight={() => setSunlightMode((s) => !s)}
+        onToggleSunlight={() => {}}
         onNavigateTab={handleSelectTab}
         onOpenProShop={() => setProShopModal({ open: true, mode: 'shop' })}
         onOpenShop={() => setProShopModal({ open: true, mode: 'shop' })}
@@ -668,23 +1334,17 @@ export default function App() {
         onOpenLegal={(section = 'reclamaciones') => setLegalModal({ open: true, section })}
         onOpenTutorial={() => setTutorialOpen(true)}
         onSecretAdminTrigger={() => setAdminModalOpen(true)}
-        onLogout={() => {
-          triggerHaptic('medium');
-          setCurrentUserId(null);
-          setIsAdminSession(false);
-          setActivePartner(null);
-          showToast('Sesión cerrada. Puedes volver a entrar cuando quieras.', 'info');
-        }}
+        onLogout={handleLogout}
       />
 
-      {/* 3. CINTA SUPERIOR AISLADA (NO INTERFIERE CON EL SCROLL DE LOS MODALES) */}
+      {/* 3. CINTA SUPERIOR AISLADA */}
       <SlimTickerBar
         onSelectTab={handleSelectTab}
         onOpenMaster={() => handleOpenTournamentsAt('master')}
         onOpenShop={() => setProShopModal({ open: true, mode: 'shop' })}
       />
 
-      {/* 4. CONTENEDOR CENTRAL SCROLLABLE (COMIENZA LIMPIO DEBAJO DEL HEADER) */}
+      {/* 4. CONTENEDOR CENTRAL SCROLLABLE */}
       <main ref={scrollContainerRef} className="tt-main-scroll">
         <div className="tt-main-inner">
           <div key={activeTab} className="tt-view-transition">
@@ -694,7 +1354,7 @@ export default function App() {
                 clubs={activeClubs}
                 challenges={challenges}
                 currentUser={currentUser}
-                isAdmin={isAdminSession}
+                isAdmin={effectiveIsAdmin}
                 theme={theme}
                 sunlightMode={sunlightMode}
                 onCreateChallenge={handleCreateChallenge}
@@ -733,7 +1393,7 @@ export default function App() {
                 tournaments={tournaments}
                 seasonSnapshots={seasonSnapshots}
                 currentUser={currentUser}
-                isAdmin={isAdminSession}
+                isAdmin={effectiveIsAdmin}
                 initialSubTab={torneosInitialSubTab}
                 theme={theme}
                 sunlightMode={sunlightMode}
@@ -752,6 +1412,7 @@ export default function App() {
             {activeTab === 'sedes' && (
               <SedesView
                 clubs={activeClubs}
+                coaches={coaches}
                 currentUser={currentUser}
                 theme={theme}
                 sunlightMode={sunlightMode}
@@ -842,12 +1503,12 @@ export default function App() {
         </div>
       </main>
 
-      {/* 5. BARRA DE NAVEGACIÓN INFERIOR (INTACTA COMO TE GUSTA) */}
+      {/* 5. BARRA DE NAVEGACIÓN INFERIOR (INTACTA) */}
       <BottomDock
         activeTab={activeTab}
         onSelectTab={handleSelectTab}
         onReselectActiveTab={scrollMainToTop}
-        challengesCount={incomingPendingChallenges.length}
+        challengesCount={incomingPendingChallenges.length + pendingScoreConfirmations.length}
         liveMatchesCount={liveMatchesCount}
         activeTournamentsCount={activeTournamentsCount}
         theme={theme}
@@ -913,7 +1574,7 @@ export default function App() {
         )}
       </ModalPortal>
 
-      {/* POP-UP AUTOMÁTICO DE RETO ENTRANTE (SIN BUCLE) */}
+      {/* POP-UP AUTOMÁTICO DE RETO ENTRANTE */}
       <ModalPortal
         isOpen={Boolean(popupChallenge)}
         onClose={() => {
@@ -964,6 +1625,7 @@ export default function App() {
                   triggerHaptic('success');
                   handleUpdateChallenge(popupChallenge.id, { status: 'SCHEDULED' });
                   setDismissedIncomingIds((prev) => [...prev, popupChallenge.id]);
+                  requestPushPermission();
                   showToast('¡Desafío aceptado! Ya aparece en la Cartelera.', 'success');
                 }}
               >
@@ -971,7 +1633,7 @@ export default function App() {
               </button>
 
               <a
-                href={Engine.buildWhatsAppLink(
+                href={buildWhatsappLink(
                   popupChallenger?.whatsapp,
                   `Hola ${popupChallenger?.name || ''}, recibí tu reto en TOTAL TENIS para ${
                     popupChallenge.clubName
@@ -998,13 +1660,83 @@ export default function App() {
         )}
       </ModalPortal>
 
+      {/* POP-UP DE DOBLE CONFIRMACIÓN DE MARCADOR (PUNTO 3) */}
+      <ModalPortal
+        isOpen={Boolean(scoreConfirmChallenge)}
+        onClose={() => {
+          if (scoreConfirmChallenge) {
+            setDismissedScoreIds((prev) => [...prev, scoreConfirmChallenge.id]);
+          }
+        }}
+        title="Confirma el Marcador"
+        subtitle="Validación oficial entre ambos jugadores"
+        icon={<IconBadge name="trophy" variant="emerald" size={38} />}
+        isTopLayer
+      >
+        {scoreConfirmChallenge && (
+          <div className="tt-incoming-popup-stack">
+            <div className="tt-ip-rival-card">
+              <div style={{ width: '100%' }}>
+                <strong>
+                  {scoreProposer?.name || 'Tu rival'} cargó el resultado
+                </strong>
+                <span>
+                  {scoreConfirmChallenge.clubName} · Marcador:{' '}
+                  <b style={{ color: '#00DC7D' }}>{scoreConfirmChallenge.scoreSummary}</b>
+                </span>
+                <small>
+                  Ganador registrado: {scoreWinner?.name || 'Por confirmar'} ·{' '}
+                  {isScoreReadyForAutoConfirm(scoreConfirmChallenge)
+                    ? 'Plazo de 24h cumplido (listo para validar)'
+                    : `Auto-validación en ${hoursLeftForAutoConfirm(scoreConfirmChallenge)}h`}
+                </small>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button
+                type="button"
+                className="tt-btn tt-btn-primary"
+                disabled={busyActionId === scoreConfirmChallenge.id}
+                onClick={() => handleConfirmProposedScore(scoreConfirmChallenge)}
+              >
+                {busyActionId === scoreConfirmChallenge.id
+                  ? 'Confirmando puntos...'
+                  : 'Confirmar Marcador y Actualizar Puntos'}
+              </button>
+
+              {scoreConfirmChallenge.proposedBy !== currentUser?.id && (
+                <button
+                  type="button"
+                  className="tt-btn tt-btn-secondary"
+                  disabled={busyActionId === scoreConfirmChallenge.id}
+                  onClick={() => handleDisputeProposedScore(scoreConfirmChallenge)}
+                >
+                  No estoy de acuerdo · Impugnar
+                </button>
+              )}
+
+              <button
+                type="button"
+                className="tt-btn tt-btn-ghost tt-btn-sm"
+                onClick={() =>
+                  setDismissedScoreIds((prev) => [...prev, scoreConfirmChallenge.id])
+                }
+              >
+                Revisar después
+              </button>
+            </div>
+          </div>
+        )}
+      </ModalPortal>
+
       {/* LOS 10 MODALES PREMIUM EN CAPA GLOBAL */}
       <ProShopAndGemsModal
         isOpen={proShopModal.open}
         initialMode={proShopModal.mode}
         onClose={() => setProShopModal((s) => ({ ...s, open: false }))}
         currentUser={currentUser}
-        products={StoreData.PROSHOP_PRODUCTS || StoreData.INITIAL_PRODUCTS || []}
+        products={products}
         clubs={activeClubs}
         gemLedger={gemLedger}
         theme={theme}
@@ -1089,7 +1821,14 @@ export default function App() {
         onClose={() => setAuthModal((s) => ({ ...s, open: false }))}
         players={players}
         clubs={activeClubs}
-        onLoginSuccess={(p) => setCurrentUserId(p.id)}
+        onLoginSuccess={(p) => {
+          if (!p?.id) return;
+          setPlayers((prev) => mergeListById(prev, p, false));
+          setCurrentUserId(p.id);
+          setIsAdminSession(Boolean(p.isAdmin));
+          linkOneSignalUser(p.id);
+          requestPushPermission();
+        }}
         onRegisterComplete={handleRegisterComplete}
         onResetPassword={(playerId, newPass) => handleUpdatePlayer(playerId, { password: newPass })}
         onPartnerLoginSuccess={(partnerObj) => {
@@ -1106,7 +1845,25 @@ export default function App() {
         onClose={() => setLegalModal((s) => ({ ...s, open: false }))}
         currentUser={currentUser}
         complaints={complaints}
-        onSubmitComplaint={(record) => setComplaints((prev) => [record, ...prev])}
+        onSubmitComplaint={async (record) => {
+          try {
+            const saved = await submitOfficialComplaintRpc({
+              playerId: currentUser?.id || null,
+              fullName: record.fullName || record.name || currentUser?.name || 'Consumidor',
+              docType: record.docType || 'DNI',
+              docNumber: record.docNumber || '',
+              email: record.email || currentUser?.email || '',
+              phone: record.phone || currentUser?.whatsapp || '',
+              claimType: record.claimType || record.type || 'Reclamo',
+              amount: record.amount || '',
+              detail: record.detail || record.description || '',
+              consumerRequest: record.consumerRequest || record.request || '',
+            });
+            setComplaints((prev) => [saved || record, ...prev]);
+          } catch {
+            setComplaints((prev) => [record, ...prev]);
+          }
+        }}
         onNotify={showToast}
       />
 
@@ -1116,6 +1873,7 @@ export default function App() {
         partner={activePartner}
         players={activePlayers}
         clubs={clubs}
+        coaches={coaches}
         theme={theme}
         onUpdateClubWeather={handleReportClubWeather}
         onNotify={showToast}
@@ -1124,7 +1882,7 @@ export default function App() {
       <AdminSuiteModal
         isOpen={adminModalOpen}
         onClose={() => setAdminModalOpen(false)}
-        isUnlockedInitially={isAdminSession}
+        isUnlockedInitially={effectiveIsAdmin}
         players={players}
         clubs={clubs}
         challenges={challenges}
@@ -1135,31 +1893,80 @@ export default function App() {
         onUnlockAdminSession={(val) => setIsAdminSession(Boolean(val))}
         onSwitchSandboxUser={(p) => {
           setCurrentUserId(p.id);
-          showToast(`Modo Sandbox activo: navegando como ${p.name}.`, 'info');
+          showToast(`Modo pruebas activo: viendo la app como ${p.name}.`, 'info');
         }}
         onAdminUpdatePlayer={handleUpdatePlayer}
-        onAdminDeletePlayer={(pid) => {
+        onAdminDeletePlayer={async (pid) => {
           setPlayers((prev) => prev.filter((p) => p.id !== pid));
           if (currentUserId === pid) setCurrentUserId(null);
+          try {
+            await deleteCloudPlayer(pid);
+          } catch (err) {
+            console.error('[TOTAL TENIS] Error eliminando jugador:', err);
+          }
           showToast('Cuenta eliminada definitivamente.', 'info');
+        }}
+        onAdminPurgeDemoPlayers={async () => {
+          try {
+            const removed = await purgeDemoPlayers();
+            setPlayers((prev) => prev.filter((p) => !p.isDemo));
+            showToast(`Se limpiaron ${removed} cuentas de prueba.`, 'success');
+          } catch {
+            showToast('No se pudieron limpiar las cuentas de prueba.', 'warning');
+          }
         }}
         onAdminApproveVip={handleAdminApproveVip}
         onAdminApproveTournamentPayment={handleAdminApproveTournamentPayment}
-        onAdminCreateTournament={(newT) => setTournaments((prev) => [newT, ...prev])}
-        onAdminCloseSeason={(nextSnap) => setSeasonSnapshots(nextSnap)}
-        onAdminResolveDispute={(chId, action) => {
-          if (action === 'CANCEL') {
-            handleUpdateChallenge(chId, { status: 'DECLINED' });
-            showToast('Encuentro anulado sin impacto en puntos.', 'info');
+        onAdminCreateTournament={async (newT) => {
+          setTournaments((prev) => [newT, ...prev]);
+          try {
+            await upsertCloudTournament(newT);
+          } catch (err) {
+            console.error('[TOTAL TENIS] Error creando torneo:', err);
           }
         }}
-        onAdminToggleClubActive={(clubId, nextActive) =>
-          setClubs((prev) => prev.map((c) => (c.id === clubId ? { ...c, active: nextActive } : c)))
-        }
-        onAdminSaveSponsors={(cfg) => setSponsorsConfig(cfg)}
-        onAdminPurgeArchivedMatches={() =>
-          setChallenges((prev) => prev.filter((c) => c.status !== 'FINISHED'))
-        }
+        onAdminCloseSeason={async (nextSnap) => {
+          setSeasonSnapshots(nextSnap);
+          try {
+            await saveCloudSetting('season_snapshots', nextSnap);
+          } catch {
+            // continuar
+          }
+        }}
+        onAdminResolveDispute={async (chId, action) => {
+          const target = challenges.find((c) => c.id === chId);
+          if (!target) return;
+          if (action === 'CANCEL') {
+            await handleUpdateChallenge(chId, { status: 'DECLINED' });
+            showToast('Encuentro anulado sin impacto en puntos.', 'info');
+          } else if (action === 'CONFIRM') {
+            await handleConfirmProposedScore({ ...target, status: 'SCORE_PROPOSED' });
+          }
+        }}
+        onAdminToggleClubActive={async (clubId, nextActive) => {
+          const target = clubs.find((c) => c.id === clubId);
+          if (!target) return;
+          const updated = { ...target, active: nextActive };
+          setClubs((prev) => prev.map((c) => (c.id === clubId ? updated : c)));
+          try {
+            await upsertCloudClub(updated);
+          } catch {
+            // continuar
+          }
+        }}
+        onAdminSaveSponsors={async (cfg) => {
+          setSponsorsConfig(cfg);
+          try {
+            await saveCloudSetting('sponsors_config', cfg);
+          } catch {
+            // continuar
+          }
+        }}
+        onAdminPurgeArchivedMatches={async () => {
+          const finishedIds = challenges.filter((c) => c.status === 'FINISHED').map((c) => c.id);
+          setChallenges((prev) => prev.filter((c) => c.status !== 'FINISHED'));
+          await Promise.all(finishedIds.map((id) => deleteCloudChallenge(id).catch(() => {})));
+        }}
         onNotify={showToast}
       />
 
@@ -1182,6 +1989,12 @@ export default function App() {
         </div>
       )}
 
+      {!cloudSynced && (
+        <div className="tt-cloud-sync-pill" aria-hidden="true">
+          Sincronizando en vivo...
+        </div>
+      )}
+
       <style>{`
         .tt-app-viewport {
           position: fixed;
@@ -1195,7 +2008,6 @@ export default function App() {
           color: var(--tt-text, #FAF9F5);
         }
 
-        /* Cinta superior de 1 sola línea, visible y sin chocar con el Header */
         .tt-slim-ticker-bar {
           flex-shrink: 0;
           padding: 0 10px 6px;
@@ -1243,7 +2055,6 @@ export default function App() {
           to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Scroll interno principal: empieza limpio debajo de Header + Cinta */
         .tt-main-scroll {
           flex: 1;
           min-height: 0;
@@ -1357,6 +2168,20 @@ export default function App() {
           border-radius: 50%;
           background: #00DC7D;
           flex-shrink: 0;
+        }
+        .tt-cloud-sync-pill {
+          position: fixed;
+          right: 12px;
+          bottom: calc(env(safe-area-inset-bottom, 0px) + 86px);
+          z-index: 40;
+          padding: 5px 10px;
+          border-radius: 999px;
+          background: rgba(20, 4, 36, 0.85);
+          border: 1px solid rgba(0, 220, 125, 0.35);
+          color: #7CF5C0;
+          font-size: 0.66rem;
+          font-weight: 800;
+          pointer-events: none;
         }
         @keyframes ttToastDrop {
           from { opacity: 0; transform: translate(-50%, -14px); }
