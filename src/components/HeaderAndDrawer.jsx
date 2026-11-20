@@ -9,20 +9,18 @@ import {
 import { getCategoryByPoints } from '../data/playersAndClubsData';
 
 /* ==========================================================================
-   HEADER FLOTANTE PROPORCIONADO + MENÚ LATERAL EN PORTAL (createPortal)
-   - Ocupa su espacio real en Flexbox: jamás tapa Perfil, Sedes ni Retos.
-   - Ancho calculado (~320px) para iPhone SE / 14 / 15 / 16 y Android sin cortes.
-   - Menú ☰ montado en document.body (z-index 9990): abre desde cualquier vista.
+   HEADER CENTRADO EN PÍLDORA BLANCA + MENÚ LATERAL (SIN "SOL INTENSO")
+   - Grid simétrico 3 columnas (1fr auto 1fr): Logo y TOTAL TENIS centrados.
+   - Sin recortes desde 360px (iPhone SE / Android) hasta Desktop.
+   - Menú ☰ en document.body (z-index 9990) con scroll blindado.
    ========================================================================== */
 export default function HeaderAndDrawer({
   currentUser = null,
   theme = 'dark',
-  sunlightMode = false,
   activeTab = 'retos',
   unreadNoticesCount = 0,
   sponsorsConfig = null,
   onToggleTheme,
-  onToggleSunlight,
   onNavigateTab,
   onOpenProShop,
   onOpenShop,
@@ -35,6 +33,7 @@ export default function HeaderAndDrawer({
   onOpenPartnerPortal,
   onOpenLegal,
   onOpenTutorial,
+  onOpenVisionIA,
   onSecretAdminTrigger,
   onLogout,
 }) {
@@ -58,7 +57,7 @@ export default function HeaderAndDrawer({
     return () => window.removeEventListener('keydown', onKey);
   }, [drawerOpen]);
 
-  // Disparador oculto de Suite Maestra Admin (5 toques rápidos al logotipo)
+  // Disparador oculto de Suite Admin (5 toques rápidos al logotipo centrado)
   const handleLogoTap = () => {
     triggerHaptic('light');
     tapCountRef.current += 1;
@@ -101,7 +100,7 @@ export default function HeaderAndDrawer({
         aria-label="Barra superior TOTAL TENIS"
       >
         <div className="tt-hdr-pill">
-          {/* Izquierda: Menú ☰ + Logotipo + Marca íntegra sin recortes */}
+          {/* Columna Izquierda: Menú ☰ + Gemas */}
           <div className="tt-hdr-left">
             <button
               type="button"
@@ -125,25 +124,6 @@ export default function HeaderAndDrawer({
 
             <button
               type="button"
-              className="tt-hdr-brand-btn"
-              onClick={handleLogoTap}
-              aria-label="TOTAL TENIS"
-            >
-              <SmartImage
-                src={ASSETS.logo}
-                alt="TOTAL TENIS"
-                className="tt-hdr-logo"
-              />
-              <span className="tt-hdr-wordmark">
-                TOTAL <em>TENIS</em>
-              </span>
-            </button>
-          </div>
-
-          {/* Derecha: Gemas + Tienda + Campana (todo proporcional en 1 fila) */}
-          <div className="tt-hdr-right">
-            <button
-              type="button"
               className="tt-hdr-gems-pill"
               onClick={openVaultAction}
               aria-label={`Bóveda de Gemas: ${gemsBalance}`}
@@ -151,15 +131,35 @@ export default function HeaderAndDrawer({
               <span className="tt-hdr-gem-diamond" aria-hidden="true">◆</span>
               <span>{gemsBalance}</span>
             </button>
+          </div>
 
+          {/* Columna Central: Logo + TOTAL TENIS perfectamente centrado */}
+          <button
+            type="button"
+            className="tt-hdr-brand-center"
+            onClick={handleLogoTap}
+            aria-label="TOTAL TENIS"
+          >
+            <SmartImage
+              src={ASSETS.logo}
+              alt="TOTAL TENIS"
+              className="tt-hdr-logo"
+            />
+            <span className="tt-hdr-wordmark">
+              TOTAL <em>TENIS</em>
+            </span>
+          </button>
+
+          {/* Columna Derecha: Tienda + Campana */}
+          <div className="tt-hdr-right">
             <button
               type="button"
               className="tt-hdr-shop-pill"
               onClick={openShopAction}
               aria-label="Abrir Tienda Pro Shop"
             >
-              <TTIcon name="shop" size={13} />
-              <span>Tienda</span>
+              <TTIcon name="shop" size={14} />
+              <span className="tt-hdr-shop-txt">Tienda</span>
             </button>
 
             <button
@@ -265,29 +265,20 @@ export default function HeaderAndDrawer({
                 </button>
               )}
 
-              <div className="tt-drw-toggles">
-                <button
-                  type="button"
-                  className={`tt-drw-toggle-pill ${theme === 'light' ? 'is-on' : ''}`}
-                  onClick={() => {
-                    triggerHaptic('light');
-                    if (onToggleTheme) onToggleTheme();
-                  }}
-                >
-                  <span>{theme === 'light' ? '☀️ Modo Claro' : '🌙 Modo Oscuro'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  className={`tt-drw-toggle-pill ${sunlightMode ? 'is-on' : ''}`}
-                  onClick={() => {
-                    triggerHaptic('light');
-                    if (onToggleSunlight) onToggleSunlight();
-                  }}
-                >
-                  <span>{sunlightMode ? '🕶️ Sol Intenso ON' : '🕶️ Sol Intenso'}</span>
-                </button>
-              </div>
+              {/* Selector único de Apariencia (Modo Oscuro / Modo Claro real) */}
+              <button
+                type="button"
+                className={`tt-drw-theme-btn ${theme === 'light' ? 'is-light-active' : ''}`}
+                onClick={() => {
+                  triggerHaptic('light');
+                  if (onToggleTheme) onToggleTheme();
+                }}
+              >
+                <span>
+                  {theme === 'light' ? '☀️ Modo Claro activo' : '🌙 Modo Oscuro activo'}
+                </span>
+                <small>{theme === 'light' ? 'Cambiar a Oscuro' : 'Cambiar a Claro'}</small>
+              </button>
 
               <div className="tt-drw-scroll">
                 <span className="tt-drw-section-lbl">EXPLORAR CIRCUITO</span>
@@ -335,6 +326,18 @@ export default function HeaderAndDrawer({
                   >
                     <TTIcon name="news" size={17} />
                     <span>Actualidad Tenis y Marcadores</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      runDrawerAction(() => {
+                        if (onOpenVisionIA) onOpenVisionIA();
+                        else if (onNavigateTab) onNavigateTab('sedes');
+                      })
+                    }
+                  >
+                    <TTIcon name="vision" size={17} />
+                    <span>Vision IA · Análisis de Partido</span>
                   </button>
                   <button
                     type="button"
@@ -399,53 +402,72 @@ export default function HeaderAndDrawer({
         )}
 
       <style>{`
-        /* FLUJO REAL EN FLEXBOX (NUNCA SE MONTA ENCIMA DE PERFIL, SEDES NI RETOS) */
         .tt-hdr-shell {
           position: relative !important;
-          top: auto !important;
-          left: auto !important;
-          right: auto !important;
           z-index: 40;
           flex-shrink: 0;
           width: 100%;
-          padding: calc(env(safe-area-inset-top, 0px) + 8px) 8px 6px;
+          padding: calc(env(safe-area-inset-top, 0px) + 8px) 10px 6px;
           display: flex;
           flex-direction: column;
           align-items: center;
           gap: 4px;
           background: transparent;
         }
+        /* Grid simétrico 3 columnas: centro matemático real para Logo + TOTAL TENIS */
         .tt-hdr-pill {
           width: 100%;
           max-width: var(--tt-container-max, 760px);
-          min-height: 48px;
-          padding: 4px 6px;
+          min-height: 50px;
+          padding: 5px 7px;
           border-radius: 999px;
           background: #FFFFFF;
           color: #1E0734;
-          border: 1px solid rgba(30, 7, 52, 0.1);
-          box-shadow: 0 8px 22px rgba(10, 2, 20, 0.3);
-          display: flex;
+          border: 1px solid rgba(30, 7, 52, 0.12);
+          box-shadow: 0 8px 22px rgba(10, 2, 20, 0.28);
+          display: grid;
+          grid-template-columns: 1fr auto 1fr;
           align-items: center;
-          justify-content: space-between;
-          gap: 4px;
+          gap: 6px;
           box-sizing: border-box;
+        }
+        .tt-hdr-shell.is-light .tt-hdr-pill {
+          box-shadow: 0 6px 20px rgba(30, 7, 52, 0.12);
+          border-color: rgba(30, 7, 52, 0.14);
         }
 
         .tt-hdr-left {
           display: flex;
           align-items: center;
+          justify-content: flex-start;
           gap: 5px;
           min-width: 0;
-          flex: 1 1 auto;
         }
+        .tt-hdr-brand-center {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          padding: 2px 4px;
+          cursor: pointer;
+          touch-action: manipulation;
+          user-select: none;
+        }
+        .tt-hdr-right {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 5px;
+          min-width: 0;
+        }
+
         .tt-hdr-icon-btn {
           position: relative;
           z-index: 2;
-          width: 32px;
-          height: 32px;
+          width: 34px;
+          height: 34px;
           border-radius: 50%;
-          background: rgba(30, 7, 52, 0.06);
+          background: rgba(30, 7, 52, 0.07);
           color: #1E0734;
           display: inline-flex;
           align-items: center;
@@ -458,52 +480,37 @@ export default function HeaderAndDrawer({
         .tt-hdr-icon-btn:active {
           transform: scale(0.92);
         }
-        .tt-hdr-brand-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 5px;
-          min-width: 0;
-          padding: 2px 0;
-          flex-shrink: 0;
-          cursor: pointer;
-          touch-action: manipulation;
-        }
+
         .tt-hdr-logo {
-          width: 28px;
-          height: 28px;
+          width: 30px;
+          height: 30px;
           border-radius: 50%;
           object-fit: cover;
           flex-shrink: 0;
+          box-shadow: 0 2px 8px rgba(30, 7, 52, 0.2);
         }
         .tt-hdr-wordmark {
           font-family: var(--tt-font-display);
           font-style: italic;
           font-weight: 900;
-          font-size: clamp(0.84rem, 3.3vw, 1.08rem);
-          letter-spacing: 0.015em;
+          font-size: clamp(0.96rem, 3.8vw, 1.24rem);
+          letter-spacing: 0.02em;
           line-height: 1;
           color: #1E0734;
           white-space: nowrap;
         }
         .tt-hdr-wordmark em {
           font-style: italic;
-          color: #00A859;
+          color: #009B56;
         }
 
-        /* CONTROLES DERECHOS COMPACTOS (CERO DESBORDES EN 360px-430px) */
-        .tt-hdr-right {
-          display: flex;
-          align-items: center;
-          gap: 4px;
-          flex-shrink: 0;
-        }
         .tt-hdr-gems-pill {
-          height: 30px;
-          padding: 0 7px;
+          height: 32px;
+          padding: 0 8px;
           border-radius: 999px;
           background: #1E0734;
           color: #FAF9F5;
-          font-size: 0.7rem;
+          font-size: 0.72rem;
           font-weight: 900;
           display: inline-flex;
           align-items: center;
@@ -518,20 +525,32 @@ export default function HeaderAndDrawer({
           line-height: 1;
         }
         .tt-hdr-shop-pill {
-          height: 30px;
-          padding: 0 8px;
+          height: 32px;
+          padding: 0 9px;
           border-radius: 999px;
           background: linear-gradient(135deg, #00DC7D 0%, #00B868 100%);
           color: #120321;
-          font-size: 0.7rem;
+          font-size: 0.72rem;
           font-weight: 900;
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          gap: 3px;
+          gap: 4px;
           white-space: nowrap;
           flex-shrink: 0;
-          overflow: hidden;
+        }
+        @media (max-width: 385px) {
+          .tt-hdr-shop-pill {
+            width: 34px;
+            padding: 0;
+          }
+          .tt-hdr-shop-txt {
+            display: none;
+          }
+          .tt-hdr-gems-pill {
+            padding: 0 7px;
+            font-size: 0.68rem;
+          }
         }
         .tt-hdr-bell-badge {
           position: absolute;
@@ -556,13 +575,13 @@ export default function HeaderAndDrawer({
           gap: 6px;
           font-size: 0.64rem;
           letter-spacing: 0.08em;
-          color: rgba(250, 249, 245, 0.76);
+          color: rgba(250, 249, 245, 0.78);
         }
         .tt-hdr-shell.is-light .tt-hdr-sponsor-strip {
-          color: rgba(30, 7, 52, 0.72);
+          color: rgba(30, 7, 52, 0.78);
         }
 
-        /* MENÚ LATERAL MONTADO EN document.body (z-index 9990) */
+        /* MENÚ LATERAL MONTADO EN document.body */
         .tt-drw-backdrop {
           position: fixed;
           inset: 0;
@@ -572,6 +591,8 @@ export default function HeaderAndDrawer({
           -webkit-backdrop-filter: blur(8px);
           display: flex;
           justify-content: flex-start;
+          overflow: hidden;
+          overscroll-behavior: contain;
         }
         .tt-drw-panel {
           width: min(84vw, 330px);
@@ -590,7 +611,7 @@ export default function HeaderAndDrawer({
         .tt-drw-panel.is-light {
           background: #FAF9F5;
           color: #1E0734;
-          border-right-color: rgba(30, 7, 52, 0.12);
+          border-right-color: rgba(30, 7, 52, 0.14);
         }
         @keyframes ttDrwSlide {
           from { transform: translateX(-100%); }
@@ -616,7 +637,7 @@ export default function HeaderAndDrawer({
         }
         .tt-drw-brand small {
           font-size: 0.66rem;
-          opacity: 0.68;
+          opacity: 0.72;
         }
         .tt-drw-close {
           width: 34px;
@@ -629,7 +650,7 @@ export default function HeaderAndDrawer({
           justify-content: center;
         }
         .tt-drw-panel.is-light .tt-drw-close {
-          background: rgba(30, 7, 52, 0.08);
+          background: rgba(30, 7, 52, 0.09);
         }
 
         .tt-drw-user-card {
@@ -643,7 +664,7 @@ export default function HeaderAndDrawer({
         }
         .tt-drw-panel.is-light .tt-drw-user-card {
           background: #FFFFFF;
-          border-color: rgba(30, 7, 52, 0.1);
+          border-color: rgba(30, 7, 52, 0.14);
         }
         .tt-drw-user-card strong {
           display: block;
@@ -655,7 +676,7 @@ export default function HeaderAndDrawer({
         .tt-drw-user-card small {
           display: block;
           font-size: 0.7rem;
-          opacity: 0.72;
+          opacity: 0.76;
         }
         .tt-drw-vip-tag {
           padding: 3px 8px;
@@ -674,30 +695,36 @@ export default function HeaderAndDrawer({
           font-weight: 900;
         }
 
-        .tt-drw-toggles {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 7px;
-        }
-        .tt-drw-toggle-pill {
-          min-height: 36px;
-          padding: 0 8px;
-          border-radius: 11px;
+        /* Botón único limpio de tema (Modo Oscuro <-> Modo Claro) */
+        .tt-drw-theme-btn {
+          width: 100%;
+          min-height: 42px;
+          padding: 0 13px;
+          border-radius: 12px;
           background: rgba(250, 249, 245, 0.08);
-          border: 1px solid rgba(250, 249, 245, 0.12);
+          border: 1px solid rgba(0, 220, 125, 0.36);
           color: inherit;
-          font-size: 0.72rem;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          font-size: 0.78rem;
           font-weight: 800;
         }
-        .tt-drw-panel.is-light .tt-drw-toggle-pill {
-          background: #FFFFFF;
-          border-color: rgba(30, 7, 52, 0.12);
-        }
-        .tt-drw-toggle-pill.is-on {
-          border-color: #00DC7D;
+        .tt-drw-theme-btn small {
+          padding: 3px 8px;
+          border-radius: 999px;
+          background: rgba(0, 220, 125, 0.16);
           color: #00DC7D;
+          font-size: 0.66rem;
+          font-weight: 900;
         }
-        .tt-drw-panel.is-light .tt-drw-toggle-pill.is-on {
+        .tt-drw-panel.is-light .tt-drw-theme-btn {
+          background: #FFFFFF;
+          border-color: rgba(30, 7, 52, 0.18);
+          color: #1E0734;
+        }
+        .tt-drw-panel.is-light .tt-drw-theme-btn small {
           background: #1E0734;
           color: #00DC7D;
         }
@@ -706,6 +733,7 @@ export default function HeaderAndDrawer({
           flex: 1;
           min-height: 0;
           overflow-y: auto;
+          overscroll-behavior-y: contain;
           padding-right: 2px;
           -webkit-overflow-scrolling: touch;
         }
@@ -718,7 +746,7 @@ export default function HeaderAndDrawer({
           margin-bottom: 6px;
         }
         .tt-drw-panel.is-light .tt-drw-section-lbl {
-          color: #008A4E;
+          color: #007A44;
         }
         .tt-drw-list {
           display: flex;
@@ -753,7 +781,7 @@ export default function HeaderAndDrawer({
           color: #FDE68A;
         }
         .tt-drw-panel.is-light .tt-drw-list button.is-legal-book {
-          background: rgba(245, 158, 11, 0.18);
+          background: rgba(245, 158, 11, 0.2);
           color: #92400E;
         }
 
@@ -765,7 +793,7 @@ export default function HeaderAndDrawer({
           gap: 7px;
         }
         .tt-drw-panel.is-light .tt-drw-foot {
-          border-top-color: rgba(30, 7, 52, 0.1);
+          border-top-color: rgba(30, 7, 52, 0.12);
         }
         .tt-drw-logout {
           min-height: 38px;
@@ -776,11 +804,12 @@ export default function HeaderAndDrawer({
           font-weight: 800;
         }
         .tt-drw-panel.is-light .tt-drw-logout {
+          background: #FEF2F2;
           color: #B91C1C;
         }
         .tt-drw-foot small {
           font-size: 0.65rem;
-          opacity: 0.6;
+          opacity: 0.65;
           text-align: center;
         }
       `}</style>
