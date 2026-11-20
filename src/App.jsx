@@ -1,16 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-/* ==========================================================================
-   IMPORTACIONES MODULARES (FASES 1 A 4 · BLOQUES 1 AL 24)
-   Se usan namespaces en data/utils para tolerar cambios futuros sin romper
-   la compilación en Vercel/Vite.
-   ========================================================================== */
 import * as PlayersData from './data/playersAndClubsData';
 import * as StoreData from './data/storeAndTournamentsData';
 import * as Engine from './utils/tenisEngine';
 
 import {
-  ASSETS,
   IconBadge,
   ModalPortal,
   SmartImage,
@@ -50,33 +44,53 @@ export const APP_RUNTIME_CONFIG = {
   firstVisitKey: 'tt_visited_before_v2',
   defaultTab: 'retos',
   toastDurationMs: 3600,
-  // Mensajes cortos de la cinta superior de 1 línea (sin recortes en iPhone)
   tickerMessages: [
-    {
-      id: 'tk-1',
-      text: 'Tips gratis de la semana en cancha → Ver ahora',
-      action: 'sedes',
-    },
-    {
-      id: 'tk-2',
-      text: 'Top 8 del Ranking van al Torneo de Maestros',
-      action: 'torneos',
-    },
-    {
-      id: 'tk-3',
-      text: 'Reporta el clima de tu sede y suma +5 Gemas 💎',
-      action: 'sedes',
-    },
-    {
-      id: 'tk-4',
-      text: 'Canjea tus Gemas en el Pro Shop (20 💎 = S/ 1.00)',
-      action: 'shop',
-    },
+    { id: 'tk-1', text: 'Tips gratis de la semana en cancha → Ver ahora', action: 'sedes' },
+    { id: 'tk-2', text: 'Top 8 del Ranking van al Master Top 8', action: 'master' },
+    { id: 'tk-3', text: 'Reporta el estado de tu sede y suma +5 Gemas', action: 'sedes' },
+    { id: 'tk-4', text: 'Canjea tus Gemas en el Pro Shop (20 💎 = S/ 1.00)', action: 'shop' },
   ],
 };
 
 /* ==========================================================================
-   RESPALDOS SEGUROS DE ESTADO INICIAL (SI LOCALSTORAGE ESTÁ VACÍO)
+   CINTA SUPERIOR AISLADA (NO RE-RENDERIZA App NI RESETEA EL SCROLL DE MODALES)
+   ========================================================================== */
+function SlimTickerBar({ onSelectTab, onOpenMaster, onOpenShop }) {
+  const [idx, setIdx] = useState(0);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setIdx((prev) => (prev + 1) % APP_RUNTIME_CONFIG.tickerMessages.length);
+    }, 5500);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const item = APP_RUNTIME_CONFIG.tickerMessages[idx];
+  if (!item) return null;
+
+  return (
+    <div className="tt-slim-ticker-bar">
+      <button
+        type="button"
+        className="tt-slim-ticker-btn"
+        onClick={() => {
+          triggerHaptic('light');
+          if (item.action === 'shop') onOpenShop();
+          else if (item.action === 'master') onOpenMaster();
+          else onSelectTab(item.action);
+        }}
+      >
+        <span className="tt-ticker-dot" aria-hidden="true" />
+        <span key={item.id} className="tt-ticker-text">
+          {item.text}
+        </span>
+      </button>
+    </div>
+  );
+}
+
+/* ==========================================================================
+   RESPALDOS SEGUROS DE ESTADO INICIAL
    ========================================================================== */
 function buildInitialPlayers() {
   const src = PlayersData.INITIAL_PLAYERS || PlayersData.DEMO_PLAYERS || [];
@@ -118,10 +132,10 @@ function buildInitialSnapshots(playersList) {
     year,
     currentSeason: 4,
     seasons: [
-      { number: 1, label: 'T1', period: 'Ene – Mar', locked: true, scores: scoresT1 },
-      { number: 2, label: 'T2', period: 'Abr – Jun', locked: true, scores: scoresT2 },
-      { number: 3, label: 'T3', period: 'Jul – Sep', locked: true, scores: scoresT3 },
-      { number: 4, label: 'T4', period: 'Oct – Dic', locked: false, scores: {} },
+      { number: 1, label: 'Temporada 1', period: 'Ene – Mar', locked: true, scores: scoresT1 },
+      { number: 2, label: 'Temporada 2', period: 'Abr – Jun', locked: true, scores: scoresT2 },
+      { number: 3, label: 'Temporada 3', period: 'Jul – Sep', locked: true, scores: scoresT3 },
+      { number: 4, label: 'Temporada 4', period: 'Oct – Dic', locked: false, scores: {} },
     ],
   };
 }
@@ -134,7 +148,6 @@ function loadPersistedBundle() {
     if (!parsed || !Array.isArray(parsed.players) || parsed.players.length === 0) {
       return null;
     }
-    // Migración automática de seguridad: corregir cuentas demo atrapadas en 0 Gemas por caché vieja
     const migratedPlayers = parsed.players.map((p) => ({
       ...p,
       gems: p.gems === 0 && (p.wins || 0) > 0 ? (p.isVip ? 220 : 35) : Number(p.gems) || 0,
@@ -146,13 +159,12 @@ function loadPersistedBundle() {
 }
 
 /* ==========================================================================
-   COMPONENTE RAÍZ MAESTRO: App (BLOQUE 25 DE 26)
+   COMPONENTE RAÍZ MAESTRO: App
    ========================================================================== */
 export default function App() {
   const scrollContainerRef = useRef(null);
   const toastTimerRef = useRef(null);
 
-  // 1. HIDRATACIÓN PERSISTENTE DEL CIRCUITO
   const initialBundle = useMemo(() => {
     const saved = typeof window !== 'undefined' ? loadPersistedBundle() : null;
     const basePlayers = saved?.players || buildInitialPlayers();
@@ -184,7 +196,6 @@ export default function App() {
   const [notices, setNotices] = useState(initialBundle.notices);
   const [sponsorsConfig, setSponsorsConfig] = useState(initialBundle.sponsorsConfig);
 
-  // 2. PREFERENCIAS VISUALES (MODO OSCURO/CLARO, SOL INTENSO Y RENDIMIENTO CERO LAG)
   const [theme, setTheme] = useState(() => {
     try {
       return window.localStorage.getItem(APP_RUNTIME_CONFIG.themeStorageKey) || 'dark';
@@ -193,9 +204,8 @@ export default function App() {
     }
   });
   const [sunlightMode, setSunlightMode] = useState(false);
-  const [performanceTier, setPerformanceTier] = useState('standard'); // 'standard' | 'lite'
+  const [performanceTier, setPerformanceTier] = useState('standard');
 
-  // 3. ARRANQUE (SPLASH / BIENVENIDA) Y NAVEGACIÓN PRINCIPAL
   const [showSplash, setShowSplash] = useState(true);
   const [isFirstVisit] = useState(() => {
     try {
@@ -205,13 +215,12 @@ export default function App() {
     }
   });
   const [activeTab, setActiveTab] = useState(APP_RUNTIME_CONFIG.defaultTab);
-  const [tickerIndex, setTickerIndex] = useState(0);
+  const [torneosInitialSubTab, setTorneosInitialSubTab] = useState('gira');
 
-  // 4. ESTADO DE SESIÓN ADMIN OCULTA Y ALIADOS B2B
   const [isAdminSession, setIsAdminSession] = useState(false);
   const [activePartner, setActivePartner] = useState(null);
 
-  // 5. CONTROL CENTRALIZADO DE LOS 10 MODALES (TODOS EN PORTAL GLOBAL)
+  // Control centralizado de los 10 Modales
   const [proShopModal, setProShopModal] = useState({ open: false, mode: 'shop' });
   const [h2hModal, setH2hModal] = useState({ open: false, playerA: null, playerB: null });
   const [storiesModal, setStoriesModal] = useState({ open: false, payload: null });
@@ -223,18 +232,10 @@ export default function App() {
   const [adminModalOpen, setAdminModalOpen] = useState(false);
   const [tutorialOpen, setTutorialOpen] = useState(false);
 
-  // Modal de Ficha Homogeneizada de Rival (misma estética que Mi Perfil + botón H2H)
   const [inspectPlayerId, setInspectPlayerId] = useState(null);
-
-  // Pop-up automático de Reto Entrante (control anti-bucle por ID)
   const [dismissedIncomingIds, setDismissedIncomingIds] = useState([]);
-
-  // Toast flotante elegante
   const [toast, setToast] = useState(null);
 
-  /* ------------------------------------------------------------------------
-     NOTIFICADOR TOAST CENTRALIZADO
-     ------------------------------------------------------------------------ */
   const showToast = useCallback((message, type = 'info') => {
     if (!message) return;
     if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
@@ -244,9 +245,6 @@ export default function App() {
     }, APP_RUNTIME_CONFIG.toastDurationMs);
   }, []);
 
-  /* ------------------------------------------------------------------------
-     CALIBRACIÓN AUTOMÁTICA DE TEMA, DISPOSITIVO Y PERSISTENCIA
-     ------------------------------------------------------------------------ */
   useEffect(() => {
     if (typeof document === 'undefined') return;
     const html = document.documentElement;
@@ -254,7 +252,6 @@ export default function App() {
     html.setAttribute('data-sunlight', sunlightMode ? 'true' : 'false');
     html.setAttribute('data-tier', performanceTier);
 
-    // Sincronizar color de barra de estado del celular (Safari iOS / Chrome Android)
     const metaTheme = document.querySelector('meta[name="theme-color"]');
     if (metaTheme) {
       metaTheme.setAttribute('content', theme === 'light' ? '#FAF9F5' : '#1E0734');
@@ -267,7 +264,6 @@ export default function App() {
     }
   }, [theme, sunlightMode, performanceTier]);
 
-  // Detectar automáticamente teléfonos gama baja / ahorro de batería para Modo Cero Lag
   useEffect(() => {
     if (typeof navigator === 'undefined') return;
     const lowMem = navigator.deviceMemory && navigator.deviceMemory <= 3;
@@ -279,7 +275,6 @@ export default function App() {
     }
   }, []);
 
-  // Persistencia automática en localStorage (con protección contra QuotaExceeded)
   useEffect(() => {
     try {
       const payload = {
@@ -297,7 +292,7 @@ export default function App() {
       };
       window.localStorage.setItem(APP_RUNTIME_CONFIG.storageKey, JSON.stringify(payload));
     } catch (e) {
-      // Si el almacenamiento está lleno, la app sigue operando sin caerse
+      // continuar
     }
   }, [
     players,
@@ -312,40 +307,18 @@ export default function App() {
     sponsorsConfig,
   ]);
 
-  // Rotación suave de la cinta superior de 1 línea cada 5.5 s
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      setTickerIndex((prev) => (prev + 1) % APP_RUNTIME_CONFIG.tickerMessages.length);
-    }, 5500);
-    return () => window.clearInterval(id);
-  }, []);
-
-  /* ------------------------------------------------------------------------
-     VALORES DERIVADOS CLAVE (USUARIO ACTUAL, CLUBES VISIBLES, RETOS VIVOS)
-     ------------------------------------------------------------------------ */
   const currentUser = useMemo(
     () => players.find((p) => p.id === currentUserId) || null,
     [players, currentUserId]
   );
 
-  // Jugadores visibles en Ranking y Retos (oculta cuentas pausadas desde Admin)
-  const activePlayers = useMemo(
-    () => players.filter((p) => !p.isPaused),
-    [players]
-  );
-
-  // Clubes visibles (respeta Feature Toggles On/Off de Admin)
-  const activeClubs = useMemo(
-    () => clubs.filter((c) => c.active !== false),
-    [clubs]
-  );
-
+  const activePlayers = useMemo(() => players.filter((p) => !p.isPaused), [players]);
+  const activeClubs = useMemo(() => clubs.filter((c) => c.active !== false), [clubs]);
   const inspectedPlayer = useMemo(
     () => players.find((p) => p.id === inspectPlayerId) || null,
     [players, inspectPlayerId]
   );
 
-  // Contadores limpios para BottomDock y Header
   const liveMatchesCount = useMemo(
     () => challenges.filter((c) => c.status === 'IN_PLAY').length,
     [challenges]
@@ -353,24 +326,13 @@ export default function App() {
 
   const incomingPendingChallenges = useMemo(() => {
     if (!currentUser?.id) return [];
-    return challenges.filter(
-      (c) => c.status === 'PENDING' && c.playerBId === currentUser.id
-    );
+    return challenges.filter((c) => c.status === 'PENDING' && c.playerBId === currentUser.id);
   }, [challenges, currentUser?.id]);
 
-  // Pop-up automático del primer reto entrante no descartado en esta sesión
   const popupChallenge = useMemo(() => {
     if (showSplash || authModal.open || !currentUser?.id) return null;
-    return (
-      incomingPendingChallenges.find((c) => !dismissedIncomingIds.includes(c.id)) || null
-    );
-  }, [
-    showSplash,
-    authModal.open,
-    currentUser?.id,
-    incomingPendingChallenges,
-    dismissedIncomingIds,
-  ]);
+    return incomingPendingChallenges.find((c) => !dismissedIncomingIds.includes(c.id)) || null;
+  }, [showSplash, authModal.open, currentUser?.id, incomingPendingChallenges, dismissedIncomingIds]);
 
   const activeTournamentsCount = useMemo(
     () => tournaments.filter((t) => t.status === 'OPEN' || t.status === 'IN_PLAY').length,
@@ -382,9 +344,6 @@ export default function App() {
     return incomingPendingChallenges.length + unreadCustom;
   }, [incomingPendingChallenges.length, notices]);
 
-  /* ------------------------------------------------------------------------
-     NAVEGACIÓN FLUIDA Y SCROLL-TO-TOP
-     ------------------------------------------------------------------------ */
   const scrollMainToTop = useCallback(() => {
     if (scrollContainerRef.current) {
       scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
@@ -401,6 +360,15 @@ export default function App() {
     [scrollMainToTop]
   );
 
+  const handleOpenTournamentsAt = useCallback(
+    (subTab = 'gira') => {
+      setTorneosInitialSubTab(subTab);
+      setActiveTab('torneos');
+      scrollMainToTop();
+    },
+    [scrollMainToTop]
+  );
+
   const handleFinishSplash = useCallback(() => {
     setShowSplash(false);
     try {
@@ -410,17 +378,12 @@ export default function App() {
     }
   }, []);
 
-  /* ------------------------------------------------------------------------
-     ACCIONES DE NEGOCIO CONECTADAS (PERFIL, RETOS, TORNEOS, SEDES, PRO SHOP)
-     ------------------------------------------------------------------------ */
   const appendGemLedger = useCallback((entry) => {
     setGemLedger((prev) => [{ id: `lg-${Date.now()}`, ...entry }, ...prev]);
   }, []);
 
   const handleUpdatePlayer = useCallback((playerId, patch) => {
-    setPlayers((prev) =>
-      prev.map((p) => (p.id === playerId ? { ...p, ...patch } : p))
-    );
+    setPlayers((prev) => prev.map((p) => (p.id === playerId ? { ...p, ...patch } : p)));
   }, []);
 
   const handleCreateChallenge = useCallback((newChallenge) => {
@@ -428,19 +391,13 @@ export default function App() {
   }, []);
 
   const handleUpdateChallenge = useCallback((challengeId, patch) => {
-    setChallenges((prev) =>
-      prev.map((c) => (c.id === challengeId ? { ...c, ...patch } : c))
-    );
+    setChallenges((prev) => prev.map((c) => (c.id === challengeId ? { ...c, ...patch } : c)));
   }, []);
 
-  // Cierre oficial de partido: actualiza marcador, ELO real, racha, calibración y Gemas por mérito
   const handleFinalizeMatch = useCallback(
     ({ challenge, eloResult, liveScore }) => {
       if (!challenge || !eloResult?.ok) return;
-      const winnerId =
-        eloResult.winnerSide === 'A' ? challenge.playerAId : challenge.playerBId;
-      const loserId =
-        eloResult.winnerSide === 'A' ? challenge.playerBId : challenge.playerAId;
+      const winnerId = eloResult.winnerSide === 'A' ? challenge.playerAId : challenge.playerBId;
 
       setChallenges((prev) =>
         prev.map((c) =>
@@ -470,12 +427,8 @@ export default function App() {
               Engine.ELO_CONFIG?.CALIBRATION_MATCHES || 5,
               (Number(p.calibrationPlayed) || 0) + 1
             );
-
-            // Recompensa equilibrada de Gemas por racha de 3+ victorias
             let bonusGems = 0;
-            if (won && nextStreak >= 3) {
-              bonusGems = p.isVip ? 13 : 5;
-            }
+            if (won && nextStreak >= 3) bonusGems = p.isVip ? 13 : 5;
 
             return {
               ...p,
@@ -501,14 +454,10 @@ export default function App() {
           detail: `Marcador ${eloResult.summary}`,
         });
       }
-      if (loserId) {
-        // Acta cerrada y trazada
-      }
     },
     [currentUserId, appendGemLedger]
   );
 
-  // Abrir Reto Rápido desde Ranking, Perfil de Rival o Head to Head
   const handleQuickChallengeFromAnywhere = useCallback(
     (rival) => {
       if (!currentUser) {
@@ -527,16 +476,13 @@ export default function App() {
     [currentUser, scrollMainToTop, showToast]
   );
 
-  // Inscripción a Torneo -> pasa SIEMPRE a "Pago en Verificación" (Admin aprueba)
   const handleRequestTournamentInscription = useCallback(({ tournamentId, playerId }) => {
     setTournaments((prev) =>
       prev.map((t) =>
         t.id === tournamentId
           ? {
               ...t,
-              pendingPaymentIds: Array.from(
-                new Set([...(t.pendingPaymentIds || []), playerId])
-              ),
+              pendingPaymentIds: Array.from(new Set([...(t.pendingPaymentIds || []), playerId])),
             }
           : t
       )
@@ -564,31 +510,18 @@ export default function App() {
     setTournaments((prev) =>
       prev.map((t) =>
         t.id === tournamentId
-          ? {
-              ...t,
-              bracketResults: {
-                ...(t.bracketResults || {}),
-                [matchId]: resultObj,
-              },
-            }
+          ? { ...t, bracketResults: { ...(t.bracketResults || {}), [matchId]: resultObj } }
           : t
       )
     );
   }, []);
 
-  // Clima de sede reportado (+5 Gemas al jugador)
   const handleReportClubWeather = useCallback(
     ({ clubId, conditionKey, rewardGems = 5 }) => {
       setClubs((prev) =>
         prev.map((c) =>
           c.id === clubId
-            ? {
-                ...c,
-                climaBase: {
-                  ...(c.climaBase || {}),
-                  conditionKey,
-                },
-              }
+            ? { ...c, climaBase: { ...(c.climaBase || {}), conditionKey } }
             : c
         )
       );
@@ -608,7 +541,7 @@ export default function App() {
         appendGemLedger({
           type: 'credit',
           amount: rewardGems,
-          title: 'Reporte climático en sede',
+          title: 'Reporte de estado en sede',
           date: 'Hoy',
           detail: `Estado actualizado (${conditionKey})`,
         });
@@ -617,7 +550,6 @@ export default function App() {
     [currentUserId, appendGemLedger]
   );
 
-  // Canjes de Gemas (Masterclass, Escenarios Grand Slam, Distintivos, Pro Shop)
   const handleDeductGemsForUnlock = useCallback(
     ({ gemsCost, patchPlayer, ledgerTitle, ledgerDetail }) => {
       if (!currentUserId) return;
@@ -645,7 +577,6 @@ export default function App() {
     [currentUserId, appendGemLedger]
   );
 
-  // Solicitud y Aprobación de Pase Socio VIP
   const handleRequestVipUpgrade = useCallback(
     ({ playerId }) => {
       handleUpdatePlayer(playerId, { vipStatus: 'PENDING_PAYMENT' });
@@ -676,7 +607,6 @@ export default function App() {
     [showToast]
   );
 
-  // Registro completo -> activa cuenta + abre Guía de 1 sola vez si no la vio
   const handleRegisterComplete = useCallback((newPlayer) => {
     setPlayers((prev) => [newPlayer, ...prev]);
     setCurrentUserId(newPlayer.id);
@@ -690,21 +620,6 @@ export default function App() {
     }
   }, []);
 
-  const handleTickerClick = () => {
-    const item = APP_RUNTIME_CONFIG.tickerMessages[tickerIndex];
-    triggerHaptic('light');
-    if (!item) return;
-    if (item.action === 'shop') {
-      setProShopModal({ open: true, mode: 'shop' });
-    } else {
-      handleSelectTab(item.action);
-    }
-  };
-
-  /* ------------------------------------------------------------------------
-     RENDER PRINCIPAL DE TOTAL TENIS
-     ------------------------------------------------------------------------ */
-  const currentTicker = APP_RUNTIME_CONFIG.tickerMessages[tickerIndex];
   const popupChallenger = popupChallenge
     ? players.find((p) => p.id === popupChallenge.playerAId)
     : null;
@@ -715,7 +630,7 @@ export default function App() {
         sunlightMode ? 'is-sunlight' : ''
       }`}
     >
-      {/* 1. SPLASH SCREEN / BIENVENIDA CINEMÁTICA */}
+      {/* 1. SPLASH SCREEN / BIENVENIDA */}
       {showSplash && (
         <SplashScreen
           theme={theme}
@@ -727,15 +642,13 @@ export default function App() {
         />
       )}
 
-      {/* 2. CABECERA SUPERIOR FLOTANTE + MENÚ LATERAL (3 RAYITAS)
-          Incluye el gesto oculto de 5 toques al logo para tu Suite Admin */}
+      {/* 2. CABECERA SUPERIOR EN FLUJO REAL + MENÚ LATERAL (3 RAYITAS) */}
       <HeaderAndDrawer
         currentUser={currentUser}
         theme={theme}
         sunlightMode={sunlightMode}
         activeTab={activeTab}
         unreadNoticesCount={unreadNoticesCount}
-        pendingChallengesCount={incomingPendingChallenges.length}
         sponsorsConfig={sponsorsConfig}
         onToggleTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
         onToggleSunlight={() => setSunlightMode((s) => !s)}
@@ -744,24 +657,17 @@ export default function App() {
         onOpenShop={() => setProShopModal({ open: true, mode: 'shop' })}
         onOpenGemsVault={() => setProShopModal({ open: true, mode: 'vault' })}
         onOpenVault={() => setProShopModal({ open: true, mode: 'vault' })}
-        onOpenNotices={(tab = 'notificaciones') =>
-          setNoticesModal({ open: true, tab })
-        }
+        onOpenNotices={(tab = 'notificaciones') => setNoticesModal({ open: true, tab })}
         onOpenVipScale={(tab = 'vip') => setVipScaleModal({ open: true, tab })}
-        onOpenStories={(payload = null) =>
-          setStoriesModal({ open: true, payload })
-        }
+        onOpenStories={(payload = null) => setStoriesModal({ open: true, payload })}
         onOpenAuth={(mode = 'login') => setAuthModal({ open: true, mode })}
         onOpenPartnerPortal={() => {
           if (activePartner) setPartnerModalOpen(true);
           else setAuthModal({ open: true, mode: 'partner' });
         }}
-        onOpenLegal={(section = 'reclamaciones') =>
-          setLegalModal({ open: true, section })
-        }
+        onOpenLegal={(section = 'reclamaciones') => setLegalModal({ open: true, section })}
         onOpenTutorial={() => setTutorialOpen(true)}
         onSecretAdminTrigger={() => setAdminModalOpen(true)}
-        onOpenAdmin={() => setAdminModalOpen(true)}
         onLogout={() => {
           triggerHaptic('medium');
           setCurrentUserId(null);
@@ -771,21 +677,14 @@ export default function App() {
         }}
       />
 
-      {/* 3. CINTA SUPERIOR DESLIZANTE DE 1 SOLA LÍNEA (SIN BLOQUES GIGANTES) */}
-      <div className="tt-slim-ticker-bar">
-        <button
-          type="button"
-          className="tt-slim-ticker-btn"
-          onClick={handleTickerClick}
-        >
-          <span className="tt-ticker-dot" aria-hidden="true" />
-          <span key={currentTicker.id} className="tt-ticker-text">
-            {currentTicker.text}
-          </span>
-        </button>
-      </div>
+      {/* 3. CINTA SUPERIOR AISLADA (NO INTERFIERE CON EL SCROLL DE LOS MODALES) */}
+      <SlimTickerBar
+        onSelectTab={handleSelectTab}
+        onOpenMaster={() => handleOpenTournamentsAt('master')}
+        onOpenShop={() => setProShopModal({ open: true, mode: 'shop' })}
+      />
 
-      {/* 4. CONTENEDOR CENTRAL SCROLLABLE (LAS 5 PANTALLAS + FOOTER INSTITUCIONAL) */}
+      {/* 4. CONTENEDOR CENTRAL SCROLLABLE (COMIENZA LIMPIO DEBAJO DEL HEADER) */}
       <main ref={scrollContainerRef} className="tt-main-scroll">
         <div className="tt-main-inner">
           <div key={activeTab} className="tt-view-transition">
@@ -802,11 +701,9 @@ export default function App() {
                 onUpdateChallenge={handleUpdateChallenge}
                 onFinalizeMatch={handleFinalizeMatch}
                 onOpenPlayerProfile={(p) => setInspectPlayerId(p.id)}
-                onOpenStoriesWithMatch={(payload) =>
-                  setStoriesModal({ open: true, payload })
-                }
+                onOpenStoriesWithMatch={(payload) => setStoriesModal({ open: true, payload })}
                 onOpenAuth={(mode) => setAuthModal({ open: true, mode })}
-                onGoToTournaments={() => handleSelectTab('torneos')}
+                onGoToTournaments={handleOpenTournamentsAt}
                 onNotify={showToast}
               />
             )}
@@ -825,7 +722,7 @@ export default function App() {
                   setH2hModal({ open: true, playerA: currentUser, playerB: rival })
                 }
                 onQuickChallenge={handleQuickChallengeFromAnywhere}
-                onGoToTournaments={() => handleSelectTab('torneos')}
+                onGoToTournaments={handleOpenTournamentsAt}
               />
             )}
 
@@ -837,6 +734,7 @@ export default function App() {
                 seasonSnapshots={seasonSnapshots}
                 currentUser={currentUser}
                 isAdmin={isAdminSession}
+                initialSubTab={torneosInitialSubTab}
                 theme={theme}
                 sunlightMode={sunlightMode}
                 onRequestTournamentInscription={handleRequestTournamentInscription}
@@ -862,9 +760,7 @@ export default function App() {
                   handleDeductGemsForUnlock({
                     gemsCost,
                     patchPlayer: (p) => ({
-                      unlockedVideos: Array.from(
-                        new Set([...(p.unlockedVideos || []), videoId])
-                      ),
+                      unlockedVideos: Array.from(new Set([...(p.unlockedVideos || []), videoId])),
                     }),
                     ledgerTitle: `Masterclass: ${title}`,
                     ledgerDetail: 'Video en cancha desbloqueado',
@@ -906,9 +802,7 @@ export default function App() {
                   handleDeductGemsForUnlock({
                     gemsCost,
                     patchPlayer: (p) => ({
-                      unlockedBadges: Array.from(
-                        new Set([...(p.unlockedBadges || []), badgeId])
-                      ),
+                      unlockedBadges: Array.from(new Set([...(p.unlockedBadges || []), badgeId])),
                       activeBadgeId: badgeId,
                     }),
                     ledgerTitle: `Distintivo: ${name}`,
@@ -919,9 +813,7 @@ export default function App() {
                 onOpenHeadToHead={(rival) =>
                   setH2hModal({ open: true, playerA: currentUser, playerB: rival })
                 }
-                onOpenStoriesWithMatch={(payload) =>
-                  setStoriesModal({ open: true, payload })
-                }
+                onOpenStoriesWithMatch={(payload) => setStoriesModal({ open: true, payload })}
                 onQuickChallenge={handleQuickChallengeFromAnywhere}
                 onOpenAuth={(mode) => setAuthModal({ open: true, mode })}
                 onNotify={showToast}
@@ -929,10 +821,12 @@ export default function App() {
             )}
           </div>
 
-          {/* PIE DE PÁGINA INSTITUCIONAL COMPLETO (CON MARGEN INFERIOR BLINDADO) */}
           <InstitutionalFooter
             sponsorsConfig={sponsorsConfig}
-            onNavigateTab={handleSelectTab}
+            onNavigateTab={(tabId) => {
+              if (tabId === 'torneos') handleOpenTournamentsAt('master');
+              else handleSelectTab(tabId);
+            }}
             onOpenProShop={(mode) => setProShopModal({ open: true, mode })}
             onOpenVipScale={(tab) => setVipScaleModal({ open: true, tab })}
             onOpenStories={() => setStoriesModal({ open: true, payload: null })}
@@ -948,7 +842,7 @@ export default function App() {
         </div>
       </main>
 
-      {/* 5. BARRA DE NAVEGACIÓN INFERIOR DEFINITIVA (5 ACTIVOS PNG + HALO ESMERALDA) */}
+      {/* 5. BARRA DE NAVEGACIÓN INFERIOR (INTACTA COMO TE GUSTA) */}
       <BottomDock
         activeTab={activeTab}
         onSelectTab={handleSelectTab}
@@ -960,9 +854,7 @@ export default function App() {
         sunlightMode={sunlightMode}
       />
 
-      {/* ====================================================================
-          MODAL HOMOGENEIZADO DE FICHA DE RIVAL (IDÉNTICA A MI PERFIL + H2H)
-          ==================================================================== */}
+      {/* MODAL HOMOGENEIZADO DE FICHA DE RIVAL */}
       <ModalPortal
         isOpen={Boolean(inspectedPlayer)}
         onClose={() => setInspectPlayerId(null)}
@@ -1021,9 +913,7 @@ export default function App() {
         )}
       </ModalPortal>
 
-      {/* ====================================================================
-          POP-UP AUTOMÁTICO DE RETO ENTRANTE (BLUR IOS · SIN BUCLE)
-          ==================================================================== */}
+      {/* POP-UP AUTOMÁTICO DE RETO ENTRANTE (SIN BUCLE) */}
       <ModalPortal
         isOpen={Boolean(popupChallenge)}
         onClose={() => {
@@ -1074,7 +964,7 @@ export default function App() {
                   triggerHaptic('success');
                   handleUpdateChallenge(popupChallenge.id, { status: 'SCHEDULED' });
                   setDismissedIncomingIds((prev) => [...prev, popupChallenge.id]);
-                  showToast('¡Desafío aceptado! Ya aparece en la Cartelera Oficial.', 'success');
+                  showToast('¡Desafío aceptado! Ya aparece en la Cartelera.', 'success');
                 }}
               >
                 Aceptar Desafío Ahora
@@ -1090,9 +980,7 @@ export default function App() {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="tt-btn tt-btn-secondary"
-                onClick={() =>
-                  setDismissedIncomingIds((prev) => [...prev, popupChallenge.id])
-                }
+                onClick={() => setDismissedIncomingIds((prev) => [...prev, popupChallenge.id])}
               >
                 <TTIcon name="whatsapp" size={17} />
                 Contraproponer Hora / Sede por WhatsApp
@@ -1101,9 +989,7 @@ export default function App() {
               <button
                 type="button"
                 className="tt-btn tt-btn-ghost tt-btn-sm"
-                onClick={() =>
-                  setDismissedIncomingIds((prev) => [...prev, popupChallenge.id])
-                }
+                onClick={() => setDismissedIncomingIds((prev) => [...prev, popupChallenge.id])}
               >
                 Revisar más tarde
               </button>
@@ -1112,9 +998,7 @@ export default function App() {
         )}
       </ModalPortal>
 
-      {/* ====================================================================
-          LOS 9 MODALES PREMIUM EN CAPA GLOBAL (FASE 4 COMPLETA)
-          ==================================================================== */}
+      {/* LOS 10 MODALES PREMIUM EN CAPA GLOBAL */}
       <ProShopAndGemsModal
         isOpen={proShopModal.open}
         initialMode={proShopModal.mode}
@@ -1182,9 +1066,7 @@ export default function App() {
           handleUpdateChallenge(ch.id, { status: 'DECLINED' });
           showToast('Desafío declinado.', 'info');
         }}
-        onMarkAllRead={() =>
-          setNotices((prev) => prev.map((n) => ({ ...n, read: true })))
-        }
+        onMarkAllRead={() => setNotices((prev) => prev.map((n) => ({ ...n, read: true })))}
         onNavigateTab={handleSelectTab}
         onNotify={showToast}
       />
@@ -1209,9 +1091,7 @@ export default function App() {
         clubs={activeClubs}
         onLoginSuccess={(p) => setCurrentUserId(p.id)}
         onRegisterComplete={handleRegisterComplete}
-        onResetPassword={(playerId, newPass) =>
-          handleUpdatePlayer(playerId, { password: newPass })
-        }
+        onResetPassword={(playerId, newPass) => handleUpdatePlayer(playerId, { password: newPass })}
         onPartnerLoginSuccess={(partnerObj) => {
           setActivePartner(partnerObj);
           setPartnerModalOpen(true);
@@ -1270,13 +1150,11 @@ export default function App() {
         onAdminResolveDispute={(chId, action) => {
           if (action === 'CANCEL') {
             handleUpdateChallenge(chId, { status: 'DECLINED' });
-            showToast('Encuentro anulado sin impacto en ELO.', 'info');
+            showToast('Encuentro anulado sin impacto en puntos.', 'info');
           }
         }}
         onAdminToggleClubActive={(clubId, nextActive) =>
-          setClubs((prev) =>
-            prev.map((c) => (c.id === clubId ? { ...c, active: nextActive } : c))
-          )
+          setClubs((prev) => prev.map((c) => (c.id === clubId ? { ...c, active: nextActive } : c)))
         }
         onAdminSaveSponsors={(cfg) => setSponsorsConfig(cfg)}
         onAdminPurgeArchivedMatches={() =>
@@ -1291,7 +1169,6 @@ export default function App() {
         onNavigateTab={handleSelectTab}
       />
 
-      {/* TOAST FLOTANTE DE RESPUESTA INMEDIATA */}
       {toast && (
         <div
           key={toast.id}
@@ -1305,9 +1182,6 @@ export default function App() {
         </div>
       )}
 
-      {/* ====================================================================
-          ESTILOS GLOBALES DE LA SHELL DE LA APP (BORDE A BORDE IPHONE/ANDROID)
-          ==================================================================== */}
       <style>{`
         .tt-app-viewport {
           position: fixed;
@@ -1321,18 +1195,18 @@ export default function App() {
           color: var(--tt-text, #FAF9F5);
         }
 
-        /* Cinta superior de 1 sola línea (sin recortes en iPhone) */
+        /* Cinta superior de 1 sola línea, visible y sin chocar con el Header */
         .tt-slim-ticker-bar {
           flex-shrink: 0;
-          padding: 0 12px 6px;
+          padding: 0 10px 6px;
           display: flex;
           justify-content: center;
           z-index: 20;
         }
         .tt-slim-ticker-btn {
           width: 100%;
-          max-width: var(--tt-container-max, 680px);
-          min-height: 30px;
+          max-width: var(--tt-container-max, 760px);
+          min-height: 28px;
           padding: 4px 12px;
           border-radius: 999px;
           background: rgba(0, 220, 125, 0.12);
@@ -1342,7 +1216,7 @@ export default function App() {
           align-items: center;
           justify-content: center;
           gap: 7px;
-          font-size: 0.72rem;
+          font-size: 0.71rem;
           font-weight: 800;
           white-space: nowrap;
           overflow: hidden;
@@ -1353,8 +1227,8 @@ export default function App() {
           color: #FAF9F5;
         }
         .tt-ticker-dot {
-          width: 7px;
-          height: 7px;
+          width: 6px;
+          height: 6px;
           border-radius: 50%;
           background: #00DC7D;
           flex-shrink: 0;
@@ -1362,14 +1236,14 @@ export default function App() {
         .tt-ticker-text {
           overflow: hidden;
           text-overflow: ellipsis;
-          animation: ttTickerFade 320ms ease;
+          animation: ttTickerFade 300ms ease;
         }
         @keyframes ttTickerFade {
-          from { opacity: 0; transform: translateY(4px); }
+          from { opacity: 0; transform: translateY(3px); }
           to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Scroll interno principal con margen inferior blindado sobre BottomDock */
+        /* Scroll interno principal: empieza limpio debajo de Header + Cinta */
         .tt-main-scroll {
           flex: 1;
           min-height: 0;
@@ -1380,23 +1254,16 @@ export default function App() {
         .tt-main-inner {
           max-width: var(--tt-container-max, 760px);
           margin: 0 auto;
-          padding: 8px 14px calc(108px + env(safe-area-inset-bottom, 0px));
+          padding: 6px 12px calc(108px + env(safe-area-inset-bottom, 0px));
         }
         .tt-view-transition {
-          animation: ttViewFadeIn 220ms cubic-bezier(0.22, 1, 0.36, 1);
+          animation: ttViewFadeIn 200ms cubic-bezier(0.22, 1, 0.36, 1);
         }
         @keyframes ttViewFadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(6px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
+          from { opacity: 0; transform: translateY(5px); }
+          to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Conmutador Ficha de Rival <-> H2H */
         .tt-rival-seg-bar {
           display: grid;
           grid-template-columns: 1fr 1fr;
@@ -1425,7 +1292,6 @@ export default function App() {
           font-weight: 800;
         }
 
-        /* Pop-up Reto Entrante */
         .tt-incoming-popup-stack {
           display: flex;
           flex-direction: column;
@@ -1458,13 +1324,12 @@ export default function App() {
           color: #00DC7D;
         }
 
-        /* Toast Flotante Global */
         .tt-global-toast {
           position: fixed;
           left: 50%;
-          top: calc(env(safe-area-inset-top, 0px) + 14px);
+          top: calc(env(safe-area-inset-top, 0px) + 12px);
           transform: translateX(-50%);
-          z-index: 200;
+          z-index: 9999;
           max-width: min(92vw, 440px);
           padding: 10px 15px;
           border-radius: 999px;
@@ -1494,14 +1359,8 @@ export default function App() {
           flex-shrink: 0;
         }
         @keyframes ttToastDrop {
-          from {
-            opacity: 0;
-            transform: translate(-50%, -14px);
-          }
-          to {
-            opacity: 1;
-            transform: translate(-50%, 0);
-          }
+          from { opacity: 0; transform: translate(-50%, -14px); }
+          to { opacity: 1; transform: translate(-50%, 0); }
         }
       `}</style>
     </div>
