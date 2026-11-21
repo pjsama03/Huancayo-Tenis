@@ -4,40 +4,64 @@ import App from './App.jsx';
 
 /* ==========================================================================
    CARGA AUTOMÁTICA DE TODAS LAS HOJAS DE ESTILO (src/styles/*.css)
-   Permite agregar o renombrar hojas de estilo en el futuro sin tocar main.jsx
    ========================================================================== */
 import.meta.glob('./styles/*.css', { eager: true });
 import.meta.glob('./*.css', { eager: true });
 
 /* ==========================================================================
-   CALIBRADOR DE PANTALLA, TECLADO Y RENDIMIENTO (IPHONE / ANDROID / WEB)
+   CALIBRADOR DE PANTALLA, TECLADO Y ALTURA REAL IPHONE PWA (SIN GAP INFERIOR)
    ========================================================================== */
 function initViewportCalibration() {
   if (typeof window === 'undefined' || typeof document === 'undefined') return;
 
   const html = document.documentElement;
+  const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent || '');
 
   const syncMetrics = () => {
+    const isStandalone =
+      window.navigator.standalone === true ||
+      Boolean(
+        window.matchMedia && window.matchMedia('(display-mode: standalone)').matches
+      );
+    html.setAttribute('data-standalone', isStandalone ? 'true' : 'false');
+
     const vv = window.visualViewport;
     const width = vv ? vv.width : window.innerWidth;
-    const height = vv ? vv.height : window.innerHeight;
+    const rawHeight = vv ? vv.height : window.innerHeight;
 
-    // Altura real útil (evita recortes en navegadores internos de WhatsApp / Instagram)
-    html.style.setProperty('--tt-dvh', `${Math.round(height)}px`);
+    // Detección de teclado virtual abierto
+    const keyboardOpen = Boolean(vv && window.innerHeight - vv.height > 140);
+    html.setAttribute('data-keyboard', keyboardOpen ? 'open' : 'closed');
 
-    // Perfil de pantalla automático (compact | standard | desktop)
+    // En iPhone PWA (standalone + black-translucent), WebKit a veces resta ~59px
+    // (Isla Dinámica) a innerHeight/100dvh, levantando el dock y dejando un hueco abajo.
+    // Con teclado cerrado, tomamos la altura física real de pantalla.
+    let effectiveHeight = rawHeight;
+    if (isStandalone && isIOS && !keyboardOpen && window.screen) {
+      const isPortrait = window.innerHeight >= window.innerWidth;
+      const fullScreenH = isPortrait
+        ? Math.max(window.screen.height, window.screen.width)
+        : Math.min(window.screen.height, window.screen.width);
+      if (fullScreenH > rawHeight && fullScreenH - rawHeight <= 110) {
+        effectiveHeight = fullScreenH;
+      }
+    }
+
+    const roundedH = Math.round(effectiveHeight);
+    html.style.setProperty('--tt-app-h', `${roundedH}px`);
+    html.style.setProperty('--tt-dvh', `${roundedH}px`);
+    html.style.setProperty('--tt-vh', `${(effectiveHeight * 0.01).toFixed(4)}px`);
+
     const screenProfile =
       width < 375 ? 'compact' : width >= 768 ? 'desktop' : 'standard';
     html.setAttribute('data-screen', screenProfile);
-
-    // Detección de teclado virtual abierto para anclar la cabecera sin saltos
-    const keyboardOpen = Boolean(vv && window.innerHeight - vv.height > 140);
-    html.setAttribute('data-keyboard', keyboardOpen ? 'open' : 'closed');
   };
 
   syncMetrics();
   window.addEventListener('resize', syncMetrics, { passive: true });
   window.addEventListener('orientationchange', syncMetrics, { passive: true });
+  window.addEventListener('pageshow', syncMetrics, { passive: true });
+  window.addEventListener('focus', syncMetrics, { passive: true });
 
   if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', syncMetrics, { passive: true });
@@ -46,7 +70,6 @@ function initViewportCalibration() {
 
 /* ==========================================================================
    ESCUDO DE RECUPERACIÓN (ERROR BOUNDARY CON IDENTIDAD TOTAL TENIS)
-   Evita pantallas en blanco si un navegador antiguo corrompe su caché local.
    ========================================================================== */
 class TotalTenisErrorBoundary extends React.Component {
   constructor(props) {
@@ -73,7 +96,7 @@ class TotalTenisErrorBoundary extends React.Component {
     try {
       window.localStorage.removeItem('tt_total_tenis_state_v2');
       window.localStorage.removeItem('tt_partner_studio_state_v1');
-    } catch (e) {
+    } catch {
       // continuar
     }
     window.location.reload();
@@ -87,7 +110,7 @@ class TotalTenisErrorBoundary extends React.Component {
     return (
       <div
         style={{
-          minHeight: '100dvh',
+          minHeight: '100vh',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -213,9 +236,6 @@ class TotalTenisErrorBoundary extends React.Component {
   }
 }
 
-/* ==========================================================================
-   ARRANQUE DE LA APLICACIÓN
-   ========================================================================== */
 initViewportCalibration();
 
 const rootEl = document.getElementById('root');
