@@ -14,18 +14,15 @@ import {
   getClubById,
   INITIAL_CLUBS,
 } from '../data/playersAndClubsData';
-import { buildWhatsAppLink } from '../utils/tenisEngine';
+import { buildWhatsappLink } from '../utils/cloudService';
 
 /* ==========================================================================
    ZONA DE EDICIÓN RÁPIDA (PRECIOS VIP, ARTE CANVA PRO, PAGOS Y BENEFICIOS)
-   --------------------------------------------------------------------------
-   - Cambia cualquier tarifa, texto o ruta de imagen aquí y toda la pantalla
-     se actualizará automáticamente sin tocar lógica ni estilos.
+   - Sin equivalencias de Gemas en Soles (regla económica de la plataforma).
    ========================================================================== */
 export const VIP_AND_SCALE_EDITABLE_CONFIG = {
-  gemsPerSol: APP_CONFIG.gemsPerSol || 20, // 20 Gemas = S/ 1.00
-  monthlyGemsIncluded: 200, // +200 Gemas mensuales incluidas (= S/ 10.00 en Pro Shop)
-  savingsPerHourSoles: 8, // Ahorro promedio VIP por hora en canchas aliadas (13h = S/ 104)
+  monthlyGemsIncluded: 200,
+  savingsPerHourSoles: 8, // Ahorro promedio VIP por hora en canchas aliadas
   cardArtwork: {
     frontImage: '/assets/carnet-vip-anverso.png',
     backImage: '/assets/carnet-vip-reverso.png',
@@ -44,7 +41,7 @@ export const VIP_AND_SCALE_EDITABLE_CONFIG = {
       price: 29.9,
       periodLabel: '/ mes',
       badge: 'MÁS POPULAR',
-      saveLabel: 'Se paga solo jugando 4 h/mes',
+      saveLabel: 'Se cubre solo jugando 4 h/mes',
     },
     {
       id: 'vip-trimestral',
@@ -66,9 +63,9 @@ export const VIP_AND_SCALE_EDITABLE_CONFIG = {
   visualBenefits: [
     {
       id: 'ben-golden',
-      title: 'Golden Ticket en 4 Sedes',
+      title: 'Beneficios en 4 Sedes',
       highlight: '-15% a -20% en cancha',
-      desc: 'Presenta tu Carnet 3D en recepción y ahorra de S/ 5 a S/ 10 por hora.',
+      desc: 'Presenta tu Carnet 3D en recepción y ahorra directo en cada reserva.',
       image: '/assets/canva-golden-ticket.png',
       fallback: ASSETS.logo,
       accent: '#F59E0B',
@@ -85,8 +82,8 @@ export const VIP_AND_SCALE_EDITABLE_CONFIG = {
     {
       id: 'ben-shop',
       title: 'Tarifa Socio en Pro Shop',
-      highlight: 'Canje 100 % Gemas',
-      desc: 'Descuentos directos en encordados, pelotas y canje completo habilitado.',
+      highlight: 'Canjes exclusivos',
+      desc: 'Descuentos directos en stock del almacén y acceso a canjes completos.',
       image: '/assets/pelota-3d-volt-azul.png',
       fallback: ASSETS.logo,
       accent: '#38BDF8',
@@ -95,10 +92,10 @@ export const VIP_AND_SCALE_EDITABLE_CONFIG = {
       id: 'ben-tourney',
       title: 'Prioridad en Torneos',
       highlight: 'Cupos y Clases VIP',
-      desc: 'Acceso preferente a cuadros oficiales y tarifa VIP con Coaches aliados.',
+      desc: 'Acceso preferente a cuadros oficiales y tarifa preferencial con Coaches.',
       image: ASSETS.gifCelebracion2 || '/assets/gif-celebracion-2.gif',
       fallback: ASSETS.trofeoMasterTop8,
-      accent: '#C85A32',
+      accent: '#D96B43',
     },
   ],
   visualRulesCards: [
@@ -107,8 +104,8 @@ export const VIP_AND_SCALE_EDITABLE_CONFIG = {
       kicker: 'CADA GAME CUENTA',
       title: 'Dominio premiado · Pelea protegida',
       bullets: [
-        'Ganar 6-0, 6-0 otorga el 100 % del techo.',
-        'Perder en 3 sets o tie-break protege tu puntaje.',
+        'Ganar con amplia ventaja entrega el máximo de puntos.',
+        'Pelear hasta el 3er set o tie-break protege tu puntaje.',
       ],
       image: '/assets/pelota-3d-volt-azul.png',
       accent: '#00DC7D',
@@ -116,10 +113,10 @@ export const VIP_AND_SCALE_EDITABLE_CONFIG = {
     {
       id: 'rule-calib',
       kicker: 'PRIMEROS 5 PARTIDOS',
-      title: 'Fase de Calibración Oficial',
+      title: 'Partidos Iniciales de Prueba',
       bullets: [
-        'Tus primeros 5 partidos fijan tu nivel real.',
-        'Ventana de retos oficiales: ±1,200 pts.',
+        'Tus primeros 5 partidos ubican tu categoría real en cancha.',
+        'Puedes retar por puntos a rivales dentro de ±1,200 pts.',
       ],
       image: '/assets/fuego-racha-3d.png',
       accent: '#38BDF8',
@@ -130,7 +127,7 @@ export const VIP_AND_SCALE_EDITABLE_CONFIG = {
       title: 'Revanchas flexibles sin bloqueos',
       bullets: [
         '1º duelo semanal: 100 % · 2º: 75 % · 3º+: 50 %.',
-        'Se reinicia al 100 % cada lunes automáticamente.',
+        'Cada lunes se reinicia automáticamente al 100 %.',
       ],
       image: '/assets/canva-golden-ticket.png',
       accent: '#F59E0B',
@@ -140,18 +137,15 @@ export const VIP_AND_SCALE_EDITABLE_CONFIG = {
       kicker: '4 TEMPORADAS AL AÑO',
       title: 'Carrera al Master Top 8',
       bullets: [
-        'Al cierre trimestral tus puntos se congelan en la tabla anual.',
-        'Los puestos #1 al #8 juegan el Master sin costo.',
+        'Al terminar cada trimestre se guarda tu puntaje en el acumulado anual.',
+        'Los puestos #1 al #8 clasifican al Master sin costo de inscripción.',
       ],
       image: ASSETS.trofeoMasterTop8,
-      accent: '#C85A32',
+      accent: '#D96B43',
     },
   ],
 };
 
-/* ==========================================================================
-   METADATOS HERÁLDICOS PARA CADA NIVEL DEL MAPA DE CATEGORÍAS
-   ========================================================================== */
 function getTierVisualMeta(catId) {
   switch (catId) {
     case '5p':
@@ -170,9 +164,9 @@ function getTierVisualMeta(catId) {
 }
 
 /* ==========================================================================
-   SUBCOMPONENTE: CARNET DIGITAL 3D INTERACTIVO (ANVERSO + REVERSO + GIRO 3D)
-   - Monta automáticamente carnet-vip-anverso.png y carnet-vip-reverso.png
-     cuando los subas a public/assets/, con fallback metálico de lujo.
+   SUBCOMPONENTE: CARNET DIGITAL 3D BLINDADO CONTRA BUG SAFARI IOS
+   - Separación real en eje Z (translateZ) + compuerta de opacidad a los 90°.
+   - Cero texto espejado del anverso en el reverso en iPhone.
    ========================================================================== */
 function InteractiveVipCard3D({ player, club, category, isPendingPayment }) {
   const [isFlipped, setIsFlipped] = useState(false);
@@ -193,12 +187,18 @@ function InteractiveVipCard3D({ player, club, category, isPendingPayment }) {
     const px = (e.clientX - rect.left) / rect.width - 0.5;
     const py = (e.clientY - rect.top) / rect.height - 0.5;
     setTilt({
-      rx: Number((-py * 11).toFixed(2)),
-      ry: Number((px * 13).toFixed(2)),
+      rx: Number((-py * 10).toFixed(2)),
+      ry: Number((px * 12).toFixed(2)),
     });
   };
 
   const resetTilt = () => setTilt({ rx: 0, ry: 0 });
+
+  const toggleFlip = () => {
+    triggerHaptic('medium');
+    setTilt({ rx: 0, ry: 0 });
+    setIsFlipped((v) => !v);
+  };
 
   return (
     <div className="tt-vip3d-wrapper">
@@ -206,17 +206,14 @@ function InteractiveVipCard3D({ player, club, category, isPendingPayment }) {
         className="tt-vip3d-scene"
         onMouseMove={handlePointerMove}
         onMouseLeave={resetTilt}
-        onClick={() => {
-          triggerHaptic('light');
-          setIsFlipped((v) => !v);
-        }}
+        onClick={toggleFlip}
         role="button"
         tabIndex={0}
         aria-label="Girar Carnet Digital 3D para ver anverso y reverso"
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
-            setIsFlipped((v) => !v);
+            toggleFlip();
           }
         }}
       >
@@ -230,7 +227,6 @@ function InteractiveVipCard3D({ player, club, category, isPendingPayment }) {
         >
           {/* CARA FRONTAL (ANVERSO) */}
           <div className={`tt-vip3d-face is-front ${isVip ? 'is-gold' : 'is-std'}`}>
-            {/* Soporte nativo para arte personalizado Canva Pro */}
             <img
               src={VIP_AND_SCALE_EDITABLE_CONFIG.cardArtwork.frontImage}
               alt=""
@@ -239,11 +235,10 @@ function InteractiveVipCard3D({ player, club, category, isPendingPayment }) {
               onError={() => setFrontArtLoaded(false)}
             />
 
-            {/* Líneas tenues grabadas de pista si aún no se carga arte Canva */}
             {!frontArtLoaded && <div className="tt-vip3d-etched-court" aria-hidden="true" />}
+            <span className="tt-vip3d-foil-sheen" aria-hidden="true" />
 
-            {/* Datos dinámicos superpuestos con alta nitidez */}
-            <div className="tt-vip3d-layer">
+            <div className="tt-vip3d-layer is-front-layer">
               <div className="tt-vip3d-top">
                 <div className="tt-vip3d-brand-pair">
                   <SmartImage
@@ -254,13 +249,17 @@ function InteractiveVipCard3D({ player, club, category, isPendingPayment }) {
                       height: 30,
                       borderRadius: '50%',
                       objectFit: 'cover',
-                      border: '1.5px solid rgba(250, 249, 245, 0.35)',
+                      border: '1.5px solid rgba(250, 249, 245, 0.42)',
                     }}
                   />
                   <span>TOTAL TENIS</span>
                 </div>
 
-                <span className={`tt-vip3d-status ${isVip ? 'is-gold' : isPendingPayment ? 'is-pending' : ''}`}>
+                <span
+                  className={`tt-vip3d-status ${
+                    isVip ? 'is-gold' : isPendingPayment ? 'is-pending' : ''
+                  }`}
+                >
                   {isVip ? 'SOCIO VIP' : isPendingPayment ? 'EN VERIFICACIÓN' : 'ESTÁNDAR'}
                 </span>
               </div>
@@ -278,7 +277,7 @@ function InteractiveVipCard3D({ player, club, category, isPendingPayment }) {
                     objectPosition: 'center top',
                     border: isVip
                       ? '2px solid #F59E0B'
-                      : '1.5px solid rgba(250, 249, 245, 0.4)',
+                      : '1.5px solid rgba(250, 249, 245, 0.42)',
                     flexShrink: 0,
                   }}
                 />
@@ -291,7 +290,6 @@ function InteractiveVipCard3D({ player, club, category, isPendingPayment }) {
                   </small>
                 </div>
 
-                {/* Chip holográfico discreto */}
                 <div className="tt-vip3d-chip" aria-hidden="true">
                   <span />
                 </div>
@@ -299,15 +297,17 @@ function InteractiveVipCard3D({ player, club, category, isPendingPayment }) {
 
               <div className="tt-vip3d-bottom">
                 <div>
-                  <small>VÁLIDO TEMPORADA</small>
-                  <strong>{validYear} · {Number(player?.points || 0).toLocaleString('es-PE')} PTS</strong>
+                  <small>VIGENCIA TEMPORADA</small>
+                  <strong>
+                    {validYear} · {Number(player?.points || 0).toLocaleString('es-PE')} PTS
+                  </strong>
                 </div>
                 <span className="tt-vip3d-flip-hint">Toca para girar ↻</span>
               </div>
             </div>
           </div>
 
-          {/* CARA TRASERA (REVERSO CON QR VERIFICABLE Y CÓDIGO DE BARRAS) */}
+          {/* CARA TRASERA (REVERSO CON QR VERIFICABLE — CERO SOLES) */}
           <div className={`tt-vip3d-face is-back ${isVip ? 'is-gold' : 'is-std'}`}>
             <img
               src={VIP_AND_SCALE_EDITABLE_CONFIG.cardArtwork.backImage}
@@ -317,7 +317,7 @@ function InteractiveVipCard3D({ player, club, category, isPendingPayment }) {
               onError={() => setBackArtLoaded(false)}
             />
 
-            <div className="tt-vip3d-layer is-back-layout">
+            <div className="tt-vip3d-layer is-back-layout is-back-layer">
               <div className="tt-vip3d-magstrip">
                 <span>CREDENCIAL VERIFICABLE · 4 SEDES OFICIALES</span>
               </div>
@@ -342,12 +342,11 @@ function InteractiveVipCard3D({ player, club, category, isPendingPayment }) {
                   <small>ID DE VERIFICACIÓN EN RECEPCIÓN</small>
                   <strong>{memberCode}</strong>
                   <span>
-                    Saldo actual: {Number(player?.gems || 0).toLocaleString('es-PE')} 💎 · 20 💎 = S/ 1.00
+                    Saldo actual: {Number(player?.gems || 0).toLocaleString('es-PE')} 💎 · Canjeable en Pro Shop
                   </span>
                 </div>
               </div>
 
-              {/* Código de barras decorativo verificable */}
               <div className="tt-vip3d-barcode" aria-hidden="true">
                 {[3, 1, 2, 4, 1, 2, 1, 3, 2, 1, 4, 2, 1, 2, 3, 1, 2, 1, 3, 2, 1, 4].map(
                   (w, i) => (
@@ -360,14 +359,7 @@ function InteractiveVipCard3D({ player, club, category, isPendingPayment }) {
         </div>
       </div>
 
-      <button
-        type="button"
-        className="tt-vip3d-flip-btn"
-        onClick={() => {
-          triggerHaptic('light');
-          setIsFlipped((v) => !v);
-        }}
-      >
+      <button type="button" className="tt-vip3d-flip-btn" onClick={toggleFlip}>
         ↻ {isFlipped ? 'Ver Anverso del Carnet' : 'Ver Reverso con QR Verificable'}
       </button>
     </div>
@@ -375,11 +367,11 @@ function InteractiveVipCard3D({ player, club, category, isPendingPayment }) {
 }
 
 /* ==========================================================================
-   COMPONENTE PRINCIPAL: VipCardAndScaleModal (BLOQUE 19 DE 26)
+   COMPONENTE PRINCIPAL: VipCardAndScaleModal (CARNET ÚNICO OFICIAL)
    ========================================================================== */
 export default function VipCardAndScaleModal({
   isOpen = false,
-  initialTab = 'vip', // 'vip' (Pase Socio VIP & Carnet 3D) | 'escala' (Mapa Categorías & Reglas ELO)
+  initialTab = 'vip',
   onClose,
   currentUser = null,
   clubs = INITIAL_CLUBS,
@@ -388,13 +380,11 @@ export default function VipCardAndScaleModal({
   onOpenAuth,
   onNotify,
 }) {
-  const [activeTab, setActiveTab] = useState(initialTab);
+  const [activeTab, setActiveTab] = useState(initialTab === 'escala' ? 'escala' : 'vip');
   const [selectedPlanId, setSelectedPlanId] = useState(VIP_AND_SCALE_EDITABLE_CONFIG.plans[0].id);
   const [showPaymentStep, setShowPaymentStep] = useState(false);
   const [localPendingVip, setLocalPendingVip] = useState(false);
-
-  // Deslizador interactivo de la Calculadora de Ahorro (default 13 h/mes = S/ 104.00/mes)
-  const [hoursPerMonth, setHoursPerMonth] = useState(13);
+  const [hoursPerMonth, setHoursPerMonth] = useState(12);
 
   useEffect(() => {
     if (isOpen) {
@@ -416,25 +406,20 @@ export default function VipCardAndScaleModal({
     [selectedPlanId]
   );
 
-  // Cálculo transparente de ahorro mensual VIP
+  // Cálculo transparente de ahorro en cancha (sin asignar soles a las Gemas)
   const savingsCalc = useMemo(() => {
     const courtSavings = hoursPerMonth * VIP_AND_SCALE_EDITABLE_CONFIG.savingsPerHourSoles;
-    const gemsSolesValue =
-      VIP_AND_SCALE_EDITABLE_CONFIG.monthlyGemsIncluded /
-      VIP_AND_SCALE_EDITABLE_CONFIG.gemsPerSol;
-    const totalMonthlyValue = courtSavings + gemsSolesValue;
     const monthlyFee = VIP_AND_SCALE_EDITABLE_CONFIG.plans[0].price;
-    const netGain = Number((totalMonthlyValue - monthlyFee).toFixed(2));
+    const netGain = Number((courtSavings - monthlyFee).toFixed(2));
+    const sliderPct = Math.round(((hoursPerMonth - 2) / (24 - 2)) * 100);
     return {
       courtSavings,
-      gemsSolesValue,
-      totalMonthlyValue,
       monthlyFee,
       netGain,
+      sliderPct,
     };
   }, [hoursPerMonth]);
 
-  // Orden descendente visual para el Mapa de Progresión (de 2ª Libre arriba hasta 5ª P abajo)
   const scaleRoadTopDown = useMemo(() => [...CATEGORIES_SCALE].reverse(), []);
 
   const handleCopyAccount = async (val, label) => {
@@ -442,7 +427,7 @@ export default function VipCardAndScaleModal({
     try {
       await navigator.clipboard.writeText(val);
       if (onNotify) onNotify(`${label} copiado al portapapeles.`, 'success');
-    } catch (e) {
+    } catch {
       if (onNotify) onNotify(`${label}: ${val}`, 'info');
     }
   };
@@ -454,7 +439,6 @@ export default function VipCardAndScaleModal({
       return;
     }
 
-    // Registrar estado "Pago en Verificación" (NUNCA auto-activa VIP sin aprobación Admin)
     setLocalPendingVip(true);
     if (onRequestVipUpgrade) {
       onRequestVipUpgrade({
@@ -466,15 +450,15 @@ export default function VipCardAndScaleModal({
     }
 
     const waMsg = [
-      `Hola organización de TOTAL TENIS, solicito activación de mi Pase Socio VIP:`,
+      'Hola organización de TOTAL TENIS, solicito activación de mi Pase Socio VIP:',
       `• Plan elegido: ${selectedPlan.name} (S/ ${selectedPlan.price.toFixed(2)})`,
       `• Jugador: ${currentUser.name} (${currentUser.credentialId || 'Socio'})`,
-      `• Beneficios incluidos: Carnet 3D + Golden Ticket en 4 sedes + ${VIP_AND_SCALE_EDITABLE_CONFIG.monthlyGemsIncluded} Gemas mensuales.`,
-      `Adjunto aquí la constancia de mi Yape / Plin / Depósito para validación.`,
+      `• Beneficios incluidos: Carnet 3D + descuentos en 4 sedes + ${VIP_AND_SCALE_EDITABLE_CONFIG.monthlyGemsIncluded} Gemas mensuales.`,
+      'Adjunto aquí la constancia de mi Yape / Plin / Depósito para validación.',
     ].join('\n');
 
     window.open(
-      buildWhatsAppLink(APP_CONFIG.supportWhatsApp, waMsg),
+      buildWhatsappLink(APP_CONFIG.supportWhatsApp, waMsg),
       '_blank',
       'noopener,noreferrer'
     );
@@ -490,10 +474,10 @@ export default function VipCardAndScaleModal({
   };
 
   const modalTitle =
-    activeTab === 'escala' ? 'Escala de Categorías y Reglas' : 'Pase Socio VIP & Carnet 3D';
+    activeTab === 'escala' ? 'Categorías y Reglas' : 'Pase Socio VIP & Carnet 3D';
   const modalSubtitle =
     activeTab === 'escala'
-      ? 'Tu mapa visual de progreso oficial (0 a 5,000+ pts)'
+      ? 'Mapa visual de progreso oficial en el circuito'
       : 'Ahorro directo en canchas, +200 Gemas al mes y Pro Shop VIP';
 
   return (
@@ -513,8 +497,13 @@ export default function VipCardAndScaleModal({
       isTopLayer
     >
       <div className={`tt-vs-root ${theme === 'light' ? 'is-light' : 'is-dark'}`}>
-        {/* Conmutador Superior Limpio: Pase Socio VIP | Escala & Reglas */}
+        {/* Conmutador con píldora deslizante (Oro en VIP <-> Esmeralda en Escala) */}
         <div className="tt-vs-tabs" role="tablist" aria-label="Pase VIP o Escala de Categorías">
+          <span
+            className={`tt-vs-tab-slider ${activeTab === 'vip' ? 'is-gold' : 'is-emerald'}`}
+            aria-hidden="true"
+            style={{ transform: `translateX(${activeTab === 'vip' ? '0%' : '100%'})` }}
+          />
           <button
             type="button"
             role="tab"
@@ -545,23 +534,22 @@ export default function VipCardAndScaleModal({
         </div>
 
         {/* ==================================================================
-            PESTAÑA 1: PASE SOCIO VIP + CARNET 3D + CALCULADORA + PAGO REAL
+            PESTAÑA 1: PASE SOCIO VIP + CARNET 3D ÚNICO + CALCULADORA
             ================================================================== */}
         {activeTab === 'vip' && (
-          <div className="tt-vs-stack">
-            {/* 1. Banner Bicolor de Alto Impacto (Púrpura Noche + Verde Esmeralda) */}
+          <div key="vs-vip" className="tt-vs-stack tt-vs-panel-enter">
             <div className="tt-vip-bicolor-banner">
               <div className="tt-vbb-left">
                 <span className="tt-vbb-kicker">
                   {isVip ? 'MEMBRESÍA ACTIVA' : 'MEMBRESÍA OFICIAL TOTAL TENIS'}
                 </span>
                 <h2>
-                  {isVip
-                    ? 'DISFRUTA TU EXPERIENCIA SOCIO VIP'
-                    : 'DESBLOQUEA TU EXPERIENCIA VIP'}
+                  {isVip ? 'DISFRUTA TU EXPERIENCIA SOCIO VIP' : 'DESBLOQUEA TU EXPERIENCIA VIP'}
                 </h2>
                 <p>
-                  Descuentos directos en las 4 sedes aliadas, <strong>+{VIP_AND_SCALE_EDITABLE_CONFIG.monthlyGemsIncluded} Gemas mensuales incluidas</strong> y acceso total al Pro Shop.
+                  Descuentos directos en las 4 sedes aliadas,{' '}
+                  <strong>+{VIP_AND_SCALE_EDITABLE_CONFIG.monthlyGemsIncluded} Gemas mensuales incluidas</strong>{' '}
+                  y acceso total al Pro Shop.
                 </p>
               </div>
 
@@ -579,7 +567,7 @@ export default function VipCardAndScaleModal({
               </div>
             </div>
 
-            {/* 2. Carnet Digital Socio VIP 3D (Anverso + Reverso con giro 3D) */}
+            {/* Carnet Digital 3D Único (Anverso + Reverso blindado Safari iOS) */}
             <InteractiveVipCard3D
               player={currentUser}
               club={userClub}
@@ -587,16 +575,16 @@ export default function VipCardAndScaleModal({
               isPendingPayment={isPendingVip}
             />
 
-            {/* 3. Beneficios VIP 100 % Visuales (Iconos 3D / GIFs, cero bloques planos) */}
             <div>
               <span className="tt-vs-kicker">BENEFICIOS REALES DESDE EL DÍA 1</span>
               <div className="tt-vip-benefits-grid">
-                {VIP_AND_SCALE_EDITABLE_CONFIG.visualBenefits.map((b) => (
-                  <article key={b.id} className="tt-vip-ben-card">
-                    <div
-                      className="tt-vip-ben-media"
-                      style={{ borderColor: `${b.accent}55` }}
-                    >
+                {VIP_AND_SCALE_EDITABLE_CONFIG.visualBenefits.map((b, idx) => (
+                  <article
+                    key={b.id}
+                    className="tt-vip-ben-card"
+                    style={{ '--vs-delay': `${idx * 55}ms` }}
+                  >
+                    <div className="tt-vip-ben-media" style={{ borderColor: `${b.accent}55` }}>
                       <SmartImage
                         src={b.image}
                         fallbackSrc={b.fallback}
@@ -616,14 +604,14 @@ export default function VipCardAndScaleModal({
               </div>
             </div>
 
-            {/* 4. Calculadora Interactiva de Ahorro (Texto exacto: +200 Gemas mensuales incluidas) */}
+            {/* Calculadora de Ahorro en Cancha (SIN soles por Gemas) */}
             <div className="tt-vip-calc-card">
               <div className="tt-vcc-head">
                 <div>
-                  <span className="tt-vs-kicker" style={{ marginBottom: 2 }}>
+                  <span className="tt-vs-kicker is-on-dark" style={{ marginBottom: 2 }}>
                     CALCULADORA DE AHORRO EN CANCHA
                   </span>
-                  <strong>¿Cuánto recuperas jugando cada mes?</strong>
+                  <strong>¿Cuánto ahorras jugando cada mes?</strong>
                 </div>
                 <span className="tt-vcc-hours-pill">{hoursPerMonth} h / mes</span>
               </div>
@@ -634,6 +622,10 @@ export default function VipCardAndScaleModal({
                 max="24"
                 step="1"
                 value={hoursPerMonth}
+                className="tt-vcc-slider"
+                style={{
+                  background: `linear-gradient(90deg, #00DC7D 0%, #00DC7D ${savingsCalc.sliderPct}%, rgba(250,249,245,0.2) ${savingsCalc.sliderPct}%, rgba(250,249,245,0.2) 100%)`,
+                }}
                 onChange={(e) => setHoursPerMonth(Number(e.target.value))}
                 aria-label="Horas de tenis jugadas al mes"
               />
@@ -644,21 +636,23 @@ export default function VipCardAndScaleModal({
                   <strong>S/ {savingsCalc.courtSavings.toFixed(2)} / mes</strong>
                 </div>
                 <div>
-                  <span>Más tus +{VIP_AND_SCALE_EDITABLE_CONFIG.monthlyGemsIncluded} Gemas mensuales incluidas</span>
-                  <strong>S/ {savingsCalc.gemsSolesValue.toFixed(2)} en tienda</strong>
+                  <span>Bono mensual de membresía</span>
+                  <strong style={{ color: '#7CF5C0' }}>
+                    +{VIP_AND_SCALE_EDITABLE_CONFIG.monthlyGemsIncluded} 💎 para Pro Shop
+                  </strong>
                 </div>
                 <div className="is-net">
-                  <span>Retorno total mensual vs. S/ {savingsCalc.monthlyFee.toFixed(2)}</span>
-                  <strong style={{ color: savingsCalc.netGain >= 0 ? '#00DC7D' : '#F59E0B' }}>
+                  <span>Balance en cancha vs. S/ {savingsCalc.monthlyFee.toFixed(2)}</span>
+                  <strong style={{ color: savingsCalc.netGain >= 0 ? '#00DC7D' : '#FDE68A' }}>
                     {savingsCalc.netGain >= 0
                       ? `+S/ ${savingsCalc.netGain.toFixed(2)} a tu favor`
-                      : `S/ ${savingsCalc.totalMonthlyValue.toFixed(2)} en valor`}
+                      : `Ahorras S/ ${savingsCalc.courtSavings.toFixed(2)} + 200 💎`}
                   </strong>
                 </div>
               </div>
             </div>
 
-            {/* 5. Selector de Plan y Flujo Real de Pago (Yape / Plin / Banco) */}
+            {/* Planes y Flujo de Pago */}
             {!isVip && (
               <div className="tt-vip-checkout-card">
                 <span className="tt-vs-kicker">ELIGE TU PLAN SOCIO VIP</span>
@@ -786,11 +780,10 @@ export default function VipCardAndScaleModal({
         )}
 
         {/* ==================================================================
-            PESTAÑA 2: MAPA VISUAL DE CATEGORÍAS ("CAMINO A LA ÉLITE") + REGLAS
+            PESTAÑA 2: MAPA VISUAL DE CATEGORÍAS + REGLAS CLARAS
             ================================================================== */}
         {activeTab === 'escala' && (
-          <div className="tt-vs-stack">
-            {/* Cabecera Personalizada de tu Ubicación en la Escalera */}
+          <div key="vs-escala" className="tt-vs-stack tt-vs-panel-enter">
             {currentUser && (
               <div className="tt-road-you-banner">
                 <div>
@@ -815,14 +808,13 @@ export default function VipCardAndScaleModal({
               </div>
             )}
 
-            {/* Mapa Vertical con Línea de Energía Luminosa (Cero lista de supermercado) */}
             <div className="tt-road-container">
               <span className="tt-vs-kicker">ESCALERA OFICIAL DE CATEGORÍAS</span>
 
               <div className="tt-road-timeline">
                 <div className="tt-road-spine" aria-hidden="true" />
 
-                {scaleRoadTopDown.map((cat) => {
+                {scaleRoadTopDown.map((cat, idx) => {
                   const isMine = Boolean(currentUser && userCategory.id === cat.id);
                   const isReached = Boolean(currentUser && userPoints >= cat.min);
                   const visual = getTierVisualMeta(cat.id);
@@ -837,10 +829,10 @@ export default function VipCardAndScaleModal({
                       className={`tt-road-node ${isMine ? 'is-current' : ''} ${
                         isReached ? 'is-reached' : ''
                       }`}
+                      style={{ '--vs-delay': `${idx * 55}ms` }}
                     >
-                      {/* Emblema circular sobre la línea de energía */}
                       <div
-                        className="tt-road-emblem"
+                        className={`tt-road-emblem ${isMine ? 'is-pulsing' : ''}`}
                         style={{
                           borderColor: isMine ? '#00DC7D' : cat.color,
                           backgroundColor: isMine ? '#00DC7D' : '#1E0734',
@@ -850,7 +842,6 @@ export default function VipCardAndScaleModal({
                         <TTIcon name={visual.badge} size={18} />
                       </div>
 
-                      {/* Tarjeta de Categoría */}
                       <div className="tt-road-card">
                         <div className="tt-road-card-top">
                           <span className="tt-road-tier" style={{ color: cat.color }}>
@@ -872,12 +863,15 @@ export default function VipCardAndScaleModal({
               </div>
             </div>
 
-            {/* Reglas Deportivas 100 % Visuales (Iconos 3D + Frases Cortas · Cero Enciclopedia) */}
             <div>
               <span className="tt-vs-kicker">CÓMO FUNCIONAN LOS PUNTOS (EN 30 SEGUNDOS)</span>
               <div className="tt-rules-visual-grid">
-                {VIP_AND_SCALE_EDITABLE_CONFIG.visualRulesCards.map((rule) => (
-                  <article key={rule.id} className="tt-rule-vcard">
+                {VIP_AND_SCALE_EDITABLE_CONFIG.visualRulesCards.map((rule, idx) => (
+                  <article
+                    key={rule.id}
+                    className="tt-rule-vcard"
+                    style={{ '--vs-delay': `${idx * 60}ms` }}
+                  >
                     <div className="tt-rv-head">
                       <SmartImage
                         src={rule.image}
@@ -906,43 +900,71 @@ export default function VipCardAndScaleModal({
         )}
       </div>
 
-      {/* ====================================================================
-          ESTILOS ENCAPSULADOS (ARMONÍA TOTAL TENIS · CARNET 3D · MAPA ÉLITE)
-          ==================================================================== */}
       <style>{`
-        .tt-vs-root {
-          display: flex;
-          flex-direction: column;
-          gap: 14px;
-        }
+        .tt-vs-root,
         .tt-vs-stack {
           display: flex;
           flex-direction: column;
           gap: 14px;
+        }
+        .tt-vs-panel-enter {
+          animation: ttVsEnter 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+        @keyframes ttVsEnter {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
         }
         .tt-vs-kicker {
           display: block;
           font-size: 0.64rem;
           font-weight: 900;
           letter-spacing: 0.09em;
-          color: #00DC7D;
+          color: var(--tt-emerald-text);
           margin-bottom: 8px;
         }
-        .tt-vs-root.is-light .tt-vs-kicker {
-          color: #008A4E;
+        .tt-vs-kicker.is-on-dark {
+          color: #00DC7D !important;
         }
 
-        /* Conmutador Superior */
+        /* Conmutador con píldora deslizante Oro <-> Esmeralda */
         .tt-vs-tabs {
+          position: relative;
           display: grid;
           grid-template-columns: 1fr 1fr;
-          gap: 6px;
-          padding: 5px;
+          padding: 4px;
           border-radius: 16px;
           background: var(--tt-surface-2);
           border: 1px solid var(--tt-border);
         }
+        .tt-vs-tab-slider {
+          position: absolute;
+          top: 4px;
+          bottom: 4px;
+          left: 4px;
+          width: calc((100% - 8px) / 2);
+          border-radius: 12px;
+          transition:
+            transform 340ms cubic-bezier(0.22, 1.24, 0.36, 1),
+            background 320ms ease,
+            box-shadow 320ms ease;
+          pointer-events: none;
+          z-index: 0;
+        }
+        .tt-vs-tab-slider.is-gold {
+          background: linear-gradient(135deg, #FEF08A 0%, #F59E0B 52%, #B45309 100%);
+          box-shadow: 0 6px 18px rgba(245, 158, 11, 0.38);
+        }
+        .tt-vs-tab-slider.is-emerald {
+          background: linear-gradient(135deg, #00DC7D 0%, #00B365 100%);
+          box-shadow: 0 6px 18px rgba(0, 220, 125, 0.32);
+        }
+        .tt-vs-root.is-light .tt-vs-tab-slider.is-emerald {
+          background: #1E0734;
+          box-shadow: 0 6px 16px rgba(30, 7, 52, 0.22);
+        }
         .tt-vs-tab {
+          position: relative;
+          z-index: 1;
           min-height: 40px;
           border-radius: 12px;
           display: inline-flex;
@@ -952,23 +974,11 @@ export default function VipCardAndScaleModal({
           font-size: 0.78rem;
           font-weight: 800;
           color: var(--tt-text-muted);
-          transition: background-color 180ms ease, color 180ms ease, transform 120ms ease;
+          transition: color 220ms ease;
         }
-        .tt-vs-tab:active {
-          transform: scale(0.97);
-        }
-        .tt-vs-tab.is-active {
-          background: #1E0734;
-          color: #00DC7D;
-        }
-        .tt-vs-root.is-dark .tt-vs-tab.is-active {
-          background: linear-gradient(135deg, #00DC7D 0%, #00B868 100%);
-          color: #120321;
-        }
-        .tt-vs-root.is-dark .tt-vs-tab.is-gold.is-active {
-          background: linear-gradient(135deg, #FBBF24 0%, #D97706 100%);
-          color: #1E1102;
-        }
+        .tt-vs-tab.is-active { color: #120321; font-weight: 900; }
+        .tt-vs-tab.is-gold.is-active { color: #1A0D00; }
+        .tt-vs-root.is-light .tt-vs-tab:not(.is-gold).is-active { color: #00DC7D; }
 
         /* 1. BANNER BICOLOR VIP */
         .tt-vip-bicolor-banner {
@@ -978,26 +988,14 @@ export default function VipCardAndScaleModal({
           grid-template-columns: 1fr;
           background: #23083C;
           color: #FAF9F5;
-          border: 1px solid rgba(245, 158, 11, 0.38);
+          border: 1px solid rgba(245, 158, 11, 0.42);
+          box-shadow: 0 14px 32px rgba(8, 1, 18, 0.35);
         }
         @media (min-width: 640px) {
-          .tt-vip-bicolor-banner {
-            grid-template-columns: 1.25fr 0.85fr;
-          }
+          .tt-vip-bicolor-banner { grid-template-columns: 1.25fr 0.85fr; }
         }
-        .tt-vbb-left {
-          padding: 16px;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          gap: 6px;
-        }
-        .tt-vbb-kicker {
-          font-size: 0.62rem;
-          font-weight: 900;
-          letter-spacing: 0.1em;
-          color: #FDE68A;
-        }
+        .tt-vbb-left { padding: 16px; display: flex; flex-direction: column; justify-content: center; gap: 6px; }
+        .tt-vbb-kicker { font-size: 0.62rem; font-weight: 900; letter-spacing: 0.1em; color: #FDE68A; }
         .tt-vbb-left h2 {
           margin: 0;
           font-family: var(--tt-font-display);
@@ -1007,59 +1005,36 @@ export default function VipCardAndScaleModal({
           line-height: 0.98;
           color: #00DC7D;
         }
-        .tt-vbb-left p {
-          margin: 0;
-          font-size: 0.78rem;
-          line-height: 1.42;
-          color: rgba(250, 249, 245, 0.86);
-        }
-        .tt-vbb-right {
-          position: relative;
-          min-height: 124px;
-          background: linear-gradient(135deg, #00DC7D 0%, #6EF2B5 100%);
-          overflow: hidden;
-        }
-        .tt-vbb-img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-        }
+        .tt-vbb-left p { margin: 0; font-size: 0.78rem; line-height: 1.42; color: rgba(250, 249, 245, 0.88); }
+        .tt-vbb-right { position: relative; min-height: 124px; background: linear-gradient(135deg, #00DC7D 0%, #6EF2B5 100%); overflow: hidden; }
+        .tt-vbb-img { width: 100%; height: 100%; object-fit: cover; }
         .tt-vbb-price-chip {
           position: absolute;
           right: 10px;
           bottom: 10px;
           padding: 6px 12px;
           border-radius: 13px;
-          background: rgba(18, 3, 33, 0.9);
+          background: rgba(18, 3, 33, 0.92);
           border: 1px solid #00DC7D;
           color: #FAF9F5;
           text-align: center;
         }
-        .tt-vbb-price-chip strong {
-          display: block;
-          font-family: var(--tt-font-display);
-          font-size: 1.25rem;
-          line-height: 1;
-          color: #00DC7D;
-        }
-        .tt-vbb-price-chip span {
-          font-size: 0.62rem;
-          font-weight: 700;
-          opacity: 0.8;
-        }
+        .tt-vbb-price-chip strong { display: block; font-family: var(--tt-font-display); font-size: 1.25rem; line-height: 1; color: #00DC7D; }
+        .tt-vbb-price-chip span { font-size: 0.62rem; font-weight: 700; opacity: 0.82; }
 
-        /* 2. CARNET DIGITAL 3D (PROPORCIÓN ÁUREA 1.58:1 + FLIP 180°) */
+        /* 2. CARNET DIGITAL 3D BLINDADO SAFARI IOS (ZERO BLEED-THROUGH) */
         .tt-vip3d-wrapper {
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 9px;
+          gap: 10px;
         }
         .tt-vip3d-scene {
           width: 100%;
           max-width: 410px;
           aspect-ratio: 1.58 / 1;
-          perspective: 1100px;
+          perspective: 1200px;
+          -webkit-perspective: 1200px;
           cursor: pointer;
         }
         .tt-vip3d-card {
@@ -1067,7 +1042,9 @@ export default function VipCardAndScaleModal({
           width: 100%;
           height: 100%;
           transform-style: preserve-3d;
-          transition: transform 540ms cubic-bezier(0.22, 1, 0.36, 1);
+          -webkit-transform-style: preserve-3d;
+          transition: transform 660ms cubic-bezier(0.22, 1.12, 0.36, 1);
+          will-change: transform;
         }
         .tt-vip3d-face {
           position: absolute;
@@ -1078,16 +1055,66 @@ export default function VipCardAndScaleModal({
           overflow: hidden;
           color: #FAF9F5;
           background: linear-gradient(135deg, #1E0734 0%, #10021C 58%, #21100B 100%);
-          border: 1.5px solid rgba(250, 249, 245, 0.18);
-          box-shadow: 0 20px 40px rgba(8, 1, 18, 0.45);
+          border: 1.5px solid rgba(250, 249, 245, 0.2);
+          box-shadow: 0 20px 42px rgba(8, 1, 18, 0.46);
         }
-        .tt-vip3d-face.is-gold {
-          border-color: rgba(245, 158, 11, 0.78);
-          box-shadow: 0 20px 42px rgba(245, 158, 11, 0.24);
+        .tt-vip3d-face.is-front {
+          transform: rotateY(0deg) translateZ(2px);
+          -webkit-transform: rotateY(0deg) translateZ(2px);
         }
         .tt-vip3d-face.is-back {
-          transform: rotateY(180deg);
+          transform: rotateY(180deg) translateZ(2px);
+          -webkit-transform: rotateY(180deg) translateZ(2px);
         }
+        .tt-vip3d-face.is-gold {
+          background: linear-gradient(135deg, #2B1A04 0%, #523308 32%, #1D0A2E 78%, #3B2305 100%);
+          border-color: rgba(252, 227, 138, 0.78);
+          box-shadow: 0 22px 44px rgba(245, 158, 11, 0.26);
+        }
+
+        /* Compuerta de visibilidad exacta a los 90°: impide que Safari iOS transparente letras al revés */
+        .tt-vip3d-card:not(.is-flipped) .tt-vip3d-face.is-front .is-front-layer {
+          opacity: 1;
+          visibility: visible;
+          transition: opacity 110ms linear 165ms, visibility 0s linear 150ms;
+        }
+        .tt-vip3d-card.is-flipped .tt-vip3d-face.is-front .is-front-layer {
+          opacity: 0;
+          visibility: hidden;
+          transition: opacity 80ms linear 130ms, visibility 0s linear 210ms;
+        }
+        .tt-vip3d-card.is-flipped .tt-vip3d-face.is-back .is-back-layer {
+          opacity: 1;
+          visibility: visible;
+          transition: opacity 110ms linear 165ms, visibility 0s linear 150ms;
+        }
+        .tt-vip3d-card:not(.is-flipped) .tt-vip3d-face.is-back .is-back-layer {
+          opacity: 0;
+          visibility: hidden;
+          transition: opacity 80ms linear 130ms, visibility 0s linear 210ms;
+        }
+
+        /* Brillo metálico holográfico diagonal */
+        .tt-vip3d-foil-sheen {
+          position: absolute;
+          inset: -35%;
+          background: linear-gradient(
+            115deg,
+            transparent 40%,
+            rgba(255, 255, 255, 0.14) 49%,
+            rgba(254, 240, 138, 0.18) 52%,
+            transparent 60%
+          );
+          transform: translateX(-110%);
+          animation: ttVipFoil 5.5s ease-in-out infinite;
+          pointer-events: none;
+          z-index: 1;
+        }
+        @keyframes ttVipFoil {
+          0%, 64% { transform: translateX(-110%); }
+          100% { transform: translateX(120%); }
+        }
+
         .tt-vip3d-custom-art {
           position: absolute;
           inset: 0;
@@ -1097,13 +1124,11 @@ export default function VipCardAndScaleModal({
           opacity: 0;
           pointer-events: none;
         }
-        .tt-vip3d-custom-art.is-visible {
-          opacity: 1;
-        }
+        .tt-vip3d-custom-art.is-visible { opacity: 1; }
         .tt-vip3d-etched-court {
           position: absolute;
           inset: 14px;
-          border: 1px solid rgba(250, 249, 245, 0.07);
+          border: 1px solid rgba(250, 249, 245, 0.08);
           border-radius: 13px;
           pointer-events: none;
         }
@@ -1114,7 +1139,7 @@ export default function VipCardAndScaleModal({
           top: 0;
           bottom: 0;
           width: 1px;
-          background: rgba(250, 249, 245, 0.06);
+          background: rgba(250, 249, 245, 0.07);
         }
         .tt-vip3d-layer {
           position: relative;
@@ -1124,14 +1149,9 @@ export default function VipCardAndScaleModal({
           display: flex;
           flex-direction: column;
           justify-content: space-between;
-          background: linear-gradient(180deg, rgba(16, 3, 29, 0.34) 0%, rgba(16, 3, 29, 0.56) 100%);
+          background: linear-gradient(180deg, rgba(16, 3, 29, 0.28) 0%, rgba(16, 3, 29, 0.56) 100%);
         }
-        .tt-vip3d-top {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 8px;
-        }
+        .tt-vip3d-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
         .tt-vip3d-brand-pair {
           display: inline-flex;
           align-items: center;
@@ -1150,155 +1170,63 @@ export default function VipCardAndScaleModal({
           font-weight: 900;
           letter-spacing: 0.09em;
         }
-        .tt-vip3d-status.is-gold {
-          background: linear-gradient(135deg, #FEF08A 0%, #F59E0B 100%);
-          color: #1E1102;
-        }
-        .tt-vip3d-status.is-pending {
-          background: rgba(245, 158, 11, 0.25);
-          border: 1px solid #F59E0B;
-          color: #FDE68A;
-        }
-        .tt-vip3d-middle {
-          display: flex;
-          align-items: center;
-          gap: 11px;
-        }
-        .tt-vip3d-holder {
-          display: block;
-          font-size: 0.94rem;
-          letter-spacing: 0.07em;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-        .tt-vip3d-code {
-          display: block;
-          margin-top: 2px;
-          font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-          font-size: 0.74rem;
-          font-weight: 700;
-          color: #00DC7D;
-        }
-        .tt-vip3d-club-cat {
-          display: block;
-          font-size: 0.68rem;
-          opacity: 0.78;
-        }
+        .tt-vip3d-status.is-gold { background: linear-gradient(135deg, #FEF08A 0%, #F59E0B 100%); color: #1E1102; }
+        .tt-vip3d-status.is-pending { background: rgba(245, 158, 11, 0.25); border: 1px solid #F59E0B; color: #FDE68A; }
+        .tt-vip3d-middle { display: flex; align-items: center; gap: 11px; }
+        .tt-vip3d-holder { display: block; font-size: 0.94rem; letter-spacing: 0.07em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .tt-vip3d-code { display: block; margin-top: 2px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.74rem; font-weight: 700; color: #00DC7D; }
+        .tt-vip3d-club-cat { display: block; font-size: 0.68rem; opacity: 0.8; }
         .tt-vip3d-chip {
           width: 34px;
           height: 24px;
           border-radius: 6px;
           background: linear-gradient(135deg, #FDE68A 0%, #D97706 100%);
-          border: 1px solid rgba(255, 255, 255, 0.45);
+          border: 1px solid rgba(255, 255, 255, 0.5);
           display: flex;
           align-items: center;
           justify-content: center;
           flex-shrink: 0;
         }
-        .tt-vip3d-chip span {
-          width: 18px;
-          height: 12px;
-          border-radius: 3px;
-          border: 1px solid rgba(30, 17, 2, 0.45);
-        }
-        .tt-vip3d-bottom {
-          display: flex;
-          align-items: flex-end;
-          justify-content: space-between;
-          gap: 8px;
-        }
-        .tt-vip3d-bottom small {
-          display: block;
-          font-size: 0.56rem;
-          letter-spacing: 0.08em;
-          opacity: 0.68;
-        }
-        .tt-vip3d-bottom strong {
-          font-size: 0.78rem;
-          letter-spacing: 0.04em;
-        }
-        .tt-vip3d-flip-hint {
-          font-size: 0.65rem;
-          font-weight: 800;
-          color: #7CF5C0;
-        }
+        .tt-vip3d-chip span { width: 18px; height: 12px; border-radius: 3px; border: 1px solid rgba(30, 17, 2, 0.45); }
+        .tt-vip3d-bottom { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; }
+        .tt-vip3d-bottom small { display: block; font-size: 0.56rem; letter-spacing: 0.08em; opacity: 0.7; }
+        .tt-vip3d-bottom strong { font-size: 0.78rem; letter-spacing: 0.04em; }
+        .tt-vip3d-flip-hint { font-size: 0.65rem; font-weight: 800; color: #7CF5C0; }
 
-        /* Reverso del Carnet */
-        .tt-vip3d-layer.is-back-layout {
-          padding: 12px 16px;
-        }
+        .tt-vip3d-layer.is-back-layout { padding: 12px 16px; }
         .tt-vip3d-magstrip {
           margin: -12px -16px 0;
           padding: 7px 16px;
-          background: rgba(8, 1, 18, 0.85);
+          background: rgba(8, 1, 18, 0.88);
           font-size: 0.58rem;
           font-weight: 900;
           letter-spacing: 0.1em;
           color: #00DC7D;
           text-align: center;
         }
-        .tt-vip3d-back-center {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
-        .tt-vip3d-qr-frame {
-          padding: 5px;
-          border-radius: 12px;
-          background: #FAF9F5;
-          flex-shrink: 0;
-        }
-        .tt-vip3d-back-info small {
-          display: block;
-          font-size: 0.58rem;
-          letter-spacing: 0.08em;
-          opacity: 0.72;
-        }
-        .tt-vip3d-back-info strong {
-          display: block;
-          font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-          font-size: 0.96rem;
-          color: #FDE68A;
-          margin: 2px 0;
-        }
-        .tt-vip3d-back-info span {
-          display: block;
-          font-size: 0.68rem;
-          opacity: 0.84;
-        }
-        .tt-vip3d-barcode {
-          height: 16px;
-          display: flex;
-          align-items: stretch;
-          justify-content: center;
-          gap: 3px;
-          opacity: 0.7;
-        }
-        .tt-vip3d-barcode span {
-          background: #FAF9F5;
-          border-radius: 1px;
-        }
+        .tt-vip3d-back-center { display: flex; align-items: center; gap: 12px; }
+        .tt-vip3d-qr-frame { padding: 5px; border-radius: 12px; background: #FAF9F5; flex-shrink: 0; }
+        .tt-vip3d-back-info small { display: block; font-size: 0.58rem; letter-spacing: 0.08em; opacity: 0.74; }
+        .tt-vip3d-back-info strong { display: block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.96rem; color: #FDE68A; margin: 2px 0; }
+        .tt-vip3d-back-info span { display: block; font-size: 0.68rem; opacity: 0.88; }
+        .tt-vip3d-barcode { height: 16px; display: flex; align-items: stretch; justify-content: center; gap: 3px; opacity: 0.72; }
+        .tt-vip3d-barcode span { background: #FAF9F5; border-radius: 1px; }
         .tt-vip3d-flip-btn {
-          padding: 6px 14px;
+          padding: 7px 15px;
           border-radius: 999px;
           background: var(--tt-surface-2);
-          border: 1px solid var(--tt-border);
+          border: 1px solid var(--tt-border-medium);
           color: var(--tt-text);
           font-size: 0.73rem;
           font-weight: 800;
+          transition: transform 160ms cubic-bezier(0.22, 1.35, 0.36, 1);
         }
+        .tt-vip3d-flip-btn:active { transform: scale(0.94); }
 
-        /* 3. BENEFICIOS VISUALES CON ICONOS 3D Y GIFS */
-        .tt-vip-benefits-grid {
-          display: grid;
-          grid-template-columns: 1fr;
-          gap: 9px;
-        }
+        /* 3. BENEFICIOS */
+        .tt-vip-benefits-grid { display: grid; grid-template-columns: 1fr; gap: 9px; }
         @media (min-width: 600px) {
-          .tt-vip-benefits-grid {
-            grid-template-columns: 1fr 1fr;
-          }
+          .tt-vip-benefits-grid { grid-template-columns: 1fr 1fr; }
         }
         .tt-vip-ben-card {
           display: flex;
@@ -1308,6 +1236,8 @@ export default function VipCardAndScaleModal({
           border-radius: 16px;
           background: var(--tt-surface-2);
           border: 1px solid var(--tt-border);
+          animation: ttVsEnter 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+          animation-delay: var(--vs-delay, 0ms);
         }
         .tt-vip-ben-media {
           width: 56px;
@@ -1320,45 +1250,23 @@ export default function VipCardAndScaleModal({
           justify-content: center;
           flex-shrink: 0;
         }
-        .tt-vip-ben-tag {
-          display: block;
-          font-size: 0.63rem;
-          font-weight: 900;
-          letter-spacing: 0.05em;
-          text-transform: uppercase;
-        }
-        .tt-vip-ben-card strong {
-          display: block;
-          font-size: 0.84rem;
-          margin-top: 1px;
-        }
-        .tt-vip-ben-card p {
-          margin: 2px 0 0;
-          font-size: 0.71rem;
-          line-height: 1.35;
-          color: var(--tt-text-muted);
-        }
+        .tt-vip-ben-tag { display: block; font-size: 0.63rem; font-weight: 900; letter-spacing: 0.05em; text-transform: uppercase; }
+        .tt-vip-ben-card strong { display: block; font-size: 0.84rem; margin-top: 1px; }
+        .tt-vip-ben-card p { margin: 2px 0 0; font-size: 0.71rem; line-height: 1.35; color: var(--tt-text-muted); }
 
-        /* 4. CALCULADORA DE AHORRO */
+        /* 4. CALCULADORA CON SLIDER PERSONALIZADO */
         .tt-vip-calc-card {
-          padding: 14px;
+          padding: 15px;
           border-radius: 18px;
           background: linear-gradient(135deg, #250942 0%, #140324 100%);
           color: #FAF9F5;
-          border: 1px solid rgba(0, 220, 125, 0.32);
+          border: 1px solid rgba(0, 220, 125, 0.36);
           display: flex;
           flex-direction: column;
-          gap: 10px;
+          gap: 11px;
         }
-        .tt-vcc-head {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 8px;
-        }
-        .tt-vcc-head strong {
-          font-size: 0.86rem;
-        }
+        .tt-vcc-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .tt-vcc-head strong { font-size: 0.86rem; }
         .tt-vcc-hours-pill {
           padding: 5px 11px;
           border-radius: 999px;
@@ -1368,25 +1276,30 @@ export default function VipCardAndScaleModal({
           font-weight: 900;
           white-space: nowrap;
         }
-        .tt-vcc-breakdown {
-          display: flex;
-          flex-direction: column;
-          gap: 7px;
-          padding-top: 6px;
+        .tt-vcc-slider {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 100%;
+          height: 8px;
+          border-radius: 999px;
+          outline: none;
         }
-        .tt-vcc-breakdown > div {
-          display: flex;
-          justify-content: space-between;
-          gap: 8px;
-          font-size: 0.77rem;
+        .tt-vcc-slider::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 24px;
+          height: 24px;
+          border-radius: 50%;
+          background: #FAF9F5;
+          border: 3px solid #00DC7D;
+          box-shadow: 0 0 12px rgba(0, 220, 125, 0.7);
+          cursor: pointer;
         }
-        .tt-vcc-breakdown .is-net {
-          padding-top: 8px;
-          border-top: 1px solid rgba(250, 249, 245, 0.14);
-          font-size: 0.84rem;
-        }
+        .tt-vcc-breakdown { display: flex; flex-direction: column; gap: 7px; padding-top: 4px; }
+        .tt-vcc-breakdown > div { display: flex; justify-content: space-between; gap: 8px; font-size: 0.77rem; }
+        .tt-vcc-breakdown .is-net { padding-top: 8px; border-top: 1px solid rgba(250, 249, 245, 0.14); font-size: 0.84rem; }
 
-        /* 5. PLANES Y PAGO YAPE / PLIN */
+        /* 5. PLANES Y PAGO */
         .tt-vip-checkout-card {
           padding: 14px;
           border-radius: 18px;
@@ -1396,15 +1309,9 @@ export default function VipCardAndScaleModal({
           flex-direction: column;
           gap: 11px;
         }
-        .tt-vip-plans-grid {
-          display: grid;
-          grid-template-columns: 1fr;
-          gap: 8px;
-        }
+        .tt-vip-plans-grid { display: grid; grid-template-columns: 1fr; gap: 8px; }
         @media (min-width: 600px) {
-          .tt-vip-plans-grid {
-            grid-template-columns: repeat(3, 1fr);
-          }
+          .tt-vip-plans-grid { grid-template-columns: repeat(3, 1fr); }
         }
         .tt-vip-plan-tile {
           padding: 11px;
@@ -1416,142 +1323,46 @@ export default function VipCardAndScaleModal({
           display: flex;
           flex-direction: column;
           gap: 4px;
+          transition: border-color 200ms ease, transform 180ms cubic-bezier(0.22, 1.3, 0.36, 1);
         }
         .tt-vip-plan-tile.is-active {
           border-color: #00DC7D;
           background: rgba(0, 220, 125, 0.12);
+          transform: translateY(-2px);
         }
-        .tt-vpt-badge {
-          align-self: flex-start;
-          padding: 2px 7px;
-          border-radius: 999px;
-          background: rgba(245, 158, 11, 0.2);
-          color: #F59E0B;
-          font-size: 0.58rem;
-          font-weight: 900;
-        }
-        .tt-vpt-price {
-          display: flex;
-          align-items: baseline;
-          gap: 4px;
-        }
-        .tt-vpt-price b {
-          font-family: var(--tt-font-display);
-          font-size: 1.38rem;
-          color: #00DC7D;
-        }
-        .tt-vs-root.is-light .tt-vpt-price b {
-          color: #1E0734;
-        }
-        .tt-vpt-price small {
-          font-size: 0.7rem;
-          color: var(--tt-text-muted);
-        }
-        .tt-vpt-save {
-          font-size: 0.67rem;
-          color: var(--tt-text-muted);
-        }
+        .tt-vpt-badge { align-self: flex-start; padding: 2px 7px; border-radius: 999px; background: rgba(245, 158, 11, 0.2); color: #D97706; font-size: 0.58rem; font-weight: 900; }
+        .tt-vs-root.is-dark .tt-vpt-badge { color: #FBBF24; }
+        .tt-vpt-price { display: flex; align-items: baseline; gap: 4px; }
+        .tt-vpt-price b { font-family: var(--tt-font-display); font-size: 1.38rem; color: var(--tt-emerald-text); }
+        .tt-vpt-price small { font-size: 0.7rem; color: var(--tt-text-muted); }
+        .tt-vpt-save { font-size: 0.67rem; color: var(--tt-text-muted); }
+        .tt-vip-pending-strip { display: flex; align-items: flex-start; gap: 10px; padding: 12px; border-radius: 14px; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.45); font-size: 0.78rem; }
+        .tt-vip-pending-strip p { margin: 3px 0 0; font-size: 0.73rem; color: var(--tt-text-muted); }
+        .tt-vip-pay-box { display: flex; flex-direction: column; gap: 8px; padding-top: 4px; }
+        .tt-vpb-head strong { display: block; font-size: 0.82rem; }
+        .tt-vpb-head small { font-size: 0.7rem; color: var(--tt-text-muted); }
+        .tt-vpb-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 11px; border-radius: 12px; background: var(--tt-surface); border: 1px solid var(--tt-border); }
+        .tt-vpb-row small { display: block; font-size: 0.64rem; color: var(--tt-text-muted); }
+        .tt-vpb-row strong { font-size: 0.88rem; }
+        .tt-vpb-copy { padding: 5px 11px; border-radius: 999px; background: rgba(0, 220, 125, 0.16); color: #00DC7D; font-size: 0.7rem; font-weight: 800; }
+        .tt-vs-root.is-light .tt-vpb-copy { background: #1E0734; color: #00DC7D; }
 
-        .tt-vip-pending-strip {
-          display: flex;
-          align-items: flex-start;
-          gap: 10px;
-          padding: 12px;
-          border-radius: 14px;
-          background: rgba(245, 158, 11, 0.15);
-          border: 1px solid rgba(245, 158, 11, 0.45);
-          font-size: 0.78rem;
-        }
-        .tt-vip-pending-strip p {
-          margin: 3px 0 0;
-          font-size: 0.73rem;
-          color: var(--tt-text-muted);
-        }
-
-        .tt-vip-pay-box {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-          padding-top: 4px;
-        }
-        .tt-vpb-head strong {
-          display: block;
-          font-size: 0.82rem;
-        }
-        .tt-vpb-head small {
-          font-size: 0.7rem;
-          color: var(--tt-text-muted);
-        }
-        .tt-vpb-row {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 8px;
-          padding: 9px 11px;
-          border-radius: 12px;
-          background: var(--tt-surface);
-          border: 1px solid var(--tt-border);
-        }
-        .tt-vpb-row small {
-          display: block;
-          font-size: 0.64rem;
-          color: var(--tt-text-muted);
-        }
-        .tt-vpb-row strong {
-          font-size: 0.88rem;
-        }
-        .tt-vpb-copy {
-          padding: 5px 11px;
-          border-radius: 999px;
-          background: rgba(0, 220, 125, 0.16);
-          color: #00DC7D;
-          font-size: 0.7rem;
-          font-weight: 800;
-        }
-        .tt-vs-root.is-light .tt-vpb-copy {
-          background: #1E0734;
-          color: #00DC7D;
-        }
-
-        /* 6. MAPA VISUAL DE CATEGORÍAS ("CAMINO A LA ÉLITE") */
+        /* 6. MAPA VERTICAL DE CATEGORÍAS + PULSO EN TU NIVEL */
         .tt-road-you-banner {
           padding: 14px;
           border-radius: 18px;
           background: linear-gradient(135deg, #1E0734 0%, #103F30 100%);
           color: #FAF9F5;
-          border: 1.5px solid rgba(0, 220, 125, 0.5);
+          border: 1.5px solid rgba(0, 220, 125, 0.52);
           display: flex;
           align-items: center;
           justify-content: space-between;
           gap: 10px;
         }
-        .tt-road-you-kicker {
-          display: block;
-          font-size: 0.62rem;
-          font-weight: 900;
-          letter-spacing: 0.09em;
-          color: #7CF5C0;
-        }
-        .tt-road-you-banner strong {
-          display: block;
-          font-family: var(--tt-font-display);
-          font-size: 1.38rem;
-          line-height: 1.08;
-        }
-        .tt-road-you-banner small {
-          display: block;
-          margin-top: 2px;
-          font-size: 0.74rem;
-          color: rgba(250, 249, 245, 0.84);
-        }
-
-        .tt-road-timeline {
-          position: relative;
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-          padding-left: 8px;
-        }
+        .tt-road-you-kicker { display: block; font-size: 0.62rem; font-weight: 900; letter-spacing: 0.09em; color: #7CF5C0; }
+        .tt-road-you-banner strong { display: block; font-family: var(--tt-font-display); font-size: 1.38rem; line-height: 1.08; }
+        .tt-road-you-banner small { display: block; margin-top: 2px; font-size: 0.74rem; color: rgba(250, 249, 245, 0.86); }
+        .tt-road-timeline { position: relative; display: flex; flex-direction: column; gap: 10px; padding-left: 8px; }
         .tt-road-spine {
           position: absolute;
           left: 27px;
@@ -1559,8 +1370,8 @@ export default function VipCardAndScaleModal({
           bottom: 18px;
           width: 3px;
           border-radius: 999px;
-          background: linear-gradient(180deg, #F59E0B 0%, #00DC7D 52%, #C85A32 100%);
-          opacity: 0.65;
+          background: linear-gradient(180deg, #F59E0B 0%, #00DC7D 52%, #D96B43 100%);
+          opacity: 0.7;
         }
         .tt-road-node {
           position: relative;
@@ -1568,6 +1379,8 @@ export default function VipCardAndScaleModal({
           display: flex;
           align-items: center;
           gap: 12px;
+          animation: ttVsEnter 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+          animation-delay: var(--vs-delay, 0ms);
         }
         .tt-road-emblem {
           width: 40px;
@@ -1578,72 +1391,24 @@ export default function VipCardAndScaleModal({
           align-items: center;
           justify-content: center;
           flex-shrink: 0;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.28);
         }
-        .tt-road-card {
-          flex: 1;
-          padding: 11px 13px;
-          border-radius: 16px;
-          background: var(--tt-surface-2);
-          border: 1.5px solid var(--tt-border);
+        .tt-road-emblem.is-pulsing {
+          animation: ttLivePulse 2s infinite;
         }
-        .tt-road-node.is-current .tt-road-card {
-          border-color: #00DC7D;
-          background: rgba(0, 220, 125, 0.12);
-          box-shadow: 0 8px 20px rgba(0, 220, 125, 0.16);
-        }
-        .tt-road-card-top {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 8px;
-        }
-        .tt-road-tier {
-          font-size: 0.62rem;
-          font-weight: 900;
-          letter-spacing: 0.08em;
-        }
-        .tt-road-range {
-          font-size: 0.74rem;
-          font-variant-numeric: tabular-nums;
-          color: var(--tt-text);
-        }
-        .tt-road-card-mid {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          margin-top: 2px;
-        }
-        .tt-road-card-mid h4 {
-          margin: 0;
-          font-family: var(--tt-font-display);
-          font-size: 1.15rem;
-          line-height: 1.05;
-        }
-        .tt-road-here-pill {
-          padding: 2px 8px;
-          border-radius: 999px;
-          background: #00DC7D;
-          color: #120321;
-          font-size: 0.6rem;
-          font-weight: 900;
-        }
-        .tt-road-card p {
-          margin: 3px 0 0;
-          font-size: 0.72rem;
-          color: var(--tt-text-muted);
-        }
+        .tt-road-card { flex: 1; padding: 11px 13px; border-radius: 16px; background: var(--tt-surface-2); border: 1.5px solid var(--tt-border); }
+        .tt-road-node.is-current .tt-road-card { border-color: #00DC7D; background: rgba(0, 220, 125, 0.12); box-shadow: 0 8px 20px rgba(0, 220, 125, 0.16); }
+        .tt-road-card-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+        .tt-road-tier { font-size: 0.62rem; font-weight: 900; letter-spacing: 0.08em; }
+        .tt-road-range { font-size: 0.74rem; font-variant-numeric: tabular-nums; color: var(--tt-text); }
+        .tt-road-card-mid { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+        .tt-road-card-mid h4 { margin: 0; font-family: var(--tt-font-display); font-size: 1.15rem; line-height: 1.05; }
+        .tt-road-here-pill { padding: 2px 8px; border-radius: 999px; background: #00DC7D; color: #120321; font-size: 0.6rem; font-weight: 900; }
+        .tt-road-card p { margin: 3px 0 0; font-size: 0.72rem; color: var(--tt-text-muted); }
 
-        /* 7. TARJETAS VISUALES DE REGLAS ELO */
-        .tt-rules-visual-grid {
-          display: grid;
-          grid-template-columns: 1fr;
-          gap: 9px;
-        }
+        .tt-rules-visual-grid { display: grid; grid-template-columns: 1fr; gap: 9px; }
         @media (min-width: 600px) {
-          .tt-rules-visual-grid {
-            grid-template-columns: 1fr 1fr;
-          }
+          .tt-rules-visual-grid { grid-template-columns: 1fr 1fr; }
         }
         .tt-rule-vcard {
           padding: 13px;
@@ -1653,39 +1418,19 @@ export default function VipCardAndScaleModal({
           display: flex;
           flex-direction: column;
           gap: 9px;
+          animation: ttVsEnter 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+          animation-delay: var(--vs-delay, 0ms);
         }
-        .tt-rv-head {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        }
-        .tt-rv-head span {
-          display: block;
-          font-size: 0.62rem;
-          font-weight: 900;
-          letter-spacing: 0.08em;
-        }
-        .tt-rv-head h4 {
-          margin: 2px 0 0;
-          font-size: 0.86rem;
-          line-height: 1.2;
-        }
-        .tt-rule-vcard ul {
-          margin: 0;
-          padding: 0;
-          list-style: none;
-          display: flex;
-          flex-direction: column;
-          gap: 5px;
-        }
-        .tt-rule-vcard li {
-          display: flex;
-          align-items: flex-start;
-          gap: 6px;
-          font-size: 0.74rem;
-          color: var(--tt-text-muted);
-          line-height: 1.35;
-        }
+        .tt-rv-head { display: flex; align-items: center; gap: 10px; }
+        .tt-rv-head span { display: block; font-size: 0.62rem; font-weight: 900; letter-spacing: 0.08em; }
+        .tt-rv-head h4 { margin: 2px 0 0; font-size: 0.86rem; line-height: 1.2; }
+        .tt-rule-vcard ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 5px; }
+        .tt-rule-vcard li { display: flex; align-items: flex-start; gap: 6px; font-size: 0.74rem; color: var(--tt-text-muted); line-height: 1.35; }
+
+        html[data-tier='lite'] .tt-vip3d-foil-sheen { display: none !important; }
+        html[data-tier='lite'] .tt-road-node,
+        html[data-tier='lite'] .tt-vip-ben-card,
+        html[data-tier='lite'] .tt-rule-vcard { animation: none !important; }
       `}</style>
     </ModalPortal>
   );
