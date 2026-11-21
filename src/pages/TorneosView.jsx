@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ASSETS,
   EmptyStateCard,
@@ -7,7 +7,6 @@ import {
   SmartImage,
   TTIcon,
   triggerHaptic,
-  useScrollReveal,
 } from '../components/AppIcons';
 import {
   APP_CONFIG,
@@ -20,20 +19,17 @@ import {
   ANNUAL_MASTER_TOP8_REWARDS,
   SEASON_QUARTERLY_REWARDS,
 } from '../data/storeAndTournamentsData';
-import {
-  buildWhatsAppLink,
-  computeMasterTop8Race,
-} from '../utils/tenisEngine';
+import { computeMasterTop8Race } from '../utils/tenisEngine';
+import { buildWhatsappLink } from '../utils/cloudService';
 
 /* ==========================================================================
-   DATOS DE RESPALDO SEGUROS (4 GIRAS, TORNEOS DEMO Y SALÓN DE LA FAMA)
-   Se usan automáticamente si el estado global llega vacío durante pruebas.
+   DATOS DE RESPALDO SEGUROS (4 GIRAS, TORNEOS DEMO Y CANALES DE PAGO)
    ========================================================================== */
 const SEASON_SWINGS = [
-  { id: 'swing-1', name: 'Gira Apertura', club: 'Country Club', season: 1, status: 'done' },
-  { id: 'swing-2', name: 'Gira de Altura', club: 'El Tambo', season: 2, status: 'done' },
-  { id: 'swing-3', name: 'Valle del Mantaro', club: 'Tauro & Inkas', season: 3, status: 'done' },
-  { id: 'swing-4', name: 'Carrera Master Top 8', club: 'Gran Final', season: 4, status: 'active' },
+  { id: 'swing-1', name: 'Gira Apertura', club: 'Country Club', season: 1 },
+  { id: 'swing-2', name: 'Gira de Altura', club: 'El Tambo', season: 2 },
+  { id: 'swing-3', name: 'Valle del Mantaro', club: 'Tauro & Inkas', season: 3 },
+  { id: 'swing-4', name: 'Master Top 8', club: 'Gran Final', season: 4 },
 ];
 
 const PAYMENT_CHANNELS = {
@@ -52,7 +48,7 @@ const FALLBACK_TOURNAMENTS = [
     clubId: 'club-country',
     clubName: 'Country Club Los Huancas',
     surface: 'Arcilla',
-    status: 'IN_PLAY', // OPEN | IN_PLAY | UPCOMING | FINISHED
+    status: 'IN_PLAY',
     dateLabel: '14 – 24 NOV',
     categoryLabel: '4ª Categoría & 5ª A',
     drawSize: 16,
@@ -62,7 +58,7 @@ const FALLBACK_TOURNAMENTS = [
     includesItems: [
       'Pelotas presurizadas nuevas en cada ronda',
       'Hidratación y fruta en zona de jugadores',
-      'Cobertura fotográfica y placa oficial de puntaje',
+      'Cobertura fotográfica y puntaje oficial del circuito',
     ],
     hasConsolation: true,
     banner: ASSETS.torneoApertura,
@@ -143,14 +139,18 @@ const FALLBACK_TOURNAMENTS = [
   },
 ];
 
+function mapInitialSubTab(subTab) {
+  if (subTab === 'master') return 'master';
+  if (subTab === 'fama' || subTab === 'hof') return 'fama';
+  return 'torneos';
+}
+
 /* ==========================================================================
    MOTOR DE LLAVES REAL (OCTAVOS DE 16 -> CUARTOS -> SEMIS -> FINAL + CONSUELO)
-   Sin siembra preferente: todos ingresan en igualdad desde la 1ª ronda.
    ========================================================================== */
 function buildTournamentBracket(tournament, playersMap, allPlayers) {
   const drawSize = Number(tournament?.drawSize) === 8 ? 8 : 16;
 
-  // Poblar la lista de participantes reales (o completar con jugadores del circuito en demo)
   let ids = Array.isArray(tournament?.participantsIds) ? [...tournament.participantsIds] : [];
   if (ids.length === 0 && allPlayers.length > 0) {
     ids = allPlayers.slice(0, Math.min(drawSize, allPlayers.length)).map((p) => p.id);
@@ -187,13 +187,21 @@ function buildTournamentBracket(tournament, playersMap, allPlayers) {
   };
 
   const isStarted = tournament?.status === 'IN_PLAY' || tournament?.status === 'FINISHED';
-  const sampleScores = ['6-3, 6-4', '7-5, 6-2', '6-4, 3-6, [10-7]', '6-2, 6-1', '7-6 (5), 6-4', '6-1, 6-3', '6-4, 6-4', '4-6, 6-3, [12-10]'];
+  const sampleScores = [
+    '6-3, 6-4',
+    '7-5, 6-2',
+    '6-4, 3-6, [10-7]',
+    '6-2, 6-1',
+    '7-6 (5), 6-4',
+    '6-1, 6-3',
+    '6-4, 6-4',
+    '4-6, 6-3, [12-10]',
+  ];
 
   let roundOf16 = [];
   let quarterFinals = [];
 
   if (drawSize === 16) {
-    // 1. OCTAVOS DE FINAL (8 PARTIDOS REALES)
     roundOf16 = Array.from({ length: 8 }, (_, idx) => {
       const pA = slotPlayers[idx * 2];
       const pB = slotPlayers[idx * 2 + 1];
@@ -208,7 +216,6 @@ function buildTournamentBracket(tournament, playersMap, allPlayers) {
       );
     });
 
-    // 2. CUARTOS DE FINAL (4 PARTIDOS alimentados por los 8 ganadores de Octavos)
     quarterFinals = Array.from({ length: 4 }, (_, idx) => {
       const m1 = roundOf16[idx * 2];
       const m2 = roundOf16[idx * 2 + 1];
@@ -223,7 +230,6 @@ function buildTournamentBracket(tournament, playersMap, allPlayers) {
       );
     });
   } else {
-    // Cuadro de 8: inicia en Cuartos de Final (4 partidos)
     quarterFinals = Array.from({ length: 4 }, (_, idx) => {
       const pA = slotPlayers[idx * 2];
       const pB = slotPlayers[idx * 2 + 1];
@@ -239,7 +245,6 @@ function buildTournamentBracket(tournament, playersMap, allPlayers) {
     });
   }
 
-  // 3. SEMIFINALES (2 PARTIDOS)
   const semiFinals = Array.from({ length: 2 }, (_, idx) => {
     const q1 = quarterFinals[idx * 2];
     const q2 = quarterFinals[idx * 2 + 1];
@@ -254,7 +259,6 @@ function buildTournamentBracket(tournament, playersMap, allPlayers) {
     );
   });
 
-  // 4. GRAN FINAL (1 PARTIDO)
   const finalMatch = resolveMatch(
     'FINAL',
     semiFinals[0]?.winner || null,
@@ -264,7 +268,6 @@ function buildTournamentBracket(tournament, playersMap, allPlayers) {
     tournament?.status === 'FINISHED' ? '6-4, 7-6 (8-6)' : null
   );
 
-  // 5. RONDA CONSUELO OPCIONAL (Perdedores de la primera ronda disputan Copa de Plata)
   const firstRoundMatches = drawSize === 16 ? roundOf16 : quarterFinals;
   const consolationMatches = [];
   if (tournament?.hasConsolation) {
@@ -296,10 +299,11 @@ function buildTournamentBracket(tournament, playersMap, allPlayers) {
 }
 
 /* ==========================================================================
-   SUBCOMPONENTE 1: TARJETA DE PARTIDO DENTRO DE LA LLAVE (BRACKET MATCH)
+   SUBCOMPONENTE 1: TARJETA DE PARTIDO DENTRO DE LA LLAVE
    ========================================================================== */
 function BracketMatchCard({
   match,
+  animIndex = 0,
   isAdmin,
   onSelectAdminWinner,
   onOpenPlayerProfile,
@@ -346,7 +350,8 @@ function BracketMatchCard({
             </strong>
             {player && (
               <small className="tt-bm-sub">
-                {getCategoryByPoints(player.points).name} · {Number(player.points || 0).toLocaleString('es-PE')} pts
+                {getCategoryByPoints(player.points).name} ·{' '}
+                {Number(player.points || 0).toLocaleString('es-PE')} pts
               </small>
             )}
           </div>
@@ -373,9 +378,14 @@ function BracketMatchCard({
   };
 
   return (
-    <div className={`tt-bm-card ${match.winner ? 'is-done' : ''}`}>
+    <div
+      className={`tt-bm-card ${match.winner ? 'is-done' : ''}`}
+      style={{ '--tn-delay': `${Math.min(animIndex, 7) * 45}ms` }}
+    >
       <div className="tt-bm-head">
-        <span>{match.id} · {match.court}</span>
+        <span>
+          {match.id} · {match.court}
+        </span>
         <span className={`tt-bm-state ${match.status.toLowerCase()}`}>
           {match.score || (match.status === 'SCHEDULED' ? 'Programado' : 'Esperando cruce')}
         </span>
@@ -462,7 +472,7 @@ function PrizeCollageShowcase({ prizes }) {
 }
 
 /* ==========================================================================
-   VISTA PRINCIPAL: TorneosView (BLOQUE 12 DE 26)
+   VISTA PRINCIPAL: TorneosView (SALTO DIRECTO MASTER TOP 8 + ACABADO PREMIUM)
    ========================================================================== */
 export default function TorneosView({
   players = [],
@@ -472,8 +482,8 @@ export default function TorneosView({
   seasonSnapshots = null,
   currentUser = null,
   isAdmin = false,
+  initialSubTab = 'gira',
   theme = 'dark',
-  sunlightMode = false,
   onRequestTournamentInscription,
   onAdminApproveInscription,
   onAdminUpdateBracketResult,
@@ -482,30 +492,30 @@ export default function TorneosView({
   onOpenAuth,
   onNotify,
 }) {
-  const heroRef = useRef(null);
-  useScrollReveal(heroRef, { startRevealed: true });
+  const [activeTab, setActiveTab] = useState(() => mapInitialSubTab(initialSubTab));
 
-  // 3 Sub-vistas principales: Torneos Activos | Master Top 8 | Salón de la Fama
-  const [activeTab, setActiveTab] = useState('torneos'); // 'torneos' | 'master' | 'fama'
+  // Sincronización inmediata al saltar desde Ranking -> Temporadas -> "Ver Master Top 8"
+  useEffect(() => {
+    setActiveTab(mapInitialSubTab(initialSubTab));
+  }, [initialSubTab]);
 
-  // Estado del Modal Completo del Torneo seleccionado
+  // Modal Completo del Torneo
   const [selectedTournamentId, setSelectedTournamentId] = useState(null);
-  const [modalSection, setModalSection] = useState('cuadro'); // 'cuadro' | 'consuelo' | 'participantes' | 'premios'
-  const [selectedRound, setSelectedRound] = useState('R16'); // 'R16' | 'QF' | 'SF' | 'FINAL'
+  const [modalSection, setModalSection] = useState('cuadro');
+  const [selectedRound, setSelectedRound] = useState('R16');
 
-  // Estado del Modal de Pago e Inscripción (Yape / Plin / Banco + blur)
+  // Modal de Pago e Inscripción (Yape / Plin / Banco)
   const [paymentTournament, setPaymentTournament] = useState(null);
   const [chosenCategory, setChosenCategory] = useState('');
   const [localPendingMap, setLocalPendingMap] = useState({});
   const [localBracketOverrides, setLocalBracketOverrides] = useState({});
 
-  // Pestaña interna del Master Top 8 Finals
-  const [masterSubTab, setMasterSubTab] = useState('resumen'); // 'resumen' | 'grupos' | 'clasificados' | 'premios'
+  // Pestaña interna del Master Top 8
+  const [masterSubTab, setMasterSubTab] = useState('resumen');
 
-  // Filtro de año / temporada en Salón de la Fama
+  // Filtro en Salón de la Fama
   const [hofCategoryFilter, setHofCategoryFilter] = useState('ALL');
 
-  // Mapa rápido ID -> Jugador
   const playersMap = useMemo(() => {
     const map = {};
     (players || []).forEach((p) => {
@@ -514,9 +524,9 @@ export default function TorneosView({
     return map;
   }, [players]);
 
-  // Lista efectiva de torneos (combina props globales + overrides locales de demo si aplica)
   const effectiveTournaments = useMemo(() => {
-    const source = Array.isArray(tournaments) && tournaments.length > 0 ? tournaments : FALLBACK_TOURNAMENTS;
+    const source =
+      Array.isArray(tournaments) && tournaments.length > 0 ? tournaments : FALLBACK_TOURNAMENTS;
     return source.map((t) => ({
       ...t,
       bracketResults: {
@@ -534,13 +544,11 @@ export default function TorneosView({
     [effectiveTournaments, selectedTournamentId]
   );
 
-  // Cuadro construido para el torneo abierto en el modal
   const activeBracket = useMemo(() => {
     if (!selectedTournament) return null;
     return buildTournamentBracket(selectedTournament, playersMap, players);
   }, [selectedTournament, playersMap, players]);
 
-  // Carrera real al Master Top 8 (100% solo lectura sobre snapshots de 4 temporadas)
   const safeSnapshots = useMemo(() => {
     if (seasonSnapshots?.seasons?.length) return seasonSnapshots;
     return {
@@ -562,7 +570,6 @@ export default function TorneosView({
 
   const masterTop8Qualifiers = useMemo(() => masterRaceAll.slice(0, 8), [masterRaceAll]);
 
-  // Grupos A (Mantaro) y B (Huaytapallana) con distribución serpentina ATP/WTA Finals (1,4,5,8 vs 2,3,6,7)
   const masterGroups = useMemo(() => {
     const q = masterTop8Qualifiers;
     return {
@@ -571,7 +578,6 @@ export default function TorneosView({
     };
   }, [masterTop8Qualifiers]);
 
-  // Salón de la Fama enriquecido (Campeones históricos con datos reales de jugadores)
   const effectiveHallOfFame = useMemo(() => {
     if (Array.isArray(hallOfFame) && hallOfFame.length > 0) return hallOfFame;
 
@@ -640,13 +646,12 @@ export default function TorneosView({
   }, [effectiveHallOfFame, hofCategoryFilter]);
 
   /* ------------------------------------------------------------------------
-     ACCIONES OPERATIVAS (ABRIR FICHA, SOLICITAR PAGO, COPIAR CUENTA, ADMIN)
+     ACCIONES OPERATIVAS
      ------------------------------------------------------------------------ */
   const handleOpenTournamentModal = (tournament, defaultSection = 'cuadro') => {
     triggerHaptic('light');
     setSelectedTournamentId(tournament.id);
     setModalSection(defaultSection);
-    // Si es de 16 arranca en Octavos (R16), si es de 8 arranca en Cuartos (QF)
     setSelectedRound(Number(tournament.drawSize) === 8 ? 'QF' : 'R16');
   };
 
@@ -657,8 +662,7 @@ export default function TorneosView({
       return;
     }
     triggerHaptic('medium');
-    const userCat = getCategoryByPoints(currentUser.points).name;
-    setChosenCategory(userCat);
+    setChosenCategory(getCategoryByPoints(currentUser.points).name);
     setPaymentTournament(tournament);
   };
 
@@ -667,7 +671,7 @@ export default function TorneosView({
     try {
       await navigator.clipboard.writeText(text);
       if (onNotify) onNotify(`${label} copiado al portapapeles.`, 'success');
-    } catch (e) {
+    } catch {
       if (onNotify) onNotify(`${label}: ${text}`, 'info');
     }
   };
@@ -675,7 +679,6 @@ export default function TorneosView({
   const handleSendPaymentVoucher = () => {
     if (!paymentTournament || !currentUser) return;
 
-    // 1. Registrar estado "Pago en Verificación" (NUNCA inscribe directo al cuadro)
     if (onRequestTournamentInscription) {
       onRequestTournamentInscription({
         tournamentId: paymentTournament.id,
@@ -692,22 +695,25 @@ export default function TorneosView({
       }));
     }
 
-    // 2. Abrir WhatsApp oficial de organización con el comprobante pre-armado
     const waMsg = [
-      `Hola organización de TOTAL TENIS, solicito validación de mi inscripción:`,
+      'Hola organización de TOTAL TENIS, solicito validación de mi inscripción:',
       `• Torneo: ${paymentTournament.name}`,
       `• Jugador: ${currentUser.name} (${currentUser.credentialId || 'Socio'})`,
       `• Categoría: ${chosenCategory || getCategoryByPoints(currentUser.points).name}`,
       `• Monto abonado: S/ ${paymentTournament.entryFee}.00`,
-      `Adjunto aquí la captura de mi Yape / Plin / Depósito para quedar inscrito en el sorteo.`,
+      'Adjunto aquí la captura de mi Yape / Plin / Depósito para quedar inscrito en el sorteo.',
     ].join('\n');
 
-    window.open(buildWhatsAppLink(APP_CONFIG.supportWhatsApp, waMsg), '_blank', 'noopener,noreferrer');
+    window.open(
+      buildWhatsappLink(APP_CONFIG.supportWhatsApp, waMsg),
+      '_blank',
+      'noopener,noreferrer'
+    );
 
     triggerHaptic('success');
     if (onNotify) {
       onNotify(
-        'Solicitud registrada en estado "Pago en Verificación". Al validar tu constancia, el Comité te ingresará al cuadro.',
+        'Solicitud registrada en estado "Pago en Verificación". Al validar tu constancia te ingresaremos al cuadro.',
         'success'
       );
     }
@@ -728,7 +734,7 @@ export default function TorneosView({
         },
       }));
     }
-    if (onNotify) onNotify(`Resultado oficial validado en llave ${matchId}.`, 'success');
+    if (onNotify) onNotify(`Resultado validado en llave ${matchId}.`, 'success');
   };
 
   const getUserTournamentStatus = (t) => {
@@ -739,18 +745,17 @@ export default function TorneosView({
   };
 
   const progressPct = Math.min(100, Math.round((safeSnapshots.currentSeason / 4) * 100));
+  const activeTabIdx = activeTab === 'torneos' ? 0 : activeTab === 'master' ? 1 : 2;
 
   return (
     <section
-      className={`tt-torneos-view ${theme === 'light' ? 'is-light' : 'is-dark'} ${
-        sunlightMode ? 'is-sunlight' : ''
-      }`}
+      className={`tt-torneos-view ${theme === 'light' ? 'is-light' : 'is-dark'}`}
       aria-label="Torneos Oficiales y Master Top 8 TOTAL TENIS"
     >
       {/* ====================================================================
-          1. BARRA DE PROGRESO DE TEMPORADA (SEASON PROGRESS POR LAS 4 GIRAS)
+          1. BARRA DE PROGRESO ANUAL (4 GIRAS DEL CIRCUITO)
           ==================================================================== */}
-      <header ref={heroRef} className="tt-season-progress-card tt-reveal-box">
+      <header className="tt-season-progress-card">
         <div className="tt-sp-top">
           <div>
             <span className="tt-sp-eyebrow">CALENDARIO OFICIAL · {safeSnapshots.year}</span>
@@ -762,7 +767,6 @@ export default function TorneosView({
           </div>
         </div>
 
-        {/* Línea segmentada de las 4 Giras */}
         <div className="tt-swings-track" aria-label="Progreso de las 4 Giras">
           {SEASON_SWINGS.map((sw) => {
             const isDone = sw.season < safeSnapshots.currentSeason;
@@ -782,9 +786,15 @@ export default function TorneosView({
       </header>
 
       {/* ====================================================================
-          2. CONMUTADOR DE 3 SUB-VISTAS (TORNEOS | MASTER TOP 8 | SALÓN FAMA)
+          2. CONMUTADOR CON INDICADOR DESLIZANTE (MUTA A ORO EN MASTER TOP 8)
           ==================================================================== */}
       <div className="tt-tn-subtabs" role="tablist" aria-label="Secciones de Torneos">
+        <span
+          className={`tt-tn-subtab-slider ${activeTab === 'master' ? 'is-gold' : ''}`}
+          aria-hidden="true"
+          style={{ transform: `translateX(${activeTabIdx * 100}%)` }}
+        />
+
         <button
           type="button"
           role="tab"
@@ -804,7 +814,7 @@ export default function TorneosView({
           aria-selected={activeTab === 'master'}
           className={`tt-tn-subtab is-gold ${activeTab === 'master' ? 'is-active' : ''}`}
           onClick={() => {
-            triggerHaptic('light');
+            triggerHaptic('medium');
             setActiveTab('master');
           }}
         >
@@ -826,16 +836,18 @@ export default function TorneosView({
       </div>
 
       {/* ====================================================================
-          VISTA 1: GALERÍA DE FICHAS DE TORNEOS (TARJETA -> MODAL COMPLETO)
+          VISTA 1: TORNEOS ACTIVOS
           ==================================================================== */}
       {activeTab === 'torneos' && (
-        <div className="tt-tn-stack">
+        <div key="tn-list" className="tt-tn-stack tt-tn-panel-reveal">
           <div className="tt-tournaments-grid">
-            {effectiveTournaments.map((t) => {
+            {effectiveTournaments.map((t, idx) => {
               const club = getClubById(clubs, t.clubId);
               const enrolledCount = Math.max(
                 (t.participantsIds || []).length,
-                t.status === 'IN_PLAY' ? Math.min(t.drawSize, players.length) : Math.min(t.drawSize - 5, players.length)
+                t.status === 'IN_PLAY'
+                  ? Math.min(t.drawSize, players.length)
+                  : Math.min(Math.max(0, t.drawSize - 5), players.length)
               );
               const spotsLeft = Math.max(0, t.drawSize - enrolledCount);
               const fillPct = Math.min(100, Math.round((enrolledCount / t.drawSize) * 100));
@@ -851,8 +863,11 @@ export default function TorneosView({
                   : { label: 'PRÓXIMA FECHA', cls: 'is-soon' };
 
               return (
-                <article key={t.id} className="tt-tcard">
-                  {/* Portada limpia con foto única y título en la base inferior */}
+                <article
+                  key={t.id}
+                  className="tt-tcard"
+                  style={{ '--tn-delay': `${idx * 75}ms` }}
+                >
                   <div
                     className="tt-tcard-hero"
                     onClick={() => handleOpenTournamentModal(t, 'cuadro')}
@@ -865,7 +880,6 @@ export default function TorneosView({
                     />
                     <div className="tt-tcard-scrim" />
 
-                    {/* Top badges: Estado + Fecha verde menta sobre píldora oscura (alto contraste) */}
                     <div className="tt-tcard-top-badges">
                       <span className={`tt-tcard-status ${statusChip.cls}`}>
                         {statusChip.label}
@@ -873,11 +887,11 @@ export default function TorneosView({
                       <span className="tt-tcard-date-dark">{t.dateLabel}</span>
                     </div>
 
-                    {/* Base inferior: Título despejando la foto de la cancha + Escudo */}
                     <div className="tt-tcard-hero-bottom">
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <span className="tt-tcard-surface">
-                          {t.surface} · Cuadro de {t.drawSize} ({t.drawSize === 16 ? 'desde Octavos' : 'desde Cuartos'})
+                          {t.surface} · Cuadro de {t.drawSize} (
+                          {t.drawSize === 16 ? 'desde Octavos' : 'desde Cuartos'})
                         </span>
                         <h2 className="tt-tcard-title">{t.name}</h2>
                       </div>
@@ -893,9 +907,7 @@ export default function TorneosView({
                     </div>
                   </div>
 
-                  {/* Cuerpo informativo limpio */}
                   <div className="tt-tcard-body">
-                    {/* Píldoras de características claras (Costo, Pelotas, Consuelo) */}
                     <div className="tt-tcard-specs-row">
                       <span className="tt-spec-chip is-price">S/ {t.entryFee}</span>
                       <span className="tt-spec-chip">{t.categoryLabel}</span>
@@ -907,7 +919,6 @@ export default function TorneosView({
                       )}
                     </div>
 
-                    {/* Control de Plazas y Condición de Sorteo */}
                     <div className="tt-spots-box">
                       <div className="tt-spots-head">
                         <span>
@@ -924,7 +935,6 @@ export default function TorneosView({
                       </div>
                     </div>
 
-                    {/* Resumen rápido de premio destacado */}
                     <div className="tt-tcard-prize-strip">
                       <TTIcon name="trophy" size={16} style={{ color: '#F59E0B', flexShrink: 0 }} />
                       <span>
@@ -932,7 +942,6 @@ export default function TorneosView({
                       </span>
                     </div>
 
-                    {/* Botones 100 % Operativos */}
                     <div className="tt-tcard-actions">
                       <button
                         type="button"
@@ -977,17 +986,15 @@ export default function TorneosView({
       )}
 
       {/* ====================================================================
-          VISTA 2: PORTADA HERO MASTER TOP 8 FINALS (100% SOLO LECTURA POR MÉRITO)
-          Prohibido mostrar inscripción ni pago: clasifican los #1 al #8 del año.
+          VISTA 2: MASTER TOP 8 FINALS (SOLO POR MÉRITO · LENGUAJE NATURAL)
           ==================================================================== */}
       {activeTab === 'master' && (
-        <div className="tt-tn-stack">
-          {/* Portada Hero Panorámica con Ficha Blanca Flotante */}
+        <div key="tn-master" className="tt-tn-stack tt-tn-master-reveal">
           <div className="tt-master-hero">
             <SmartImage
               src={ASSETS.torneoMasterTop8}
               fallbackSrc={ASSETS.torneoApertura}
-              alt="Torneo de Maestros Master Top 8 Finals"
+              alt="Torneo de Maestros Master Top 8"
               className="tt-master-hero-bg"
             />
             <div className="tt-master-hero-scrim" />
@@ -1000,17 +1007,16 @@ export default function TorneosView({
                 </span>
                 <h2 className="tt-master-title">MASTER TOP 8 FINALS</h2>
                 <p className="tt-master-lead">
-                  Los 8 jugadores con mayor puntaje acumulado en las 4 temporadas cerradas (T1 + T2 + T3 + T4) disputan la Copa de Maestros sin costo de inscripción.
+                  Los 8 jugadores con mayor puntaje total acumulado en las 4 temporadas del año disputan la Copa de Maestros sin costo de inscripción.
                 </p>
               </div>
 
-              {/* Ficha Blanca Flotante Estilo Editorial */}
               <div className="tt-master-float-card">
                 <div className="tt-mfc-head">
                   <SmartImage
                     src={ASSETS.trofeoMasterTop8}
                     alt="Copa Master Top 8"
-                    style={{ width: 42, height: 42, objectFit: 'contain' }}
+                    style={{ width: 44, height: 44, objectFit: 'contain' }}
                   />
                   <div>
                     <strong>FINALES {safeSnapshots.year}</strong>
@@ -1020,7 +1026,7 @@ export default function TorneosView({
                 <div className="tt-mfc-meta">
                   <div>
                     <span>ACCESO</span>
-                    <strong style={{ color: '#008A4E' }}>CLASIFICACIÓN TOP 8</strong>
+                    <strong style={{ color: '#007A44' }}>TOP 8 DEL AÑO</strong>
                   </div>
                   <div>
                     <span>INSCRIPCIÓN</span>
@@ -1028,12 +1034,11 @@ export default function TorneosView({
                   </div>
                 </div>
                 <div className="tt-mfc-readonly">
-                  Tabla oficial de solo lectura · Actualizada al cierre de cada temporada
+                  Clasificación actualizada automáticamente al cierre de cada temporada
                 </div>
               </div>
             </div>
 
-            {/* Pestañas píldora internas del Master Top 8 */}
             <div className="tt-master-pills-bar">
               {[
                 { id: 'resumen', label: 'Formato · 3 Fases' },
@@ -1056,36 +1061,34 @@ export default function TorneosView({
             </div>
           </div>
 
-          {/* Sub-sección Master 1: Las 3 Tarjetas Editoriales sobre Marfil */}
           {masterSubTab === 'resumen' && (
             <div className="tt-master-phases-grid">
-              <article className="tt-phase-card">
+              <article className="tt-phase-card" style={{ '--tn-delay': '0ms' }}>
                 <span className="tt-phase-num">FASE 1</span>
-                <h3>Clasificación Anual (T1 + T2 + T3 + T4)</h3>
+                <h3>Puntos Totales del Año (T1 a T4)</h3>
                 <p>
-                  Al llegar la medianoche (00:00) del último día de cada trimestre, tus puntos oficiales se congelan en la tabla estática anual. Al cerrar la 4ª temporada, la suma total define del #1 al #8 sin pagar inscripción.
+                  Al terminar cada trimestre se guarda tu puntaje de esa temporada. La suma de las 4 temporadas define automáticamente a los 8 clasificados sin pagar inscripción.
                 </p>
               </article>
 
-              <article className="tt-phase-card">
+              <article className="tt-phase-card" style={{ '--tn-delay': '80ms' }}>
                 <span className="tt-phase-num">FASE 2</span>
-                <h3>Grupos A y B (Round Robin)</h3>
+                <h3>Grupos A y B (Todos contra Todos)</h3>
                 <p>
-                  Los 8 clasificados se reparten en Grupo A (Mantaro) y Grupo B (Huaytapallana) de 4 tenistas cada uno. Todos juegan contra todos en su grupo (3 partidos garantizados por maestro).
+                  Los 8 clasificados se dividen en Grupo A (Mantaro) y Grupo B (Huaytapallana) de 4 jugadores cada uno. Cada maestro juega 3 partidos garantizados en fase de grupos.
                 </p>
               </article>
 
-              <article className="tt-phase-card">
+              <article className="tt-phase-card" style={{ '--tn-delay': '160ms' }}>
                 <span className="tt-phase-num">FASE 3</span>
                 <h3>Semifinales Cruzadas y Gran Final</h3>
                 <p>
-                  El #1 del Grupo A enfrenta al #2 del Grupo B, y el #1 del Grupo B al #2 del Grupo A. Los ganadores definen al Campeón Anual de Maestros con cobertura completa y premiación mayor.
+                  El #1 del Grupo A enfrenta al #2 del Grupo B, y el #1 del Grupo B al #2 del Grupo A. Los ganadores definen al Campeón Anual con premiación mayor.
                 </p>
               </article>
             </div>
           )}
 
-          {/* Sub-sección Master 2: Proyección Viva de Grupos A y B */}
           {masterSubTab === 'grupos' && (
             <div className="tt-master-groups-grid">
               {[
@@ -1095,7 +1098,7 @@ export default function TorneosView({
                 <div key={grp.key} className="tt-group-card">
                   <div className="tt-group-card-head">
                     <strong>{grp.title}</strong>
-                    <span>Round Robin · Top 2 avanzan</span>
+                    <span>Top 2 avanzan a Semis</span>
                   </div>
 
                   {grp.rows.length === 0 ? (
@@ -1130,11 +1133,13 @@ export default function TorneosView({
                           />
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <strong>{row.player.name}</strong>
-                            <small>{row.category.name} · {row.player.clubName || 'Independiente'}</small>
+                            <small>
+                              {row.category.name} · {row.player.clubName || 'Independiente'}
+                            </small>
                           </div>
                           <div className="tt-group-pts">
                             <strong>{row.totalAnnual.toLocaleString('es-PE')}</strong>
-                            <span>ANUAL</span>
+                            <span>TOTALES</span>
                           </div>
                         </div>
                       ))}
@@ -1145,7 +1150,6 @@ export default function TorneosView({
             </div>
           )}
 
-          {/* Sub-sección Master 3: Tabla de los 8 Clasificados */}
           {masterSubTab === 'clasificados' && (
             <div className="tt-master-q-list">
               {masterTop8Qualifiers.length === 0 ? (
@@ -1155,10 +1159,11 @@ export default function TorneosView({
                   description="Apenas se registren partidos oficiales verás aquí a los 8 líderes clasificados al Torneo de Maestros."
                 />
               ) : (
-                masterTop8Qualifiers.map((row) => (
+                masterTop8Qualifiers.map((row, idx) => (
                   <div
                     key={row.player.id}
                     className="tt-master-q-row"
+                    style={{ '--tn-delay': `${idx * 45}ms` }}
                     onClick={() => {
                       triggerHaptic('light');
                       if (onOpenPlayerProfile) onOpenPlayerProfile(row.player);
@@ -1175,19 +1180,17 @@ export default function TorneosView({
                         borderRadius: 13,
                         objectFit: 'cover',
                         objectPosition: 'center top',
-                        border: '2px solid #00DC7D',
+                        border: '2px solid #F59E0B',
                         flexShrink: 0,
                       }}
                     />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <strong>{row.player.name}</strong>
-                      <small>
-                        {row.category.name} · T1–T4 acumulados
-                      </small>
+                      <small>{row.category.name} · Puntos acumulados T1–T4</small>
                     </div>
                     <div className="tt-master-q-pts">
                       <strong>{row.totalAnnual.toLocaleString('es-PE')}</strong>
-                      <span>PTS ANUALES</span>
+                      <span>PTS TOTALES</span>
                     </div>
                   </div>
                 ))
@@ -1195,7 +1198,6 @@ export default function TorneosView({
             </div>
           )}
 
-          {/* Sub-sección Master 4: Premios Mayores Anuales (Separados de Trimestrales) */}
           {masterSubTab === 'premios' && (
             <div className="tt-master-rewards-wrap">
               <div className="tt-mr-card is-annual">
@@ -1220,7 +1222,9 @@ export default function TorneosView({
                   {SEASON_QUARTERLY_REWARDS.podium.map((p) => (
                     <div key={p.place} className="tt-mr-item">
                       <strong>{p.label}</strong>
-                      <span>{p.physicalItems.join(' + ')} · {p.gemsRangeLabel}</span>
+                      <span>
+                        {p.physicalItems.join(' + ')} · {p.gemsRangeLabel}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -1231,22 +1235,21 @@ export default function TorneosView({
       )}
 
       {/* ====================================================================
-          VISTA 3: SALÓN DE LA FAMA (TARJETAS HORIZONTALES CON BLOQUE WINNER ESMERALDA)
+          VISTA 3: SALÓN DE LA FAMA (TARJETAS HORIZONTALES WINNER ESMERALDA)
           ==================================================================== */}
       {activeTab === 'fama' && (
-        <div className="tt-tn-stack">
+        <div key="tn-fama" className="tt-tn-stack tt-tn-panel-reveal">
           <div className="tt-hof-intro">
             <IconBadge name="crown" variant="gold" size={40} />
             <div>
-              <span className="tt-hof-kicker">CUADRO DE HONOR INAMOVIBLE</span>
+              <span className="tt-hof-kicker">CUADRO DE HONOR OFICIAL</span>
               <h2 className="tt-hof-title">Salón de la Fama · Campeones Históricos</h2>
               <p className="tt-hof-sub">
-                Registro oficial de ganadores de cada gira y torneo cerrado del circuito TOTAL TENIS.
+                Registro oficial de campeones de cada gira y torneo finalizado en TOTAL TENIS.
               </p>
             </div>
           </div>
 
-          {/* Filtros de categoría del Salón de la Fama */}
           <div className="tt-hof-filters">
             {['ALL', '3ª Categoría', '4ª Categoría', '5ª A', 'Damas'].map((catLabel) => (
               <button
@@ -1267,13 +1270,13 @@ export default function TorneosView({
             <EmptyStateCard
               theme={theme}
               title="Sin registros en esta categoría"
-              description="Selecciona otra categoría para explorar el historial de campeones del circuito."
+              description="Selecciona otra categoría para explorar el historial de campeones."
               actionLabel="Ver todos los campeones"
               onAction={() => setHofCategoryFilter('ALL')}
             />
           ) : (
             <div className="tt-hof-cards-list">
-              {filteredHallOfFame.map((entry) => {
+              {filteredHallOfFame.map((entry, idx) => {
                 const champ = entry.champion;
                 const total = (Number(entry.wins) || 0) + (Number(entry.losses) || 0);
                 const eff = total > 0 ? ((entry.wins / total) * 100).toFixed(1) : '100.0';
@@ -1281,15 +1284,17 @@ export default function TorneosView({
                 const surname = (champ?.name || 'CAMPEÓN').split(' ').slice(-1)[0].toUpperCase();
 
                 return (
-                  <article key={entry.id} className="tt-winner-row-card">
-                    {/* Columna 1: Fecha condensada sobre Púrpura Noche */}
+                  <article
+                    key={entry.id}
+                    className="tt-winner-row-card"
+                    style={{ '--tn-delay': `${idx * 70}ms` }}
+                  >
                     <div className="tt-wr-date-col">
                       <strong>{entry.dateTop}</strong>
                       <span>{entry.dateBottom}</span>
                       <small>{entry.year}</small>
                     </div>
 
-                    {/* Columna 2: Ficha Editorial Blanca del Torneo + Récord estilo TV */}
                     <div className="tt-wr-center-col">
                       <div className="tt-wr-badges">
                         <span className="tt-wr-cat-pill">{entry.category}</span>
@@ -1299,7 +1304,6 @@ export default function TorneosView({
                       <span className="tt-wr-season">{entry.seasonLabel}</span>
                       <h3 className="tt-wr-tourney-name">{entry.tournamentName}</h3>
 
-                      {/* Fin al texto críptico "11G 1P": Píldora de récord estilo TV */}
                       <div className="tt-wr-record-strip">
                         <span className="is-wins">{entry.wins} VICTORIAS</span>
                         <span className="is-losses">
@@ -1309,8 +1313,8 @@ export default function TorneosView({
                       </div>
                     </div>
 
-                    {/* Columna 3: Módulo Derecho Integrado WINNER en Degradado Verde Esmeralda */}
                     <div className="tt-wr-emerald-col">
+                      <span className="tt-wr-emerald-sheen" aria-hidden="true" />
                       <div className="tt-wr-winner-text">
                         <span className="tt-wr-winner-tag">WINNER</span>
                         <strong className="tt-wr-surname">{surname}</strong>
@@ -1337,8 +1341,8 @@ export default function TorneosView({
                             <button
                               type="button"
                               className="tt-wr-circle-btn"
-                              aria-label={`Comparar Head to Head con ${champ?.name}`}
-                              title="Head-to-Head"
+                              aria-label={`Comparar cara a cara con ${champ?.name}`}
+                              title="Cara a cara (H2H)"
                               onClick={() => {
                                 triggerHaptic('light');
                                 onOpenHeadToHead(champ);
@@ -1376,7 +1380,7 @@ export default function TorneosView({
       )}
 
       {/* ====================================================================
-          MODAL 1 (PORTAL): FICHA COMPLETA DEL TORNEO + LLAVES DESDE OCTAVOS
+          MODAL 1: FICHA COMPLETA DEL TORNEO + LLAVES DESDE OCTAVOS
           ==================================================================== */}
       <ModalPortal
         isOpen={Boolean(selectedTournament && activeBracket)}
@@ -1392,7 +1396,6 @@ export default function TorneosView({
       >
         {selectedTournament && activeBracket && (
           <div className="tt-tmodal-wrap">
-            {/* Pestañas internas del Torneo (Ronda Consuelo solo si está activada en este torneo) */}
             <div className="tt-tmodal-tabs">
               <button
                 type="button"
@@ -1441,10 +1444,8 @@ export default function TorneosView({
               </button>
             </div>
 
-            {/* SECCIÓN A: CUADRO PRINCIPAL (ARRANCA EN OCTAVOS DE FINAL SI ES DE 16) */}
             {modalSection === 'cuadro' && (
               <div className="tt-bracket-section">
-                {/* Selector interactivo de rondas */}
                 <div className="tt-rounds-pills">
                   {activeBracket.drawSize === 16 && (
                     <button
@@ -1490,13 +1491,13 @@ export default function TorneosView({
                   </button>
                 </div>
 
-                {/* Partidos de la ronda activa */}
-                <div className="tt-bracket-matches-grid">
+                <div key={selectedRound} className="tt-bracket-matches-grid">
                   {selectedRound === 'R16' &&
-                    activeBracket.roundOf16.map((m) => (
+                    activeBracket.roundOf16.map((m, idx) => (
                       <BracketMatchCard
                         key={m.id}
                         match={m}
+                        animIndex={idx}
                         isAdmin={isAdmin}
                         onSelectAdminWinner={handleAdminPickWinner}
                         onOpenPlayerProfile={onOpenPlayerProfile}
@@ -1504,10 +1505,11 @@ export default function TorneosView({
                     ))}
 
                   {selectedRound === 'QF' &&
-                    activeBracket.quarterFinals.map((m) => (
+                    activeBracket.quarterFinals.map((m, idx) => (
                       <BracketMatchCard
                         key={m.id}
                         match={m}
+                        animIndex={idx}
                         isAdmin={isAdmin}
                         onSelectAdminWinner={handleAdminPickWinner}
                         onOpenPlayerProfile={onOpenPlayerProfile}
@@ -1515,10 +1517,11 @@ export default function TorneosView({
                     ))}
 
                   {selectedRound === 'SF' &&
-                    activeBracket.semiFinals.map((m) => (
+                    activeBracket.semiFinals.map((m, idx) => (
                       <BracketMatchCard
                         key={m.id}
                         match={m}
+                        animIndex={idx}
                         isAdmin={isAdmin}
                         onSelectAdminWinner={handleAdminPickWinner}
                         onOpenPlayerProfile={onOpenPlayerProfile}
@@ -1528,6 +1531,7 @@ export default function TorneosView({
                   {selectedRound === 'FINAL' && (
                     <BracketMatchCard
                       match={activeBracket.finalMatch}
+                      animIndex={0}
                       isAdmin={isAdmin}
                       onSelectAdminWinner={handleAdminPickWinner}
                       onOpenPlayerProfile={onOpenPlayerProfile}
@@ -1537,7 +1541,6 @@ export default function TorneosView({
               </div>
             )}
 
-            {/* SECCIÓN B: RONDA CONSUELO OPCIONAL (COPA DE PLATA) */}
             {modalSection === 'consuelo' && selectedTournament.hasConsolation && (
               <div className="tt-bracket-section">
                 <div className="tt-consolation-note">
@@ -1548,10 +1551,11 @@ export default function TorneosView({
                 </div>
 
                 <div className="tt-bracket-matches-grid">
-                  {activeBracket.consolationMatches.map((m) => (
+                  {activeBracket.consolationMatches.map((m, idx) => (
                     <BracketMatchCard
                       key={m.id}
                       match={m}
+                      animIndex={idx}
                       isAdmin={isAdmin}
                       onSelectAdminWinner={handleAdminPickWinner}
                       onOpenPlayerProfile={onOpenPlayerProfile}
@@ -1561,17 +1565,15 @@ export default function TorneosView({
               </div>
             )}
 
-            {/* SECCIÓN C: PARTICIPANTES & SORTEO TRANSPARENTE (SIN SIEMBRA PREFERENTE) */}
             {modalSection === 'participantes' && (
               <div className="tt-participants-section">
                 <div className="tt-consolation-note">
                   <TTIcon name="users" size={17} style={{ color: '#F59E0B', flexShrink: 0 }} />
                   <span>
-                    Sorteo puro transparente sin siembra preferente: todos los inscritos compiten en igualdad de condiciones desde la primera ronda.
+                    Sorteo transparente: todos los inscritos ingresan en igualdad de condiciones desde la primera ronda.
                   </span>
                 </div>
 
-                {/* Solicitudes en verificación visibles solo para Admin oculto */}
                 {isAdmin && (selectedTournament.pendingPaymentIds || []).length > 0 && (
                   <div className="tt-admin-pending-box">
                     <strong>Pagos por aprobar ({selectedTournament.pendingPaymentIds.length})</strong>
@@ -1580,7 +1582,9 @@ export default function TorneosView({
                       if (!p) return null;
                       return (
                         <div key={pid} className="tt-admin-pending-row">
-                          <span>{p.name} ({getCategoryByPoints(p.points).name})</span>
+                          <span>
+                            {p.name} ({getCategoryByPoints(p.points).name})
+                          </span>
                           <button
                             type="button"
                             className="tt-btn tt-btn-primary tt-btn-sm"
@@ -1625,7 +1629,9 @@ export default function TorneosView({
                       />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <strong>{p.name}</strong>
-                        <small>{getCategoryByPoints(p.points).name} · {p.clubName || 'Independiente'}</small>
+                        <small>
+                          {getCategoryByPoints(p.points).name} · {p.clubName || 'Independiente'}
+                        </small>
                       </div>
                       <span className="tt-enrolled-pts">
                         {Number(p.points || 0).toLocaleString('es-PE')} pts
@@ -1636,7 +1642,6 @@ export default function TorneosView({
               </div>
             )}
 
-            {/* SECCIÓN D: VITRINA COLLAGE DE PREMIOS + QUÉ INCLUYE EL TORNEO */}
             {modalSection === 'premios' && (
               <div className="tt-tmodal-prizes-stack">
                 <PrizeCollageShowcase prizes={selectedTournament.prizes} />
@@ -1655,7 +1660,6 @@ export default function TorneosView({
               </div>
             )}
 
-            {/* Pie del Modal: Botón de Inscripción si aún no está inscrito */}
             {selectedTournament.status !== 'FINISHED' && (
               <div className="tt-tmodal-foot">
                 {getUserTournamentStatus(selectedTournament) === 'ENROLLED' ? (
@@ -1689,8 +1693,7 @@ export default function TorneosView({
       </ModalPortal>
 
       {/* ====================================================================
-          MODAL 2 (PORTAL CON BLUR): INSCRIPCIÓN CON PAGO (YAPE / PLIN / BANCO)
-          El jugador envía constancia -> Estado "Pago en Verificación" -> Admin aprueba
+          MODAL 2: INSCRIPCIÓN CON PAGO (YAPE / PLIN / BANCO)
           ==================================================================== */}
       <ModalPortal
         isOpen={Boolean(paymentTournament)}
@@ -1702,7 +1705,6 @@ export default function TorneosView({
       >
         {paymentTournament && (
           <div className="tt-pay-modal-stack">
-            {/* Monto y qué incluye */}
             <div className="tt-pay-hero-box">
               <div>
                 <span>CUOTA DE INSCRIPCIÓN</span>
@@ -1725,7 +1727,6 @@ export default function TorneosView({
               </ul>
             </div>
 
-            {/* Selector de categoría */}
             <div className="tt-pay-field">
               <label htmlFor="tt-pay-cat">Categoría en la que participas</label>
               <select
@@ -1744,7 +1745,6 @@ export default function TorneosView({
               </select>
             </div>
 
-            {/* Datos de pago copiables: Yape / Plin y Depósito Bancario */}
             <div className="tt-pay-channels-box">
               <span className="tt-pay-channels-title">MEDIOS DE PAGO OFICIALES</span>
               <p className="tt-pay-holder">Titular: {PAYMENT_CHANNELS.holder}</p>
@@ -1793,7 +1793,8 @@ export default function TorneosView({
             </div>
 
             <p className="tt-pay-disclaimer">
-              Envía tu constancia por WhatsApp al Comité Organizador. Tu solicitud quedará en estado <strong>Pago en Verificación</strong> hasta que confirmemos tu abono y te ingresemos oficialmente al sorteo.
+              Envía tu constancia por WhatsApp al Comité Organizador. Tu solicitud quedará en estado{' '}
+              <strong>Pago en Verificación</strong> hasta confirmar tu abono e ingresarte oficialmente al sorteo.
             </p>
 
             <button
@@ -1809,20 +1810,17 @@ export default function TorneosView({
         )}
       </ModalPortal>
 
-      {/* ====================================================================
-          ESTILOS ENCAPSULADOS DE PRECISIÓN EDITORIAL (TORNEOS + MASTER + FAMA)
-          ==================================================================== */}
       <style>{`
         .tt-torneos-view {
           display: flex;
           flex-direction: column;
-          gap: 15px;
+          gap: 14px;
         }
 
-        /* 1. BARRA SEASON PROGRESS POR LAS 4 GIRAS */
+        /* 1. BARRA SEASON PROGRESS */
         .tt-season-progress-card {
           border-radius: 24px;
-          padding: 18px;
+          padding: 17px;
           background: linear-gradient(135deg, #1AE68A 0%, #6EF2B5 54%, #CCFCE5 100%);
           color: #160428;
           box-shadow: 0 14px 32px rgba(0, 184, 104, 0.22);
@@ -1831,10 +1829,10 @@ export default function TorneosView({
           gap: 13px;
         }
         .tt-torneos-view.is-dark .tt-season-progress-card {
-          background: linear-gradient(135deg, #103F30 0%, #1E0734 60%, #2D0C4F 100%);
+          background: linear-gradient(135deg, #103F30 0%, #1E0734 58%, #2D0C4F 100%);
           color: #FAF9F5;
           border: 1px solid rgba(0, 220, 125, 0.34);
-          box-shadow: 0 16px 36px rgba(8, 1, 18, 0.42);
+          box-shadow: var(--tt-card-specular), 0 16px 36px rgba(8, 1, 18, 0.42);
         }
         .tt-sp-top {
           display: flex;
@@ -1844,10 +1842,10 @@ export default function TorneosView({
         }
         .tt-sp-eyebrow {
           display: inline-block;
-          font-size: 0.66rem;
+          font-size: 0.65rem;
           font-weight: 900;
           letter-spacing: 0.1em;
-          opacity: 0.78;
+          opacity: 0.8;
         }
         .tt-torneos-view.is-dark .tt-sp-eyebrow {
           color: #00DC7D;
@@ -1858,7 +1856,7 @@ export default function TorneosView({
           font-family: var(--tt-font-display);
           font-style: italic;
           font-weight: 900;
-          font-size: clamp(1.55rem, 6vw, 2.15rem);
+          font-size: clamp(1.5rem, 5.8vw, 2.1rem);
           line-height: 0.98;
         }
         .tt-sp-pct-badge {
@@ -1868,16 +1866,17 @@ export default function TorneosView({
           color: #FAF9F5;
           text-align: center;
           flex-shrink: 0;
+          box-shadow: 0 6px 16px rgba(10, 2, 20, 0.25);
         }
         .tt-sp-pct-badge strong {
           display: block;
           font-family: var(--tt-font-display);
-          font-size: 1.25rem;
+          font-size: 1.24rem;
           line-height: 1;
           color: #00DC7D;
         }
         .tt-sp-pct-badge span {
-          font-size: 0.56rem;
+          font-size: 0.54rem;
           font-weight: 800;
           letter-spacing: 0.06em;
           opacity: 0.8;
@@ -1888,31 +1887,22 @@ export default function TorneosView({
           grid-template-columns: repeat(4, minmax(0, 1fr));
           gap: 7px;
         }
-        .tt-swing-step {
-          display: flex;
-          flex-direction: column;
-          gap: 3px;
-        }
+        .tt-swing-step { display: flex; flex-direction: column; gap: 3px; }
         .tt-swing-bar {
           height: 6px;
           border-radius: 999px;
           background: rgba(22, 4, 40, 0.16);
+          transition: transform 420ms ease;
         }
-        .tt-torneos-view.is-dark .tt-swing-bar {
-          background: rgba(250, 249, 245, 0.14);
-        }
-        .tt-swing-step.is-done .tt-swing-bar {
-          background: #1E0734;
-        }
-        .tt-torneos-view.is-dark .tt-swing-step.is-done .tt-swing-bar {
-          background: #00DC7D;
-        }
+        .tt-torneos-view.is-dark .tt-swing-bar { background: rgba(250, 249, 245, 0.14); }
+        .tt-swing-step.is-done .tt-swing-bar { background: #1E0734; }
+        .tt-torneos-view.is-dark .tt-swing-step.is-done .tt-swing-bar { background: #00DC7D; }
         .tt-swing-step.is-active .tt-swing-bar {
           background: linear-gradient(90deg, #F59E0B 0%, #00DC7D 100%);
-          box-shadow: 0 0 10px rgba(0, 220, 125, 0.65);
+          box-shadow: 0 0 12px rgba(0, 220, 125, 0.7);
         }
         .tt-swing-step strong {
-          font-size: 0.68rem;
+          font-size: 0.67rem;
           font-weight: 900;
           line-height: 1.1;
           white-space: nowrap;
@@ -1920,73 +1910,102 @@ export default function TorneosView({
           text-overflow: ellipsis;
         }
         .tt-swing-step span {
-          font-size: 0.6rem;
-          opacity: 0.72;
+          font-size: 0.59rem;
+          opacity: 0.74;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
         }
 
-        /* 2. SUB-TABS */
+        /* 2. SUB-TABS CON SLIDER ELÁSTICO QUE MUTA A ORO */
         .tt-tn-subtabs {
+          position: relative;
           display: grid;
           grid-template-columns: repeat(3, 1fr);
-          gap: 6px;
-          padding: 5px;
+          padding: 4px;
           border-radius: 18px;
           background: var(--tt-surface-2);
           border: 1px solid var(--tt-border);
+          box-shadow: var(--tt-card-specular);
+        }
+        .tt-tn-subtab-slider {
+          position: absolute;
+          top: 4px;
+          bottom: 4px;
+          left: 4px;
+          width: calc((100% - 8px) / 3);
+          border-radius: 13px;
+          background: linear-gradient(135deg, #00DC7D 0%, #00B365 100%);
+          box-shadow: 0 6px 16px rgba(0, 220, 125, 0.32);
+          transition:
+            transform 340ms cubic-bezier(0.22, 1.22, 0.36, 1),
+            background 360ms ease,
+            box-shadow 360ms ease;
+          pointer-events: none;
+          z-index: 0;
+        }
+        .tt-tn-subtab-slider.is-gold {
+          background: linear-gradient(135deg, #FEF08A 0%, #F59E0B 52%, #B45309 100%);
+          box-shadow: 0 6px 18px rgba(245, 158, 11, 0.42);
+        }
+        .tt-torneos-view.is-light .tt-tn-subtab-slider:not(.is-gold) {
+          background: #1E0734;
+          box-shadow: 0 6px 16px rgba(30, 7, 52, 0.22);
         }
         .tt-tn-subtab {
-          min-height: 42px;
+          position: relative;
+          z-index: 1;
+          min-height: 41px;
           border-radius: 13px;
-          font-size: 0.78rem;
+          font-size: 0.77rem;
           font-weight: 800;
           color: var(--tt-text-muted);
-          transition: background-color 180ms ease, color 180ms ease, transform 120ms ease;
+          transition: color 220ms ease, transform 140ms ease;
         }
-        .tt-tn-subtab:active {
-          transform: scale(0.97);
-        }
+        .tt-tn-subtab:active { transform: scale(0.96); }
         .tt-tn-subtab.is-active {
-          background: #1E0734;
+          color: #10021E;
+          font-weight: 900;
+        }
+        .tt-torneos-view.is-light .tt-tn-subtab.is-active:not(.is-gold) {
           color: #00DC7D;
-          box-shadow: 0 6px 16px rgba(10, 2, 20, 0.22);
         }
-        .tt-torneos-view.is-dark .tt-tn-subtab.is-active {
-          background: linear-gradient(135deg, #00DC7D 0%, #00B868 100%);
-          color: #120321;
-        }
-        .tt-torneos-view.is-dark .tt-tn-subtab.is-gold.is-active {
-          background: linear-gradient(135deg, #FBBF24 0%, #D97706 100%);
-          color: #1E1102;
+        .tt-tn-subtab.is-gold.is-active {
+          color: #1A0D00;
         }
 
-        .tt-tn-stack {
-          display: flex;
-          flex-direction: column;
-          gap: 14px;
+        .tt-tn-stack { display: flex; flex-direction: column; gap: 14px; }
+        .tt-tn-panel-reveal {
+          animation: ttTnReveal 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+        .tt-tn-master-reveal {
+          animation: ttMasterDramatic 460ms cubic-bezier(0.22, 1.12, 0.36, 1) both;
+        }
+        @keyframes ttTnReveal {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes ttMasterDramatic {
+          from { opacity: 0; transform: scale(0.97) translateY(12px); }
+          to { opacity: 1; transform: scale(1) translateY(0); }
         }
 
-        /* 3. FICHAS DE TORNEOS ACTIVOS */
-        .tt-tournaments-grid {
-          display: grid;
-          grid-template-columns: 1fr;
-          gap: 14px;
-        }
+        /* 3. FICHAS DE TORNEOS */
+        .tt-tournaments-grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
         @media (min-width: 760px) {
-          .tt-tournaments-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-          }
+          .tt-tournaments-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
         .tt-tcard {
           border-radius: 24px;
           overflow: hidden;
           background: var(--tt-surface);
           border: 1px solid var(--tt-border);
-          box-shadow: var(--tt-shadow-sm);
+          box-shadow: var(--tt-card-specular), var(--tt-shadow-sm);
           display: flex;
           flex-direction: column;
+          animation: ttTnReveal 400ms cubic-bezier(0.22, 1, 0.36, 1) both;
+          animation-delay: var(--tn-delay, 0ms);
+          transition: transform 240ms cubic-bezier(0.22, 1.2, 0.36, 1), border-color 220ms ease;
         }
         .tt-tcard-hero {
           position: relative;
@@ -1997,6 +2016,7 @@ export default function TorneosView({
           justify-content: space-between;
           padding: 13px 14px;
           background: #1A0530;
+          overflow: hidden;
         }
         .tt-tcard-img {
           position: absolute;
@@ -2004,7 +2024,9 @@ export default function TorneosView({
           width: 100%;
           height: 100%;
           object-fit: cover;
+          transition: transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
         }
+        .tt-tcard:hover .tt-tcard-img { transform: scale(1.04); }
         .tt-tcard-scrim {
           position: absolute;
           inset: 0;
@@ -2031,24 +2053,10 @@ export default function TorneosView({
           font-weight: 900;
           letter-spacing: 0.06em;
         }
-        .tt-tcard-status.is-live {
-          background: #00DC7D;
-          color: #120321;
-        }
-        .tt-tcard-status.is-open {
-          background: #F59E0B;
-          color: #1E1102;
-        }
-        .tt-tcard-status.is-soon {
-          background: rgba(250, 249, 245, 0.18);
-          color: #FAF9F5;
-          backdrop-filter: blur(8px);
-        }
-        .tt-tcard-status.is-done {
-          background: rgba(148, 163, 184, 0.28);
-          color: #FAF9F5;
-        }
-        /* Fecha Verde Menta sobre píldora oscura (alto contraste garantizado) */
+        .tt-tcard-status.is-live { background: #00DC7D; color: #120321; }
+        .tt-tcard-status.is-open { background: #F59E0B; color: #1E1102; }
+        .tt-tcard-status.is-soon { background: rgba(250, 249, 245, 0.18); color: #FAF9F5; backdrop-filter: blur(8px); }
+        .tt-tcard-status.is-done { background: rgba(148, 163, 184, 0.28); color: #FAF9F5; }
         .tt-tcard-date-dark {
           padding: 4px 10px;
           border-radius: 999px;
@@ -2067,13 +2075,7 @@ export default function TorneosView({
           justify-content: space-between;
           gap: 10px;
         }
-        .tt-tcard-surface {
-          display: block;
-          font-size: 0.68rem;
-          font-weight: 700;
-          color: #7CF5C0;
-          margin-bottom: 2px;
-        }
+        .tt-tcard-surface { display: block; font-size: 0.68rem; font-weight: 700; color: #7CF5C0; margin-bottom: 2px; }
         .tt-tcard-title {
           margin: 0;
           font-family: var(--tt-font-display);
@@ -2092,18 +2094,8 @@ export default function TorneosView({
           overflow: hidden;
           flex-shrink: 0;
         }
-
-        .tt-tcard-body {
-          padding: 14px;
-          display: flex;
-          flex-direction: column;
-          gap: 11px;
-        }
-        .tt-tcard-specs-row {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 6px;
-        }
+        .tt-tcard-body { padding: 14px; display: flex; flex-direction: column; gap: 11px; }
+        .tt-tcard-specs-row { display: flex; flex-wrap: wrap; gap: 6px; }
         .tt-spec-chip {
           padding: 4px 9px;
           border-radius: 999px;
@@ -2113,54 +2105,22 @@ export default function TorneosView({
           font-weight: 700;
           color: var(--tt-text-muted);
         }
-        .tt-spec-chip.is-price {
-          background: rgba(245, 158, 11, 0.16);
-          border-color: rgba(245, 158, 11, 0.45);
-          color: #F59E0B;
-          font-weight: 900;
-        }
-        .tt-spec-chip.is-ok {
-          background: rgba(0, 220, 125, 0.14);
-          border-color: rgba(0, 220, 125, 0.42);
-          color: #00DC7D;
-        }
-        .tt-torneos-view.is-light .tt-spec-chip.is-ok {
-          color: #008A4E;
-        }
-        .tt-spec-chip.is-silver {
-          background: rgba(56, 189, 248, 0.14);
-          border-color: rgba(56, 189, 248, 0.36);
-          color: #38BDF8;
-        }
+        .tt-spec-chip.is-price { background: rgba(245, 158, 11, 0.16); border-color: rgba(245, 158, 11, 0.45); color: #D97706; font-weight: 900; }
+        .tt-torneos-view.is-dark .tt-spec-chip.is-price { color: #FBBF24; }
+        .tt-spec-chip.is-ok { background: rgba(0, 220, 125, 0.14); border-color: rgba(0, 220, 125, 0.42); color: var(--tt-emerald-text); }
+        .tt-spec-chip.is-silver { background: rgba(56, 189, 248, 0.14); border-color: rgba(56, 189, 248, 0.36); color: #0284C7; }
+        .tt-torneos-view.is-dark .tt-spec-chip.is-silver { color: #38BDF8; }
 
-        .tt-spots-box {
-          display: flex;
-          flex-direction: column;
-          gap: 5px;
-        }
-        .tt-spots-head {
-          display: flex;
-          justify-content: space-between;
-          gap: 8px;
-          font-size: 0.72rem;
-          color: var(--tt-text-muted);
-          flex-wrap: wrap;
-        }
-        .tt-spots-head strong {
-          color: var(--tt-text);
-        }
-        .tt-spots-track {
-          height: 7px;
-          border-radius: 999px;
-          background: var(--tt-surface-2);
-          overflow: hidden;
-        }
+        .tt-spots-box { display: flex; flex-direction: column; gap: 5px; }
+        .tt-spots-head { display: flex; justify-content: space-between; gap: 8px; font-size: 0.72rem; color: var(--tt-text-muted); flex-wrap: wrap; }
+        .tt-spots-head strong { color: var(--tt-text); }
+        .tt-spots-track { height: 7px; border-radius: 999px; background: var(--tt-surface-2); overflow: hidden; }
         .tt-spots-fill {
           height: 100%;
           border-radius: 999px;
           background: linear-gradient(90deg, #00DC7D 0%, #F59E0B 100%);
+          transition: width 550ms cubic-bezier(0.22, 1, 0.36, 1);
         }
-
         .tt-tcard-prize-strip {
           display: flex;
           align-items: center;
@@ -2172,13 +2132,7 @@ export default function TorneosView({
           font-weight: 700;
           color: var(--tt-text);
         }
-
-        .tt-tcard-actions {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          flex-wrap: wrap;
-        }
+        .tt-tcard-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
         .tt-enrolled-pill,
         .tt-verifying-pill {
           min-height: 40px;
@@ -2190,22 +2144,12 @@ export default function TorneosView({
           font-size: 0.76rem;
           font-weight: 800;
         }
-        .tt-enrolled-pill {
-          background: rgba(0, 220, 125, 0.16);
-          border: 1px solid rgba(0, 220, 125, 0.45);
-          color: #00DC7D;
-        }
-        .tt-torneos-view.is-light .tt-enrolled-pill {
-          background: #1E0734;
-          color: #00DC7D;
-        }
-        .tt-verifying-pill {
-          background: rgba(245, 158, 11, 0.16);
-          border: 1px solid rgba(245, 158, 11, 0.45);
-          color: #F59E0B;
-        }
+        .tt-enrolled-pill { background: rgba(0, 220, 125, 0.16); border: 1px solid rgba(0, 220, 125, 0.45); color: #00DC7D; }
+        .tt-torneos-view.is-light .tt-enrolled-pill { background: #1E0734; color: #00DC7D; }
+        .tt-verifying-pill { background: rgba(245, 158, 11, 0.16); border: 1px solid rgba(245, 158, 11, 0.45); color: #D97706; }
+        .tt-torneos-view.is-dark .tt-verifying-pill { color: #FBBF24; }
 
-        /* 4. MASTER TOP 8 FINALS (SOLO LECTURA POR MÉRITO) */
+        /* 4. MASTER TOP 8 */
         .tt-master-hero {
           position: relative;
           border-radius: 26px;
@@ -2213,41 +2157,21 @@ export default function TorneosView({
           padding: 18px;
           background: #1A0530;
           color: #FAF9F5;
-          border: 1.5px solid rgba(245, 158, 11, 0.42);
+          border: 1.5px solid rgba(245, 158, 11, 0.48);
+          box-shadow: 0 18px 42px rgba(245, 158, 11, 0.16);
           display: flex;
           flex-direction: column;
           gap: 15px;
         }
-        .tt-master-hero-bg {
-          position: absolute;
-          inset: 0;
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-          opacity: 0.52;
-        }
+        .tt-master-hero-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.52; }
         .tt-master-hero-scrim {
           position: absolute;
           inset: 0;
-          background: linear-gradient(
-            135deg,
-            rgba(22, 4, 40, 0.94) 0%,
-            rgba(30, 7, 52, 0.72) 55%,
-            rgba(16, 3, 29, 0.96) 100%
-          );
+          background: linear-gradient(135deg, rgba(22, 4, 40, 0.94) 0%, rgba(30, 7, 52, 0.72) 55%, rgba(16, 3, 29, 0.96) 100%);
         }
-        .tt-master-hero-grid {
-          position: relative;
-          z-index: 2;
-          display: grid;
-          grid-template-columns: 1fr;
-          gap: 14px;
-        }
+        .tt-master-hero-grid { position: relative; z-index: 2; display: grid; grid-template-columns: 1fr; gap: 14px; }
         @media (min-width: 720px) {
-          .tt-master-hero-grid {
-            grid-template-columns: 1.25fr 1fr;
-            align-items: center;
-          }
+          .tt-master-hero-grid { grid-template-columns: 1.25fr 1fr; align-items: center; }
         }
         .tt-master-exclusive-pill {
           display: inline-flex;
@@ -2256,7 +2180,7 @@ export default function TorneosView({
           padding: 5px 11px;
           border-radius: 999px;
           background: rgba(245, 158, 11, 0.22);
-          border: 1px solid rgba(245, 158, 11, 0.58);
+          border: 1px solid rgba(245, 158, 11, 0.6);
           color: #FDE68A;
           font-size: 0.66rem;
           font-weight: 900;
@@ -2272,74 +2196,31 @@ export default function TorneosView({
           line-height: 0.98;
           color: #FAF9F5;
         }
-        .tt-master-lead {
-          margin: 8px 0 0;
-          font-size: 0.82rem;
-          line-height: 1.45;
-          color: rgba(250, 249, 245, 0.84);
-        }
-
-        /* Ficha Blanca Flotante Derecha */
+        .tt-master-lead { margin: 8px 0 0; font-size: 0.82rem; line-height: 1.45; color: rgba(250, 249, 245, 0.84); }
         .tt-master-float-card {
           border-radius: 20px;
           padding: 14px;
           background: #FAF9F5;
           color: #1E0734;
-          box-shadow: 0 16px 34px rgba(0, 0, 0, 0.42);
+          box-shadow: 0 18px 36px rgba(0, 0, 0, 0.44);
           display: flex;
           flex-direction: column;
           gap: 10px;
+          animation: ttFloatCardIn 500ms cubic-bezier(0.22, 1.18, 0.36, 1) both;
         }
-        .tt-mfc-head {
-          display: flex;
-          align-items: center;
-          gap: 10px;
+        @keyframes ttFloatCardIn {
+          from { opacity: 0; transform: translateY(14px) scale(0.96); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
         }
-        .tt-mfc-head strong {
-          display: block;
-          font-family: var(--tt-font-display);
-          font-size: 1.15rem;
-          line-height: 1;
-        }
-        .tt-mfc-head span {
-          font-size: 0.68rem;
-          font-weight: 800;
-          color: rgba(30, 7, 52, 0.64);
-          letter-spacing: 0.06em;
-        }
-        .tt-mfc-meta {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 8px;
-          padding: 9px;
-          border-radius: 13px;
-          background: rgba(30, 7, 52, 0.06);
-        }
-        .tt-mfc-meta span {
-          display: block;
-          font-size: 0.6rem;
-          font-weight: 800;
-          color: rgba(30, 7, 52, 0.56);
-        }
-        .tt-mfc-meta strong {
-          font-size: 0.78rem;
-          font-weight: 900;
-        }
-        .tt-mfc-readonly {
-          font-size: 0.68rem;
-          font-weight: 700;
-          color: rgba(30, 7, 52, 0.66);
-          text-align: center;
-        }
+        .tt-mfc-head { display: flex; align-items: center; gap: 10px; }
+        .tt-mfc-head strong { display: block; font-family: var(--tt-font-display); font-size: 1.15rem; line-height: 1; }
+        .tt-mfc-head span { font-size: 0.68rem; font-weight: 800; color: rgba(30, 7, 52, 0.64); letter-spacing: 0.06em; }
+        .tt-mfc-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 9px; border-radius: 13px; background: rgba(30, 7, 52, 0.06); }
+        .tt-mfc-meta span { display: block; font-size: 0.6rem; font-weight: 800; color: rgba(30, 7, 52, 0.56); }
+        .tt-mfc-meta strong { font-size: 0.78rem; font-weight: 900; }
+        .tt-mfc-readonly { font-size: 0.68rem; font-weight: 700; color: rgba(30, 7, 52, 0.68); text-align: center; }
 
-        .tt-master-pills-bar {
-          position: relative;
-          z-index: 2;
-          display: flex;
-          gap: 7px;
-          overflow-x: auto;
-          padding-bottom: 2px;
-        }
+        .tt-master-pills-bar { position: relative; z-index: 2; display: flex; gap: 7px; overflow-x: auto; padding-bottom: 2px; }
         .tt-master-pill {
           flex-shrink: 0;
           min-height: 36px;
@@ -2350,23 +2231,13 @@ export default function TorneosView({
           color: #FAF9F5;
           font-size: 0.74rem;
           font-weight: 800;
+          transition: all 200ms ease;
         }
-        .tt-master-pill.is-active {
-          background: #00DC7D;
-          border-color: #00DC7D;
-          color: #120321;
-        }
+        .tt-master-pill.is-active { background: #F59E0B; border-color: #FEF08A; color: #1A0D00; }
 
-        /* 3 Tarjetas de Formato sobre Marfil */
-        .tt-master-phases-grid {
-          display: grid;
-          grid-template-columns: 1fr;
-          gap: 11px;
-        }
+        .tt-master-phases-grid { display: grid; grid-template-columns: 1fr; gap: 11px; }
         @media (min-width: 720px) {
-          .tt-master-phases-grid {
-            grid-template-columns: repeat(3, 1fr);
-          }
+          .tt-master-phases-grid { grid-template-columns: repeat(3, 1fr); }
         }
         .tt-phase-card {
           border-radius: 20px;
@@ -2377,124 +2248,33 @@ export default function TorneosView({
           display: flex;
           flex-direction: column;
           gap: 6px;
+          animation: ttTnReveal 400ms cubic-bezier(0.22, 1, 0.36, 1) both;
+          animation-delay: var(--tn-delay, 0ms);
         }
-        .tt-phase-num {
-          align-self: flex-start;
-          padding: 3px 9px;
-          border-radius: 999px;
-          background: #1E0734;
-          color: #00DC7D;
-          font-size: 0.64rem;
-          font-weight: 900;
-          letter-spacing: 0.08em;
-        }
-        .tt-phase-card h3 {
-          margin: 2px 0 0;
-          font-size: 0.94rem;
-          font-weight: 900;
-        }
-        .tt-phase-card p {
-          margin: 0;
-          font-size: 0.77rem;
-          line-height: 1.45;
-          color: rgba(30, 7, 52, 0.75);
-        }
+        .tt-phase-num { align-self: flex-start; padding: 3px 9px; border-radius: 999px; background: #1E0734; color: #00DC7D; font-size: 0.64rem; font-weight: 900; letter-spacing: 0.08em; }
+        .tt-phase-card h3 { margin: 2px 0 0; font-size: 0.94rem; font-weight: 900; }
+        .tt-phase-card p { margin: 0; font-size: 0.77rem; line-height: 1.45; color: rgba(30, 7, 52, 0.76); }
 
-        /* Grupos A y B */
-        .tt-master-groups-grid {
-          display: grid;
-          grid-template-columns: 1fr;
-          gap: 12px;
-        }
+        .tt-master-groups-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
         @media (min-width: 720px) {
-          .tt-master-groups-grid {
-            grid-template-columns: 1fr 1fr;
-          }
+          .tt-master-groups-grid { grid-template-columns: 1fr 1fr; }
         }
-        .tt-group-card {
-          border-radius: 20px;
-          background: var(--tt-surface);
-          border: 1px solid var(--tt-border);
-          overflow: hidden;
-        }
-        .tt-group-card-head {
-          padding: 12px 14px;
-          background: #1E0734;
-          color: #FAF9F5;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 8px;
-        }
-        .tt-group-card-head strong {
-          font-size: 0.8rem;
-          letter-spacing: 0.06em;
-          color: #00DC7D;
-        }
-        .tt-group-card-head span {
-          font-size: 0.68rem;
-          opacity: 0.76;
-        }
-        .tt-group-rows {
-          display: flex;
-          flex-direction: column;
-        }
-        .tt-group-row {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          padding: 11px 13px;
-          border-bottom: 1px solid var(--tt-border);
-          cursor: pointer;
-        }
-        .tt-group-row:last-child {
-          border-bottom: none;
-        }
-        .tt-group-row.is-advancing {
-          box-shadow: inset 3px 0 0 #00DC7D;
-        }
-        .tt-group-seed {
-          font-family: var(--tt-font-display);
-          font-size: 1.15rem;
-          font-weight: 900;
-          min-width: 26px;
-          color: #F59E0B;
-        }
-        .tt-group-row strong {
-          display: block;
-          font-size: 0.86rem;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-        .tt-group-row small {
-          display: block;
-          font-size: 0.7rem;
-          color: var(--tt-text-muted);
-        }
-        .tt-group-pts {
-          text-align: right;
-          flex-shrink: 0;
-        }
-        .tt-group-pts strong {
-          font-family: var(--tt-font-display);
-          font-size: 1.05rem;
-          color: #00DC7D;
-        }
-        .tt-torneos-view.is-light .tt-group-pts strong {
-          color: #1E0734;
-        }
-        .tt-group-pts span {
-          font-size: 0.56rem;
-          font-weight: 800;
-          color: var(--tt-text-muted);
-        }
+        .tt-group-card { border-radius: 20px; background: var(--tt-surface); border: 1px solid var(--tt-border); overflow: hidden; box-shadow: var(--tt-card-specular), var(--tt-shadow-sm); }
+        .tt-group-card-head { padding: 12px 14px; background: #1E0734; color: #FAF9F5; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+        .tt-group-card-head strong { font-size: 0.8rem; letter-spacing: 0.06em; color: #FDE68A; }
+        .tt-group-card-head span { font-size: 0.68rem; opacity: 0.78; }
+        .tt-group-rows { display: flex; flex-direction: column; }
+        .tt-group-row { display: flex; align-items: center; gap: 10px; padding: 11px 13px; border-bottom: 1px solid var(--tt-border); cursor: pointer; }
+        .tt-group-row:last-child { border-bottom: none; }
+        .tt-group-row.is-advancing { box-shadow: inset 3px 0 0 #00DC7D; }
+        .tt-group-seed { font-family: var(--tt-font-display); font-size: 1.15rem; font-weight: 900; min-width: 26px; color: #F59E0B; }
+        .tt-group-row strong { display: block; font-size: 0.86rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .tt-group-row small { display: block; font-size: 0.7rem; color: var(--tt-text-muted); }
+        .tt-group-pts { text-align: right; flex-shrink: 0; }
+        .tt-group-pts strong { font-family: var(--tt-font-display); font-size: 1.05rem; color: var(--tt-emerald-text); }
+        .tt-group-pts span { font-size: 0.56rem; font-weight: 800; color: var(--tt-text-muted); }
 
-        .tt-master-q-list {
-          display: flex;
-          flex-direction: column;
-          gap: 9px;
-        }
+        .tt-master-q-list { display: flex; flex-direction: column; gap: 9px; }
         .tt-master-q-row {
           display: flex;
           align-items: center;
@@ -2503,129 +2283,47 @@ export default function TorneosView({
           border-radius: 17px;
           background: var(--tt-surface);
           border: 1px solid var(--tt-border);
+          box-shadow: var(--tt-card-specular), var(--tt-shadow-sm);
           cursor: pointer;
+          animation: ttTnReveal 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+          animation-delay: var(--tn-delay, 0ms);
         }
-        .tt-master-q-num {
-          font-family: var(--tt-font-display);
-          font-size: 1.35rem;
-          font-weight: 900;
-          color: #00DC7D;
-          min-width: 30px;
-        }
-        .tt-torneos-view.is-light .tt-master-q-num {
-          color: #1E0734;
-        }
-        .tt-master-q-row strong {
-          display: block;
-          font-size: 0.9rem;
-        }
-        .tt-master-q-row small {
-          font-size: 0.72rem;
-          color: var(--tt-text-muted);
-        }
-        .tt-master-q-pts {
-          text-align: right;
-        }
-        .tt-master-q-pts strong {
-          font-family: var(--tt-font-display);
-          font-size: 1.2rem;
-          color: #F59E0B;
-        }
-        .tt-master-q-pts span {
-          font-size: 0.58rem;
-          font-weight: 800;
-          color: var(--tt-text-muted);
-        }
+        .tt-master-q-num { font-family: var(--tt-font-display); font-size: 1.32rem; font-weight: 900; color: #F59E0B; min-width: 30px; }
+        .tt-master-q-row strong { display: block; font-size: 0.9rem; }
+        .tt-master-q-row small { font-size: 0.72rem; color: var(--tt-text-muted); }
+        .tt-master-q-pts { text-align: right; }
+        .tt-master-q-pts strong { font-family: var(--tt-font-display); font-size: 1.18rem; color: #F59E0B; }
+        .tt-torneos-view.is-light .tt-master-q-pts strong { color: #B45309; }
+        .tt-master-q-pts span { font-size: 0.56rem; font-weight: 800; color: var(--tt-text-muted); }
 
-        .tt-master-rewards-wrap {
-          display: grid;
-          grid-template-columns: 1fr;
-          gap: 12px;
-        }
+        .tt-master-rewards-wrap { display: grid; grid-template-columns: 1fr; gap: 12px; }
         @media (min-width: 720px) {
-          .tt-master-rewards-wrap {
-            grid-template-columns: 1fr 1fr;
-          }
+          .tt-master-rewards-wrap { grid-template-columns: 1fr 1fr; }
         }
-        .tt-mr-card {
-          border-radius: 20px;
-          padding: 15px;
-          background: var(--tt-surface);
-          border: 1px solid var(--tt-border);
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-        .tt-mr-card.is-annual {
-          border-color: rgba(245, 158, 11, 0.48);
-        }
-        .tt-mr-kicker {
-          font-size: 0.64rem;
-          font-weight: 900;
-          letter-spacing: 0.08em;
-          color: #00DC7D;
-        }
-        .tt-mr-kicker.is-gold {
-          color: #F59E0B;
-        }
-        .tt-mr-card h3 {
-          margin: 0;
-          font-size: 0.98rem;
-        }
-        .tt-mr-card p {
-          margin: 0;
-          font-size: 0.76rem;
-          color: var(--tt-text-muted);
-        }
-        .tt-mr-podium {
-          display: flex;
-          flex-direction: column;
-          gap: 7px;
-        }
-        .tt-mr-item {
-          padding: 9px 11px;
-          border-radius: 13px;
-          background: var(--tt-surface-2);
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
-          font-size: 0.76rem;
-        }
+        .tt-mr-card { border-radius: 20px; padding: 15px; background: var(--tt-surface); border: 1px solid var(--tt-border); display: flex; flex-direction: column; gap: 8px; }
+        .tt-mr-card.is-annual { border-color: rgba(245, 158, 11, 0.48); }
+        .tt-mr-kicker { font-size: 0.64rem; font-weight: 900; letter-spacing: 0.08em; color: var(--tt-emerald-text); }
+        .tt-mr-kicker.is-gold { color: #F59E0B; }
+        .tt-mr-card h3 { margin: 0; font-size: 0.98rem; }
+        .tt-mr-card p { margin: 0; font-size: 0.76rem; color: var(--tt-text-muted); }
+        .tt-mr-podium { display: flex; flex-direction: column; gap: 7px; }
+        .tt-mr-item { padding: 9px 11px; border-radius: 13px; background: var(--tt-surface-2); display: flex; flex-direction: column; gap: 2px; font-size: 0.76rem; }
 
-        /* 5. SALÓN DE LA FAMA — TARJETAS HORIZONTALES WINNER ESMERALDA */
+        /* 5. SALÓN DE LA FAMA */
         .tt-hof-intro {
           border-radius: 20px;
           padding: 15px;
           background: var(--tt-surface);
           border: 1px solid rgba(245, 158, 11, 0.35);
+          box-shadow: var(--tt-card-specular), var(--tt-shadow-sm);
           display: flex;
           align-items: flex-start;
           gap: 12px;
         }
-        .tt-hof-kicker {
-          display: block;
-          font-size: 0.64rem;
-          font-weight: 900;
-          letter-spacing: 0.09em;
-          color: #F59E0B;
-        }
-        .tt-hof-title {
-          margin: 2px 0 0;
-          font-family: var(--tt-font-display);
-          font-size: 1.28rem;
-          line-height: 1.08;
-        }
-        .tt-hof-sub {
-          margin: 4px 0 0;
-          font-size: 0.78rem;
-          color: var(--tt-text-muted);
-        }
-        .tt-hof-filters {
-          display: flex;
-          gap: 7px;
-          overflow-x: auto;
-          padding-bottom: 2px;
-        }
+        .tt-hof-kicker { display: block; font-size: 0.64rem; font-weight: 900; letter-spacing: 0.09em; color: #F59E0B; }
+        .tt-hof-title { margin: 2px 0 0; font-family: var(--tt-font-display); font-size: 1.28rem; line-height: 1.08; }
+        .tt-hof-sub { margin: 4px 0 0; font-size: 0.78rem; color: var(--tt-text-muted); }
+        .tt-hof-filters { display: flex; gap: 7px; overflow-x: auto; padding-bottom: 2px; }
         .tt-hof-chip {
           flex-shrink: 0;
           min-height: 34px;
@@ -2637,18 +2335,9 @@ export default function TorneosView({
           border: 1px solid var(--tt-border);
           color: var(--tt-text-muted);
         }
-        .tt-hof-chip.is-active {
-          background: #1E0734;
-          border-color: #00DC7D;
-          color: #00DC7D;
-          font-weight: 800;
-        }
+        .tt-hof-chip.is-active { background: #1E0734; border-color: #00DC7D; color: #00DC7D; font-weight: 800; }
 
-        .tt-hof-cards-list {
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
+        .tt-hof-cards-list { display: flex; flex-direction: column; gap: 12px; }
         .tt-winner-row-card {
           border-radius: 22px;
           overflow: hidden;
@@ -2657,115 +2346,37 @@ export default function TorneosView({
           display: grid;
           grid-template-columns: 1fr;
           box-shadow: 0 12px 28px rgba(10, 2, 20, 0.28);
+          animation: ttHofSlide 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+          animation-delay: var(--tn-delay, 0ms);
+        }
+        @keyframes ttHofSlide {
+          from { opacity: 0; transform: translateX(-10px); }
+          to { opacity: 1; transform: translateX(0); }
         }
         @media (min-width: 680px) {
-          .tt-winner-row-card {
-            grid-template-columns: 82px 1.2fr 1.05fr;
-          }
+          .tt-winner-row-card { grid-template-columns: 82px 1.2fr 1.05fr; }
         }
-        .tt-wr-date-col {
-          padding: 12px 10px;
-          background: #1A0530;
-          color: #FAF9F5;
-          display: flex;
-          flex-direction: row;
-          align-items: center;
-          justify-content: space-between;
-          gap: 6px;
-        }
+        .tt-wr-date-col { padding: 12px 10px; background: #1A0530; color: #FAF9F5; display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 6px; }
         @media (min-width: 680px) {
-          .tt-wr-date-col {
-            flex-direction: column;
-            justify-content: center;
-            text-align: center;
-          }
+          .tt-wr-date-col { flex-direction: column; justify-content: center; text-align: center; }
         }
-        .tt-wr-date-col strong {
-          font-family: var(--tt-font-display);
-          font-size: 1.05rem;
-          line-height: 1;
-        }
-        .tt-wr-date-col span {
-          font-size: 0.76rem;
-          font-weight: 900;
-          color: #00DC7D;
-          letter-spacing: 0.08em;
-        }
-        .tt-wr-date-col small {
-          font-size: 0.68rem;
-          opacity: 0.68;
-        }
+        .tt-wr-date-col strong { font-family: var(--tt-font-display); font-size: 1.05rem; line-height: 1; }
+        .tt-wr-date-col span { font-size: 0.76rem; font-weight: 900; color: #00DC7D; letter-spacing: 0.08em; }
+        .tt-wr-date-col small { font-size: 0.68rem; opacity: 0.68; }
+        .tt-wr-center-col { padding: 14px; background: #FAF9F5; color: #1E0734; display: flex; flex-direction: column; justify-content: center; gap: 5px; }
+        .tt-wr-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+        .tt-wr-cat-pill { padding: 2px 8px; border-radius: 999px; background: #1E0734; color: #FAF9F5; font-size: 0.64rem; font-weight: 800; }
+        .tt-wr-surf-pill { padding: 2px 8px; border-radius: 999px; background: rgba(200, 90, 50, 0.14); color: #B44924; font-size: 0.64rem; font-weight: 900; }
+        .tt-wr-season { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.07em; color: rgba(30, 7, 52, 0.56); }
+        .tt-wr-tourney-name { margin: 0; font-family: var(--tt-font-display); font-size: 1.15rem; font-weight: 900; line-height: 1.08; }
+        .tt-wr-record-strip { margin-top: 4px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 0.66rem; font-weight: 900; }
+        .tt-wr-record-strip .is-wins { padding: 3px 8px; border-radius: 7px; background: #00DC7D; color: #120321; }
+        .tt-wr-record-strip .is-losses { padding: 3px 8px; border-radius: 7px; background: rgba(30, 7, 52, 0.1); color: rgba(30, 7, 52, 0.72); }
+        .tt-wr-record-strip .is-eff { color: #007A44; }
 
-        .tt-wr-center-col {
-          padding: 14px;
-          background: #FAF9F5;
-          color: #1E0734;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          gap: 5px;
-        }
-        .tt-wr-badges {
-          display: flex;
-          gap: 6px;
-          flex-wrap: wrap;
-        }
-        .tt-wr-cat-pill {
-          padding: 2px 8px;
-          border-radius: 999px;
-          background: #1E0734;
-          color: #FAF9F5;
-          font-size: 0.64rem;
-          font-weight: 800;
-        }
-        .tt-wr-surf-pill {
-          padding: 2px 8px;
-          border-radius: 999px;
-          background: rgba(200, 90, 50, 0.14);
-          color: #B44924;
-          font-size: 0.64rem;
-          font-weight: 900;
-        }
-        .tt-wr-season {
-          font-size: 0.65rem;
-          font-weight: 800;
-          letter-spacing: 0.07em;
-          color: rgba(30, 7, 52, 0.56);
-        }
-        .tt-wr-tourney-name {
-          margin: 0;
-          font-family: var(--tt-font-display);
-          font-size: 1.15rem;
-          font-weight: 900;
-          line-height: 1.08;
-        }
-        .tt-wr-record-strip {
-          margin-top: 4px;
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          flex-wrap: wrap;
-          font-size: 0.66rem;
-          font-weight: 900;
-        }
-        .tt-wr-record-strip .is-wins {
-          padding: 3px 8px;
-          border-radius: 7px;
-          background: #00DC7D;
-          color: #120321;
-        }
-        .tt-wr-record-strip .is-losses {
-          padding: 3px 8px;
-          border-radius: 7px;
-          background: rgba(30, 7, 52, 0.1);
-          color: rgba(30, 7, 52, 0.72);
-        }
-        .tt-wr-record-strip .is-eff {
-          color: #008A4E;
-        }
-
-        /* Módulo Derecho Integrado WINNER Esmeralda */
         .tt-wr-emerald-col {
+          position: relative;
+          overflow: hidden;
           padding: 13px 14px;
           background: linear-gradient(135deg, #00DC7D 0%, #6EF2B5 100%);
           color: #120321;
@@ -2774,35 +2385,23 @@ export default function TorneosView({
           justify-content: space-between;
           gap: 10px;
         }
-        .tt-wr-winner-text {
-          min-width: 0;
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
+        .tt-wr-emerald-sheen {
+          position: absolute;
+          inset: -30%;
+          background: linear-gradient(112deg, transparent 42%, rgba(255, 255, 255, 0.34) 50%, transparent 58%);
+          transform: translateX(-110%);
+          animation: ttWinnerSheen 6s ease-in-out infinite;
+          pointer-events: none;
         }
-        .tt-wr-winner-tag {
-          font-size: 0.62rem;
-          font-weight: 900;
-          letter-spacing: 0.14em;
-          opacity: 0.72;
+        @keyframes ttWinnerSheen {
+          0%, 66% { transform: translateX(-110%); }
+          100% { transform: translateX(120%); }
         }
-        .tt-wr-surname {
-          font-family: var(--tt-font-display);
-          font-size: 1.38rem;
-          font-weight: 900;
-          line-height: 0.96;
-          color: #120321;
-        }
-        .tt-wr-fullname {
-          font-size: 0.72rem;
-          font-weight: 700;
-          opacity: 0.82;
-        }
-        .tt-wr-circle-actions {
-          margin-top: 6px;
-          display: flex;
-          gap: 7px;
-        }
+        .tt-wr-winner-text { position: relative; z-index: 2; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+        .tt-wr-winner-tag { font-size: 0.62rem; font-weight: 900; letter-spacing: 0.14em; opacity: 0.74; }
+        .tt-wr-surname { font-family: var(--tt-font-display); font-size: 1.38rem; font-weight: 900; line-height: 0.96; color: #120321; }
+        .tt-wr-fullname { font-size: 0.72rem; font-weight: 700; opacity: 0.84; }
+        .tt-wr-circle-actions { margin-top: 6px; display: flex; gap: 7px; }
         .tt-wr-circle-btn {
           width: 32px;
           height: 32px;
@@ -2813,23 +2412,15 @@ export default function TorneosView({
           align-items: center;
           justify-content: center;
           box-shadow: 0 4px 10px rgba(18, 3, 33, 0.25);
+          transition: transform 160ms cubic-bezier(0.22, 1.4, 0.36, 1);
         }
-        .tt-wr-portrait-box {
-          flex-shrink: 0;
-        }
+        .tt-wr-circle-btn:active { transform: scale(0.88); }
+        .tt-wr-portrait-box { position: relative; z-index: 2; flex-shrink: 0; }
 
-        /* 6. MODAL DEL TORNEO (CUADROS, OCTAVOS, CONSUELO Y COLLAGE PREMIOS) */
-        .tt-tmodal-wrap {
-          display: flex;
-          flex-direction: column;
-          gap: 14px;
-        }
-        .tt-tmodal-tabs {
-          display: flex;
-          gap: 6px;
-          overflow-x: auto;
-          padding-bottom: 2px;
-        }
+        /* 6. MODALES TORNEO & PAGO */
+        .tt-tmodal-wrap { display: flex; flex-direction: column; gap: 14px; }
+        .tt-tmodal-tabs,
+        .tt-rounds-pills { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
         .tt-tmodal-tab {
           flex-shrink: 0;
           min-height: 38px;
@@ -2841,17 +2432,7 @@ export default function TorneosView({
           font-size: 0.76rem;
           font-weight: 800;
         }
-        .tt-tmodal-tab.is-active {
-          background: #1E0734;
-          border-color: #00DC7D;
-          color: #00DC7D;
-        }
-        .tt-rounds-pills {
-          display: flex;
-          gap: 6px;
-          overflow-x: auto;
-          padding-bottom: 2px;
-        }
+        .tt-tmodal-tab.is-active { background: #1E0734; border-color: #00DC7D; color: #00DC7D; }
         .tt-round-pill {
           flex-shrink: 0;
           min-height: 34px;
@@ -2863,424 +2444,96 @@ export default function TorneosView({
           font-size: 0.73rem;
           font-weight: 800;
         }
-        .tt-round-pill.is-active {
-          background: rgba(0, 220, 125, 0.16);
-          border-color: #00DC7D;
-          color: #00DC7D;
-        }
-        .tt-torneos-view.is-light .tt-round-pill.is-active {
-          background: #1E0734;
-          color: #00DC7D;
-        }
-        .tt-round-pill.is-final.is-active {
-          background: linear-gradient(135deg, #FBBF24 0%, #D97706 100%);
-          border-color: #F59E0B;
-          color: #1E1102;
-        }
+        .tt-round-pill.is-active { background: rgba(0, 220, 125, 0.16); border-color: #00DC7D; color: #00DC7D; }
+        .tt-torneos-view.is-light .tt-round-pill.is-active { background: #1E0734; color: #00DC7D; }
+        .tt-round-pill.is-final.is-active { background: linear-gradient(135deg, #FBBF24 0%, #D97706 100%); border-color: #F59E0B; color: #1E1102; }
 
         .tt-bracket-section,
         .tt-participants-section,
-        .tt-tmodal-prizes-stack {
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
-        .tt-bracket-matches-grid {
-          display: grid;
-          grid-template-columns: 1fr;
-          gap: 10px;
-        }
+        .tt-tmodal-prizes-stack { display: flex; flex-direction: column; gap: 12px; }
+        .tt-bracket-matches-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
         @media (min-width: 680px) {
-          .tt-bracket-matches-grid {
-            grid-template-columns: repeat(2, 1fr);
-          }
+          .tt-bracket-matches-grid { grid-template-columns: repeat(2, 1fr); }
         }
         .tt-bm-card {
           border-radius: 16px;
           background: var(--tt-surface-2);
           border: 1px solid var(--tt-border);
           overflow: hidden;
+          animation: ttTnReveal 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+          animation-delay: var(--tn-delay, 0ms);
         }
-        .tt-bm-card.is-done {
-          border-color: rgba(0, 220, 125, 0.34);
-        }
-        .tt-bm-head {
-          padding: 7px 11px;
-          background: rgba(30, 7, 52, 0.18);
-          border-bottom: 1px solid var(--tt-border);
-          display: flex;
-          justify-content: space-between;
-          font-size: 0.68rem;
-          font-weight: 800;
-          color: var(--tt-text-muted);
-        }
-        .tt-bm-state.finished {
-          color: #00DC7D;
-        }
-        .tt-torneos-view.is-light .tt-bm-state.finished {
-          color: #008A4E;
-        }
-        .tt-bm-slot {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 8px;
-          padding: 9px 11px;
-          cursor: pointer;
-        }
-        .tt-bm-slot.is-winner {
-          background: rgba(0, 220, 125, 0.12);
-        }
-        .tt-bm-slot.is-loser {
-          opacity: 0.62;
-        }
-        .tt-bm-divider {
-          height: 1px;
-          background: var(--tt-border);
-        }
-        .tt-bm-player-left {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          min-width: 0;
-        }
-        .tt-bm-tbd-avatar {
-          width: 30px;
-          height: 30px;
-          border-radius: 50%;
-          background: var(--tt-surface);
-          border: 1px dashed var(--tt-border);
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 0.78rem;
-          font-weight: 800;
-          color: var(--tt-text-muted);
-          flex-shrink: 0;
-        }
-        .tt-bm-name {
-          display: block;
-          font-size: 0.82rem;
-          font-weight: 800;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-        .tt-bm-sub {
-          display: block;
-          font-size: 0.66rem;
-          color: var(--tt-text-muted);
-        }
-        .tt-bm-right {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          flex-shrink: 0;
-        }
-        .tt-bm-win-arrow {
-          color: #00DC7D;
-          font-size: 0.8rem;
-          font-weight: 900;
-        }
-        .tt-bm-admin-pick {
-          padding: 3px 8px;
-          border-radius: 999px;
-          background: #00DC7D;
-          color: #120321;
-          font-size: 0.66rem;
-          font-weight: 900;
-        }
+        .tt-bm-card.is-done { border-color: rgba(0, 220, 125, 0.36); }
+        .tt-bm-head { padding: 7px 11px; background: rgba(30, 7, 52, 0.18); border-bottom: 1px solid var(--tt-border); display: flex; justify-content: space-between; font-size: 0.68rem; font-weight: 800; color: var(--tt-text-muted); }
+        .tt-bm-state.finished { color: var(--tt-emerald-text); }
+        .tt-bm-slot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 11px; cursor: pointer; }
+        .tt-bm-slot.is-winner { background: rgba(0, 220, 125, 0.12); }
+        .tt-bm-slot.is-loser { opacity: 0.62; }
+        .tt-bm-divider { height: 1px; background: var(--tt-border); }
+        .tt-bm-player-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
+        .tt-bm-tbd-avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--tt-surface); border: 1px dashed var(--tt-border); display: inline-flex; align-items: center; justify-content: center; font-size: 0.78rem; font-weight: 800; color: var(--tt-text-muted); flex-shrink: 0; }
+        .tt-bm-name { display: block; font-size: 0.82rem; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .tt-bm-sub { display: block; font-size: 0.66rem; color: var(--tt-text-muted); }
+        .tt-bm-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+        .tt-bm-win-arrow { color: #00DC7D; font-size: 0.8rem; font-weight: 900; }
+        .tt-bm-admin-pick { padding: 3px 8px; border-radius: 999px; background: #00DC7D; color: #120321; font-size: 0.66rem; font-weight: 900; }
 
-        .tt-consolation-note {
-          display: flex;
-          align-items: flex-start;
-          gap: 9px;
-          padding: 11px;
-          border-radius: 14px;
-          background: var(--tt-surface-2);
-          font-size: 0.77rem;
-          line-height: 1.4;
-          color: var(--tt-text-muted);
-        }
-
-        .tt-enrolled-grid {
-          display: grid;
-          grid-template-columns: 1fr;
-          gap: 8px;
-        }
+        .tt-consolation-note { display: flex; align-items: flex-start; gap: 9px; padding: 11px; border-radius: 14px; background: var(--tt-surface-2); font-size: 0.77rem; line-height: 1.4; color: var(--tt-text-muted); }
+        .tt-enrolled-grid { display: grid; grid-template-columns: 1fr; gap: 8px; }
         @media (min-width: 640px) {
-          .tt-enrolled-grid {
-            grid-template-columns: 1fr 1fr;
-          }
+          .tt-enrolled-grid { grid-template-columns: 1fr 1fr; }
         }
-        .tt-enrolled-row {
-          display: flex;
-          align-items: center;
-          gap: 9px;
-          padding: 9px 11px;
-          border-radius: 14px;
-          background: var(--tt-surface-2);
-          border: 1px solid var(--tt-border);
-          cursor: pointer;
-        }
-        .tt-enrolled-num {
-          font-family: var(--tt-font-display);
-          font-size: 1rem;
-          font-weight: 900;
-          min-width: 22px;
-          color: var(--tt-text-muted);
-        }
-        .tt-enrolled-row strong {
-          display: block;
-          font-size: 0.82rem;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-        .tt-enrolled-row small {
-          display: block;
-          font-size: 0.68rem;
-          color: var(--tt-text-muted);
-        }
-        .tt-enrolled-pts {
-          font-size: 0.74rem;
-          font-weight: 800;
-          color: #00DC7D;
-          white-space: nowrap;
-        }
-        .tt-torneos-view.is-light .tt-enrolled-pts {
-          color: #008A4E;
-        }
+        .tt-enrolled-row { display: flex; align-items: center; gap: 9px; padding: 9px 11px; border-radius: 14px; background: var(--tt-surface-2); border: 1px solid var(--tt-border); cursor: pointer; }
+        .tt-enrolled-num { font-family: var(--tt-font-display); font-size: 1rem; font-weight: 900; min-width: 22px; color: var(--tt-text-muted); }
+        .tt-enrolled-row strong { display: block; font-size: 0.82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .tt-enrolled-row small { display: block; font-size: 0.68rem; color: var(--tt-text-muted); }
+        .tt-enrolled-pts { font-size: 0.74rem; font-weight: 800; color: var(--tt-emerald-text); white-space: nowrap; }
 
-        .tt-admin-pending-box {
-          padding: 12px;
-          border-radius: 14px;
-          background: rgba(245, 158, 11, 0.14);
-          border: 1px solid rgba(245, 158, 11, 0.45);
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-          font-size: 0.8rem;
-        }
-        .tt-admin-pending-row {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 8px;
-        }
+        .tt-admin-pending-box { padding: 12px; border-radius: 14px; background: rgba(245, 158, 11, 0.14); border: 1px solid rgba(245, 158, 11, 0.45); display: flex; flex-direction: column; gap: 8px; font-size: 0.8rem; }
+        .tt-admin-pending-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 
-        /* Vitrina Visual Tipo Collage de Premios */
-        .tt-prize-collage {
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-        }
-        .tt-prize-collage-head {
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
-        }
-        .tt-prize-kicker {
-          font-size: 0.66rem;
-          font-weight: 900;
-          letter-spacing: 0.09em;
-          color: #F59E0B;
-        }
-        .tt-prize-collage-head small {
-          font-size: 0.74rem;
-          color: var(--tt-text-muted);
-        }
-        .tt-prize-collage-grid {
-          display: grid;
-          grid-template-columns: 1fr;
-          gap: 9px;
-        }
+        .tt-prize-collage { display: flex; flex-direction: column; gap: 10px; }
+        .tt-prize-collage-head { display: flex; flex-direction: column; gap: 2px; }
+        .tt-prize-kicker { font-size: 0.66rem; font-weight: 900; letter-spacing: 0.09em; color: #F59E0B; }
+        .tt-prize-collage-head small { font-size: 0.74rem; color: var(--tt-text-muted); }
+        .tt-prize-collage-grid { display: grid; grid-template-columns: 1fr; gap: 9px; }
         @media (min-width: 560px) {
-          .tt-prize-collage-grid {
-            grid-template-columns: 1fr 1fr;
-          }
+          .tt-prize-collage-grid { grid-template-columns: 1fr 1fr; }
         }
-        .tt-prize-tile {
-          display: flex;
-          align-items: center;
-          gap: 11px;
-          padding: 12px;
-          border-radius: 16px;
-          background: var(--tt-surface-2);
-          border: 1px solid var(--tt-border);
-        }
-        .tt-prize-tile.is-featured {
-          grid-column: 1 / -1;
-          background: linear-gradient(135deg, rgba(245, 158, 11, 0.16) 0%, rgba(30, 7, 52, 0.18) 100%);
-          border-color: rgba(245, 158, 11, 0.45);
-        }
-        .tt-prize-tile.is-cash {
-          border-color: rgba(0, 220, 125, 0.4);
-        }
-        .tt-prize-tile-label {
-          display: block;
-          font-size: 0.62rem;
-          font-weight: 900;
-          letter-spacing: 0.08em;
-          color: var(--tt-text-muted);
-        }
-        .tt-prize-tile-val {
-          display: block;
-          font-size: 0.84rem;
-          font-weight: 800;
-          line-height: 1.25;
-          margin-top: 2px;
-        }
+        .tt-prize-tile { display: flex; align-items: center; gap: 11px; padding: 12px; border-radius: 16px; background: var(--tt-surface-2); border: 1px solid var(--tt-border); }
+        .tt-prize-tile.is-featured { grid-column: 1 / -1; background: linear-gradient(135deg, rgba(245, 158, 11, 0.16) 0%, rgba(30, 7, 52, 0.18) 100%); border-color: rgba(245, 158, 11, 0.45); }
+        .tt-prize-tile.is-cash { border-color: rgba(0, 220, 125, 0.4); }
+        .tt-prize-tile-label { display: block; font-size: 0.62rem; font-weight: 900; letter-spacing: 0.08em; color: var(--tt-text-muted); }
+        .tt-prize-tile-val { display: block; font-size: 0.84rem; font-weight: 800; line-height: 1.25; margin-top: 2px; }
 
-        .tt-includes-box {
-          padding: 13px;
-          border-radius: 16px;
-          background: var(--tt-surface-2);
-          border: 1px solid var(--tt-border);
-          font-size: 0.8rem;
-        }
-        .tt-includes-box ul {
-          margin: 8px 0 0;
-          padding: 0;
-          list-style: none;
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-        }
-        .tt-includes-box li {
-          display: flex;
-          align-items: flex-start;
-          gap: 7px;
-          font-size: 0.77rem;
-          color: var(--tt-text-muted);
-        }
-        .tt-tmodal-foot {
-          padding-top: 6px;
-          border-top: 1px solid var(--tt-border);
-        }
+        .tt-includes-box { padding: 13px; border-radius: 16px; background: var(--tt-surface-2); border: 1px solid var(--tt-border); font-size: 0.8rem; }
+        .tt-includes-box ul { margin: 8px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+        .tt-includes-box li { display: flex; align-items: flex-start; gap: 7px; font-size: 0.77rem; color: var(--tt-text-muted); }
+        .tt-tmodal-foot { padding-top: 6px; border-top: 1px solid var(--tt-border); }
 
-        /* 7. MODAL DE PAGO E INSCRIPCIÓN (YAPE / PLIN / BANCO) */
-        .tt-pay-modal-stack {
-          display: flex;
-          flex-direction: column;
-          gap: 13px;
-        }
-        .tt-pay-hero-box {
-          padding: 14px;
-          border-radius: 18px;
-          background: linear-gradient(135deg, #250942 0%, #140324 100%);
-          color: #FAF9F5;
-          border: 1px solid rgba(0, 220, 125, 0.35);
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 10px;
-        }
-        .tt-pay-hero-box span {
-          display: block;
-          font-size: 0.64rem;
-          font-weight: 800;
-          letter-spacing: 0.08em;
-          opacity: 0.74;
-        }
-        .tt-pay-hero-box strong {
-          font-family: var(--tt-font-display);
-          font-size: 1.85rem;
-          line-height: 1;
-          color: #00DC7D;
-        }
-        .tt-pay-balls-tag {
-          padding: 6px 11px;
-          border-radius: 999px;
-          background: rgba(250, 249, 245, 0.14);
-          font-size: 0.72rem;
-          font-weight: 800;
-        }
-        .tt-pay-balls-tag.is-yes {
-          background: rgba(0, 220, 125, 0.2);
-          color: #7CF5C0;
-        }
-        .tt-pay-field {
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-        }
-        .tt-pay-field label {
-          font-size: 0.74rem;
-          font-weight: 800;
-          color: var(--tt-text-muted);
-        }
-        .tt-pay-select {
-          min-height: 44px;
-          padding: 0 12px;
-          border-radius: 13px;
-          background: var(--tt-surface-2);
-          border: 1px solid var(--tt-border);
-          color: var(--tt-text);
-          font-size: 0.88rem;
-          font-weight: 700;
-        }
-        .tt-pay-channels-box {
-          padding: 13px;
-          border-radius: 16px;
-          background: var(--tt-surface-2);
-          border: 1px solid var(--tt-border);
-          display: flex;
-          flex-direction: column;
-          gap: 9px;
-        }
-        .tt-pay-channels-title {
-          font-size: 0.66rem;
-          font-weight: 900;
-          letter-spacing: 0.09em;
-          color: #00DC7D;
-        }
-        .tt-torneos-view.is-light .tt-pay-channels-title {
-          color: #008A4E;
-        }
-        .tt-pay-holder {
-          margin: -4px 0 2px;
-          font-size: 0.74rem;
-          color: var(--tt-text-muted);
-        }
-        .tt-pay-row {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 8px;
-          padding: 9px 11px;
-          border-radius: 12px;
-          background: var(--tt-surface);
-          border: 1px solid var(--tt-border);
-        }
-        .tt-pay-row small {
-          display: block;
-          font-size: 0.65rem;
-          color: var(--tt-text-muted);
-        }
-        .tt-pay-row strong {
-          font-size: 0.88rem;
-          font-variant-numeric: tabular-nums;
-        }
-        .tt-copy-chip {
-          padding: 6px 11px;
-          border-radius: 999px;
-          background: rgba(0, 220, 125, 0.16);
-          color: #00DC7D;
-          font-size: 0.72rem;
-          font-weight: 800;
-          flex-shrink: 0;
-        }
-        .tt-torneos-view.is-light .tt-copy-chip {
-          background: #1E0734;
-          color: #00DC7D;
-        }
-        .tt-pay-disclaimer {
-          margin: 0;
-          font-size: 0.75rem;
-          line-height: 1.45;
-          color: var(--tt-text-muted);
-        }
+        .tt-pay-modal-stack { display: flex; flex-direction: column; gap: 13px; }
+        .tt-pay-hero-box { padding: 14px; border-radius: 18px; background: linear-gradient(135deg, #250942 0%, #140324 100%); color: #FAF9F5; border: 1px solid rgba(0, 220, 125, 0.35); display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+        .tt-pay-hero-box span { display: block; font-size: 0.64rem; font-weight: 800; letter-spacing: 0.08em; opacity: 0.74; }
+        .tt-pay-hero-box strong { font-family: var(--tt-font-display); font-size: 1.85rem; line-height: 1; color: #00DC7D; }
+        .tt-pay-balls-tag { padding: 6px 11px; border-radius: 999px; background: rgba(250, 249, 245, 0.14); font-size: 0.72rem; font-weight: 800; }
+        .tt-pay-balls-tag.is-yes { background: rgba(0, 220, 125, 0.2); color: #7CF5C0; }
+        .tt-pay-field { display: flex; flex-direction: column; gap: 6px; }
+        .tt-pay-field label { font-size: 0.74rem; font-weight: 800; color: var(--tt-text-muted); }
+        .tt-pay-select { min-height: 44px; padding: 0 12px; border-radius: 13px; background: var(--tt-surface-2); border: 1px solid var(--tt-border); color: var(--tt-text); font-size: 0.88rem; font-weight: 700; }
+        .tt-pay-channels-box { padding: 13px; border-radius: 16px; background: var(--tt-surface-2); border: 1px solid var(--tt-border); display: flex; flex-direction: column; gap: 9px; }
+        .tt-pay-channels-title { font-size: 0.66rem; font-weight: 900; letter-spacing: 0.09em; color: var(--tt-emerald-text); }
+        .tt-pay-holder { margin: -4px 0 2px; font-size: 0.74rem; color: var(--tt-text-muted); }
+        .tt-pay-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 11px; border-radius: 12px; background: var(--tt-surface); border: 1px solid var(--tt-border); }
+        .tt-pay-row small { display: block; font-size: 0.65rem; color: var(--tt-text-muted); }
+        .tt-pay-row strong { font-size: 0.88rem; font-variant-numeric: tabular-nums; }
+        .tt-copy-chip { padding: 6px 11px; border-radius: 999px; background: rgba(0, 220, 125, 0.16); color: #00DC7D; font-size: 0.72rem; font-weight: 800; flex-shrink: 0; }
+        .tt-torneos-view.is-light .tt-copy-chip { background: #1E0734; color: #00DC7D; }
+        .tt-pay-disclaimer { margin: 0; font-size: 0.75rem; line-height: 1.45; color: var(--tt-text-muted); }
+
+        html[data-tier='lite'] .tt-wr-emerald-sheen { display: none !important; }
+        html[data-tier='lite'] .tt-tcard,
+        html[data-tier='lite'] .tt-phase-card,
+        html[data-tier='lite'] .tt-winner-row-card { animation: none !important; }
       `}</style>
     </section>
   );
