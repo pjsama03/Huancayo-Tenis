@@ -5,7 +5,7 @@
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
-   1. RESET UNIVERSAL Y ANCLAJE REAL A PANTALLA COMPLETA (CERO HUECO INFERIOR)
+   1. RESET UNIVERSAL Y ALTURA FÍSICA REAL EDGE-TO-EDGE (CERO GAP INFERIOR)
    -------------------------------------------------------------------------- */
 *,
 *::before,
@@ -16,26 +16,24 @@
 
 html {
   width: 100%;
-  height: 100%;
+  height: var(--tt-app-h, 100%);
   min-height: 100%;
-  min-height: -webkit-fill-available;
   font-size: 16px;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
   background-color: var(--tt-bg-app);
   color: var(--tt-text-primary);
   font-family: var(--tt-font-sans);
-  overflow-x: hidden;
-  overscroll-behavior-y: none;
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 body {
   margin: 0;
   padding: 0;
   width: 100%;
-  height: 100%;
-  min-height: 100vh;
-  min-height: -webkit-fill-available;
+  height: var(--tt-app-h, 100%);
+  min-height: 100%;
   background-color: var(--tt-bg-app);
   color: var(--tt-text-primary);
   font-family: var(--tt-font-sans);
@@ -43,32 +41,64 @@ body {
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overflow-x: hidden;
-  overscroll-behavior-y: none;
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 #root {
   width: 100%;
-  height: 100%;
-  min-height: 100vh;
-  min-height: -webkit-fill-available;
+  height: var(--tt-app-h, 100%);
+  min-height: 100%;
   display: flex;
   flex-direction: column;
   position: relative;
+  overflow: hidden;
   background-color: var(--tt-bg-app);
 }
 
-/* Fuerza que el contenedor raíz cubra de borde a borde físico en iPhone PWA
-   sin que height: 100dvh lo recorte por arriba del Home Indicator */
+/* Lienzo raíz con iluminación atmosférica de estadio y altura física real
+   (elimina el recorte de ~59px de WebKit en iPhone PWA standalone) */
 .tt-app-viewport {
   position: fixed !important;
   top: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
   left: 0 !important;
-  height: auto !important;
+  right: 0 !important;
+  height: var(--tt-app-h, 100%) !important;
   min-height: 100% !important;
   width: 100% !important;
+  overflow: hidden !important;
+}
+
+.tt-app-viewport.is-dark {
+  background:
+    radial-gradient(
+      ellipse 95% 42% at 50% -8%,
+      rgba(104, 34, 176, 0.42) 0%,
+      rgba(0, 220, 125, 0.08) 46%,
+      rgba(22, 4, 40, 0) 76%
+    ),
+    linear-gradient(180deg, #1b0630 0%, #160428 45%, #11021f 100%) !important;
+}
+
+.tt-app-viewport.is-light {
+  background:
+    radial-gradient(
+      ellipse 95% 36% at 50% -10%,
+      rgba(0, 220, 125, 0.09) 0%,
+      rgba(250, 249, 245, 0) 70%
+    ),
+    #faf9f5 !important;
+}
+
+html[data-tier='lite'] .tt-app-viewport.is-dark {
+  background: #160428 !important;
+}
+html[data-tier='lite'] .tt-app-viewport.is-light {
+  background: #faf9f5 !important;
+}
+
+html[data-standalone='true'] .tt-main-inner {
+  padding-bottom: calc(122px + env(safe-area-inset-bottom, 0px)) !important;
 }
 
 button,
@@ -182,7 +212,7 @@ textarea {
 }
 
 /* --------------------------------------------------------------------------
-   3. SHELL PRINCIPAL
+   3. SHELL PRINCIPAL Y DOCK ANCLADO AL CONTENEDOR FÍSICO (NO FIXED BUG)
    -------------------------------------------------------------------------- */
 .tt-app-shell {
   width: 100%;
@@ -218,18 +248,16 @@ html[data-keyboard='open'] .tt-bottom-dock {
   pointer-events: none;
 }
 
-/* --------------------------------------------------------------------------
-   4. BARRA DE NAVEGACIÓN INFERIOR (PEGADA AL BORDE INFERIOR REAL EN IPHONE)
-   -------------------------------------------------------------------------- */
+/* Base del Dock compatible con BottomDock.jsx (sin forzar position: fixed) */
 .tt-bottom-dock {
-  position: fixed !important;
-  left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
   z-index: var(--tt-z-dock);
   background-color: var(--tt-dock-bg);
   border-top: 1px solid var(--tt-dock-border);
-  padding-bottom: max(var(--tt-safe-bottom), 8px);
+  padding-bottom: var(--tt-safe-bottom);
   padding-left: var(--tt-safe-left);
   padding-right: var(--tt-safe-right);
   backdrop-filter: blur(var(--tt-blur-md));
@@ -246,131 +274,8 @@ html[data-keyboard='open'] .tt-bottom-dock {
   align-items: stretch;
 }
 
-.tt-dock-item {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  min-height: var(--tt-touch-min);
-  padding: 6px 2px 4px;
-  color: var(--tt-text-muted);
-  transition: color var(--tt-dur-fast) ease;
-  overflow: visible;
-}
-
-.tt-dock-item::before {
-  content: '';
-  position: absolute;
-  top: -1px;
-  left: 12%;
-  right: 12%;
-  height: 3px;
-  border-radius: 0 0 4px 4px;
-  background-color: var(--tt-emerald-500);
-  box-shadow: 0 0 12px var(--tt-emerald-500), 0 2px 10px rgba(0, 220, 125, 0.55);
-  opacity: 0;
-  transform: scaleX(0.25);
-  transition: opacity var(--tt-dur-base) ease,
-    transform var(--tt-dur-base) var(--tt-ease-spring);
-}
-
-.tt-dock-item::after {
-  content: '';
-  position: absolute;
-  inset: 2px 4px;
-  border-radius: 16px;
-  background: radial-gradient(
-    circle at 50% 42%,
-    rgba(0, 220, 125, 0.34) 0%,
-    rgba(0, 220, 125, 0.11) 46%,
-    rgba(0, 220, 125, 0) 76%
-  );
-  opacity: 0;
-  transform: scale(0.7);
-  transition: opacity var(--tt-dur-base) ease,
-    transform var(--tt-dur-base) var(--tt-ease-spring);
-  pointer-events: none;
-  z-index: 0;
-}
-
-.tt-dock-item.is-active {
-  color: var(--tt-emerald-500);
-}
-
-.tt-dock-item.is-active::before {
-  opacity: 1;
-  transform: scaleX(1);
-}
-
-.tt-dock-item.is-active::after {
-  opacity: 1;
-  transform: scale(1);
-}
-
-.tt-dock-content {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  transform: scale(1) translateY(0);
-  transition: transform var(--tt-dur-base) var(--tt-ease-spring);
-  will-change: transform;
-}
-
-.tt-dock-item.is-active .tt-dock-content {
-  transform: scale(1.14) translateY(-1.5px);
-}
-
-.tt-dock-item:active .tt-dock-content {
-  transform: scale(0.95);
-}
-
-.tt-dock-img {
-  width: 26px;
-  height: 26px;
-  object-fit: contain;
-  opacity: 0.72;
-  filter: grayscale(0.28) brightness(0.92);
-  transition: filter var(--tt-dur-base) ease, opacity var(--tt-dur-base) ease;
-}
-
-.tt-dock-item.is-active .tt-dock-img {
-  opacity: 1;
-  filter: drop-shadow(0 0 8px rgba(0, 220, 125, 0.72)) brightness(1.12);
-}
-
-.tt-dock-label {
-  font-size: 0.67rem;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  line-height: 1.05;
-  white-space: nowrap;
-  text-align: center;
-  transition: font-weight var(--tt-dur-fast) ease, text-shadow var(--tt-dur-base) ease;
-}
-
-.tt-dock-item.is-active .tt-dock-label {
-  font-weight: 800;
-  color: var(--tt-emerald-500);
-  text-shadow: 0 0 12px rgba(0, 220, 125, 0.42);
-}
-
-html[data-theme='light'] .tt-dock-item.is-active .tt-dock-label {
-  color: #007a44;
-  text-shadow: none;
-}
-
-html[data-screen='compact'] .tt-dock-label {
-  font-size: 0.61rem;
-}
-
 /* --------------------------------------------------------------------------
-   5. MOTOR UNIVERSAL DE PORTALES (SCROLL ESTABLE SIN REBOTE EN IPHONE)
+   4. MOTOR UNIVERSAL DE PORTALES (SCROLL ESTABLE SIN REBOTE EN IPHONE)
    -------------------------------------------------------------------------- */
 .tt-modal-backdrop {
   position: fixed;
@@ -407,7 +312,9 @@ html[data-screen='compact'] .tt-dock-label {
   color: var(--tt-text-primary);
   border: 1px solid var(--tt-border-medium);
   border-radius: var(--tt-radius-xl);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), var(--tt-shadow-lg);
+  box-shadow: var(--tt-card-specular), var(--tt-shadow-lg);
+  backdrop-filter: blur(var(--tt-blur-md));
+  -webkit-backdrop-filter: blur(var(--tt-blur-md));
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -434,7 +341,7 @@ html[data-screen='compact'] .tt-dock-label {
   gap: 12px;
   padding: 15px 16px 13px;
   border-bottom: 1px solid var(--tt-border-subtle);
-  background-color: var(--tt-bg-surface);
+  background-color: transparent;
 }
 
 .tt-modal-backdrop.is-fullscreen .tt-modal-head {
@@ -494,7 +401,7 @@ html[data-screen='compact'] .tt-dock-label {
 }
 
 /* --------------------------------------------------------------------------
-   6. ESTADOS VACÍOS LIMPIOS (ELIMINA RECUADRO NEGRO EN ILUSTRACIONES)
+   5. ESTADOS VACÍOS LIMPIOS (ELIMINA RECUADRO NEGRO EN ILUSTRACIONES)
    -------------------------------------------------------------------------- */
 .tt-empty-card img,
 .tt-empty-illustration {
@@ -510,7 +417,7 @@ html[data-theme='light'] .tt-empty-illustration {
 }
 
 /* --------------------------------------------------------------------------
-   7. SCROLL-REVEAL PROGRESIVO
+   6. SCROLL-REVEAL PROGRESIVO
    -------------------------------------------------------------------------- */
 .tt-scroll-hero {
   position: relative;
@@ -574,16 +481,26 @@ html[data-tier='lite'] .tt-reveal-item {
 }
 
 /* --------------------------------------------------------------------------
-   8. TARJETAS CON PROFUNDIDAD EDITORIAL, PODIO, BOTONES Y PÍLDORAS
+   7. TARJETAS CRISTALINAS PREMIUM, MICRO-AURAS, PODIO Y BOTONES JOYA
    -------------------------------------------------------------------------- */
 .tt-card,
-.tt-match-card {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), var(--tt-shadow-sm);
+.tt-match-card,
+.tt-rival-row {
+  box-shadow: var(--tt-card-specular), var(--tt-shadow-sm);
+  transition:
+    border-color var(--tt-dur-fast) ease,
+    box-shadow var(--tt-dur-base) ease,
+    transform var(--tt-dur-fast) var(--tt-ease-spring);
 }
 
-html[data-theme='light'] .tt-card,
-html[data-theme='light'] .tt-match-card {
-  box-shadow: var(--tt-shadow-sm);
+@media (hover: hover) {
+  .tt-card-interactive:hover,
+  .tt-match-card:hover,
+  .tt-proshop-card:hover {
+    border-color: rgba(0, 220, 125, 0.48);
+    box-shadow: var(--tt-card-specular), 0 0 22px rgba(0, 220, 125, 0.16), var(--tt-shadow-md);
+    transform: translateY(-2px);
+  }
 }
 
 .tt-card {
@@ -593,7 +510,6 @@ html[data-theme='light'] .tt-match-card {
   padding: 16px;
   position: relative;
   overflow: hidden;
-  transition: border-color var(--tt-dur-fast) ease, transform var(--tt-dur-fast) var(--tt-ease-spring);
 }
 
 .tt-card-interactive:active {
@@ -602,20 +518,20 @@ html[data-theme='light'] .tt-match-card {
 
 .tt-podium-1 {
   border: 1.5px solid var(--tt-podium-gold-border);
-  box-shadow: var(--tt-podium-gold-glow);
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.16) 0%, var(--tt-bg-surface) 58%);
+  box-shadow: var(--tt-card-specular), var(--tt-podium-gold-glow);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.18) 0%, var(--tt-bg-surface) 58%);
 }
 
 .tt-podium-2 {
   border: 1.5px solid var(--tt-podium-silver-border);
-  box-shadow: var(--tt-podium-silver-glow);
-  background: linear-gradient(135deg, rgba(203, 213, 225, 0.13) 0%, var(--tt-bg-surface) 58%);
+  box-shadow: var(--tt-card-specular), var(--tt-podium-silver-glow);
+  background: linear-gradient(135deg, rgba(203, 213, 225, 0.14) 0%, var(--tt-bg-surface) 58%);
 }
 
 .tt-podium-3 {
   border: 1.5px solid var(--tt-podium-bronze-border);
-  box-shadow: var(--tt-podium-bronze-glow);
-  background: linear-gradient(135deg, rgba(217, 119, 87, 0.14) 0%, var(--tt-bg-surface) 58%);
+  box-shadow: var(--tt-card-specular), var(--tt-podium-bronze-glow);
+  background: linear-gradient(135deg, rgba(217, 119, 87, 0.15) 0%, var(--tt-bg-surface) 58%);
 }
 
 html[data-theme='light'] .tt-podium-1 {
@@ -645,7 +561,7 @@ html[data-theme='light'] .tt-podium-3 {
   font-weight: 900;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  box-shadow: 0 2px 10px rgba(245, 158, 11, 0.42);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 3px 10px rgba(245, 158, 11, 0.42);
 }
 
 .tt-badge-standard {
@@ -681,37 +597,45 @@ html[data-theme='light'] .tt-podium-3 {
 }
 
 .tt-btn:active {
-  transform: scale(0.96);
+  transform: scale(0.955);
 }
 
 .tt-btn-primary {
   background: var(--tt-grad-mint);
   color: var(--tt-text-on-emerald);
-  box-shadow: 0 8px 22px rgba(0, 220, 125, 0.32);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    0 10px 24px rgba(0, 220, 125, 0.34);
 }
 
 .tt-btn-secondary {
   background-color: rgba(250, 249, 245, 0.09);
   border: 1.5px solid rgba(250, 249, 245, 0.22);
   color: #faf9f5;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 html[data-theme='light'] .tt-btn-secondary {
   background-color: #1e0734;
   border-color: #1e0734;
   color: #faf9f5;
+  box-shadow: 0 6px 16px rgba(30, 7, 52, 0.16);
 }
 
 .tt-btn-gold {
   background: var(--tt-podium-gold-grad);
   color: var(--tt-text-on-gold);
-  box-shadow: 0 8px 22px rgba(245, 158, 11, 0.34);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    0 10px 24px rgba(245, 158, 11, 0.36);
 }
 
 .tt-btn-clay {
   background: var(--tt-grad-clay);
   color: #ffffff;
-  box-shadow: 0 8px 20px rgba(200, 90, 50, 0.32);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 8px 20px rgba(200, 90, 50, 0.34);
 }
 
 .tt-btn-ghost {
@@ -738,7 +662,7 @@ html[data-theme='light'] .tt-btn-danger {
   padding: 12px 14px;
   border-radius: var(--tt-radius-md);
   background: var(--tt-grad-mint);
-  color: #120321;
+  color: #10021e;
   font-weight: 900;
   font-size: var(--tt-text-base);
   display: flex;
@@ -746,7 +670,7 @@ html[data-theme='light'] .tt-btn-danger {
   align-items: center;
   justify-content: center;
   gap: 2px;
-  box-shadow: 0 8px 22px rgba(0, 220, 125, 0.32);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 10px 24px rgba(0, 220, 125, 0.34);
   transition: transform 110ms var(--tt-ease-spring);
 }
 
@@ -806,15 +730,15 @@ html[data-theme='light'] .tt-btn-danger {
   white-space: nowrap;
   flex-shrink: 0;
   transition: background-color var(--tt-dur-fast) ease, color var(--tt-dur-fast) ease,
-    border-color var(--tt-dur-fast) ease;
+    border-color var(--tt-dur-fast) ease, transform var(--tt-dur-fast) var(--tt-ease-spring);
 }
 
 .tt-filter-pill.is-active {
   background: var(--tt-grad-mint);
   border-color: transparent;
-  color: #120321;
+  color: #10021e;
   font-weight: 800;
-  box-shadow: 0 4px 14px rgba(0, 220, 125, 0.28);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 4px 16px rgba(0, 220, 125, 0.3);
 }
 
 html[data-theme='light'] .tt-filter-pill.is-active {
@@ -824,7 +748,7 @@ html[data-theme='light'] .tt-filter-pill.is-active {
 }
 
 /* --------------------------------------------------------------------------
-   9. CARNET DIGITAL 3D (CON BLINDAJE DE GIRO SAFARI IOS)
+   8. CARNET DIGITAL 3D (CON BLINDAJE DE GIRO SAFARI IOS)
    -------------------------------------------------------------------------- */
 .tt-card3d-scene {
   perspective: 1100px;
@@ -875,7 +799,7 @@ html[data-theme='light'] .tt-filter-pill.is-active {
 }
 
 /* --------------------------------------------------------------------------
-   10. ESCAPARATE TIENDA PRO SHOP
+   9. ESCAPARATE TIENDA PRO SHOP
    -------------------------------------------------------------------------- */
 .tt-proshop-grid {
   display: grid;
@@ -890,9 +814,10 @@ html[data-theme='light'] .tt-filter-pill.is-active {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  box-shadow: var(--tt-shadow-sm);
+  box-shadow: var(--tt-card-specular), var(--tt-shadow-sm);
   transition: transform var(--tt-dur-fast) var(--tt-ease-spring),
-    border-color var(--tt-dur-fast) ease;
+    border-color var(--tt-dur-fast) ease,
+    box-shadow var(--tt-dur-base) ease;
 }
 
 .tt-proshop-card:active {
@@ -919,7 +844,7 @@ html[data-theme='light'] .tt-filter-pill.is-active {
 }
 
 /* --------------------------------------------------------------------------
-   11. PULSO EN VIVO, SPLASH Y TOASTS
+   10. PULSO EN VIVO, SPLASH Y TOASTS
    -------------------------------------------------------------------------- */
 .tt-live-dot {
   width: 8px;
@@ -983,7 +908,7 @@ html[data-theme='light'] .tt-filter-pill.is-active {
 }
 
 /* --------------------------------------------------------------------------
-   12. ADAPTACIÓN DESKTOP (>= 768px)
+   11. ADAPTACIÓN DESKTOP (>= 768px)
    -------------------------------------------------------------------------- */
 @media (min-width: 768px) {
   .tt-proshop-grid {
