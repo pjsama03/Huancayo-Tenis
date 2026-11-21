@@ -1,17 +1,18 @@
 /* ==========================================================================
-   TOTAL TENIS · SISTEMA MAESTRO DE TOKENS DE DISEÑO (ALTO CONTRASTE OLED)
+   TOTAL TENIS · SISTEMA MAESTRO DE TOKENS DE DISEÑO (ACABADO PREMIUM OLED)
    Modo Oscuro (Púrpura Noche Profundo + Cristal) + Modo Claro Editorial
+   Compatibilidad Universal: iOS 12+ / Android 8+ hasta Flagships 120Hz
    ========================================================================== */
 
 :root {
   /* ------------------------------------------------------------------------
      1. PALETA DE MARCA INMUTABLE (TOTAL TENIS)
      ------------------------------------------------------------------------ */
-  --tt-purple-950: #0e021a;
-  --tt-purple-900: #140424; /* Púrpura Noche Profundo OLED */
-  --tt-purple-850: #1d0733; /* Superficie Elevada */
-  --tt-purple-800: #250a40; /* Tarjeta Estándar Oscura */
-  --tt-purple-700: #36125c; /* Borde / Hover Oscuro */
+  --tt-purple-950: #10021e;
+  --tt-purple-900: #1b0630; /* Púrpura Noche Base */
+  --tt-purple-850: #22083c; /* Superficie Elevada */
+  --tt-purple-800: #290c46; /* Tarjeta Estándar Oscura */
+  --tt-purple-700: #391460; /* Borde / Hover Oscuro */
   --tt-purple-600: #4f2080;
 
   --tt-emerald-500: #00dc7d; /* Verde Esmeralda Firma */
@@ -21,7 +22,7 @@
   --tt-emerald-600: #00b365;
   --tt-emerald-700: #008a4d;
   --tt-emerald-text: #00dc7d;
-  --tt-emerald-glow: rgba(0, 220, 125, 0.38);
+  --tt-emerald-glow: rgba(0, 220, 125, 0.42);
   --tt-emerald-soft: rgba(0, 220, 125, 0.14);
 
   --tt-ivory-50: #ffffff;   /* Blanco Puro */
@@ -52,71 +53,74 @@
   /* ------------------------------------------------------------------------
      2. PODIO METÁLICO (#1 ORO, #2 PLATA, #3 BRONCE) Y DOBLE CARNET
      ------------------------------------------------------------------------ */
-  --tt-podium-gold-border: rgba(245, 158, 11, 0.72);
-  --tt-podium-gold-glow: 0 0 24px rgba(245, 158, 11, 0.24);
-  --tt-podium-gold-grad: linear-gradient(135deg, #ffe082 0%, #f59e0b 48%, #b45309 100%);
+  --tt-podium-gold-border: rgba(245, 158, 11, 0.78);
+  --tt-podium-gold-glow: 0 0 28px rgba(245, 158, 11, 0.28);
+  --tt-podium-gold-grad: linear-gradient(135deg, #ffe58f 0%, #f59e0b 48%, #b45309 100%);
 
-  --tt-podium-silver-border: rgba(203, 213, 225, 0.68);
-  --tt-podium-silver-glow: 0 0 20px rgba(203, 213, 225, 0.18);
+  --tt-podium-silver-border: rgba(203, 213, 225, 0.72);
+  --tt-podium-silver-glow: 0 0 22px rgba(203, 213, 225, 0.2);
   --tt-podium-silver-grad: linear-gradient(135deg, #f8fafc 0%, #cbd5e1 52%, #64748b 100%);
 
-  --tt-podium-bronze-border: rgba(217, 119, 87, 0.68);
-  --tt-podium-bronze-glow: 0 0 20px rgba(217, 119, 87, 0.2);
+  --tt-podium-bronze-border: rgba(217, 119, 87, 0.72);
+  --tt-podium-bronze-glow: 0 0 22px rgba(217, 119, 87, 0.22);
   --tt-podium-bronze-grad: linear-gradient(135deg, #f3bfa3 0%, #d97757 52%, #8c3f23 100%);
 
   /* Carnet VIP Dorado Metálico vs. Carnet Estándar Púrpura */
   --tt-vip-card-grad: linear-gradient(135deg, #2f1f04 0%, #6b490c 26%, #d4af37 54%, #fce38a 70%, #8a5e10 100%);
-  --tt-vip-card-border: rgba(252, 227, 138, 0.75);
-  --tt-std-card-grad: linear-gradient(135deg, #140424 0%, #250a40 52%, #3d1566 100%);
-  --tt-std-card-border: rgba(250, 249, 245, 0.22);
+  --tt-vip-card-border: rgba(252, 227, 138, 0.78);
+  --tt-std-card-grad: linear-gradient(135deg, #150327 0%, #290c46 52%, #3f166b 100%);
+  --tt-std-card-border: rgba(250, 249, 245, 0.24);
 
   /* Degradados Firma */
-  --tt-grad-mint: linear-gradient(135deg, #00dc7d 0%, #1ae68a 52%, #7cf5c0 100%);
-  --tt-grad-brand: linear-gradient(135deg, #1c0631 0%, #2d0d4e 60%, #120321 100%);
+  --tt-grad-mint: linear-gradient(135deg, #00e080 0%, #16e88c 50%, #6cf5ba 100%);
+  --tt-grad-brand: linear-gradient(135deg, #1f0737 0%, #311056 58%, #150326 100%);
   --tt-grad-clay: linear-gradient(135deg, #c85a32 0%, #d96b43 55%, #e07a5f 100%);
   --tt-grad-gold: linear-gradient(135deg, #f59e0b 0%, #fbbf24 50%, #d97706 100%);
 
   /* ------------------------------------------------------------------------
      3. TOKENS SEMÁNTICOS · MODO OSCURO PREMIUM (PROFUNDO + CRISTAL)
      ------------------------------------------------------------------------ */
-  --tt-bg-app: #140424;
-  --tt-bg: #140424;
-  --tt-bg-deep: #0e021a;
-  --tt-bg-surface: #1d0733;
-  --tt-surface: #1d0733;
+  --tt-bg-app: #160428;
+  --tt-bg: #160428;
+  --tt-bg-deep: #10021e;
+  --tt-bg-surface: rgba(36, 11, 61, 0.92);
+  --tt-surface: rgba(36, 11, 61, 0.92);
   --tt-bg-surface-2: rgba(250, 249, 245, 0.065);
   --tt-surface-2: rgba(250, 249, 245, 0.065);
-  --tt-bg-elevated: #280c47;
-  --tt-bg-glass: rgba(20, 4, 36, 0.86);
-  --tt-bg-glass-strong: rgba(14, 2, 26, 0.94);
-  --tt-bg-pill: rgba(250, 249, 245, 0.075);
-  --tt-bg-input: rgba(14, 2, 26, 0.78);
+  --tt-bg-elevated: #311054;
+  --tt-bg-glass: rgba(24, 6, 43, 0.84);
+  --tt-bg-glass-strong: rgba(16, 3, 30, 0.94);
+  --tt-bg-pill: rgba(250, 249, 245, 0.08);
+  --tt-bg-input: rgba(14, 3, 27, 0.76);
 
   --tt-text-primary: #faf9f5;
   --tt-text: #faf9f5;
   --tt-text-secondary: rgba(250, 249, 245, 0.82);
-  --tt-text-muted: rgba(250, 249, 245, 0.62);
-  --tt-text-on-emerald: #120321;
+  --tt-text-muted: rgba(250, 249, 245, 0.6);
+  --tt-text-on-emerald: #10021e;
   --tt-text-on-gold: #1a0d00;
   --tt-text-on-light: #1e0734;
 
-  --tt-border-subtle: rgba(250, 249, 245, 0.1);
-  --tt-border: rgba(250, 249, 245, 0.11);
-  --tt-border-medium: rgba(250, 249, 245, 0.2);
-  --tt-border-accent: rgba(0, 220, 125, 0.48);
-  --tt-border-gold: rgba(245, 158, 11, 0.52);
+  --tt-border-subtle: rgba(250, 249, 245, 0.11);
+  --tt-border: rgba(250, 249, 245, 0.12);
+  --tt-border-medium: rgba(250, 249, 245, 0.21);
+  --tt-border-accent: rgba(0, 220, 125, 0.5);
+  --tt-border-gold: rgba(245, 158, 11, 0.55);
+
+  /* Reflejo superior interno de cristal en tarjetas */
+  --tt-card-specular: inset 0 1px 0 rgba(255, 255, 255, 0.11);
 
   /* Cabecera Flotante & Dock */
   --tt-header-pill-bg: #ffffff;
   --tt-header-pill-text: #1e0734;
-  --tt-header-pill-shadow: 0 10px 28px rgba(8, 1, 16, 0.46);
-  --tt-dock-bg: rgba(15, 3, 28, 0.96);
+  --tt-header-pill-shadow: 0 12px 30px rgba(8, 1, 16, 0.46);
+  --tt-dock-bg: rgba(18, 4, 34, 0.94);
   --tt-dock-border: rgba(250, 249, 245, 0.12);
 
-  /* Sombras & Blur */
-  --tt-shadow-sm: 0 8px 24px rgba(5, 1, 12, 0.4);
-  --tt-shadow-md: 0 16px 38px rgba(5, 1, 12, 0.52);
-  --tt-shadow-lg: 0 26px 60px rgba(4, 0, 10, 0.68);
+  /* Sombras Multicapa & Blur */
+  --tt-shadow-sm: 0 8px 22px rgba(7, 1, 15, 0.36);
+  --tt-shadow-md: 0 16px 38px rgba(6, 1, 14, 0.48);
+  --tt-shadow-lg: 0 26px 62px rgba(4, 0, 10, 0.66);
   --tt-blur-sm: 12px;
   --tt-blur-md: 20px;
   --tt-blur-lg: 28px;
@@ -124,7 +128,7 @@
   /* ------------------------------------------------------------------------
      4. TIPOGRAFÍA FLUIDA (320px -> 1440px)
      ------------------------------------------------------------------------ */
-  --tt-font-display: 'Barlow Condensed', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --tt-font-display: 'Antonio', 'Barlow Condensed', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --tt-font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 
   --tt-text-xs: clamp(0.6875rem, 2.6vw, 0.75rem);
@@ -145,6 +149,7 @@
   --tt-safe-right: env(safe-area-inset-right, 0px);
 
   --tt-vh: 1vh;
+  --tt-app-h: 100%;
   --tt-app-height: 100%;
   --tt-page-pad: 14px;
   --tt-container-max: 1120px;
@@ -183,20 +188,20 @@
 }
 
 /* ==========================================================================
-   MODO CLARO REAL (ALTO CONTRASTE EDITORIAL SOBRE MARFIL #FAF9F5 Y #FFFFFF)
+   MODO CLARO EDITORIAL REAL (MARFIL #FAF9F5 + BLANCO PURO #FFFFFF)
    ========================================================================== */
 html[data-theme='light'] {
   --tt-bg-app: #faf9f5;
   --tt-bg: #faf9f5;
-  --tt-bg-deep: #efece3;
+  --tt-bg-deep: #f0ede4;
   --tt-bg-surface: #ffffff;
   --tt-surface: #ffffff;
-  --tt-bg-surface-2: #f3f0e8;
-  --tt-surface-2: #f3f0e8;
+  --tt-bg-surface-2: #f4f1e8;
+  --tt-surface-2: #f4f1e8;
   --tt-bg-elevated: #ffffff;
   --tt-bg-glass: rgba(250, 249, 245, 0.94);
   --tt-bg-glass-strong: rgba(255, 255, 255, 0.98);
-  --tt-bg-pill: rgba(30, 7, 52, 0.065);
+  --tt-bg-pill: rgba(30, 7, 52, 0.06);
   --tt-bg-input: #f7f5ef;
 
   --tt-text-primary: #1e0734;
@@ -205,21 +210,23 @@ html[data-theme='light'] {
   --tt-text-muted: #5d4773;
   --tt-emerald-text: #007a44;
 
-  --tt-border-subtle: rgba(30, 7, 52, 0.12);
-  --tt-border: rgba(30, 7, 52, 0.14);
-  --tt-border-medium: rgba(30, 7, 52, 0.24);
+  --tt-border-subtle: rgba(30, 7, 52, 0.11);
+  --tt-border: rgba(30, 7, 52, 0.13);
+  --tt-border-medium: rgba(30, 7, 52, 0.22);
   --tt-border-accent: rgba(0, 148, 82, 0.5);
   --tt-border-gold: rgba(180, 83, 9, 0.48);
 
+  --tt-card-specular: inset 0 1px 0 rgba(255, 255, 255, 0.95);
+
   --tt-header-pill-bg: #ffffff;
   --tt-header-pill-text: #1e0734;
-  --tt-header-pill-shadow: 0 8px 24px rgba(30, 7, 52, 0.12);
-  --tt-dock-bg: rgba(255, 255, 255, 0.97);
+  --tt-header-pill-shadow: 0 8px 24px rgba(30, 7, 52, 0.11);
+  --tt-dock-bg: rgba(255, 255, 255, 0.96);
   --tt-dock-border: rgba(30, 7, 52, 0.12);
 
-  --tt-shadow-sm: 0 4px 12px rgba(30, 7, 52, 0.08);
-  --tt-shadow-md: 0 12px 28px rgba(30, 7, 52, 0.12);
-  --tt-shadow-lg: 0 22px 46px rgba(30, 7, 52, 0.18);
+  --tt-shadow-sm: 0 4px 14px rgba(30, 7, 52, 0.07);
+  --tt-shadow-md: 0 12px 28px rgba(30, 7, 52, 0.11);
+  --tt-shadow-lg: 0 22px 48px rgba(30, 7, 52, 0.16);
 }
 
 /* ==========================================================================
@@ -252,9 +259,11 @@ html[data-tier='lite'] {
   --tt-blur-sm: 0px;
   --tt-blur-md: 0px;
   --tt-blur-lg: 0px;
-  --tt-bg-glass: #140424;
-  --tt-bg-glass-strong: #0e021a;
-  --tt-dock-bg: #0f031c;
+  --tt-bg-surface: #23083c;
+  --tt-surface: #23083c;
+  --tt-bg-glass: #160428;
+  --tt-bg-glass-strong: #10021e;
+  --tt-dock-bg: #120321;
   --tt-shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.28);
   --tt-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.36);
   --tt-shadow-lg: 0 8px 20px rgba(0, 0, 0, 0.45);
@@ -264,6 +273,8 @@ html[data-tier='lite'] {
 }
 
 html[data-theme='light'][data-tier='lite'] {
+  --tt-bg-surface: #ffffff;
+  --tt-surface: #ffffff;
   --tt-bg-glass: #faf9f5;
   --tt-bg-glass-strong: #ffffff;
   --tt-dock-bg: #ffffff;
