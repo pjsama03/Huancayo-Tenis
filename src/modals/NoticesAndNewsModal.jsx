@@ -12,16 +12,15 @@ import {
   INITIAL_CLUBS,
   getClubById,
 } from '../data/playersAndClubsData';
-import { buildWhatsAppLink } from '../utils/tenisEngine';
+import { buildWhatsappLink } from '../utils/cloudService';
 
 /* ==========================================================================
    ZONA DE EDICIÓN RÁPIDA (FUENTES RSS, MARCADORES PRO Y AVISO DEL CIRCUITO)
-   --------------------------------------------------------------------------
    - Cero noticias inventadas y cero fotos recicladas de la app como prensa.
-   - Marcadores ATP / WTA 100 % solo lectura con refresco cada 60 segundos.
+   - Marcadores ATP / WTA solo lectura con refresco automático cada 60 s.
    ========================================================================== */
 export const NOTICES_NEWS_EDITABLE_CONFIG = {
-  proScoreRefreshMs: 60000, // Refresco automático cada 60 segundos
+  proScoreRefreshMs: 60000,
   rssFeeds: [
     {
       id: 'puntodebreak',
@@ -58,17 +57,17 @@ export const NOTICES_NEWS_EDITABLE_CONFIG = {
   circuitBulletin: {
     id: 'bulletin-season-4',
     category: 'CIRCUITO',
-    title: 'Recta final hacia el Master Top 8: suma puntos oficiales antes del cierre a las 00:00',
-    subtitle: 'Los puestos #1 al #8 de la tabla anual acumulada clasifican sin costo al Torneo de Maestros.',
+    title: 'Recta final hacia el Master Top 8: suma puntos antes del cierre de temporada',
+    subtitle: 'Los 8 jugadores con más puntos totales del año clasifican sin costo al Torneo de Maestros.',
     timeLabel: 'Aviso oficial',
-    actionLabel: 'VER TORNEOS',
+    actionLabel: 'VER MASTER TOP 8',
     actionTarget: 'torneos',
     logo: ASSETS.trofeoMasterTop8,
   },
 };
 
 /* ==========================================================================
-   UTILIDADES DE TIEMPO RELATIVO Y EXTRACCIÓN DE IMÁGENES REALES EN RSS
+   UTILIDADES DE TIEMPO, EXTRACCIÓN RSS Y LIMPIEZA ESTRICTA DE MARCADORES PRO
    ========================================================================== */
 function formatRelativeTime(dateInput) {
   if (!dateInput) return 'Reciente';
@@ -97,21 +96,127 @@ function stripHtmlText(html = '') {
 }
 
 function extractRealPressImage(item) {
-  // 1. Miniatura directa o enclosure del RSS
   if (item?.thumbnail && /^https?:\/\//i.test(item.thumbnail)) {
     return item.thumbnail;
   }
   if (item?.enclosure?.link && /^https?:\/\//i.test(item.enclosure.link)) {
     return item.enclosure.link;
   }
-  // 2. Extraer primera etiqueta <img src="..."> real embebida en content o description
   const rawHtml = `${item?.content || ''} ${item?.description || ''}`;
   const match = rawHtml.match(/<img[^>]+src=["'](https?:\/\/[^"']+)["']/i);
   if (match && match[1]) {
     return match[1];
   }
-  // 3. Si el medio no incluye imagen real, devolver null (PROHIBIDO usar assets internos de la app)
   return null;
+}
+
+const INVALID_PLAYER_NAME_RE =
+  /^(tbd|tba|bye|unknown|qualifier|wildcard|wc|ll|winner|loser|jugador\s*\d*|player\s*\d*|n\/a|-+|\?+)$/i;
+
+function isRealCompetitorName(rawName) {
+  const clean = String(rawName || '').replace(/\s+/g, ' ').trim();
+  if (clean.length < 3) return false;
+  if (INVALID_PLAYER_NAME_RE.test(clean)) return false;
+  if (/\b(tbd|tba|bye|winner of|loser of|to be determined)\b/i.test(clean)) return false;
+  return true;
+}
+
+function resolveProCompetitorName(competitor) {
+  if (!competitor) return '';
+
+  // 1. Singles: ESPN a veces entrega displayName en athlete o en el propio competidor (Finals)
+  const directCandidates = [
+    competitor?.athlete?.displayName,
+    competitor?.athlete?.fullName,
+    competitor?.athlete?.shortName,
+    competitor?.displayName,
+    competitor?.name,
+  ];
+
+  for (const cand of directCandidates) {
+    if (isRealCompetitorName(cand)) {
+      return String(cand).replace(/\s+/g, ' ').trim();
+    }
+  }
+
+  // 2. Dobles o Finals con roster.athletes
+  const rosterAthletes = Array.isArray(competitor?.roster?.athletes)
+    ? competitor.roster.athletes
+    : Array.isArray(competitor?.athletes)
+    ? competitor.athletes
+    : [];
+
+  if (rosterAthletes.length > 0) {
+    const names = rosterAthletes
+      .map((a) => a?.shortName || a?.displayName || a?.fullName || a?.lastName || '')
+      .map((n) => String(n).trim())
+      .filter((n) => isRealCompetitorName(n));
+
+    if (names.length > 0) {
+      return names.join(' / ');
+    }
+  }
+
+  // 3. Fallback equipo (solo si no es un placeholder genérico)
+  const teamCandidates = [
+    competitor?.team?.displayName,
+    competitor?.team?.shortDisplayName,
+    competitor?.team?.name,
+  ];
+  for (const cand of teamCandidates) {
+    if (isRealCompetitorName(cand)) {
+      return String(cand).replace(/\s+/g, ' ').trim();
+    }
+  }
+
+  return '';
+}
+
+function parseCompetitorLinescores(competitor) {
+  const raw = Array.isArray(competitor?.linescores) ? competitor.linescores : [];
+  return raw
+    .map((ls) => {
+      if (ls === null || ls === undefined) return null;
+      const val =
+        ls.value !== undefined && ls.value !== null
+          ? Number(ls.value)
+          : ls.displayValue !== undefined
+          ? Number(ls.displayValue)
+          : NaN;
+      if (Number.isNaN(val)) return null;
+      const tb =
+        ls.tiebreak !== undefined && ls.tiebreak !== null && String(ls.tiebreak).trim() !== ''
+          ? String(ls.tiebreak)
+          : null;
+      return {
+        games: String(Math.round(val)),
+        tiebreak: tb,
+        winner: Boolean(ls.winner),
+      };
+    })
+    .filter(Boolean);
+}
+
+function translateProStatus(state, rawDetail = '', rawDesc = '') {
+  const combined = `${rawDetail} ${rawDesc}`.toLowerCase();
+  if (combined.includes('walkover') || combined.includes('w/o')) return 'Walkover';
+  if (combined.includes('retired') || combined.includes('ret.')) return 'Finalizado · Retiro';
+  if (combined.includes('suspended')) return 'Suspendido';
+  if (combined.includes('delayed') || combined.includes('rain')) return 'Demorado por clima';
+  if (combined.includes('canceled') || combined.includes('cancelled')) return 'Cancelado';
+
+  if (state === 'in') {
+    const setMatch = combined.match(/(\d)(?:st|nd|rd|th)\s+set/);
+    if (setMatch) return `En juego · Set ${setMatch[1]}`;
+    return 'En juego';
+  }
+  if (state === 'post') return 'Finalizado';
+
+  // Programado: si viene fecha/hora legible, mostrarla limpia
+  if (rawDetail && !/scheduled|tbd/i.test(rawDetail)) {
+    return rawDetail;
+  }
+  return 'Programado';
 }
 
 async function fetchSingleRssFeed(feedConfig) {
@@ -141,7 +246,7 @@ async function fetchSingleRssFeed(feedConfig) {
       pubDate: item.pubDate || null,
       imageUrl: extractRealPressImage(item),
     }));
-  } catch (e) {
+  } catch {
     return [];
   } finally {
     window.clearTimeout(timeout);
@@ -150,7 +255,7 @@ async function fetchSingleRssFeed(feedConfig) {
 
 async function fetchLiveProScoreboard(tour = 'atp') {
   const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), 7000);
+  const timeout = window.setTimeout(() => controller.abort(), 7500);
 
   try {
     const url = `https://site.api.espn.com/apis/site/v2/sports/tennis/${tour}/scoreboard`;
@@ -158,6 +263,7 @@ async function fetchLiveProScoreboard(tour = 'atp') {
     if (!resp.ok) throw new Error('Scoreboard unavailable');
     const data = await resp.json();
     const events = Array.isArray(data?.events) ? data.events : [];
+    const seenKeys = new Set();
     const parsedMatches = [];
 
     events.forEach((ev) => {
@@ -167,68 +273,105 @@ async function fetchLiveProScoreboard(tour = 'atp') {
 
       if (groupings.length > 0) {
         groupings.forEach((g) => {
+          const groupLabel = g?.grouping?.displayName || '';
           if (Array.isArray(g.competitions)) {
-            g.competitions.forEach((c) => competitions.push(c));
+            g.competitions.forEach((c) => competitions.push({ comp: c, groupLabel }));
           }
         });
       } else if (Array.isArray(ev.competitions)) {
-        ev.competitions.forEach((c) => competitions.push(c));
+        ev.competitions.forEach((c) => competitions.push({ comp: c, groupLabel: '' }));
       }
 
-      competitions.slice(0, 10).forEach((comp) => {
-        const competitors = Array.isArray(comp.competitors) ? comp.competitors : [];
+      competitions.forEach(({ comp, groupLabel }) => {
+        const competitors = Array.isArray(comp?.competitors) ? comp.competitors : [];
         if (competitors.length < 2) return;
 
         const c1 = competitors[0];
         const c2 = competitors[1];
-        const name1 =
-          c1?.athlete?.displayName || c1?.team?.displayName || c1?.athlete?.shortName || 'Jugador 1';
-        const name2 =
-          c2?.athlete?.displayName || c2?.team?.displayName || c2?.athlete?.shortName || 'Jugador 2';
+        const name1 = resolveProCompetitorName(c1);
+        const name2 = resolveProCompetitorName(c2);
+
+        // Descartar estrictamente cualquier partido incompleto o TBD/BYE
+        if (!name1 || !name2) return;
+        if (name1.toLowerCase() === name2.toLowerCase()) return;
 
         const state = comp?.status?.type?.state || 'pre'; // 'in' | 'post' | 'pre'
-        const statusDetail =
-          comp?.status?.type?.shortDetail ||
-          comp?.status?.type?.description ||
-          (state === 'in' ? 'En juego' : state === 'post' ? 'Finalizado' : 'Programado');
+        const rawDetail = comp?.status?.type?.shortDetail || '';
+        const rawDesc = comp?.status?.type?.description || '';
 
-        const extractSets = (competitor) =>
-          (Array.isArray(competitor?.linescores) ? competitor.linescores : []).map((ls) =>
-            ls?.value !== undefined ? String(ls.value) : '-'
-          );
+        // Descartar cancelados o partidos marcados como finalizados sin marcador real (salvo W.O.)
+        if (/cancel/i.test(`${rawDetail} ${rawDesc}`)) return;
+
+        const sets1 = parseCompetitorLinescores(c1);
+        const sets2 = parseCompetitorLinescores(c2);
+        const isWalkover = /walkover|w\/o/i.test(`${rawDetail} ${rawDesc}`);
+
+        if (state === 'post' && !isWalkover && (sets1.length === 0 || sets2.length === 0)) {
+          return;
+        }
+        if (state === 'in' && sets1.length === 0 && sets2.length === 0) {
+          return;
+        }
+
+        const dedupeKey = `${eventName}|${[name1.toLowerCase(), name2.toLowerCase()].sort().join('|')}|${state}`;
+        if (seenKeys.has(dedupeKey)) return;
+        seenKeys.add(dedupeKey);
 
         const officialLink =
+          comp?.links?.[0]?.href ||
           ev?.links?.[0]?.href ||
-          (tour === 'wta' ? 'https://www.wtatennis.com/scores' : 'https://www.atptour.com/es/scores/current');
+          (tour === 'wta'
+            ? 'https://www.wtatennis.com/scores'
+            : 'https://www.atptour.com/es/scores/current');
+
+        const roundName =
+          comp?.round?.displayName ||
+          comp?.notes?.[0]?.headline ||
+          groupLabel ||
+          'Cuadro Principal';
+
+        const isDoubles =
+          name1.includes(' / ') ||
+          name2.includes(' / ') ||
+          /doubles|dobles/i.test(`${groupLabel} ${roundName}`);
 
         parsedMatches.push({
           id: `${tour}-${comp.id || parsedMatches.length}`,
           tour: tour.toUpperCase(),
           tournamentName: eventName,
-          roundName: comp?.round?.displayName || comp?.notes?.[0]?.headline || 'Cuadro Principal',
+          roundName,
+          isDoubles,
           state,
-          statusDetail,
+          statusDetail: translateProStatus(state, rawDetail, rawDesc),
+          dateMs: comp?.date ? new Date(comp.date).getTime() || 0 : 0,
           player1: {
             name: name1,
+            seed: c1?.curatedRank?.current && c1.curatedRank.current < 99 ? c1.curatedRank.current : null,
             winner: Boolean(c1?.winner),
-            sets: extractSets(c1),
+            sets: sets1,
           },
           player2: {
             name: name2,
+            seed: c2?.curatedRank?.current && c2.curatedRank.current < 99 ? c2.curatedRank.current : null,
             winner: Boolean(c2?.winner),
-            sets: extractSets(c2),
+            sets: sets2,
           },
           officialLink,
         });
       });
     });
 
-    // Priorizar partidos EN VIVO primero, luego finalizados y programados
-    const weight = { in: 0, post: 1, pre: 2 };
+    // Priorizar: 1) En vivo, 2) Singles antes que Dobles, 3) Finalizados recientes, 4) Programados
+    const stateWeight = { in: 0, post: 1, pre: 2 };
     return parsedMatches
-      .sort((a, b) => (weight[a.state] ?? 3) - (weight[b.state] ?? 3))
-      .slice(0, 12);
-  } catch (e) {
+      .sort((a, b) => {
+        const sw = (stateWeight[a.state] ?? 3) - (stateWeight[b.state] ?? 3);
+        if (sw !== 0) return sw;
+        if (a.isDoubles !== b.isDoubles) return a.isDoubles ? 1 : -1;
+        return b.dateMs - a.dateMs;
+      })
+      .slice(0, 16);
+  } catch {
     return [];
   } finally {
     window.clearTimeout(timeout);
@@ -236,9 +379,9 @@ async function fetchLiveProScoreboard(tour = 'atp') {
 }
 
 /* ==========================================================================
-   SUBCOMPONENTE: TARJETA EDITORIAL DE NOTICIA REAL (SIN ASSETS FALSOS)
+   SUBCOMPONENTE: TARJETA EDITORIAL DE NOTICIA REAL
    ========================================================================== */
-function PressArticleCard({ article }) {
+function PressArticleCard({ article, animIndex = 0 }) {
   const [imgFailed, setImgFailed] = useState(false);
   const showRealPhoto = Boolean(article.imageUrl) && !imgFailed;
 
@@ -248,9 +391,9 @@ function PressArticleCard({ article }) {
       target="_blank"
       rel="noopener noreferrer"
       className="tt-nn-press-card"
+      style={{ '--nn-delay': `${Math.min(animIndex, 8) * 45}ms` }}
       onClick={() => triggerHaptic('light')}
     >
-      {/* Foto real del medio O tarjeta tipográfica limpia del portal (cero assets internos) */}
       {showRealPhoto ? (
         <div className="tt-nn-press-media">
           <img
@@ -260,10 +403,7 @@ function PressArticleCard({ article }) {
             onError={() => setImgFailed(true)}
             className="tt-nn-press-img"
           />
-          <span
-            className="tt-nn-source-float"
-            style={{ backgroundColor: article.accent }}
-          >
+          <span className="tt-nn-source-float" style={{ backgroundColor: article.accent }}>
             {article.sourceName}
           </span>
         </div>
@@ -307,11 +447,11 @@ function PressArticleCard({ article }) {
 }
 
 /* ==========================================================================
-   COMPONENTE PRINCIPAL: NoticesAndNewsModal (BLOQUE 18 DE 26)
+   COMPONENTE PRINCIPAL: NoticesAndNewsModal
    ========================================================================== */
 export default function NoticesAndNewsModal({
   isOpen = false,
-  initialTab = 'notificaciones', // 'notificaciones' | 'actualidad' | 'marcadores'
+  initialTab = 'notificaciones',
   onClose,
   currentUser = null,
   players = [],
@@ -328,22 +468,21 @@ export default function NoticesAndNewsModal({
   const [activeTab, setActiveTab] = useState(initialTab);
   const [readIds, setReadIds] = useState([]);
 
-  // Estado Actualidad Tenis (RSS real en vivo)
+  // Actualidad Tenis (RSS real)
   const [pressArticles, setPressArticles] = useState([]);
   const [isLoadingPress, setIsLoadingPress] = useState(false);
   const [pressSourceFilter, setPressSourceFilter] = useState('ALL');
   const [pressLastSync, setPressLastSync] = useState(null);
 
-  // Estado Marcadores ATP / WTA (Solo lectura · Refresco cada 60 s)
-  const [proTour, setProTour] = useState('atp'); // 'atp' | 'wta'
+  // Marcadores ATP / WTA (solo lectura · refresco 60s)
+  const [proTour, setProTour] = useState('atp');
   const [proMatches, setProMatches] = useState([]);
   const [isLoadingPro, setIsLoadingPro] = useState(false);
   const [proLastSync, setProLastSync] = useState(null);
 
-  // Permiso de notificaciones Push nativas (PWA)
   const [pushStatus, setPushStatus] = useState(() => {
     if (typeof window === 'undefined' || !('Notification' in window)) return 'unsupported';
-    return window.Notification.permission; // 'default' | 'granted' | 'denied'
+    return window.Notification.permission;
   });
 
   useEffect(() => {
@@ -352,7 +491,6 @@ export default function NoticesAndNewsModal({
     }
   }, [isOpen, initialTab]);
 
-  // Mapa rápido de jugadores
   const playersMap = useMemo(() => {
     const m = {};
     (players || []).forEach((p) => {
@@ -361,9 +499,6 @@ export default function NoticesAndNewsModal({
     return m;
   }, [players]);
 
-  /* ------------------------------------------------------------------------
-     1. CARGA REAL DE NOTICIAS (RSS EN VIVO SIN RELLENO FALSO)
-     ------------------------------------------------------------------------ */
   const loadPressFeeds = useCallback(async () => {
     setIsLoadingPress(true);
     try {
@@ -390,9 +525,6 @@ export default function NoticesAndNewsModal({
     }
   }, [isOpen, activeTab, pressArticles.length, loadPressFeeds]);
 
-  /* ------------------------------------------------------------------------
-     2. CARGA Y AUTO-REFRESCO CADA 60 SEGUNDOS DE MARCADORES ATP / WTA
-     ------------------------------------------------------------------------ */
   const loadProScores = useCallback(async (tourKey) => {
     setIsLoadingPro(true);
     try {
@@ -415,14 +547,38 @@ export default function NoticesAndNewsModal({
     return () => window.clearInterval(intervalId);
   }, [isOpen, activeTab, proTour, loadProScores]);
 
-  /* ------------------------------------------------------------------------
-     3. CONSTRUCCIÓN DE TARJETAS DE NOTIFICACIONES ACCIONABLES (BLANCO MARFIL)
-     ------------------------------------------------------------------------ */
+  /* Construcción de Notificaciones Accionables */
   const notificationItems = useMemo(() => {
     const items = [];
 
-    // A. Retos entrantes pendientes para el usuario actual (matching estricto por ID)
     if (currentUser?.id) {
+      // A. Marcadores propuestos por el rival esperando confirmación
+      (challenges || [])
+        .filter(
+          (c) =>
+            c.status === 'SCORE_PROPOSED' &&
+            (c.playerAId === currentUser.id || c.playerBId === currentUser.id) &&
+            c.proposedBy &&
+            c.proposedBy !== currentUser.id
+        )
+        .forEach((ch) => {
+          const rival = playersMap[ch.proposedBy];
+          const club = getClubById(clubs, ch.clubId);
+          items.push({
+            id: `noti-score-${ch.id}`,
+            category: 'CONFIRMAR MARCADOR',
+            unread: !readIds.includes(`noti-score-${ch.id}`),
+            title: `${rival?.name || 'Tu rival'} subió el resultado (${ch.scoreSummary || 'Ver sets'})`,
+            subtitle: `${ch.clubName} · Confírmalo para actualizar tus puntos al instante`,
+            timeLabel: 'Acción requerida',
+            logo: club?.logo || ASSETS.logo,
+            type: 'GO_TO_TAB',
+            targetTab: 'retos',
+            ctaLabel: 'REVISAR EN RETOS',
+          });
+        });
+
+      // B. Retos entrantes pendientes
       (challenges || [])
         .filter((c) => c.status === 'PENDING' && c.playerBId === currentUser.id)
         .forEach((ch) => {
@@ -434,7 +590,7 @@ export default function NoticesAndNewsModal({
             unread: !readIds.includes(`noti-ch-${ch.id}`),
             title: `${challenger?.name || 'Un jugador'} te ha retado en ${ch.clubName}`,
             subtitle: `${ch.dateLabel || 'Fecha propuesta'} · ${ch.timeLabel || ''} · ${
-              ch.mode === 'Amistoso' ? 'Amistoso' : 'Oficial por puntos'
+              ch.mode === 'Amistoso' ? 'Amistoso' : 'Por puntos'
             }`,
             timeLabel: 'Pendiente de respuesta',
             logo: club?.logo || ASSETS.logo,
@@ -444,7 +600,7 @@ export default function NoticesAndNewsModal({
           });
         });
 
-      // B. Partidos del usuario que están EN JUEGO ahora
+      // C. Partidos en juego
       (challenges || [])
         .filter(
           (c) =>
@@ -459,7 +615,7 @@ export default function NoticesAndNewsModal({
             category: 'EN CANCHA',
             unread: !readIds.includes(`noti-live-${ch.id}`),
             title: `Tu partido frente a ${opp?.name || 'tu rival'} está en curso`,
-            subtitle: `${ch.clubName} · Marcador oficial listo para actualizar`,
+            subtitle: `${ch.clubName} · Marcador listo para actualizar`,
             timeLabel: 'En vivo',
             logo: club?.logo || ASSETS.logo,
             type: 'GO_TO_TAB',
@@ -469,7 +625,7 @@ export default function NoticesAndNewsModal({
         });
     }
 
-    // C. Torneos con inscripciones abiertas
+    // D. Torneos con inscripciones abiertas
     (tournaments || [])
       .filter((t) => t.status === 'OPEN')
       .slice(0, 2)
@@ -489,7 +645,7 @@ export default function NoticesAndNewsModal({
         });
       });
 
-    // D. Notificaciones personalizadas inyectadas desde el estado global
+    // E. Notificaciones del estado global
     (notices || []).forEach((n) => {
       items.push({
         id: n.id,
@@ -505,7 +661,7 @@ export default function NoticesAndNewsModal({
       });
     });
 
-    // E. Boletín institucional fijado del circuito
+    // F. Boletín institucional
     const bull = NOTICES_NEWS_EDITABLE_CONFIG.circuitBulletin;
     items.push({
       id: bull.id,
@@ -533,9 +689,6 @@ export default function NoticesAndNewsModal({
     return pressArticles.filter((a) => a.sourceId === pressSourceFilter);
   }, [pressArticles, pressSourceFilter]);
 
-  /* ------------------------------------------------------------------------
-     ACCIONES (MARCAR LEÍDO, ACTIVAR PUSH PWA, ACEPTAR/CONTRAPROPONER RETO)
-     ------------------------------------------------------------------------ */
   const handleMarkAllAsRead = () => {
     triggerHaptic('light');
     setReadIds(notificationItems.map((i) => i.id));
@@ -560,9 +713,9 @@ export default function NoticesAndNewsModal({
       if (res === 'granted') {
         if (onNotify) onNotify('¡Alertas activadas! Recibirás avisos de retos y torneos.', 'success');
       } else {
-        if (onNotify) onNotify('Puedes activar las alertas luego desde los ajustes de tu navegador.', 'info');
+        if (onNotify) onNotify('Puedes activar las alertas luego desde los ajustes de tu dispositivo.', 'info');
       }
-    } catch (e) {
+    } catch {
       if (onNotify) onNotify('Activa las alertas desde la configuración de tu dispositivo.', 'info');
     }
   };
@@ -571,11 +724,14 @@ export default function NoticesAndNewsModal({
     triggerHaptic('light');
     const msg = `Hola ${challenger?.name || ''}, recibí tu desafío en TOTAL TENIS para ${ch.clubName} (${ch.dateLabel} · ${ch.timeLabel}). ¿Te parece si coordinamos otra hora o sede?`;
     window.open(
-      buildWhatsAppLink(challenger?.whatsapp, msg),
+      buildWhatsappLink(challenger?.whatsapp, msg),
       '_blank',
       'noopener,noreferrer'
     );
   };
+
+  const activeTabIdx =
+    activeTab === 'notificaciones' ? 0 : activeTab === 'actualidad' ? 1 : 2;
 
   return (
     <ModalPortal
@@ -587,10 +743,14 @@ export default function NoticesAndNewsModal({
       isWide
       isTopLayer
     >
-      {/* Superficie Editorial en Blanco Marfil (#FAF9F5) como el blueprint aprobado */}
       <div className="tt-nn-editorial-shell">
-        {/* 1. CONMUTADOR DE 3 PESTAÑAS LIMPIAS */}
+        {/* 1. CONMUTADOR CON INDICADOR DESLIZANTE ELÁSTICO */}
         <div className="tt-nn-tabs" role="tablist" aria-label="Notificaciones y Boletín Tenis">
+          <span
+            className="tt-nn-tab-slider"
+            aria-hidden="true"
+            style={{ transform: `translateX(${activeTabIdx * 100}%)` }}
+          />
           <button
             type="button"
             role="tab"
@@ -615,7 +775,7 @@ export default function NoticesAndNewsModal({
               setActiveTab('actualidad');
             }}
           >
-            Actualidad Tenis
+            Actualidad
           </button>
 
           <button
@@ -633,11 +793,10 @@ export default function NoticesAndNewsModal({
         </div>
 
         {/* ==================================================================
-            PESTAÑA 1: NOTIFICACIONES DEL CIRCUITO (ESTILO EDITORIAL MARFIL)
+            PESTAÑA 1: NOTIFICACIONES DEL CIRCUITO
             ================================================================== */}
         {activeTab === 'notificaciones' && (
-          <div className="tt-nn-stack">
-            {/* Barra de acciones rápidas + Activación de Alertas Push */}
+          <div key="nn-notis" className="tt-nn-stack tt-nn-enter">
             <div className="tt-nn-utility-row">
               {pushStatus !== 'granted' ? (
                 <button
@@ -671,29 +830,24 @@ export default function NoticesAndNewsModal({
               />
             ) : (
               <div className="tt-nn-cards-list">
-                {notificationItems.map((item) => (
-                  <article key={item.id} className="tt-nn-card">
-                    {/* Fila Superior: Píldora gris de categoría + Punto verde activo */}
+                {notificationItems.map((item, idx) => (
+                  <article
+                    key={item.id}
+                    className="tt-nn-card"
+                    style={{ '--nn-delay': `${Math.min(idx, 8) * 40}ms` }}
+                  >
                     <div className="tt-nn-card-top">
                       <span className="tt-nn-cat-pill">{item.category}</span>
                       <div className="tt-nn-top-right">
                         <span className="tt-nn-time">{item.timeLabel}</span>
-                        {item.unread && (
-                          <span
-                            className="tt-nn-green-dot"
-                            aria-label="Sin leer"
-                          />
-                        )}
+                        {item.unread && <span className="tt-nn-green-dot" aria-label="Sin leer" />}
                       </div>
                     </div>
 
-                    {/* Centro: Titular grande en negrita + Escudo del club/torneo a la derecha */}
                     <div className="tt-nn-card-mid">
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <h3 className="tt-nn-card-title">{item.title}</h3>
-                        {item.subtitle && (
-                          <p className="tt-nn-card-sub">{item.subtitle}</p>
-                        )}
+                        {item.subtitle && <p className="tt-nn-card-sub">{item.subtitle}</p>}
                       </div>
 
                       <div className="tt-nn-crest-box">
@@ -706,7 +860,6 @@ export default function NoticesAndNewsModal({
                       </div>
                     </div>
 
-                    {/* Pie: Botones píldora con borde verde a la izquierda */}
                     <div className="tt-nn-card-actions">
                       {item.type === 'INCOMING_CHALLENGE' && item.challenge && (
                         <>
@@ -771,11 +924,10 @@ export default function NoticesAndNewsModal({
         )}
 
         {/* ==================================================================
-            PESTAÑA 2: ACTUALIDAD TENIS (FEEDS RSS REALES EN VIVO · $0)
+            PESTAÑA 2: ACTUALIDAD TENIS (RSS REAL EN VIVO)
             ================================================================== */}
         {activeTab === 'actualidad' && (
-          <div className="tt-nn-stack">
-            {/* Cabecera Editorial + Filtros por Medio */}
+          <div key="nn-press" className="tt-nn-stack tt-nn-enter">
             <div className="tt-nn-press-bar">
               <div className="tt-nn-source-pills">
                 <button
@@ -812,7 +964,11 @@ export default function NoticesAndNewsModal({
                   loadPressFeeds();
                 }}
               >
-                {isLoadingPress ? 'Cargando...' : pressLastSync ? `↻ ${pressLastSync}` : '↻ Actualizar'}
+                {isLoadingPress
+                  ? 'Cargando...'
+                  : pressLastSync
+                  ? `↻ ${pressLastSync}`
+                  : '↻ Actualizar'}
               </button>
             </div>
 
@@ -824,7 +980,7 @@ export default function NoticesAndNewsModal({
               </div>
             ) : filteredPress.length === 0 ? (
               <div className="tt-nn-fallback-box">
-                <strong>No pudimos conectar con el feed en este momento</strong>
+                <strong>No pudimos conectar con el boletín en este momento</strong>
                 <p>
                   Nunca mostramos noticias falsas ni desactualizadas. Puedes reintentar o abrir directamente los portales oficiales de tenis:
                 </p>
@@ -852,8 +1008,8 @@ export default function NoticesAndNewsModal({
               </div>
             ) : (
               <div className="tt-nn-press-grid">
-                {filteredPress.map((art) => (
-                  <PressArticleCard key={art.id} article={art} />
+                {filteredPress.map((art, idx) => (
+                  <PressArticleCard key={art.id} article={art} animIndex={idx} />
                 ))}
               </div>
             )}
@@ -861,23 +1017,24 @@ export default function NoticesAndNewsModal({
         )}
 
         {/* ==================================================================
-            PESTAÑA 3: MARCADORES ATP / WTA EN VIVO (SOLO LECTURA · CADA 60 S)
+            PESTAÑA 3: MARCADORES ATP / WTA (NOMBRES REALES + CERO INCOMPLETOS)
             ================================================================== */}
         {activeTab === 'marcadores' && (
-          <div className="tt-nn-stack">
-            {/* Cabecera Verde Menta estilo Live Tennis Scores */}
-            <div className="tt-nn-pro-hero">
+          <div key={`nn-pro-${proTour}`} className="tt-nn-stack tt-nn-enter">
+            <div className={`tt-nn-pro-hero ${proTour === 'wta' ? 'is-wta' : 'is-atp'}`}>
               <div>
-                <span className="tt-nn-pro-kicker">SOLO LECTURA · ACTUALIZACIÓN AUTOMÁTICA 60S</span>
-                <h3>MARCADORES ATP & WTA</h3>
+                <span className="tt-nn-pro-kicker">
+                  MARCADORES OFICIALES · ACTUALIZACIÓN CADA 60 S
+                </span>
+                <h3>{proTour === 'wta' ? 'WTA TOUR EN VIVO' : 'ATP TOUR EN VIVO'}</h3>
               </div>
 
               <div className="tt-nn-tour-switch">
                 <button
                   type="button"
-                  className={proTour === 'atp' ? 'is-active' : ''}
+                  className={proTour === 'atp' ? 'is-active is-atp' : ''}
                   onClick={() => {
-                    triggerHaptic('light');
+                    triggerHaptic('medium');
                     setProTour('atp');
                   }}
                 >
@@ -885,9 +1042,9 @@ export default function NoticesAndNewsModal({
                 </button>
                 <button
                   type="button"
-                  className={proTour === 'wta' ? 'is-active' : ''}
+                  className={proTour === 'wta' ? 'is-active is-wta' : ''}
                   onClick={() => {
-                    triggerHaptic('light');
+                    triggerHaptic('medium');
                     setProTour('wta');
                   }}
                 >
@@ -899,8 +1056,8 @@ export default function NoticesAndNewsModal({
             <div className="tt-nn-pro-sync-strip">
               <span>
                 {proLastSync
-                  ? `Última consulta: ${proLastSync}`
-                  : 'Conectando marcadores oficiales...'}
+                  ? `Última consulta: ${proLastSync} · ${proMatches.length} partido(s)`
+                  : 'Consultando marcadores oficiales...'}
               </span>
               <button
                 type="button"
@@ -911,7 +1068,7 @@ export default function NoticesAndNewsModal({
                   loadProScores(proTour);
                 }}
               >
-                {isLoadingPro ? 'Actualizando...' : '↻ Refrescar ahora'}
+                {isLoadingPro ? 'Actualizando...' : '↻ Refrescar'}
               </button>
             </div>
 
@@ -923,9 +1080,9 @@ export default function NoticesAndNewsModal({
               </div>
             ) : proMatches.length === 0 ? (
               <div className="tt-nn-fallback-box">
-                <strong>Sin partidos profesionales en cancha ahora mismo</strong>
+                <strong>Sin partidos oficiales completos en este momento</strong>
                 <p>
-                  Cuando haya jornada activa del circuito {proTour.toUpperCase()}, los sets se mostrarán aquí en tiempo real. También puedes consultar la cobertura oficial directa:
+                  Cuando haya jornada activa del circuito {proTour.toUpperCase()} con jugadores confirmados, los marcadores aparecerán aquí automáticamente.
                 </p>
                 <div className="tt-nn-portal-links">
                   {NOTICES_NEWS_EDITABLE_CONFIG.officialPortals.slice(1).map((p) => (
@@ -943,10 +1100,13 @@ export default function NoticesAndNewsModal({
               </div>
             ) : (
               <div className="tt-nn-pro-grid">
-                {proMatches.map((m) => (
+                {proMatches.map((m, idx) => (
                   <article
                     key={m.id}
-                    className={`tt-nn-pro-card ${m.state === 'in' ? 'is-live' : ''}`}
+                    className={`tt-nn-pro-card ${m.state === 'in' ? 'is-live' : ''} ${
+                      proTour === 'wta' ? 'is-wta-card' : 'is-atp-card'
+                    }`}
+                    style={{ '--nn-delay': `${Math.min(idx, 10) * 42}ms` }}
                   >
                     <div className="tt-nn-pro-head">
                       <span className="tt-nn-pro-tourney">{m.tournamentName}</span>
@@ -957,24 +1117,40 @@ export default function NoticesAndNewsModal({
                     </div>
 
                     <div className={`tt-nn-pro-row ${m.player1.winner ? 'is-win' : ''}`}>
-                      <strong>{m.player1.name}</strong>
+                      <div className="tt-nn-pro-player-name">
+                        {m.player1.seed && <span className="tt-nn-seed">({m.player1.seed})</span>}
+                        <strong>{m.player1.name}</strong>
+                      </div>
                       <div className="tt-nn-pro-sets">
                         {m.player1.sets.length > 0 ? (
-                          m.player1.sets.map((s, i) => <span key={i}>{s}</span>)
+                          m.player1.sets.map((s, i) => (
+                            <span key={i} className={s.winner ? 'is-set-won' : ''}>
+                              {s.games}
+                              {s.tiebreak ? <sup>{s.tiebreak}</sup> : null}
+                            </span>
+                          ))
                         ) : (
-                          <span>—</span>
+                          <span className="is-empty">—</span>
                         )}
                         {m.player1.winner && <em>◀</em>}
                       </div>
                     </div>
 
                     <div className={`tt-nn-pro-row ${m.player2.winner ? 'is-win' : ''}`}>
-                      <strong>{m.player2.name}</strong>
+                      <div className="tt-nn-pro-player-name">
+                        {m.player2.seed && <span className="tt-nn-seed">({m.player2.seed})</span>}
+                        <strong>{m.player2.name}</strong>
+                      </div>
                       <div className="tt-nn-pro-sets">
                         {m.player2.sets.length > 0 ? (
-                          m.player2.sets.map((s, i) => <span key={i}>{s}</span>)
+                          m.player2.sets.map((s, i) => (
+                            <span key={i} className={s.winner ? 'is-set-won' : ''}>
+                              {s.games}
+                              {s.tiebreak ? <sup>{s.tiebreak}</sup> : null}
+                            </span>
+                          ))
                         ) : (
-                          <span>—</span>
+                          <span className="is-empty">—</span>
                         )}
                         {m.player2.winner && <em>◀</em>}
                       </div>
@@ -989,7 +1165,7 @@ export default function NoticesAndNewsModal({
                         className="tt-nn-pro-ext"
                         onClick={() => triggerHaptic('light')}
                       >
-                        Ver cobertura oficial ↗
+                        Cobertura oficial ↗
                       </a>
                     </div>
                   </article>
@@ -1000,9 +1176,6 @@ export default function NoticesAndNewsModal({
         )}
       </div>
 
-      {/* ====================================================================
-          ESTILOS ENCAPSULADOS (BLANCO MARFIL EDITORIAL + ACENTOS ESMERALDA)
-          ==================================================================== */}
       <style>{`
         .tt-nn-editorial-shell {
           border-radius: 20px;
@@ -1014,16 +1187,31 @@ export default function NoticesAndNewsModal({
           gap: 13px;
         }
 
-        /* Conmutador de 3 pestañas */
+        /* Conmutador con slider elástico */
         .tt-nn-tabs {
+          position: relative;
           display: grid;
           grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 5px;
           padding: 4px;
           border-radius: 15px;
           background: rgba(30, 7, 52, 0.08);
         }
+        .tt-nn-tab-slider {
+          position: absolute;
+          top: 4px;
+          bottom: 4px;
+          left: 4px;
+          width: calc((100% - 8px) / 3);
+          border-radius: 11px;
+          background: #1E0734;
+          box-shadow: 0 5px 14px rgba(30, 7, 52, 0.24);
+          transition: transform 320ms cubic-bezier(0.22, 1.24, 0.36, 1);
+          pointer-events: none;
+          z-index: 0;
+        }
         .tt-nn-tab {
+          position: relative;
+          z-index: 1;
           min-height: 38px;
           padding: 0 6px;
           border-radius: 11px;
@@ -1035,11 +1223,11 @@ export default function NoticesAndNewsModal({
           font-weight: 800;
           color: rgba(30, 7, 52, 0.68);
           white-space: nowrap;
+          transition: color 200ms ease;
         }
         .tt-nn-tab.is-active {
-          background: #1E0734;
           color: #00DC7D;
-          box-shadow: 0 4px 12px rgba(30, 7, 52, 0.22);
+          font-weight: 900;
         }
         .tt-nn-count-dot {
           min-width: 18px;
@@ -1048,27 +1236,24 @@ export default function NoticesAndNewsModal({
           border-radius: 999px;
           background: #00DC7D;
           color: #120321;
-          font-size: 0.65rem;
+          font-size: 0.64rem;
           font-weight: 900;
           display: inline-flex;
           align-items: center;
           justify-content: center;
         }
 
-        .tt-nn-stack {
-          display: flex;
-          flex-direction: column;
-          gap: 11px;
+        .tt-nn-stack { display: flex; flex-direction: column; gap: 11px; }
+        .tt-nn-enter {
+          animation: ttNnFadeUp 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+        @keyframes ttNnFadeUp {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
         }
 
-        /* 1. NOTIFICACIONES EDITORIALES */
-        .tt-nn-utility-row {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 8px;
-          flex-wrap: wrap;
-        }
+        /* 1. NOTIFICACIONES */
+        .tt-nn-utility-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
         .tt-nn-push-pill {
           display: inline-flex;
           align-items: center;
@@ -1081,23 +1266,10 @@ export default function NoticesAndNewsModal({
           font-size: 0.71rem;
           font-weight: 800;
         }
-        .tt-nn-push-ok {
-          font-size: 0.72rem;
-          font-weight: 800;
-          color: #008A4E;
-        }
-        .tt-nn-mark-read {
-          font-size: 0.72rem;
-          font-weight: 800;
-          color: rgba(30, 7, 52, 0.66);
-          text-decoration: underline;
-        }
+        .tt-nn-push-ok { font-size: 0.72rem; font-weight: 800; color: #007A44; }
+        .tt-nn-mark-read { font-size: 0.72rem; font-weight: 800; color: rgba(30, 7, 52, 0.66); text-decoration: underline; }
 
-        .tt-nn-cards-list {
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-        }
+        .tt-nn-cards-list { display: flex; flex-direction: column; gap: 10px; }
         .tt-nn-card {
           border-radius: 18px;
           padding: 14px;
@@ -1107,72 +1279,19 @@ export default function NoticesAndNewsModal({
           display: flex;
           flex-direction: column;
           gap: 10px;
+          animation: ttNnFadeUp 340ms cubic-bezier(0.22, 1, 0.36, 1) both;
+          animation-delay: var(--nn-delay, 0ms);
         }
-        .tt-nn-card-top {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 8px;
-        }
-        .tt-nn-cat-pill {
-          padding: 3px 9px;
-          border-radius: 999px;
-          background: #EFEBF5;
-          color: #1E0734;
-          font-size: 0.62rem;
-          font-weight: 900;
-          letter-spacing: 0.07em;
-        }
-        .tt-nn-top-right {
-          display: inline-flex;
-          align-items: center;
-          gap: 7px;
-        }
-        .tt-nn-time {
-          font-size: 0.69rem;
-          font-weight: 700;
-          color: rgba(30, 7, 52, 0.56);
-        }
-        .tt-nn-green-dot {
-          width: 9px;
-          height: 9px;
-          border-radius: 50%;
-          background: #00DC7D;
-          box-shadow: 0 0 8px rgba(0, 220, 125, 0.75);
-        }
-        .tt-nn-card-mid {
-          display: flex;
-          align-items: flex-start;
-          gap: 12px;
-        }
-        .tt-nn-card-title {
-          margin: 0;
-          font-size: 0.94rem;
-          font-weight: 900;
-          line-height: 1.26;
-          color: #1E0734;
-        }
-        .tt-nn-card-sub {
-          margin: 4px 0 0;
-          font-size: 0.76rem;
-          line-height: 1.38;
-          color: rgba(30, 7, 52, 0.7);
-        }
-        .tt-nn-crest-box {
-          width: 46px;
-          height: 46px;
-          border-radius: 13px;
-          overflow: hidden;
-          background: #FAF9F5;
-          border: 1px solid rgba(30, 7, 52, 0.12);
-          flex-shrink: 0;
-        }
-        .tt-nn-card-actions {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          flex-wrap: wrap;
-        }
+        .tt-nn-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .tt-nn-cat-pill { padding: 3px 9px; border-radius: 999px; background: #EFEBF5; color: #1E0734; font-size: 0.62rem; font-weight: 900; letter-spacing: 0.07em; }
+        .tt-nn-top-right { display: inline-flex; align-items: center; gap: 7px; }
+        .tt-nn-time { font-size: 0.69rem; font-weight: 700; color: rgba(30, 7, 52, 0.56); }
+        .tt-nn-green-dot { width: 9px; height: 9px; border-radius: 50%; background: #00DC7D; box-shadow: 0 0 8px rgba(0, 220, 125, 0.75); }
+        .tt-nn-card-mid { display: flex; align-items: flex-start; gap: 12px; }
+        .tt-nn-card-title { margin: 0; font-size: 0.94rem; font-weight: 900; line-height: 1.26; color: #1E0734; }
+        .tt-nn-card-sub { margin: 4px 0 0; font-size: 0.76rem; line-height: 1.38; color: rgba(30, 7, 52, 0.7); }
+        .tt-nn-crest-box { width: 46px; height: 46px; border-radius: 13px; overflow: hidden; background: #FAF9F5; border: 1px solid rgba(30, 7, 52, 0.12); flex-shrink: 0; }
+        .tt-nn-card-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
         .tt-nn-pill-btn {
           display: inline-flex;
           align-items: center;
@@ -1181,43 +1300,22 @@ export default function NoticesAndNewsModal({
           padding: 0 13px;
           border-radius: 999px;
           background: transparent;
-          border: 1.5px solid #00B868;
+          border: 1.5px solid #00A859;
           color: #1E0734;
           font-size: 0.69rem;
           font-weight: 900;
           letter-spacing: 0.04em;
           text-decoration: none;
+          transition: transform 150ms cubic-bezier(0.22, 1.35, 0.36, 1);
         }
-        .tt-nn-pill-btn.is-solid {
-          background: #00DC7D;
-          border-color: #00DC7D;
-          color: #120321;
-        }
-        .tt-nn-text-decline {
-          font-size: 0.72rem;
-          font-weight: 800;
-          color: #DC2626;
-          padding: 4px 6px;
-        }
+        .tt-nn-pill-btn:active { transform: scale(0.94); }
+        .tt-nn-pill-btn.is-solid { background: #00DC7D; border-color: #00DC7D; color: #120321; }
+        .tt-nn-text-decline { font-size: 0.72rem; font-weight: 800; color: #DC2626; padding: 4px 6px; }
 
-        /* 2. ACTUALIDAD TENIS (RSS REAL) */
-        .tt-nn-press-bar {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 8px;
-          flex-wrap: wrap;
-        }
-        .tt-nn-source-pills {
-          display: flex;
-          gap: 6px;
-          overflow-x: auto;
-          padding-bottom: 2px;
-          scrollbar-width: none;
-        }
-        .tt-nn-source-pills::-webkit-scrollbar {
-          display: none;
-        }
+        /* 2. ACTUALIDAD TENIS */
+        .tt-nn-press-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+        .tt-nn-source-pills { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+        .tt-nn-source-pills::-webkit-scrollbar { display: none; }
         .tt-nn-src-filter {
           flex-shrink: 0;
           min-height: 32px;
@@ -1225,33 +1323,16 @@ export default function NoticesAndNewsModal({
           border-radius: 999px;
           background: #FFFFFF;
           border: 1px solid rgba(30, 7, 52, 0.14);
-          color: rgba(30, 7, 52, 0.72);
+          color: rgba(30, 7, 52, 0.74);
           font-size: 0.71rem;
           font-weight: 800;
         }
-        .tt-nn-src-filter.is-active {
-          background: #1E0734;
-          border-color: #1E0734;
-          color: #00DC7D;
-        }
-        .tt-nn-refresh-btn {
-          padding: 5px 11px;
-          border-radius: 999px;
-          background: rgba(30, 7, 52, 0.08);
-          color: #1E0734;
-          font-size: 0.7rem;
-          font-weight: 800;
-        }
+        .tt-nn-src-filter.is-active { background: #1E0734; border-color: #1E0734; color: #00DC7D; }
+        .tt-nn-refresh-btn { padding: 5px 11px; border-radius: 999px; background: rgba(30, 7, 52, 0.09); color: #1E0734; font-size: 0.7rem; font-weight: 800; }
 
-        .tt-nn-press-grid {
-          display: grid;
-          grid-template-columns: 1fr;
-          gap: 11px;
-        }
+        .tt-nn-press-grid { display: grid; grid-template-columns: 1fr; gap: 11px; }
         @media (min-width: 660px) {
-          .tt-nn-press-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-          }
+          .tt-nn-press-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
         .tt-nn-press-card {
           border-radius: 18px;
@@ -1263,163 +1344,69 @@ export default function NoticesAndNewsModal({
           text-decoration: none;
           display: flex;
           flex-direction: column;
+          animation: ttNnFadeUp 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+          animation-delay: var(--nn-delay, 0ms);
         }
-        .tt-nn-press-media {
-          position: relative;
-          aspect-ratio: 16 / 9;
-          background: #1E0734;
-          overflow: hidden;
-        }
-        .tt-nn-press-img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-        }
-        .tt-nn-source-float {
-          position: absolute;
-          left: 10px;
-          top: 10px;
-          padding: 3px 9px;
-          border-radius: 999px;
-          color: #FFFFFF;
-          font-size: 0.62rem;
-          font-weight: 900;
-          letter-spacing: 0.05em;
-        }
-        .tt-nn-press-editorial-banner {
-          padding: 11px 13px 0;
-          border-left: 4px solid #1E0734;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 8px;
-        }
-        .tt-nn-press-body {
-          padding: 12px 13px 13px;
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-          flex: 1;
-        }
-        .tt-nn-press-meta-top {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 8px;
-        }
-        .tt-nn-source-chip {
-          padding: 2px 8px;
-          border-radius: 999px;
-          font-size: 0.64rem;
-          font-weight: 900;
-        }
-        .tt-nn-press-time {
-          font-size: 0.68rem;
-          font-weight: 700;
-          color: rgba(30, 7, 52, 0.55);
-        }
-        .tt-nn-press-title {
-          margin: 0;
-          font-size: 0.9rem;
-          font-weight: 900;
-          line-height: 1.25;
-          color: #1E0734;
-        }
-        .tt-nn-press-excerpt {
-          margin: 0;
-          font-size: 0.74rem;
-          line-height: 1.4;
-          color: rgba(30, 7, 52, 0.72);
-        }
-        .tt-nn-press-foot {
-          margin-top: auto;
-          padding-top: 6px;
-        }
-        .tt-nn-read-pill {
-          display: inline-block;
-          padding: 4px 10px;
-          border-radius: 999px;
-          border: 1.5px solid #00B868;
-          color: #1E0734;
-          font-size: 0.66rem;
-          font-weight: 900;
-        }
+        .tt-nn-press-media { position: relative; aspect-ratio: 16 / 9; background: #1E0734; overflow: hidden; }
+        .tt-nn-press-img { width: 100%; height: 100%; object-fit: cover; }
+        .tt-nn-source-float { position: absolute; left: 10px; top: 10px; padding: 3px 9px; border-radius: 999px; color: #FFFFFF; font-size: 0.62rem; font-weight: 900; letter-spacing: 0.05em; }
+        .tt-nn-press-editorial-banner { padding: 11px 13px 0; border-left: 4px solid #1E0734; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+        .tt-nn-press-body { padding: 12px 13px 13px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+        .tt-nn-press-meta-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+        .tt-nn-source-chip { padding: 2px 8px; border-radius: 999px; font-size: 0.64rem; font-weight: 900; }
+        .tt-nn-press-time { font-size: 0.68rem; font-weight: 700; color: rgba(30, 7, 52, 0.56); }
+        .tt-nn-press-title { margin: 0; font-size: 0.9rem; font-weight: 900; line-height: 1.25; color: #1E0734; }
+        .tt-nn-press-excerpt { margin: 0; font-size: 0.74rem; line-height: 1.4; color: rgba(30, 7, 52, 0.72); }
+        .tt-nn-press-foot { margin-top: auto; padding-top: 6px; }
+        .tt-nn-read-pill { display: inline-block; padding: 4px 10px; border-radius: 999px; border: 1.5px solid #00A859; color: #1E0734; font-size: 0.66rem; font-weight: 900; }
 
-        /* 3. MARCADORES ATP & WTA EN VIVO (SOLO LECTURA) */
+        /* 3. MARCADORES ATP (AZUL ESTADIO) & WTA (ORQUÍDEA) */
         .tt-nn-pro-hero {
           border-radius: 18px;
           padding: 14px;
-          background: linear-gradient(135deg, #1AE68A 0%, #7CF5C0 100%);
-          color: #1E0734;
           display: flex;
           align-items: center;
           justify-content: space-between;
           gap: 10px;
           flex-wrap: wrap;
+          color: #FAF9F5;
+          transition: background 360ms ease;
         }
-        .tt-nn-pro-kicker {
-          display: block;
-          font-size: 0.6rem;
-          font-weight: 900;
-          letter-spacing: 0.08em;
-          opacity: 0.76;
+        .tt-nn-pro-hero.is-atp {
+          background: linear-gradient(135deg, #0D2558 0%, #15469B 55%, #00A859 100%);
         }
-        .tt-nn-pro-hero h3 {
-          margin: 2px 0 0;
-          font-family: var(--tt-font-display);
-          font-style: italic;
-          font-size: 1.45rem;
-          line-height: 1;
+        .tt-nn-pro-hero.is-wta {
+          background: linear-gradient(135deg, #2A0845 0%, #6D176E 55%, #DB2777 100%);
         }
-        .tt-nn-tour-switch {
-          display: inline-flex;
-          padding: 3px;
-          border-radius: 999px;
-          background: rgba(30, 7, 52, 0.14);
-        }
-        .tt-nn-tour-switch button {
-          padding: 6px 12px;
-          border-radius: 999px;
-          font-size: 0.72rem;
-          font-weight: 900;
-          color: #1E0734;
-        }
-        .tt-nn-tour-switch button.is-active {
-          background: #1E0734;
-          color: #00DC7D;
-        }
-        .tt-nn-pro-sync-strip {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          font-size: 0.71rem;
-          font-weight: 700;
-          color: rgba(30, 7, 52, 0.65);
-        }
+        .tt-nn-pro-kicker { display: block; font-size: 0.58rem; font-weight: 900; letter-spacing: 0.08em; opacity: 0.82; }
+        .tt-nn-pro-hero h3 { margin: 2px 0 0; font-family: var(--tt-font-display); font-style: italic; font-size: 1.46rem; line-height: 1; }
+        .tt-nn-tour-switch { display: inline-flex; padding: 3px; border-radius: 999px; background: rgba(14, 3, 27, 0.34); }
+        .tt-nn-tour-switch button { padding: 6px 12px; border-radius: 999px; font-size: 0.72rem; font-weight: 900; color: rgba(250, 249, 245, 0.8); }
+        .tt-nn-tour-switch button.is-active { background: #FAF9F5; color: #1E0734; }
 
-        .tt-nn-pro-grid {
-          display: grid;
-          grid-template-columns: 1fr;
-          gap: 10px;
-        }
+        .tt-nn-pro-sync-strip { display: flex; align-items: center; justify-content: space-between; font-size: 0.71rem; font-weight: 700; color: rgba(30, 7, 52, 0.68); }
+
+        .tt-nn-pro-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
         @media (min-width: 660px) {
-          .tt-nn-pro-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-          }
+          .tt-nn-pro-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
         .tt-nn-pro-card {
           border-radius: 17px;
           padding: 12px 13px;
-          background: #1E0734;
+          background: #1B0630;
           color: #FAF9F5;
           border: 1px solid rgba(30, 7, 52, 0.14);
           display: flex;
           flex-direction: column;
           gap: 7px;
+          animation: ttNnFadeUp 340ms cubic-bezier(0.22, 1, 0.36, 1) both;
+          animation-delay: var(--nn-delay, 0ms);
         }
+        .tt-nn-pro-card.is-atp-card { background: linear-gradient(155deg, #131E3E 0%, #1B0630 100%); }
+        .tt-nn-pro-card.is-wta-card { background: linear-gradient(155deg, #2A093E 0%, #170426 100%); }
         .tt-nn-pro-card.is-live {
           border-color: #00DC7D;
-          box-shadow: 0 8px 20px rgba(0, 220, 125, 0.16);
+          box-shadow: 0 10px 22px rgba(0, 220, 125, 0.18);
         }
         .tt-nn-pro-head {
           display: flex;
@@ -1437,46 +1424,22 @@ export default function NoticesAndNewsModal({
           overflow: hidden;
           text-overflow: ellipsis;
         }
-        .tt-nn-pro-state {
-          display: inline-flex;
-          align-items: center;
-          gap: 5px;
-          font-weight: 900;
-          white-space: nowrap;
-        }
-        .tt-nn-pro-state.is-in {
-          color: #00DC7D;
-        }
-        .tt-nn-live-dot {
-          width: 7px;
-          height: 7px;
-          border-radius: 50%;
-          background: #00DC7D;
-          animation: ttLivePulse 1.5s infinite;
-        }
-        .tt-nn-pro-row {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 8px;
-          font-size: 0.84rem;
-        }
-        .tt-nn-pro-row.is-win strong {
-          color: #00DC7D;
-        }
-        .tt-nn-pro-sets {
-          display: flex;
-          align-items: center;
-          gap: 7px;
-          font-family: var(--tt-font-display);
-          font-size: 1.04rem;
-          font-variant-numeric: tabular-nums;
-        }
-        .tt-nn-pro-sets em {
-          font-style: normal;
-          color: #00DC7D;
-          font-size: 0.72rem;
-        }
+        .tt-nn-pro-card.is-wta-card .tt-nn-pro-tourney { color: #F9A8D4; }
+        .tt-nn-pro-state { display: inline-flex; align-items: center; gap: 5px; font-weight: 900; white-space: nowrap; }
+        .tt-nn-pro-state.is-in { color: #00DC7D; }
+        .tt-nn-live-dot { width: 7px; height: 7px; border-radius: 50%; background: #00DC7D; animation: ttLivePulse 1.5s infinite; }
+
+        .tt-nn-pro-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 0.84rem; }
+        .tt-nn-pro-player-name { display: flex; align-items: center; gap: 5px; min-width: 0; }
+        .tt-nn-pro-player-name strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .tt-nn-seed { font-size: 0.68rem; font-weight: 800; color: rgba(250, 249, 245, 0.58); flex-shrink: 0; }
+        .tt-nn-pro-row.is-win strong { color: #00DC7D; }
+        .tt-nn-pro-sets { display: flex; align-items: center; gap: 6px; font-family: var(--tt-font-display); font-size: 1.06rem; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+        .tt-nn-pro-sets span { min-width: 16px; text-align: center; opacity: 0.78; }
+        .tt-nn-pro-sets span.is-set-won { opacity: 1; font-weight: 900; color: #FFFFFF; }
+        .tt-nn-pro-sets sup { font-size: 0.58rem; color: #7CF5C0; margin-left: 1px; }
+        .tt-nn-pro-sets em { font-style: normal; color: #00DC7D; font-size: 0.72rem; }
+
         .tt-nn-pro-foot {
           margin-top: 2px;
           padding-top: 6px;
@@ -1487,62 +1450,25 @@ export default function NoticesAndNewsModal({
           font-size: 0.68rem;
           color: rgba(250, 249, 245, 0.72);
         }
-        .tt-nn-pro-ext {
-          color: #00DC7D;
-          font-weight: 800;
-          text-decoration: none;
-        }
+        .tt-nn-pro-ext { color: #00DC7D; font-weight: 800; text-decoration: none; }
 
-        /* Fallbacks y Skeletons limpios */
-        .tt-nn-fallback-box {
-          padding: 16px;
-          border-radius: 18px;
-          background: #FFFFFF;
-          border: 1px solid rgba(30, 7, 52, 0.12);
-          text-align: center;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 8px;
-        }
-        .tt-nn-fallback-box p {
-          margin: 0;
-          font-size: 0.77rem;
-          line-height: 1.44;
-          color: rgba(30, 7, 52, 0.72);
-          max-width: 440px;
-        }
-        .tt-nn-portal-links {
-          display: flex;
-          flex-wrap: wrap;
-          justify-content: center;
-          gap: 7px;
-          margin-top: 4px;
-        }
-        .tt-nn-skeleton-stack {
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-        }
+        .tt-nn-fallback-box { padding: 16px; border-radius: 18px; background: #FFFFFF; border: 1px solid rgba(30, 7, 52, 0.12); text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+        .tt-nn-fallback-box p { margin: 0; font-size: 0.77rem; line-height: 1.44; color: rgba(30, 7, 52, 0.72); max-width: 440px; }
+        .tt-nn-portal-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 7px; margin-top: 4px; }
+        .tt-nn-skeleton-stack { display: flex; flex-direction: column; gap: 10px; }
         .tt-nn-skeleton-card {
           height: 142px;
           border-radius: 18px;
-          background: linear-gradient(
-            90deg,
-            rgba(30, 7, 52, 0.06) 25%,
-            rgba(30, 7, 52, 0.12) 50%,
-            rgba(30, 7, 52, 0.06) 75%
-          );
+          background: linear-gradient(90deg, rgba(30, 7, 52, 0.06) 25%, rgba(30, 7, 52, 0.12) 50%, rgba(30, 7, 52, 0.06) 75%);
           background-size: 200% 100%;
           animation: ttShimmer 1.3s infinite linear;
         }
-        .tt-nn-skeleton-card.is-short {
-          height: 106px;
-        }
-        @keyframes ttShimmer {
-          0% { background-position: 200% 0; }
-          100% { background-position: -200% 0; }
-        }
+        .tt-nn-skeleton-card.is-short { height: 106px; }
+        @keyframes ttShimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+        html[data-tier='lite'] .tt-nn-card,
+        html[data-tier='lite'] .tt-nn-press-card,
+        html[data-tier='lite'] .tt-nn-pro-card { animation: none !important; }
       `}</style>
     </ModalPortal>
   );
