@@ -1,20 +1,6 @@
 import React, { useMemo } from 'react';
 import { ASSETS, SmartImage, triggerHaptic } from './AppIcons';
 
-/* ==========================================================================
-   TOTAL TENIS · BARRA DE NAVEGACIÓN INFERIOR DEFINITIVA (BLOQUE 9 DE 26)
-   --------------------------------------------------------------------------
-   - 5 pestañas fijas con los 5 PNGs oficiales de public/assets/:
-     1. Retos          -> /assets/nav-retos.png
-     2. Ranking        -> /assets/nav-ranking.png
-     3. Torneos        -> /assets/nav-torneos.png
-     4. Sedes & Coach  -> /assets/nav-sedes.png
-     5. Mi Perfil      -> /assets/nav-perfil.png
-   - Diseño activo: Línea superior luminosa Esmeralda (#00DC7D) + cascada/halo
-     difuminado detrás + aumento suave conjunto scale(1.14) de icono y texto.
-   - Sin cajas cuadradas opacas, sin círculos pesados, sin lupas literales.
-   - Ergonomía móvil real (68px + safe-area-bottom) + modo Cero Lag (lite).
-   ========================================================================== */
 export const DOCK_TABS = [
   {
     id: 'retos',
@@ -70,7 +56,6 @@ export default function BottomDock({
 }) {
   const isLight = theme === 'light';
 
-  // Índice activo (0..4) para metadatos de accesibilidad y consistencia
   const activeIndex = useMemo(() => {
     const idx = DOCK_TABS.findIndex((t) => t.id === activeTab);
     return idx >= 0 ? idx : 0;
@@ -79,7 +64,6 @@ export default function BottomDock({
   const handleTabPress = (tabId) => {
     triggerHaptic('light');
 
-    // Comportamiento nativo iOS/Android: tocar la pestaña activa vuelve suavemente arriba
     if (tabId === activeTab) {
       if (typeof onReselectActiveTab === 'function') {
         onReselectActiveTab(tabId);
@@ -143,7 +127,6 @@ export default function BottomDock({
                       className="tt-dock-img tt-dock-v2-img"
                     />
 
-                    {/* Micro-indicador EN VIVO (pulso esmeralda limpio) */}
                     {showRetosLive && (
                       <span
                         className="tt-dock-v2-live-dot"
@@ -152,20 +135,17 @@ export default function BottomDock({
                       />
                     )}
 
-                    {/* Micro-contador de retos pendientes (solo si no hay pulso live) */}
                     {showRetosCount && (
                       <span className="tt-dock-v2-badge" aria-hidden="true">
                         {challengesCount > 9 ? '9+' : challengesCount}
                       </span>
                     )}
 
-                    {/* Micro-destello dorado si hay torneos abiertos */}
                     {showTorneosDot && (
                       <span className="tt-dock-v2-gold-dot" aria-hidden="true" />
                     )}
                   </div>
 
-                  {/* Etiqueta completa en pantallas normales y compacta en 320px-360px */}
                   <span className="tt-dock-label tt-dock-v2-label">
                     <span className="tt-dock-label-full">{tab.label}</span>
                     <span className="tt-dock-label-compact">{tab.compactLabel}</span>
@@ -180,11 +160,11 @@ export default function BottomDock({
       {/* Estilos encapsulados de precisión visual para la Barra Inferior Definitiva */}
       <style>{`
         .tt-dock-v2 {
-          position: fixed;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          z-index: var(--tt-z-dock, 40);
+          position: absolute !important;
+          left: 0 !important;
+          right: 0 !important;
+          bottom: 0 !important;
+          z-index: var(--tt-z-dock, 70);
           padding-bottom: var(--tt-safe-bottom, env(safe-area-inset-bottom, 0px));
           padding-left: var(--tt-safe-left, env(safe-area-inset-left, 0px));
           padding-right: var(--tt-safe-right, env(safe-area-inset-right, 0px));
@@ -195,12 +175,16 @@ export default function BottomDock({
             border-color 220ms ease;
         }
 
+        html[data-standalone='true'] .tt-dock-v2 {
+          padding-bottom: max(env(safe-area-inset-bottom, 0px), 18px);
+        }
+
         /* Tema Oscuro (Púrpura Noche translúcido) */
         .tt-dock-v2.is-dark {
           background: linear-gradient(
             180deg,
             rgba(25, 6, 46, 0.92) 0%,
-            rgba(18, 4, 34, 0.97) 100%
+            rgba(18, 4, 34, 0.98) 100%
           );
           border-top: 1px solid rgba(250, 249, 245, 0.11);
           box-shadow: 0 -10px 30px rgba(8, 1, 18, 0.45);
@@ -208,7 +192,7 @@ export default function BottomDock({
           -webkit-backdrop-filter: blur(18px) saturate(140%);
         }
 
-        /* Tema Claro (Marfil Editorial de alto contraste al sol) */
+        /* Tema Claro (Marfil Editorial de alto contraste) */
         .tt-dock-v2.is-light {
           background: linear-gradient(
             180deg,
@@ -219,16 +203,6 @@ export default function BottomDock({
           box-shadow: 0 -8px 26px rgba(30, 7, 52, 0.09);
           backdrop-filter: blur(16px);
           -webkit-backdrop-filter: blur(16px);
-        }
-
-        /* Refuerzo Modo Sol Intenso en Cancha */
-        .tt-dock-v2.is-sunlight.is-light {
-          background: #FFFFFF;
-          border-top: 1.5px solid rgba(30, 7, 52, 0.24);
-        }
-        .tt-dock-v2.is-sunlight.is-dark {
-          background: #140326;
-          border-top: 1.5px solid rgba(0, 220, 125, 0.28);
         }
 
         .tt-dock-v2-inner {
@@ -450,20 +424,12 @@ export default function BottomDock({
           display: none;
         }
 
-        /* Pantallas muy angostas (320px - 365px): abreviar "Sedes & Coach" -> "Sedes" */
         @media (max-width: 365px) {
-          .tt-dock-label-full {
-            display: none;
-          }
-          .tt-dock-label-compact {
-            display: inline;
-          }
-          .tt-dock-v2-label {
-            font-size: 0.64rem;
-          }
+          .tt-dock-label-full { display: none; }
+          .tt-dock-label-compact { display: inline; }
+          .tt-dock-v2-label { font-size: 0.64rem; }
         }
 
-        /* Micro-indicadores limpios */
         .tt-dock-v2-live-dot {
           position: absolute;
           top: -2px;
@@ -505,7 +471,6 @@ export default function BottomDock({
           box-shadow: 0 0 8px rgba(245, 158, 11, 0.8);
         }
 
-        /* Modo Cero Lag (Equipos antiguos / gama baja): 0 filtros pesados */
         html[data-tier='lite'] .tt-dock-v2.is-dark {
           background: #160428 !important;
           backdrop-filter: none !important;
@@ -524,7 +489,6 @@ export default function BottomDock({
           filter: brightness(1.1) !important;
         }
 
-        /* Adaptación Tablet / Desktop (>= 768px) */
         @media (min-width: 768px) {
           .tt-dock-v2-inner {
             max-width: 660px;
