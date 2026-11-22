@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ASSETS,
   EmptyStateCard,
@@ -73,8 +73,7 @@ function formatDynamicDateAndTime(isoString, fallbackDate = '', fallbackTime = '
 
   try {
     const now = new Date();
-    const fmtKey = (dt) =>
-      dt.toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
+    const fmtKey = (dt) => dt.toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
     const targetKey = fmtKey(d);
     const todayKey = fmtKey(now);
     const tomorrow = new Date(now);
@@ -117,8 +116,7 @@ function formatDynamicDateAndTime(isoString, fallbackDate = '', fallbackTime = '
     return {
       dateText: fallbackDate || d.toLocaleDateString('es-PE'),
       timeText:
-        fallbackTime ||
-        d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }),
+        fallbackTime || d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }),
     };
   }
 }
@@ -197,7 +195,7 @@ function buildLiveScoreFromDirectDraft(draft) {
 }
 
 /* ==========================================================================
-   SUBCOMPONENTE 1: AVATAR CON ANILLO DE CATEGORÍA Y ESCUDO DE CLUB
+   SUBCOMPONENTE 1: AVATAR CON ANILLO LIMPIO Y ESCUDO REAL DEL CLUB
    ========================================================================== */
 function PlayerAvatarWithClub({
   player,
@@ -212,6 +210,7 @@ function PlayerAvatarWithClub({
   return (
     <button
       type="button"
+      className="tt-rt-avatar-btn"
       onClick={(e) => {
         e.stopPropagation();
         triggerHaptic('light');
@@ -273,7 +272,7 @@ function PlayerAvatarWithClub({
 }
 
 /* ==========================================================================
-   SUBCOMPONENTE 2: TARJETA PÓSTER VS (MULTIUSUARIO + MODO ESPECTADOR)
+   SUBCOMPONENTE 2: TARJETA PÓSTER VS (LIQUID GLASS + MODO ESPECTADOR)
    ========================================================================== */
 function MatchPosterCard({
   challenge,
@@ -354,7 +353,8 @@ function MatchPosterCard({
           />
           <strong className="tt-match-player-name">{playerA?.name || 'Jugador A'}</strong>
           <div className="tt-match-player-meta">
-            <span style={{ color: catA.color, fontWeight: 800 }}>{catA.name}</span>
+            <span className="tt-cat-dot-inline" style={{ backgroundColor: catA.color }} />
+            <span>{catA.name}</span>
             <span>·</span>
             <span>{Number(playerA?.points || 0).toLocaleString('es-PE')} pts</span>
           </div>
@@ -374,12 +374,13 @@ function MatchPosterCard({
             player={playerB}
             clubs={clubs}
             size={56}
-            ringColor="#F59E0B"
+            ringColor="#E5C16C"
             onClick={onOpenPlayerProfile}
           />
           <strong className="tt-match-player-name">{playerB?.name || 'Jugador B'}</strong>
           <div className="tt-match-player-meta">
-            <span style={{ color: catB.color, fontWeight: 800 }}>{catB.name}</span>
+            <span className="tt-cat-dot-inline" style={{ backgroundColor: catB.color }} />
+            <span>{catB.name}</span>
             <span>·</span>
             <span>{Number(playerB?.points || 0).toLocaleString('es-PE')} pts</span>
           </div>
@@ -473,20 +474,19 @@ function MatchPosterCard({
         </div>
         {challenge.ballsAgreement && (
           <div className="tt-match-venue-item is-subtle">
-            <TTIcon name="ball" size={14} style={{ color: '#F59E0B' }} />
+            <TTIcon name="ball" size={14} style={{ color: '#E5C16C' }} />
             <span>{challenge.ballsAgreement}</span>
           </div>
         )}
       </div>
 
-      {/* Acciones por Rol (Contendientes editan · Espectadores solo ven) */}
+      {/* Acciones por Rol */}
       <div className="tt-match-actions">
-        {/* 1. Pendiente: el retado acepta o declina */}
         {isPending && perms.isPlayerB && (
           <>
             <button
               type="button"
-              className="tt-btn tt-btn-primary tt-btn-sm"
+              className="tt-btn tt-btn-primary tt-btn-sm tt-glass-press"
               style={{ flex: 1 }}
               onClick={() => {
                 triggerHaptic('success');
@@ -497,7 +497,7 @@ function MatchPosterCard({
             </button>
             <button
               type="button"
-              className="tt-btn tt-btn-ghost tt-btn-sm"
+              className="tt-btn tt-btn-ghost tt-btn-sm tt-glass-press"
               onClick={() => {
                 triggerHaptic('warning');
                 onDeclineChallenge(challenge);
@@ -508,7 +508,6 @@ function MatchPosterCard({
           </>
         )}
 
-        {/* 2. Pendiente enviado por mí */}
         {isPending && perms.isPlayerA && (
           <div className="tt-waiting-banner">
             <TTIcon name="clock" size={15} />
@@ -516,12 +515,11 @@ function MatchPosterCard({
           </div>
         )}
 
-        {/* 3. Programado: Contendientes suben resultado directo o reprograman */}
         {isScheduled && (perms.isParticipant || isAdmin) && (
           <>
             <button
               type="button"
-              className="tt-btn tt-btn-primary tt-btn-sm"
+              className="tt-btn tt-btn-primary tt-btn-sm tt-glass-press"
               style={{ flex: 1 }}
               onClick={() => {
                 triggerHaptic('medium');
@@ -535,7 +533,7 @@ function MatchPosterCard({
             {perms.canReschedule && (
               <button
                 type="button"
-                className="tt-btn tt-btn-secondary tt-btn-sm"
+                className="tt-btn tt-btn-secondary tt-btn-sm tt-glass-press"
                 onClick={() => {
                   triggerHaptic('light');
                   onOpenReschedule(challenge);
@@ -548,11 +546,12 @@ function MatchPosterCard({
           </>
         )}
 
-        {/* 4. En Juego: Contendientes / Árbitro editan · Espectadores solo siguen en vivo */}
         {isLive && (
           <button
             type="button"
-            className={`tt-btn ${perms.canEditScore ? 'tt-btn-primary' : 'tt-btn-secondary'} tt-btn-sm`}
+            className={`tt-btn ${
+              perms.canEditScore ? 'tt-btn-primary' : 'tt-btn-secondary'
+            } tt-btn-sm tt-glass-press`}
             style={{ flex: 1 }}
             onClick={() => {
               triggerHaptic('light');
@@ -568,7 +567,6 @@ function MatchPosterCard({
           </button>
         )}
 
-        {/* 5. Marcador propuesto (esperando confirmación del rival) */}
         {isProposed && perms.isParticipant && (
           <div className="tt-waiting-banner">
             <TTIcon name="clock" size={15} />
@@ -580,11 +578,10 @@ function MatchPosterCard({
           </div>
         )}
 
-        {/* 6. Finalizado: compartir Story 9:16 */}
         {isFinished && (perms.isParticipant || isAdmin) && onOpenStories && (
           <button
             type="button"
-            className="tt-btn tt-btn-secondary tt-btn-sm"
+            className="tt-btn tt-btn-secondary tt-btn-sm tt-glass-press"
             style={{ flex: 1 }}
             onClick={() => {
               triggerHaptic('light');
@@ -596,7 +593,6 @@ function MatchPosterCard({
           </button>
         )}
 
-        {/* 7. Espectador viendo un partido programado / pendiente */}
         {!canManage && (isScheduled || isPending) && (
           <div className="tt-spectator-pill">
             <TTIcon name="vision" size={14} />
@@ -604,13 +600,12 @@ function MatchPosterCard({
           </div>
         )}
 
-        {/* WhatsApp directo solo para contendientes */}
         {!isFinished && perms.isParticipant && whatsappUrl && !opponent?.hideWhatsapp && (
           <a
             href={whatsappUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="tt-icon-action-btn is-wa"
+            className="tt-icon-action-btn is-wa tt-glass-press"
             aria-label={`Coordinar por WhatsApp con ${opponent?.name}`}
             onClick={() => triggerHaptic('light')}
           >
@@ -623,7 +618,7 @@ function MatchPosterCard({
 }
 
 /* ==========================================================================
-   VISTA PRINCIPAL: RetosView (LIMPIA, SIN RELOJ/UV Y CON MARCADOR DIRECTO)
+   VISTA PRINCIPAL: RetosView (CARRUSEL INSTANTÁNEO + LIQUID GLASS TÁCTIL)
    ========================================================================== */
 export default function RetosView({
   players = [],
@@ -644,24 +639,19 @@ export default function RetosView({
   const [subTab, setSubTab] = useState('cartelera'); // 'cartelera' | 'mis-retos' | 'lanzar'
   const [heroSlideIdx, setHeroSlideIdx] = useState(0);
 
-  // Filtros de "Lanzar Reto"
   const [rivalSearch, setRivalSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [onlyInRange, setOnlyInRange] = useState(true);
-
-  // Filtro de Cartelera
   const [boardFilter, setBoardFilter] = useState('ALL');
 
-  // Modales en Portal
   const [challengeTarget, setChallengeTarget] = useState(null);
   const [activeScoreboardId, setActiveScoreboardId] = useState(null);
-  const [scoreModalMode, setScoreModalMode] = useState('direct'); // 'direct' | 'live'
+  const [scoreModalMode, setScoreModalMode] = useState('direct');
   const [directDraft, setDirectDraft] = useState(() => createDirectDraftFromScore(null));
   const [rescheduleTarget, setRescheduleTarget] = useState(null);
   const [celebrationPayload, setCelebrationPayload] = useState(null);
   const [showWalkoverBox, setShowWalkoverBox] = useState(false);
 
-  // Formulario Crear Nuevo Desafío
   const [formMode, setFormMode] = useState('Por puntos');
   const [formClubId, setFormClubId] = useState(clubs?.[0]?.id || 'club-country');
   const [formCustomVenue, setFormCustomVenue] = useState('');
@@ -669,7 +659,6 @@ export default function RetosView({
   const [formTime, setFormTime] = useState('18:00');
   const [formBalls, setFormBalls] = useState(BALLS_AGREEMENTS[0]);
 
-  // Formulario Reprogramar / Clima
   const [reschedDate, setReschedDate] = useState(() => getTodayDateInputValue(2));
   const [reschedTime, setReschedTime] = useState('19:00');
   const [reschedReason, setReschedReason] = useState('Lluvia intensa en cancha');
@@ -728,7 +717,9 @@ export default function RetosView({
       .filter((c) => c.status !== 'DECLINED')
       .filter((c) => {
         if (boardFilter === 'ALL') return true;
-        if (boardFilter === 'IN_PLAY') return c.status === 'IN_PLAY' || c.status === 'SCORE_PROPOSED';
+        if (boardFilter === 'IN_PLAY') {
+          return c.status === 'IN_PLAY' || c.status === 'SCORE_PROPOSED';
+        }
         return c.status === boardFilter;
       })
       .sort((a, b) => (orderWeight[a.status] ?? 9) - (orderWeight[b.status] ?? 9));
@@ -767,7 +758,23 @@ export default function RetosView({
     [challenges, activeScoreboardId]
   );
 
-  /* Carrusel Hero Compacto (Sin reloj, sin UV, sin tarjeta redundante) */
+  const openScoreModal = useCallback(
+    (ch, preferredMode = 'direct') => {
+      if (!ch) return;
+      const perms = getMatchPermissions(ch, currentUser, isAdmin);
+      setActiveScoreboardId(ch.id);
+      setDirectDraft(createDirectDraftFromScore(ch.liveScore));
+      setShowWalkoverBox(false);
+      if (perms.isJudge || (!perms.canEditScore && ch.status === 'IN_PLAY')) {
+        setScoreModalMode('live');
+      } else {
+        setScoreModalMode(preferredMode);
+      }
+    },
+    [currentUser, isAdmin]
+  );
+
+  /* Carrusel Hero con las 3 fotos precargadas desde el segundo 0 */
   const heroSlides = useMemo(() => {
     const featuredLive = liveChallenges[0];
     const pA = featuredLive ? playersMap[featuredLive.playerAId] : null;
@@ -816,11 +823,11 @@ export default function RetosView({
         },
       },
     ];
-  }, [liveChallenges, playersMap, onGoToTournaments]);
+  }, [liveChallenges, playersMap, onGoToTournaments, openScoreModal]);
 
-  const activeSlide = heroSlides[heroSlideIdx % heroSlides.length];
+  const currentSlideIdx = heroSlideIdx % heroSlides.length;
+  const activeSlide = heroSlides[currentSlideIdx];
 
-  // Auto-rotación pausada automáticamente cuando hay cualquier modal abierto
   useEffect(() => {
     if (challengeTarget || activeScoreboardId || rescheduleTarget || celebrationPayload) {
       return undefined;
@@ -834,20 +841,6 @@ export default function RetosView({
   /* ------------------------------------------------------------------------
      ACCIONES DE NEGOCIO
      ------------------------------------------------------------------------ */
-  const openScoreModal = (ch, preferredMode = 'direct') => {
-    if (!ch) return;
-    const perms = getMatchPermissions(ch, currentUser, isAdmin);
-    setActiveScoreboardId(ch.id);
-    setDirectDraft(createDirectDraftFromScore(ch.liveScore));
-    setShowWalkoverBox(false);
-    // Si es árbitro designado o espectador de un partido en vivo, abre vista en vivo
-    if (perms.isJudge || (!perms.canEditScore && ch.status === 'IN_PLAY')) {
-      setScoreModalMode('live');
-    } else {
-      setScoreModalMode(preferredMode);
-    }
-  };
-
   const openCreateChallengeModal = (rival, forceFriendly = false) => {
     if (!currentUser) {
       if (onNotify) onNotify('Inicia sesión para pactar un desafío.', 'info');
@@ -1099,9 +1092,7 @@ export default function RetosView({
         climateNote: reschedReason,
       });
       triggerHaptic('medium');
-      if (onNotify) {
-        onNotify(`Reprogramación registrada (${reschedReason}).`, 'info');
-      }
+      if (onNotify) onNotify(`Reprogramación registrada (${reschedReason}).`, 'info');
       if (rival && !rival.hideWhatsapp) {
         const wa = buildWhatsappLink(
           rival.whatsapp,
@@ -1180,22 +1171,27 @@ export default function RetosView({
     players.length,
   ]);
 
+  const subTabIdx = subTab === 'cartelera' ? 0 : subTab === 'mis-retos' ? 1 : 2;
+
   return (
     <section
       className={`tt-retos-view ${theme === 'light' ? 'is-light' : 'is-dark'}`}
       aria-label="Retos y Cartelera Oficial TOTAL TENIS"
     >
       {/* ====================================================================
-          1. CARRUSEL HERO COMPACTO (SIN RELOJ, SIN UV, SIN BLOQUE REDUNDANTE)
+          1. CARRUSEL HERO INSTANTÁNEO (3 FOTOS MONTADAS CON PRELOAD + CROSSFADE)
           ==================================================================== */}
       <div className="tt-hero-stage">
-        <SmartImage
-          src={activeSlide.image}
-          fallbackSrc={ASSETS.bienvenidaOscuro}
-          alt={activeSlide.title}
-          priority
-          className="tt-hero-stage-bg"
-        />
+        {heroSlides.map((slide, idx) => (
+          <SmartImage
+            key={slide.id}
+            src={slide.image}
+            fallbackSrc={ASSETS.bienvenidaOscuro}
+            alt={slide.title}
+            priority
+            className={`tt-hero-stage-bg ${idx === currentSlideIdx ? 'is-visible' : ''}`}
+          />
+        ))}
         <div className="tt-hero-stage-scrim" />
 
         <div className="tt-hero-stage-content">
@@ -1204,13 +1200,15 @@ export default function RetosView({
             {activeSlide.tag}
           </span>
 
-          <h1 className="tt-hero-headline">{activeSlide.title}</h1>
+          <h1 key={activeSlide.id} className="tt-hero-headline">
+            {activeSlide.title}
+          </h1>
           <p className="tt-hero-subcopy">{activeSlide.subtitle}</p>
 
           <div className="tt-hero-footer-row">
             <button
               type="button"
-              className="tt-hero-cta-pill"
+              className="tt-hero-cta-pill tt-glass-press"
               onClick={activeSlide.onCta}
             >
               <span className="tt-cta-emerald-dot" />
@@ -1223,7 +1221,7 @@ export default function RetosView({
                   <button
                     key={s.id}
                     type="button"
-                    className={`tt-hero-dot ${idx === heroSlideIdx ? 'is-active' : ''}`}
+                    className={`tt-hero-dot ${idx === currentSlideIdx ? 'is-active' : ''}`}
                     onClick={() => {
                       triggerHaptic('light');
                       setHeroSlideIdx(idx);
@@ -1236,7 +1234,7 @@ export default function RetosView({
                 <button
                   type="button"
                   aria-label="Anterior"
-                  className="tt-circle-nav-btn"
+                  className="tt-circle-nav-btn tt-glass-press"
                   onClick={() => {
                     triggerHaptic('light');
                     setHeroSlideIdx((prev) => (prev - 1 + heroSlides.length) % heroSlides.length);
@@ -1247,7 +1245,7 @@ export default function RetosView({
                 <button
                   type="button"
                   aria-label="Siguiente"
-                  className="tt-circle-nav-btn"
+                  className="tt-circle-nav-btn tt-glass-press"
                   onClick={() => {
                     triggerHaptic('light');
                     setHeroSlideIdx((prev) => (prev + 1) % heroSlides.length);
@@ -1282,7 +1280,7 @@ export default function RetosView({
           <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
             <button
               type="button"
-              className="tt-btn tt-btn-primary tt-btn-sm"
+              className="tt-btn tt-btn-primary tt-btn-sm tt-glass-press"
               style={{ flex: 1 }}
               onClick={() => {
                 triggerHaptic('success');
@@ -1293,7 +1291,7 @@ export default function RetosView({
             </button>
             <button
               type="button"
-              className="tt-btn tt-btn-secondary tt-btn-sm"
+              className="tt-btn tt-btn-secondary tt-btn-sm tt-glass-press"
               onClick={() => {
                 triggerHaptic('light');
                 setSubTab('mis-retos');
@@ -1306,9 +1304,15 @@ export default function RetosView({
       )}
 
       {/* ====================================================================
-          3. SELECTOR DE 3 SUB-VISTAS (CARTELERA | TUS DESAFÍOS | LANZAR RETO)
+          3. SELECTOR DE 3 SUB-VISTAS CON SLIDER ELÁSTICO LIQUID GLASS
           ==================================================================== */}
       <div className="tt-subtabs-bar" role="tablist" aria-label="Secciones de Retos">
+        <span
+          className="tt-subtab-slider"
+          aria-hidden="true"
+          style={{ transform: `translateX(${subTabIdx * 100}%)` }}
+        />
+
         <button
           type="button"
           role="tab"
@@ -1362,7 +1366,7 @@ export default function RetosView({
           4A. CARTELERA PÚBLICA
           ==================================================================== */}
       {subTab === 'cartelera' && (
-        <div className="tt-retos-panel">
+        <div key="panel-cartelera" className="tt-retos-panel tt-rt-panel-in">
           <div className="tt-filter-pills-row">
             {[
               { id: 'ALL', label: 'Todos' },
@@ -1373,7 +1377,7 @@ export default function RetosView({
               <button
                 key={f.id}
                 type="button"
-                className={`tt-filter-chip ${boardFilter === f.id ? 'is-active' : ''}`}
+                className={`tt-filter-chip tt-glass-press ${boardFilter === f.id ? 'is-active' : ''}`}
                 onClick={() => {
                   triggerHaptic('light');
                   setBoardFilter(f.id);
@@ -1425,7 +1429,7 @@ export default function RetosView({
           4B. TUS DESAFÍOS
           ==================================================================== */}
       {subTab === 'mis-retos' && (
-        <div className="tt-retos-panel">
+        <div key="panel-mis-retos" className="tt-retos-panel tt-rt-panel-in">
           {!currentUser ? (
             <EmptyStateCard
               theme={theme}
@@ -1475,7 +1479,7 @@ export default function RetosView({
           4C. LANZAR RETO (BUSCADOR DE RIVALES)
           ==================================================================== */}
       {subTab === 'lanzar' && (
-        <div className="tt-retos-panel">
+        <div key="panel-lanzar" className="tt-retos-panel tt-rt-panel-in">
           <div className="tt-radar-controls">
             <div className="tt-search-box">
               <TTIcon name="search" size={17} style={{ opacity: 0.65 }} />
@@ -1491,7 +1495,7 @@ export default function RetosView({
             <div className="tt-filter-pills-row">
               <button
                 type="button"
-                className={`tt-filter-chip ${onlyInRange ? 'is-active' : ''}`}
+                className={`tt-filter-chip tt-glass-press ${onlyInRange ? 'is-active' : ''}`}
                 onClick={() => {
                   triggerHaptic('light');
                   setOnlyInRange((v) => !v);
@@ -1502,7 +1506,7 @@ export default function RetosView({
 
               <button
                 type="button"
-                className={`tt-filter-chip ${categoryFilter === 'ALL' ? 'is-active' : ''}`}
+                className={`tt-filter-chip tt-glass-press ${categoryFilter === 'ALL' ? 'is-active' : ''}`}
                 onClick={() => {
                   triggerHaptic('light');
                   setCategoryFilter('ALL');
@@ -1515,7 +1519,7 @@ export default function RetosView({
                 <button
                   key={cat.id}
                   type="button"
-                  className={`tt-filter-chip ${categoryFilter === cat.id ? 'is-active' : ''}`}
+                  className={`tt-filter-chip tt-glass-press ${categoryFilter === cat.id ? 'is-active' : ''}`}
                   onClick={() => {
                     triggerHaptic('light');
                     setCategoryFilter(cat.id);
@@ -1572,14 +1576,12 @@ export default function RetosView({
                     <div className="tt-rival-info">
                       <div className="tt-rival-name-line">
                         <strong>{player.name}</strong>
-                        {player.isVip && <span className="tt-badge-vip">VIP</span>}
+                        {player.isVip && <span className="tt-vip-micro-pill">VIP</span>}
                       </div>
 
                       <div className="tt-rival-meta-line">
-                        <span
-                          className="tt-cat-mini-pill"
-                          style={{ color: cat.color, backgroundColor: cat.badgeBg }}
-                        >
+                        <span className="tt-cat-mini-pill">
+                          <i className="tt-cat-dot-inline" style={{ backgroundColor: cat.color }} />
                           {cat.name}
                         </span>
                         <span>{Number(player.points || 0).toLocaleString('es-PE')} pts</span>
@@ -1608,7 +1610,7 @@ export default function RetosView({
                       {inOfficialRange ? (
                         <button
                           type="button"
-                          className="tt-btn tt-btn-primary tt-btn-sm"
+                          className="tt-btn tt-btn-primary tt-btn-sm tt-glass-press"
                           onClick={() => {
                             triggerHaptic('medium');
                             openCreateChallengeModal(player, false);
@@ -1619,7 +1621,7 @@ export default function RetosView({
                       ) : (
                         <button
                           type="button"
-                          className="tt-btn tt-btn-ghost tt-btn-sm"
+                          className="tt-btn tt-btn-ghost tt-btn-sm tt-glass-press"
                           onClick={() => {
                             triggerHaptic('light');
                             openCreateChallengeModal(player, true);
@@ -1690,7 +1692,7 @@ export default function RetosView({
                       key={m}
                       type="button"
                       disabled={blocked}
-                      className={`tt-choice-pill ${formMode === m ? 'is-selected' : ''}`}
+                      className={`tt-choice-pill tt-glass-press ${formMode === m ? 'is-selected' : ''}`}
                       onClick={() => {
                         triggerHaptic('light');
                         setFormMode(m);
@@ -1712,7 +1714,7 @@ export default function RetosView({
                     <button
                       key={club.id}
                       type="button"
-                      className={`tt-venue-option ${selected ? 'is-selected' : ''}`}
+                      className={`tt-venue-option tt-glass-press ${selected ? 'is-selected' : ''}`}
                       onClick={() => {
                         triggerHaptic('light');
                         setFormClubId(club.id);
@@ -1737,7 +1739,9 @@ export default function RetosView({
 
                 <button
                   type="button"
-                  className={`tt-venue-option is-custom ${formClubId === 'custom' ? 'is-selected' : ''}`}
+                  className={`tt-venue-option is-custom tt-glass-press ${
+                    formClubId === 'custom' ? 'is-selected' : ''
+                  }`}
                   onClick={() => {
                     triggerHaptic('light');
                     setFormClubId('custom');
@@ -1797,7 +1801,7 @@ export default function RetosView({
                 <button
                   key={slot}
                   type="button"
-                  className={`tt-slot-chip ${formTime === slot ? 'is-selected' : ''}`}
+                  className={`tt-slot-chip tt-glass-press ${formTime === slot ? 'is-selected' : ''}`}
                   onClick={() => {
                     triggerHaptic('light');
                     setFormTime(slot);
@@ -1815,7 +1819,7 @@ export default function RetosView({
                   <button
                     key={opt}
                     type="button"
-                    className={`tt-choice-pill ${formBalls === opt ? 'is-selected' : ''}`}
+                    className={`tt-choice-pill tt-glass-press ${formBalls === opt ? 'is-selected' : ''}`}
                     onClick={() => {
                       triggerHaptic('light');
                       setFormBalls(opt);
@@ -1830,12 +1834,12 @@ export default function RetosView({
             <div style={{ display: 'flex', gap: 10, paddingTop: 6 }}>
               <button
                 type="button"
-                className="tt-btn tt-btn-ghost"
+                className="tt-btn tt-btn-ghost tt-glass-press"
                 onClick={() => setChallengeTarget(null)}
               >
                 Cancelar
               </button>
-              <button type="submit" className="tt-btn tt-btn-primary" style={{ flex: 1 }}>
+              <button type="submit" className="tt-btn tt-btn-primary tt-glass-press" style={{ flex: 1 }}>
                 Enviar Desafío
               </button>
             </div>
@@ -1863,7 +1867,6 @@ export default function RetosView({
       >
         {activeScoreboardChallenge && activeSbData && (
           <div className="tt-mc-container">
-            {/* Switch claro: Resultado Directo (Jugadores) vs. Modo Árbitro en Vivo */}
             {activeSbData.perms.canConfirmOfficial && (
               <div className="tt-score-mode-switch" role="tablist">
                 <button
@@ -1893,7 +1896,6 @@ export default function RetosView({
               </div>
             )}
 
-            {/* Tablero Resumen Superior */}
             <div className="tt-stadium-board">
               <div className="tt-stadium-head">
                 <span>JUGADORES</span>
@@ -1901,7 +1903,7 @@ export default function RetosView({
                   <span>S1</span>
                   <span>S2</span>
                   {(activeSbData.scoreEval.needsSuperTieBreak || directBuilt.needsStb) && (
-                    <span style={{ color: '#F59E0B' }}>STB</span>
+                    <span style={{ color: '#E5C16C' }}>STB</span>
                   )}
                 </div>
               </div>
@@ -1948,7 +1950,7 @@ export default function RetosView({
                     player={activeSbData.pB}
                     clubs={clubs}
                     size={38}
-                    ringColor="#F59E0B"
+                    ringColor="#E5C16C"
                   />
                   <div style={{ minWidth: 0 }}>
                     <strong>{activeSbData.pB?.name}</strong>
@@ -1979,16 +1981,12 @@ export default function RetosView({
               </div>
             </div>
 
-            {/* ==============================================================
-                MODO A: CARGA DIRECTA POR SETS (PARA JUGADORES — RÁPIDO)
-                ============================================================== */}
             {activeSbData.perms.canConfirmOfficial && scoreModalMode === 'direct' && (
               <div className="tt-mc-controls-wrap">
                 <p className="tt-direct-hint">
                   Escribe el marcador final de cada set. Al enviarlo, tu rival recibirá una alerta para confirmarlo.
                 </p>
 
-                {/* Set 1 */}
                 <div className="tt-direct-set-box">
                   <div className="tt-direct-set-head">
                     <strong>Set 1</strong>
@@ -2058,7 +2056,6 @@ export default function RetosView({
                   )}
                 </div>
 
-                {/* Set 2 */}
                 <div className="tt-direct-set-box">
                   <div className="tt-direct-set-head">
                     <strong>Set 2</strong>
@@ -2128,7 +2125,6 @@ export default function RetosView({
                   )}
                 </div>
 
-                {/* Set 3 Super Tie-Break (aparece automáticamente si empataron 1-1) */}
                 {directBuilt.needsStb && (
                   <div className="tt-direct-set-box is-stb-card">
                     <div className="tt-direct-set-head">
@@ -2171,7 +2167,6 @@ export default function RetosView({
                   </div>
                 )}
 
-                {/* Previsualización y Envío */}
                 {activeSbData.scoreEval.finished ? (
                   <div className="tt-elo-preview-card">
                     <div className="tt-elo-preview-head">
@@ -2216,7 +2211,7 @@ export default function RetosView({
 
                     <button
                       type="button"
-                      className="tt-btn tt-btn-primary"
+                      className="tt-btn tt-btn-primary tt-glass-press"
                       style={{ width: '100%', marginTop: 10 }}
                       onClick={() =>
                         handleSubmitMatchResult({
@@ -2236,7 +2231,6 @@ export default function RetosView({
                   </div>
                 )}
 
-                {/* Walkover discreto */}
                 <div className="tt-mc-secondary-bar">
                   <button
                     type="button"
@@ -2255,7 +2249,7 @@ export default function RetosView({
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                       <button
                         type="button"
-                        className="tt-btn tt-btn-secondary tt-btn-sm"
+                        className="tt-btn tt-btn-secondary tt-btn-sm tt-glass-press"
                         onClick={() =>
                           handleSubmitMatchResult({
                             scoreObj: createEmptyLiveScore(),
@@ -2268,7 +2262,7 @@ export default function RetosView({
                       </button>
                       <button
                         type="button"
-                        className="tt-btn tt-btn-secondary tt-btn-sm"
+                        className="tt-btn tt-btn-secondary tt-btn-sm tt-glass-press"
                         onClick={() =>
                           handleSubmitMatchResult({
                             scoreObj: createEmptyLiveScore(),
@@ -2285,9 +2279,6 @@ export default function RetosView({
               </div>
             )}
 
-            {/* ==============================================================
-                MODO B: MARCADOR EN VIVO GAME A GAME (EXCLUSIVO ÁRBITRO)
-                ============================================================== */}
             {activeSbData.perms.canEditScore &&
               (scoreModalMode === 'live' || !activeSbData.perms.canConfirmOfficial) && (
                 <div className="tt-mc-controls-wrap">
@@ -2368,7 +2359,7 @@ export default function RetosView({
                               <div className="tt-stepper-btns">
                                 <button
                                   type="button"
-                                  className="tt-step-minus"
+                                  className="tt-step-minus tt-glass-press"
                                   disabled={sObj.a <= 0}
                                   onClick={() => {
                                     triggerHaptic('light');
@@ -2384,7 +2375,7 @@ export default function RetosView({
                                 </button>
                                 <button
                                   type="button"
-                                  className="tt-step-plus"
+                                  className="tt-step-plus tt-glass-press"
                                   disabled={!canAddA}
                                   onClick={() => {
                                     triggerHaptic('score');
@@ -2408,7 +2399,7 @@ export default function RetosView({
                               <div className="tt-stepper-btns">
                                 <button
                                   type="button"
-                                  className="tt-step-minus"
+                                  className="tt-step-minus tt-glass-press"
                                   disabled={sObj.b <= 0}
                                   onClick={() => {
                                     triggerHaptic('light');
@@ -2424,7 +2415,7 @@ export default function RetosView({
                                 </button>
                                 <button
                                   type="button"
-                                  className="tt-step-plus is-amber"
+                                  className="tt-step-plus is-champagne tt-glass-press"
                                   disabled={!canAddB}
                                   onClick={() => {
                                     triggerHaptic('score');
@@ -2454,7 +2445,7 @@ export default function RetosView({
                                 <div className="tt-stepper-btns">
                                   <button
                                     type="button"
-                                    className="tt-step-minus"
+                                    className="tt-step-minus tt-glass-press"
                                     disabled={sObj.tbA <= 0}
                                     onClick={() =>
                                       handleScoreboardAction({
@@ -2469,7 +2460,7 @@ export default function RetosView({
                                   </button>
                                   <button
                                     type="button"
-                                    className="tt-step-plus"
+                                    className="tt-step-plus tt-glass-press"
                                     onClick={() =>
                                       handleScoreboardAction({
                                         type: 'TB_DELTA',
@@ -2491,7 +2482,7 @@ export default function RetosView({
                                 <div className="tt-stepper-btns">
                                   <button
                                     type="button"
-                                    className="tt-step-minus"
+                                    className="tt-step-minus tt-glass-press"
                                     disabled={sObj.tbB <= 0}
                                     onClick={() =>
                                       handleScoreboardAction({
@@ -2506,7 +2497,7 @@ export default function RetosView({
                                   </button>
                                   <button
                                     type="button"
-                                    className="tt-step-plus is-amber"
+                                    className="tt-step-plus is-champagne tt-glass-press"
                                     onClick={() =>
                                       handleScoreboardAction({
                                         type: 'TB_DELTA',
@@ -2553,7 +2544,7 @@ export default function RetosView({
                             <div className="tt-stepper-btns">
                               <button
                                 type="button"
-                                className="tt-step-minus"
+                                className="tt-step-minus tt-glass-press"
                                 disabled={activeSbData.liveScore.set3.a <= 0}
                                 onClick={() =>
                                   handleScoreboardAction({
@@ -2567,7 +2558,7 @@ export default function RetosView({
                               </button>
                               <button
                                 type="button"
-                                className="tt-step-plus"
+                                className="tt-step-plus tt-glass-press"
                                 onClick={() =>
                                   handleScoreboardAction({
                                     type: 'STB_DELTA',
@@ -2588,7 +2579,7 @@ export default function RetosView({
                             <div className="tt-stepper-btns">
                               <button
                                 type="button"
-                                className="tt-step-minus"
+                                className="tt-step-minus tt-glass-press"
                                 disabled={activeSbData.liveScore.set3.b <= 0}
                                 onClick={() =>
                                   handleScoreboardAction({
@@ -2602,7 +2593,7 @@ export default function RetosView({
                               </button>
                               <button
                                 type="button"
-                                className="tt-step-plus is-amber"
+                                className="tt-step-plus is-champagne tt-glass-press"
                                 onClick={() =>
                                   handleScoreboardAction({
                                     type: 'STB_DELTA',
@@ -2628,7 +2619,7 @@ export default function RetosView({
                       {activeSbData.perms.canConfirmOfficial ? (
                         <button
                           type="button"
-                          className="tt-btn tt-btn-primary"
+                          className="tt-btn tt-btn-primary tt-glass-press"
                           style={{ width: '100%' }}
                           onClick={() =>
                             handleSubmitMatchResult({
@@ -2662,7 +2653,6 @@ export default function RetosView({
                 </div>
               )}
 
-            {/* MODO ESPECTADOR */}
             {!activeSbData.perms.canEditScore && (
               <div className="tt-spectator-note">
                 <TTIcon name="vision" size={18} style={{ color: '#00DC7D' }} />
@@ -2726,7 +2716,9 @@ export default function RetosView({
                           <button
                             key={reason}
                             type="button"
-                            className={`tt-choice-pill ${reschedReason === reason ? 'is-selected' : ''}`}
+                            className={`tt-choice-pill tt-glass-press ${
+                              reschedReason === reason ? 'is-selected' : ''
+                            }`}
                             onClick={() => setReschedReason(reason)}
                           >
                             {reason}
@@ -2766,7 +2758,11 @@ export default function RetosView({
                     </div>
                   </div>
 
-                  <button type="submit" className="tt-btn tt-btn-primary" style={{ width: '100%' }}>
+                  <button
+                    type="submit"
+                    className="tt-btn tt-btn-primary tt-glass-press"
+                    style={{ width: '100%' }}
+                  >
                     {isOrdinary
                       ? 'Confirmar Nuevo Horario'
                       : 'Reprogramar y Avisar por WhatsApp'}
@@ -2851,7 +2847,7 @@ export default function RetosView({
               {onOpenStoriesWithMatch && (
                 <button
                   type="button"
-                  className="tt-btn tt-btn-primary"
+                  className="tt-btn tt-btn-primary tt-glass-press"
                   style={{ flex: 1 }}
                   onClick={() => {
                     const payload = {
@@ -2869,7 +2865,7 @@ export default function RetosView({
               )}
               <button
                 type="button"
-                className="tt-btn tt-btn-secondary"
+                className="tt-btn tt-btn-secondary tt-glass-press"
                 onClick={() => setCelebrationPayload(null)}
               >
                 Continuar
@@ -2886,15 +2882,31 @@ export default function RetosView({
           gap: 13px;
         }
 
-        /* 1. HERO COMPACTO (SUBE LOS DESAFÍOS ARRIBA DEL TODO) */
+        /* Física táctil elástica compartida */
+        .tt-glass-press {
+          transition:
+            transform 170ms cubic-bezier(0.22, 1.38, 0.36, 1),
+            box-shadow 220ms ease,
+            border-color 200ms ease,
+            background-color 200ms ease !important;
+        }
+        .tt-glass-press:active {
+          transform: scale(0.95) !important;
+        }
+        .tt-rt-avatar-btn {
+          transition: transform 180ms cubic-bezier(0.22, 1.35, 0.36, 1);
+        }
+        .tt-rt-avatar-btn:active { transform: scale(0.93); }
+
+        /* 1. HERO COMPACTO CON 3 CAPAS PRECARGADAS (CROSSFADE SIN ESPERAS) */
         .tt-hero-stage {
           position: relative;
-          min-height: 176px;
-          border-radius: 22px;
+          min-height: 178px;
+          border-radius: 23px;
           overflow: hidden;
-          background-color: #1A0530;
-          border: 1px solid var(--tt-border);
-          box-shadow: var(--tt-shadow-md);
+          background: linear-gradient(135deg, #24093F 0%, #140324 100%);
+          border: 1px solid rgba(255, 255, 255, 0.14);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), var(--tt-shadow-md);
           display: flex;
           flex-direction: column;
           justify-content: flex-end;
@@ -2906,13 +2918,22 @@ export default function RetosView({
           height: 100%;
           object-fit: cover;
           object-position: center 28%;
+          opacity: 0;
+          transform: scale(1.04);
+          transition: opacity 520ms ease, transform 900ms cubic-bezier(0.22, 1, 0.36, 1);
+          pointer-events: none;
+        }
+        .tt-hero-stage-bg.is-visible {
+          opacity: 1;
+          transform: scale(1);
         }
         .tt-hero-stage-scrim {
           position: absolute;
           inset: 0;
+          z-index: 1;
           background: linear-gradient(
             180deg,
-            rgba(20, 5, 36, 0.22) 0%,
+            rgba(20, 5, 36, 0.24) 0%,
             rgba(20, 5, 36, 0.62) 48%,
             rgba(16, 3, 29, 0.95) 100%
           );
@@ -2920,7 +2941,7 @@ export default function RetosView({
         .tt-hero-stage-content {
           position: relative;
           z-index: 2;
-          padding: 14px 16px;
+          padding: 15px 16px;
           display: flex;
           flex-direction: column;
           gap: 6px;
@@ -2932,10 +2953,12 @@ export default function RetosView({
           align-self: flex-start;
           padding: 4px 10px;
           border-radius: 999px;
-          background: rgba(18, 3, 33, 0.76);
-          border: 1px solid rgba(0, 220, 125, 0.45);
+          background: rgba(18, 3, 33, 0.68);
+          border: 1px solid rgba(0, 220, 125, 0.44);
+          backdrop-filter: blur(10px);
+          -webkit-backdrop-filter: blur(10px);
           color: #00DC7D;
-          font-size: 0.64rem;
+          font-size: 0.63rem;
           font-weight: 800;
           letter-spacing: 0.08em;
           text-transform: uppercase;
@@ -2945,10 +2968,15 @@ export default function RetosView({
           font-family: var(--tt-font-display);
           font-style: italic;
           font-weight: 900;
-          font-size: clamp(1.25rem, 5vw, 1.72rem);
+          font-size: clamp(1.26rem, 5vw, 1.72rem);
           line-height: 1.04;
           color: #FAF9F5;
           text-shadow: 0 3px 12px rgba(0, 0, 0, 0.65);
+          animation: ttRtSlideText 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+        @keyframes ttRtSlideText {
+          from { opacity: 0; transform: translateY(5px); }
+          to { opacity: 1; transform: translateY(0); }
         }
         .tt-hero-subcopy {
           margin: 0;
@@ -2971,14 +2999,13 @@ export default function RetosView({
           min-height: 36px;
           padding: 0 14px;
           border-radius: 999px;
-          background: #FAF9F5;
+          background: rgba(250, 249, 245, 0.95);
           color: #1E0734;
           font-size: 0.73rem;
           font-weight: 900;
           letter-spacing: 0.04em;
-          box-shadow: 0 6px 16px rgba(0, 0, 0, 0.28);
+          box-shadow: inset 0 1px 0 #FFFFFF, 0 8px 18px rgba(0, 0, 0, 0.3);
         }
-        .tt-hero-cta-pill:active { transform: scale(0.96); }
         .tt-cta-emerald-dot {
           width: 8px;
           height: 8px;
@@ -2993,16 +3020,18 @@ export default function RetosView({
           height: 7px;
           border-radius: 999px;
           background: rgba(250, 249, 245, 0.38);
-          transition: width 200ms ease, background-color 200ms ease;
+          transition: width 240ms cubic-bezier(0.22, 1.25, 0.36, 1), background-color 200ms ease;
         }
-        .tt-hero-dot.is-active { width: 20px; background: #00DC7D; }
+        .tt-hero-dot.is-active { width: 22px; background: #00DC7D; }
         .tt-hero-arrows { display: flex; gap: 5px; }
         .tt-circle-nav-btn {
-          width: 28px;
-          height: 28px;
+          width: 29px;
+          height: 29px;
           border-radius: 50%;
-          background: rgba(250, 249, 245, 0.16);
-          border: 1px solid rgba(250, 249, 245, 0.26);
+          background: rgba(250, 249, 245, 0.14);
+          border: 1px solid rgba(250, 249, 245, 0.24);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
           color: #FAF9F5;
           font-size: 1rem;
           display: inline-flex;
@@ -3020,51 +3049,72 @@ export default function RetosView({
 
         /* 2. ALERTA RETOS ENTRANTES */
         .tt-incoming-alert {
-          border-radius: 18px;
+          border-radius: 19px;
           padding: 13px;
-          background: linear-gradient(135deg, #1E0734 0%, #2C0B4E 100%);
-          border: 1.5px solid rgba(0, 220, 125, 0.58);
+          background: linear-gradient(135deg, #21073A 0%, #140324 100%);
+          border: 1px solid rgba(0, 220, 125, 0.48);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 12px 26px rgba(0, 220, 125, 0.14);
           color: #FAF9F5;
         }
         .tt-incoming-alert-head { display: flex; align-items: center; gap: 11px; }
         .tt-incoming-kicker {
           display: block;
-          font-size: 0.64rem;
+          font-size: 0.63rem;
           font-weight: 900;
           letter-spacing: 0.08em;
           color: #00DC7D;
         }
 
-        /* 3. SUB-TABS */
+        /* 3. SUB-TABS CON SLIDER ELÁSTICO LIQUID GLASS */
         .tt-subtabs-bar {
+          position: relative;
           display: grid;
           grid-template-columns: repeat(3, 1fr);
-          gap: 6px;
-          padding: 5px;
+          padding: 4px;
           border-radius: 18px;
           background: var(--tt-surface-2);
           border: 1px solid var(--tt-border);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+          backdrop-filter: blur(14px);
+          -webkit-backdrop-filter: blur(14px);
+        }
+        .tt-subtab-slider {
+          position: absolute;
+          top: 4px;
+          bottom: 4px;
+          left: 4px;
+          width: calc((100% - 8px) / 3);
+          border-radius: 13px;
+          background: linear-gradient(135deg, #00DC7D 0%, #00B365 100%);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 6px 16px rgba(0, 220, 125, 0.3);
+          transition: transform 320ms cubic-bezier(0.22, 1.24, 0.36, 1);
+          pointer-events: none;
+          z-index: 0;
+        }
+        .tt-retos-view.is-light .tt-subtab-slider {
+          background: #1E0734;
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 6px 16px rgba(30, 7, 52, 0.22);
         }
         .tt-subtab-btn {
-          min-height: 40px;
+          position: relative;
+          z-index: 1;
+          min-height: 41px;
           border-radius: 13px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
           gap: 5px;
-          font-size: 0.78rem;
+          font-size: 0.77rem;
           font-weight: 800;
           color: var(--tt-text-muted);
-          transition: background-color 160ms ease, color 160ms ease;
+          transition: color 200ms ease;
         }
         .tt-subtab-btn.is-active {
-          background: #1E0734;
-          color: #00DC7D;
-          box-shadow: 0 5px 14px rgba(10, 2, 20, 0.22);
+          color: #10021E;
+          font-weight: 900;
         }
-        .tt-retos-view.is-dark .tt-subtab-btn.is-active {
-          background: linear-gradient(135deg, #00DC7D 0%, #00B868 100%);
-          color: #120321;
+        .tt-retos-view.is-light .tt-subtab-btn.is-active {
+          color: #00DC7D;
         }
         .tt-subtab-chip {
           min-width: 18px;
@@ -3073,19 +3123,24 @@ export default function RetosView({
           border-radius: 999px;
           background: rgba(0, 220, 125, 0.2);
           color: var(--tt-emerald-text);
-          font-size: 0.66rem;
+          font-size: 0.65rem;
           font-weight: 900;
           display: inline-flex;
           align-items: center;
           justify-content: center;
         }
         .tt-retos-view.is-dark .tt-subtab-btn.is-active .tt-subtab-chip {
-          background: rgba(18, 3, 33, 0.22);
-          color: #120321;
+          background: rgba(16, 2, 30, 0.22);
+          color: #10021E;
         }
 
         /* 4. FILTROS Y PANELES */
         .tt-retos-panel { display: flex; flex-direction: column; gap: 12px; }
+        .tt-rt-panel-in { animation: ttRtFade 280ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+        @keyframes ttRtFade {
+          from { opacity: 0; transform: translateY(7px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
         .tt-filter-pills-row {
           display: flex;
           gap: 7px;
@@ -3103,13 +3158,15 @@ export default function RetosView({
           font-weight: 700;
           background: var(--tt-surface-2);
           border: 1px solid var(--tt-border);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
           color: var(--tt-text-muted);
         }
         .tt-filter-chip.is-active {
           background: rgba(0, 220, 125, 0.16);
-          border-color: rgba(0, 220, 125, 0.55);
+          border-color: rgba(0, 220, 125, 0.52);
           color: #00DC7D;
           font-weight: 800;
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 4px 12px rgba(0, 220, 125, 0.18);
         }
         .tt-retos-view.is-light .tt-filter-chip.is-active {
           background: #1E0734;
@@ -3117,7 +3174,7 @@ export default function RetosView({
           color: #00DC7D;
         }
 
-        /* 5. TARJETAS PÓSTER VS */
+        /* 5. TARJETAS PÓSTER VS (LIQUID GLASS + CHAMPÁN SOBRIO) */
         .tt-matches-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
         @media (min-width: 760px) {
           .tt-matches-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -3127,12 +3184,17 @@ export default function RetosView({
           padding: 14px;
           background: var(--tt-surface);
           border: 1px solid var(--tt-border);
-          box-shadow: var(--tt-shadow-sm);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), var(--tt-shadow-sm);
+          backdrop-filter: blur(14px);
+          -webkit-backdrop-filter: blur(14px);
           display: flex;
           flex-direction: column;
           gap: 12px;
         }
-        .tt-match-card.is-live { border-color: rgba(0, 220, 125, 0.52); }
+        .tt-match-card.is-live {
+          border-color: rgba(0, 220, 125, 0.5);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 10px 24px rgba(0, 220, 125, 0.14);
+        }
         .tt-match-card-top {
           display: flex;
           align-items: center;
@@ -3145,17 +3207,17 @@ export default function RetosView({
           gap: 6px;
           padding: 4px 10px;
           border-radius: 999px;
-          font-size: 0.65rem;
+          font-size: 0.64rem;
           font-weight: 900;
           letter-spacing: 0.06em;
         }
-        .tt-match-pill.is-live { background: rgba(0, 220, 125, 0.18); color: #00DC7D; }
-        .tt-retos-view.is-light .tt-match-pill.is-live { background: #1E0734; color: #00DC7D; }
-        .tt-match-pill.is-scheduled { background: rgba(56, 189, 248, 0.16); color: #38BDF8; }
-        .tt-retos-view.is-light .tt-match-pill.is-scheduled { background: rgba(30, 7, 52, 0.09); color: #1E0734; }
-        .tt-match-pill.is-pending { background: rgba(245, 158, 11, 0.18); color: #F59E0B; }
-        .tt-retos-view.is-light .tt-match-pill.is-pending { background: #FEF3C7; color: #92400E; }
-        .tt-match-pill.is-disputed { background: rgba(239, 68, 68, 0.18); color: #F87171; }
+        .tt-match-pill.is-live { background: rgba(0, 220, 125, 0.16); color: #00DC7D; border: 1px solid rgba(0, 220, 125, 0.35); }
+        .tt-retos-view.is-light .tt-match-pill.is-live { background: #1E0734; color: #00DC7D; border-color: transparent; }
+        .tt-match-pill.is-scheduled { background: rgba(147, 197, 253, 0.15); color: #93C5FD; }
+        .tt-retos-view.is-light .tt-match-pill.is-scheduled { background: rgba(30, 7, 52, 0.08); color: #1E0734; }
+        .tt-match-pill.is-pending { background: rgba(229, 193, 108, 0.14); color: #E5C16C; border: 1px solid rgba(229, 193, 108, 0.34); }
+        .tt-retos-view.is-light .tt-match-pill.is-pending { background: #FBF4E0; color: #8A5D10; border-color: rgba(154, 107, 22, 0.28); }
+        .tt-match-pill.is-disputed { background: rgba(239, 68, 68, 0.16); color: #F87171; }
         .tt-retos-view.is-light .tt-match-pill.is-disputed { background: #FEE2E2; color: #B91C1C; }
         .tt-match-pill.is-finished { background: var(--tt-surface-2); color: var(--tt-text-muted); }
         .tt-match-mode-tag { font-size: 0.7rem; font-weight: 700; color: var(--tt-text-muted); }
@@ -3193,13 +3255,20 @@ export default function RetosView({
           color: var(--tt-text-muted);
           flex-wrap: wrap;
         }
+        .tt-cat-dot-inline {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          display: inline-block;
+          flex-shrink: 0;
+        }
         .tt-winner-chip {
           display: inline-block;
           padding: 2px 8px;
           border-radius: 999px;
-          background: rgba(0, 220, 125, 0.18);
+          background: rgba(0, 220, 125, 0.16);
           color: #00DC7D;
-          font-size: 0.62rem;
+          font-size: 0.61rem;
           font-weight: 900;
           letter-spacing: 0.08em;
         }
@@ -3216,9 +3285,10 @@ export default function RetosView({
           font-style: italic;
           font-weight: 900;
           font-size: 1.16rem;
-          color: #D97706;
+          color: #E5C16C;
           line-height: 1;
         }
+        .tt-retos-view.is-light .tt-vs-emblem { color: #9A6B16; }
         .tt-match-date-chip { font-size: 0.69rem; font-weight: 800; color: var(--tt-text); white-space: nowrap; }
         .tt-match-time-chip { font-size: 0.68rem; font-weight: 700; color: var(--tt-text-muted); white-space: nowrap; }
 
@@ -3247,8 +3317,8 @@ export default function RetosView({
           justify-content: center;
         }
         .tt-sb-cell.is-stb {
-          background: rgba(245, 158, 11, 0.22);
-          color: #FDE68A;
+          background: rgba(229, 193, 108, 0.2);
+          color: #F3DC9B;
           min-width: 30px;
           width: auto;
           padding: 0 6px;
@@ -3289,10 +3359,11 @@ export default function RetosView({
           flex-shrink: 0;
         }
         .tt-icon-action-btn.is-wa {
-          background: rgba(37, 211, 102, 0.16);
+          background: rgba(37, 211, 102, 0.15);
           color: #16A34A;
           border: 1px solid rgba(37, 211, 102, 0.35);
         }
+        .tt-retos-view.is-dark .tt-icon-action-btn.is-wa { color: #4ADE80; }
         .tt-waiting-banner {
           flex: 1;
           display: flex;
@@ -3300,11 +3371,13 @@ export default function RetosView({
           gap: 7px;
           padding: 9px 11px;
           border-radius: 12px;
-          background: rgba(245, 158, 11, 0.14);
-          color: #D97706;
+          background: rgba(229, 193, 108, 0.12);
+          border: 1px solid rgba(229, 193, 108, 0.3);
+          color: #E5C16C;
           font-size: 0.74rem;
           font-weight: 800;
         }
+        .tt-retos-view.is-light .tt-waiting-banner { color: #8A5D10; background: #FBF4E0; }
         .tt-spectator-pill {
           flex: 1;
           display: inline-flex;
@@ -3330,6 +3403,7 @@ export default function RetosView({
           border-radius: 15px;
           background: var(--tt-surface);
           border: 1px solid var(--tt-border);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
         }
         .tt-search-box input {
           width: 100%;
@@ -3348,13 +3422,34 @@ export default function RetosView({
           border-radius: 18px;
           background: var(--tt-surface);
           border: 1px solid var(--tt-border);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
         }
         .tt-rival-row.is-out-of-range { opacity: 0.75; }
         .tt-rival-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
         .tt-rival-name-line { display: flex; align-items: center; gap: 6px; font-size: 0.9rem; }
         .tt-rival-name-line strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .tt-vip-micro-pill {
+          padding: 1px 6px;
+          border-radius: 6px;
+          background: rgba(229, 193, 108, 0.16);
+          border: 1px solid rgba(229, 193, 108, 0.42);
+          color: #E5C16C;
+          font-size: 0.58rem;
+          font-weight: 900;
+        }
+        .tt-retos-view.is-light .tt-vip-micro-pill { background: #FBF4E0; color: #8A5D10; }
         .tt-rival-meta-line { display: flex; align-items: center; gap: 6px; font-size: 0.72rem; color: var(--tt-text-muted); flex-wrap: wrap; }
-        .tt-cat-mini-pill { padding: 2px 7px; border-radius: 999px; font-weight: 800; font-size: 0.67rem; }
+        .tt-cat-mini-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          padding: 2px 7px;
+          border-radius: 999px;
+          background: var(--tt-surface-2);
+          color: var(--tt-text-secondary);
+          font-weight: 800;
+          font-size: 0.66rem;
+        }
         .tt-rival-forecast-line { display: flex; align-items: center; gap: 6px; font-size: 0.7rem; color: var(--tt-text-muted); flex-wrap: wrap; }
         .tt-rival-forecast-line .is-win { color: var(--tt-emerald-text); font-weight: 800; }
         .tt-rival-forecast-line .is-loss { color: #EF4444; font-weight: 700; }
@@ -3372,7 +3467,7 @@ export default function RetosView({
           border: 1px solid rgba(0, 220, 125, 0.34);
         }
         .tt-forecast-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; font-size: 0.8rem; }
-        .tt-rematch-tag { padding: 3px 8px; border-radius: 999px; background: rgba(245, 158, 11, 0.22); color: #FDE68A; font-size: 0.66rem; font-weight: 800; }
+        .tt-rematch-tag { padding: 3px 8px; border-radius: 999px; background: rgba(229, 193, 108, 0.2); color: #F3DC9B; font-size: 0.66rem; font-weight: 800; }
         .tt-forecast-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
         .tt-forecast-cell { padding: 9px 10px; border-radius: 12px; background: rgba(250, 249, 245, 0.07); display: flex; flex-direction: column; gap: 2px; }
         .tt-forecast-cell span { font-size: 0.68rem; opacity: 0.78; }
@@ -3433,7 +3528,7 @@ export default function RetosView({
           border: 1px solid var(--tt-border);
           color: var(--tt-text-muted);
         }
-        .tt-slot-chip.is-selected { background: #00DC7D; border-color: #00DC7D; color: #120321; font-weight: 900; }
+        .tt-slot-chip.is-selected { background: #00DC7D; border-color: #00DC7D; color: #10021E; font-weight: 900; }
         .tt-balls-stack { display: flex; flex-direction: column; gap: 7px; }
 
         /* 8. MODAL MARCADOR DIRECTO + MODO ÁRBITRO */
@@ -3489,9 +3584,8 @@ export default function RetosView({
           justify-content: center;
         }
         .tt-st-num sup { font-size: 0.6rem; color: #00DC7D; margin-left: 1px; }
-        .tt-st-num.is-stb { background: rgba(245, 158, 11, 0.24); color: #FDE68A; min-width: 38px; width: auto; padding: 0 6px; }
+        .tt-st-num.is-stb { background: rgba(229, 193, 108, 0.22); color: #F3DC9B; min-width: 38px; width: auto; padding: 0 6px; }
 
-        /* Inputs directos rápidos por set */
         .tt-direct-hint { margin: 0; font-size: 0.77rem; color: var(--tt-text-muted); line-height: 1.4; }
         .tt-direct-set-box {
           border-radius: 16px;
@@ -3502,7 +3596,7 @@ export default function RetosView({
           flex-direction: column;
           gap: 10px;
         }
-        .tt-direct-set-box.is-stb-card { border-color: rgba(245, 158, 11, 0.52); }
+        .tt-direct-set-box.is-stb-card { border-color: rgba(229, 193, 108, 0.5); }
         .tt-direct-set-head { display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; }
         .tt-direct-set-head span { font-size: 0.7rem; color: var(--tt-text-muted); }
         .tt-direct-inputs-row {
@@ -3569,9 +3663,10 @@ export default function RetosView({
           flex-direction: column;
           gap: 10px;
         }
-        .tt-set-control-card.is-stb-card { border-color: rgba(245, 158, 11, 0.45); }
+        .tt-set-control-card.is-stb-card { border-color: rgba(229, 193, 108, 0.45); }
         .tt-set-control-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 0.8rem; }
-        .tt-unlock-btn { padding: 4px 10px; border-radius: 999px; background: rgba(245, 158, 11, 0.16); color: #D97706; font-size: 0.7rem; font-weight: 800; }
+        .tt-unlock-btn { padding: 4px 10px; border-radius: 999px; background: rgba(229, 193, 108, 0.16); color: #E5C16C; font-size: 0.7rem; font-weight: 800; }
+        .tt-retos-view.is-light .tt-unlock-btn { color: #8A5D10; }
         .tt-tb-panel { display: flex; flex-direction: column; gap: 10px; }
         .tt-tb-banner { text-align: center; padding: 6px 10px; border-radius: 10px; background: rgba(0, 220, 125, 0.15); color: var(--tt-emerald-text); font-size: 0.68rem; font-weight: 900; }
         .tt-dual-stepper { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -3579,8 +3674,8 @@ export default function RetosView({
         .tt-stepper-name { font-size: 0.76rem; font-weight: 800; color: var(--tt-text-muted); text-align: center; }
         .tt-stepper-btns { display: flex; gap: 6px; }
         .tt-step-minus { width: 40px; height: 44px; border-radius: 12px; background: var(--tt-surface); border: 1px solid var(--tt-border); color: var(--tt-text); font-size: 1.2rem; font-weight: 800; }
-        .tt-step-plus { flex: 1; height: 44px; border-radius: 12px; background: linear-gradient(135deg, #00DC7D 0%, #00B868 100%); color: #120321; font-size: 0.82rem; font-weight: 900; }
-        .tt-step-plus.is-amber { background: linear-gradient(135deg, #FBBF24 0%, #D97706 100%); color: #1E1102; }
+        .tt-step-plus { flex: 1; height: 44px; border-radius: 12px; background: linear-gradient(135deg, #00DC7D 0%, #00B365 100%); color: #10021E; font-size: 0.82rem; font-weight: 900; }
+        .tt-step-plus.is-champagne { background: linear-gradient(135deg, #F5E1A4 0%, #CCA046 100%); color: #1A1102; }
 
         .tt-judge-assign-box { display: flex; flex-direction: column; gap: 6px; }
         .tt-elo-preview-card {
@@ -3600,7 +3695,7 @@ export default function RetosView({
         .tt-spectator-note { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 14px; background: var(--tt-surface-2); font-size: 0.8rem; color: var(--tt-text-muted); }
         .tt-rule-callout { display: flex; gap: 10px; padding: 12px; border-radius: 14px; font-size: 0.82rem; }
         .tt-rule-callout.is-ok { background: rgba(0, 220, 125, 0.14); border: 1px solid rgba(0, 220, 125, 0.4); }
-        .tt-rule-callout.is-warn { background: rgba(245, 158, 11, 0.14); border: 1px solid rgba(245, 158, 11, 0.42); }
+        .tt-rule-callout.is-warn { background: rgba(229, 193, 108, 0.14); border: 1px solid rgba(229, 193, 108, 0.42); }
       `}</style>
     </section>
   );
