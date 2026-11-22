@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 
 /* ==========================================================================
    1. MAPA MAESTRO DE ACTIVOS (public/assets/)
-   Conecta tus 42 archivos previos + 26 nuevos de TOTAL TENIS + ranuras Pro Shop
+   Conserva el 100% de las rutas existentes + alias verificados de sedes.
    ========================================================================== */
 export const ASSETS = {
   // Identidad Oficial TOTAL TENIS
@@ -28,16 +28,23 @@ export const ASSETS = {
   clubRomina: '/assets/club-romina-cutipa.png',
   clubInkas: '/assets/club-los-inkas.png',
 
+  // Portadas Oficiales de las 4 Sedes
+  sedeCountry: '/assets/sede-country-club.jpg',
+  sedeRomina: '/assets/sede-romina-cutipa.jpg',
+  sedeTauro: '/assets/sede-club-tauro.jpg',
+  sedeInkas: '/assets/sede-los-inkas.jpg',
+
   // Estados Vacíos Oficiales (Claro / Oscuro)
   estadoVacioClaro: '/assets/estado-vacio-claro.png',
   estadoVacioOscuro: '/assets/estado-vacio-oscuro.png',
 
-  // Escenarios Grand Slam para Perfil (Sin jugador naranja detrás)
+  // Escenarios Grand Slam para Perfil
   bgArcilla: '/assets/perfil-bg-arcilla.jpg',
   bgCesped: '/assets/perfil-bg-cesped.jpg',
   bgDura: '/assets/perfil-bg-dura.jpg',
   bgFinals: '/assets/perfil-bg-finals.jpg',
   bgPurpuraOscuro: '/assets/perfil-bg-purpura-oscuro.jpg',
+  bgMarfilClaro: '/assets/perfil-bg-marfil-claro.jpg',
 
   // Portadas Únicas de Torneos
   torneoAltura: '/assets/torneo-altura.jpg',
@@ -49,7 +56,7 @@ export const ASSETS = {
   trofeoCampeonGira: '/assets/trofeo-campeon-gira.png',
   trofeoMasterTop8: '/assets/trofeo-master-top8.png',
 
-  // Insignias Oficiales de Logro y Tienda
+  // Insignias de respaldo (ya no se muestran en vitrina ni tienda)
   badgeInvicto: '/assets/badge-invicto.png',
   badgeMaestroTop8: '/assets/badge-maestro-top8.png',
   badgeMataGigantes: '/assets/badge-mata-gigantes.png',
@@ -78,12 +85,13 @@ export const ASSETS = {
   raquetaPro: '/assets/raqueta-3d-pro.png',
   raquetaOscura: '/assets/raqueta-3d-oscura.png',
 
-  // Ranuras Listas para tu Carnet VIP de Canva Pro
+  // Ranuras Listas para Carnet VIP Canva Pro
   carnetVipAnverso: '/assets/carnet-vip-anverso.png',
   carnetVipReverso: '/assets/carnet-vip-reverso.png',
 
-  // Ranuras Listas para Pro Shop Estilo Amazon (Fondo Blanco #FFFFFF)
+  // Ranuras Pro Shop
   proshopCuerda: '/assets/proshop-cuerda.png',
+  proshopEncordado: '/assets/proshop-encordado.png',
   proshopPelotas: '/assets/proshop-pelotas.png',
   proshopOvergrip: '/assets/proshop-overgrip.png',
   proshopAntivibrador: '/assets/proshop-antivibrador.png',
@@ -109,7 +117,7 @@ export const ASSETS = {
 };
 
 /* ==========================================================================
-   2. VIBRACIÓN HÁPTICA SEGURA (SE ADAPTA A CADA DISPOSITIVO SIN ERRORES)
+   2. VIBRACIÓN HÁPTICA SEGURA
    ========================================================================== */
 export function triggerHaptic(type = 'light') {
   try {
@@ -122,14 +130,13 @@ export function triggerHaptic(type = 'light') {
       warning: [30, 40, 30],
     };
     navigator.vibrate(patterns[type] || 10);
-  } catch (e) {
-    // Silencioso en Safari iOS u otros navegadores sin Vibration API
+  } catch {
+    // Silencioso en Safari iOS sin Vibration API
   }
 }
 
 /* ==========================================================================
-   3. HOOK SCROLL-REVEAL PROGRESIVO (ESTILO APPLE · CERO LAG EN GAMA BAJA)
-   Calcula --tt-reveal de 0 a 1 conforme el usuario desliza la pantalla.
+   3. HOOK SCROLL-REVEAL PROGRESIVO (CERO LAG EN GAMA BAJA)
    ========================================================================== */
 export function useScrollReveal(ref, { startRevealed = true } = {}) {
   const [progress, setProgress] = useState(startRevealed ? 1 : 0.25);
@@ -151,7 +158,6 @@ export function useScrollReveal(ref, { startRevealed = true } = {}) {
       if (!ref.current) return;
       const rect = ref.current.getBoundingClientRect();
       const vh = window.innerHeight || 800;
-      // En el tope superior (Hero inicial) empieza en 0.88 y llega a 1.0 suavemente al bajar
       const raw =
         rect.top <= 140
           ? Math.min(1, Math.max(0.84, 0.88 + Math.abs(Math.min(0, rect.top)) / 180))
@@ -179,13 +185,12 @@ export function useScrollReveal(ref, { startRevealed = true } = {}) {
 }
 
 /* ==========================================================================
-   4. COMPONENTE <SmartImage /> (AUTO-CORRECCIÓN .PNG/.JPG/.WEBP + CERO ROTOS)
+   4. COMPONENTE <SmartImage /> (CARGA PRIORITARIA + AUTO-RESPALDO)
    ========================================================================== */
 function buildExtensionCandidates(src, fallbackSrc) {
   const list = [];
   if (src) {
     list.push(src);
-    // Si es un activo local en /assets/, probar extensiones alternas automáticamente
     const match = typeof src === 'string' && src.match(/^(\/assets\/.+)\.(png|jpg|jpeg|webp)$/i);
     if (match) {
       const base = match[1];
@@ -260,6 +265,7 @@ export function SmartImage({
       style={style}
       loading={priority ? 'eager' : 'lazy'}
       decoding={priority ? 'sync' : 'async'}
+      fetchPriority={priority ? 'high' : 'auto'}
       onError={() => {
         if (idx + 1 < candidates.length) {
           setIdx(idx + 1);
@@ -273,9 +279,84 @@ export function SmartImage({
 }
 
 /* ==========================================================================
-   5. MOTOR UNIVERSAL <ModalPortal /> EN document.body (CERO PANTALLAS VACÍAS)
+   5. MOTOR UNIVERSAL <ModalPortal /> EN document.body
+   - SCROLL BLINDADO: jamás vuelve a scrollTop = 0 al interactuar dentro.
+   - CAPA AUTH EXCLUSIVA (isAuthLayer): siempre encima de cualquier modal.
+   - BOTTOM-SHEET SUAVE (isBottomSheet / isAuthLayer): desliza desde abajo.
    ========================================================================== */
 let openModalCount = 0;
+
+function ensureModalLayerStyles() {
+  if (typeof document === 'undefined') return;
+  if (document.getElementById('tt-portal-layer-styles')) return;
+
+  const styleEl = document.createElement('style');
+  styleEl.id = 'tt-portal-layer-styles';
+  styleEl.textContent = `
+    .tt-modal-backdrop.is-top-layer {
+      z-index: 2500 !important;
+    }
+    .tt-modal-backdrop.is-auth-layer {
+      z-index: 9500 !important;
+      animation: ttAuthBackdropIn 220ms ease-out both !important;
+    }
+    .tt-modal-backdrop.is-bottom-sheet {
+      align-items: flex-end !important;
+      padding: 0 !important;
+    }
+    .tt-modal-backdrop.is-bottom-sheet .tt-modal-sheet {
+      width: 100% !important;
+      max-width: 560px !important;
+      max-height: 90dvh !important;
+      border-radius: 28px 28px 0 0 !important;
+      margin: 0 auto !important;
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+      animation: ttBottomSheetSlideUp 360ms cubic-bezier(0.22, 1.12, 0.36, 1) both !important;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.24),
+        0 -16px 48px rgba(8, 1, 18, 0.55) !important;
+      backdrop-filter: blur(22px) saturate(160%) !important;
+      -webkit-backdrop-filter: blur(22px) saturate(160%) !important;
+    }
+    @media (min-width: 640px) {
+      .tt-modal-backdrop.is-bottom-sheet {
+        align-items: center !important;
+        padding: 18px !important;
+      }
+      .tt-modal-backdrop.is-bottom-sheet .tt-modal-sheet {
+        border-radius: 26px !important;
+        max-height: 88dvh !important;
+      }
+    }
+    .tt-sheet-grabber-wrap {
+      display: flex;
+      justify-content: center;
+      padding: 9px 0 2px;
+      flex-shrink: 0;
+    }
+    .tt-sheet-grabber {
+      width: 40px;
+      height: 4px;
+      border-radius: 999px;
+      background: rgba(148, 163, 184, 0.45);
+    }
+    .tt-modal-close-btn {
+      transition: transform 160ms cubic-bezier(0.22, 1.4, 0.36, 1), background-color 180ms ease;
+    }
+    .tt-modal-close-btn:active {
+      transform: scale(0.88);
+    }
+    @keyframes ttAuthBackdropIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes ttBottomSheetSlideUp {
+      from { opacity: 0.4; transform: translateY(100%); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  `;
+  document.head.appendChild(styleEl);
+}
 
 export function ModalPortal({
   isOpen,
@@ -287,14 +368,24 @@ export function ModalPortal({
   isFullscreen = false,
   isWide = false,
   isTopLayer = false,
+  isAuthLayer = false,
+  isBottomSheet = false,
   forceDarkAdmin = false,
   hideHeader = false,
   headerExtra = null,
 }) {
   const bodyRef = useRef(null);
+  const onCloseRef = useRef(onClose);
+
+  // Mantener referencia actualizada sin re-disparar el efecto de apertura/scroll
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!isOpen || typeof document === 'undefined') return undefined;
+
+    ensureModalLayerStyles();
 
     openModalCount += 1;
     const prevOverflow = document.body.style.overflow;
@@ -302,13 +393,13 @@ export function ModalPortal({
       document.body.style.overflow = 'hidden';
     }
 
-    // Forzar scroll al inicio desde el primer milisegundo (resuelve pantalla vacía iPhone)
+    // Solo al abrir el modal (transición false -> true), posicionar scroll al inicio
     const raf = window.requestAnimationFrame(() => {
       if (bodyRef.current) bodyRef.current.scrollTop = 0;
     });
 
     const handleKey = (e) => {
-      if (e.key === 'Escape' && onClose) onClose();
+      if (e.key === 'Escape' && onCloseRef.current) onCloseRef.current();
     };
     window.addEventListener('keydown', handleKey);
 
@@ -320,22 +411,24 @@ export function ModalPortal({
         document.body.style.overflow = prevOverflow || '';
       }
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   if (!isOpen || typeof document === 'undefined') return null;
+
+  const useSheetMode = Boolean(isBottomSheet || isAuthLayer);
 
   return createPortal(
     <div
       className={`tt-modal-backdrop ${isFullscreen ? 'is-fullscreen' : ''} ${
         isTopLayer ? 'is-top-layer' : ''
-      }`}
+      } ${isAuthLayer ? 'is-auth-layer' : ''} ${useSheetMode ? 'is-bottom-sheet' : ''}`}
       role="dialog"
       aria-modal="true"
       aria-label={typeof title === 'string' ? title : 'Ventana TOTAL TENIS'}
       onClick={(e) => {
-        if (e.target === e.currentTarget && onClose) {
+        if (e.target === e.currentTarget && onCloseRef.current) {
           triggerHaptic('light');
-          onClose();
+          onCloseRef.current();
         }
       }}
     >
@@ -345,6 +438,12 @@ export function ModalPortal({
         }`}
         onClick={(e) => e.stopPropagation()}
       >
+        {useSheetMode && (
+          <div className="tt-sheet-grabber-wrap" aria-hidden="true">
+            <span className="tt-sheet-grabber" />
+          </div>
+        )}
+
         {!hideHeader && (
           <div className="tt-modal-head">
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
@@ -466,14 +565,14 @@ export function EmptyStateCard({
 }
 
 /* ==========================================================================
-   7. LAURELES CEREMONIALES DE PODIO (#1 ORO, #2 PLATA, #3 BRONCE)
+   7. LAURELES CEREMONIALES DE PODIO (#1 CHAMPÁN, #2 PLATA, #3 BRONCE)
    ========================================================================== */
 export function LaurelBadge({ rank = 1, size = 56 }) {
   const uid = useId();
   const palettes = {
-    1: { a: '#FFF0A8', b: '#F59E0B', c: '#B45309', text: '#FFF4C2', glow: 'rgba(245,158,11,0.45)' },
-    2: { a: '#FFFFFF', b: '#CBD5E1', c: '#64748B', text: '#F8FAFC', glow: 'rgba(203,213,225,0.35)' },
-    3: { a: '#FAD3BC', b: '#D97757', c: '#8C3F23', text: '#FCE2D2', glow: 'rgba(217,119,87,0.38)' },
+    1: { a: '#FAF0CA', b: '#E5C16C', c: '#9A6B16', text: '#FAF0CA', glow: 'rgba(229,193,108,0.4)' },
+    2: { a: '#FFFFFF', b: '#CBD5E1', c: '#64748B', text: '#F8FAFC', glow: 'rgba(203,213,225,0.34)' },
+    3: { a: '#F5D8C6', b: '#C6835E', c: '#7C3D21', text: '#F5D8C6', glow: 'rgba(198,131,94,0.34)' },
   };
   const p = palettes[rank] || palettes[1];
   const gradId = `laurel-${rank}-${uid}`;
@@ -500,7 +599,6 @@ export function LaurelBadge({ rank = 1, size = 56 }) {
             <stop offset="100%" stopColor={p.c} />
           </linearGradient>
         </defs>
-        {/* Rama Izquierda */}
         <path
           d="M27 54C16 49 10 38 11 25C12 17 16 11 22 8"
           stroke={`url(#${gradId})`}
@@ -513,7 +611,6 @@ export function LaurelBadge({ rank = 1, size = 56 }) {
         <ellipse cx="15.5" cy="15" rx="4.8" ry="2.4" transform="rotate(36 15.5 15)" fill={`url(#${gradId})`} />
         <ellipse cx="21" cy="49" rx="4.8" ry="2.3" transform="rotate(-55 21 49)" fill={`url(#${gradId})`} />
 
-        {/* Rama Derecha */}
         <path
           d="M37 54C48 49 54 38 53 25C52 17 48 11 42 8"
           stroke={`url(#${gradId})`}
@@ -526,9 +623,7 @@ export function LaurelBadge({ rank = 1, size = 56 }) {
         <ellipse cx="48.5" cy="15" rx="4.8" ry="2.4" transform="rotate(-36 48.5 15)" fill={`url(#${gradId})`} />
         <ellipse cx="43" cy="49" rx="4.8" ry="2.3" transform="rotate(55 43 49)" fill={`url(#${gradId})`} />
 
-        {/* Medallón Central */}
         <circle cx="32" cy="31" r="15.5" fill="#1E0734" stroke={`url(#${gradId})`} strokeWidth="2.2" />
-        {/* Estrella superior en el #1 */}
         {rank === 1 && (
           <path
             d="M32 6L33.6 9.8L37.7 10.1L34.5 12.8L35.5 16.8L32 14.6L28.5 16.8L29.5 12.8L26.3 10.1L30.4 9.8L32 6Z"
@@ -554,30 +649,29 @@ export function LaurelBadge({ rank = 1, size = 56 }) {
 }
 
 /* ==========================================================================
-   8. LIBRERÍA DE INSIGNIAS VECTORIALES DE DOBLE CAPA (CERO EMOJIS FEOS)
-   Reemplaza "librito", "diamante 5 líneas", "camarita" y "trofeo básico".
+   8. LIBRERÍA DE INSIGNIAS VECTORIALES DE DOBLE CAPA (ACABADO LIQUID GLASS)
    ========================================================================== */
 export function IconBadge({ name, variant = 'emerald', size = 40 }) {
   const styles = {
     emerald: {
       bg: 'linear-gradient(135deg, #00DC7D 0%, #00A85D 100%)',
-      color: '#120321',
-      shadow: '0 6px 16px rgba(0, 220, 125, 0.32)',
+      color: '#10021E',
+      shadow: 'inset 0 1px 0 rgba(255,255,255,0.45), 0 6px 16px rgba(0, 220, 125, 0.32)',
     },
     gold: {
-      bg: 'linear-gradient(135deg, #FDE68A 0%, #F59E0B 52%, #B45309 100%)',
-      color: '#1E1102',
-      shadow: '0 6px 16px rgba(245, 158, 11, 0.34)',
+      bg: 'linear-gradient(135deg, #F5E1A4 0%, #E5C16C 52%, #B5882B 100%)',
+      color: '#1A1102',
+      shadow: 'inset 0 1px 0 rgba(255,255,255,0.5), 0 6px 16px rgba(229, 193, 108, 0.34)',
     },
     purple: {
       bg: 'linear-gradient(135deg, #431870 0%, #1E0734 100%)',
       color: '#00DC7D',
-      shadow: '0 6px 16px rgba(30, 7, 52, 0.34)',
+      shadow: 'inset 0 1px 0 rgba(255,255,255,0.22), 0 6px 16px rgba(30, 7, 52, 0.36)',
     },
     clay: {
-      bg: 'linear-gradient(135deg, #E07A5F 0%, #C85A32 100%)',
+      bg: 'linear-gradient(135deg, #DE8566 0%, #B44D2B 100%)',
       color: '#FFFFFF',
-      shadow: '0 6px 16px rgba(200, 90, 50, 0.32)',
+      shadow: 'inset 0 1px 0 rgba(255,255,255,0.34), 0 6px 16px rgba(180, 77, 43, 0.32)',
     },
   };
   const v = styles[variant] || styles.emerald;
@@ -599,7 +693,6 @@ export function IconBadge({ name, variant = 'emerald', size = 40 }) {
         overflow: 'hidden',
       }}
     >
-      {/* Brillo superior sutil estilo relieve 3D */}
       <span
         style={{
           position: 'absolute',
@@ -626,7 +719,6 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
   };
 
   switch (name) {
-    /* GEMA FACETADA 3D CON BRILLO INTERNO (Adiós diamante de 5 líneas) */
     case 'gem': {
       const g1 = `gem-top-${uid}`;
       const g2 = `gem-bot-${uid}`;
@@ -654,7 +746,48 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
       );
     }
 
-    /* LIBRO DE RECLAMACIONES OFICIAL (Escudo editorial con hoja y check, cero librito feo) */
+    case 'camera':
+      return (
+        <svg {...common}>
+          <path
+            d="M4.5 8.5C4.5 7.4 5.4 6.5 6.5 6.5H8.3L9.6 4.7C9.9 4.3 10.4 4 10.9 4H13.1C13.6 4 14.1 4.3 14.4 4.7L15.7 6.5H17.5C18.6 6.5 19.5 7.4 19.5 8.5V17.5C19.5 18.6 18.6 19.5 17.5 19.5H6.5C5.4 19.5 4.5 18.6 4.5 17.5V8.5Z"
+            fill="currentColor"
+            fillOpacity="0.16"
+            stroke="currentColor"
+            strokeWidth="1.9"
+            strokeLinejoin="round"
+          />
+          <circle cx="12" cy="13" r="3.2" stroke="currentColor" strokeWidth="1.9" />
+          <circle cx="16.8" cy="9.5" r="0.9" fill="currentColor" />
+        </svg>
+      );
+
+    case 'play':
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="9" fill="currentColor" fillOpacity="0.16" stroke="currentColor" strokeWidth="1.9" />
+          <polygon points="10,8.5 16.5,12 10,15.5" fill="currentColor" />
+        </svg>
+      );
+
+    case 'lock':
+      return (
+        <svg {...common}>
+          <rect x="5" y="10.5" width="14" height="9.5" rx="2.5" fill="currentColor" fillOpacity="0.16" stroke="currentColor" strokeWidth="1.9" />
+          <path d="M8.2 10.5V7.8C8.2 5.7 9.9 4 12 4C14.1 4 15.8 5.7 15.8 7.8V10.5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+          <circle cx="12" cy="15.2" r="1.3" fill="currentColor" />
+        </svg>
+      );
+
+    case 'externalLink':
+      return (
+        <svg {...common}>
+          <path d="M14 4.5H19.5V10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M10.5 13.5L19.5 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          <path d="M18 13.5V17.5C18 18.6 17.1 19.5 16 19.5H6.5C5.4 19.5 4.5 18.6 4.5 17.5V8C4.5 6.9 5.4 6 6.5 6H10.5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+        </svg>
+      );
+
     case 'claimsBook':
       return (
         <svg {...common}>
@@ -678,7 +811,6 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
         </svg>
       );
 
-    /* PUBLICA TUS VICTORIAS EN STORIES (Marco vertical 9:16 + destello editorial, cero camarita fea) */
     case 'stories':
       return (
         <svg {...common}>
@@ -702,7 +834,6 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
         </svg>
       );
 
-    /* TROFEO ESCULPIDO DE DOBLE CAPA */
     case 'trophy':
       return (
         <svg {...common}>
@@ -721,7 +852,6 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
         </svg>
       );
 
-    /* CORONA VIP METÁLICA */
     case 'crown':
       return (
         <svg {...common}>
@@ -737,7 +867,6 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
         </svg>
       );
 
-    /* TIENDA PRO SHOP (BOLSA COMERCIAL) */
     case 'shop':
       return (
         <svg {...common}>
@@ -754,7 +883,6 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
         </svg>
       );
 
-    /* MENÚ 3 RAYITAS ESTILIZADO */
     case 'menu':
       return (
         <svg {...common}>
@@ -764,7 +892,6 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
         </svg>
       );
 
-    /* CERRAR X */
     case 'close':
       return (
         <svg {...common}>
@@ -772,7 +899,6 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
         </svg>
       );
 
-    /* CAMPANA DE AVISOS / NOTICIERO EN VIVO */
     case 'bell':
       return (
         <svg {...common}>
@@ -789,7 +915,6 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
         </svg>
       );
 
-    /* SOL (MODO CLARO) */
     case 'sun':
       return (
         <svg {...common}>
@@ -803,7 +928,6 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
         </svg>
       );
 
-    /* LUNA (MODO OSCURO) */
     case 'moon':
       return (
         <svg {...common}>
@@ -818,7 +942,6 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
         </svg>
       );
 
-    /* CALENDARIO */
     case 'calendar':
       return (
         <svg {...common}>
@@ -830,7 +953,6 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
         </svg>
       );
 
-    /* RELOJ */
     case 'clock':
       return (
         <svg {...common}>
@@ -839,7 +961,6 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
         </svg>
       );
 
-    /* GOOGLE MAPS PIN */
     case 'mapPin':
       return (
         <svg {...common}>
@@ -855,7 +976,6 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
         </svg>
       );
 
-    /* VIDEO / REELS EN CANCHA */
     case 'video':
       return (
         <svg {...common}>
@@ -864,7 +984,6 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
         </svg>
       );
 
-    /* RAQUETAS / RETAR */
     case 'challenge':
       return (
         <svg {...common}>
@@ -874,7 +993,6 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
         </svg>
       );
 
-    /* JUEZ / MARCADOR EN CANCHA */
     case 'scoreboard':
       return (
         <svg {...common}>
@@ -884,7 +1002,6 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
         </svg>
       );
 
-    /* ESCUDO LEGAL / VERIFICADO */
     case 'shield':
       return (
         <svg {...common}>
@@ -900,7 +1017,6 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
         </svg>
       );
 
-    /* TOTAL TENIS VISION IA */
     case 'vision':
       return (
         <svg {...common}>
@@ -915,7 +1031,6 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
         </svg>
       );
 
-    /* AJUSTES / TUERCA */
     case 'settings':
       return (
         <svg {...common}>
@@ -928,7 +1043,6 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
         </svg>
       );
 
-    /* COMPARTIR / EXPORTAR */
     case 'share':
       return (
         <svg {...common}>
@@ -939,7 +1053,6 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
         </svg>
       );
 
-    /* DESCARGA / EXCEL */
     case 'download':
       return (
         <svg {...common}>
@@ -948,7 +1061,6 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
         </svg>
       );
 
-    /* ESCALA / GRÁFICO RANKING */
     case 'chart':
       return (
         <svg {...common}>
@@ -958,7 +1070,6 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
         </svg>
       );
 
-    /* COACH / USUARIOS / GRUPOS */
     case 'users':
       return (
         <svg {...common}>
@@ -969,7 +1080,6 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
         </svg>
       );
 
-    /* CLUB / SEDE */
     case 'club':
       return (
         <svg {...common}>
@@ -978,7 +1088,6 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
         </svg>
       );
 
-    /* BUSCAR */
     case 'search':
       return (
         <svg {...common}>
@@ -987,7 +1096,6 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
         </svg>
       );
 
-    /* CHECK VERIFICADO */
     case 'check':
       return (
         <svg {...common}>
@@ -995,7 +1103,6 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
         </svg>
       );
 
-    /* FLECHA DERECHA */
     case 'chevronRight':
       return (
         <svg {...common}>
@@ -1003,7 +1110,6 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
         </svg>
       );
 
-    /* WHATSAPP */
     case 'whatsapp':
       return (
         <svg {...common}>
@@ -1022,7 +1128,6 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
         </svg>
       );
 
-    /* INSTAGRAM */
     case 'instagram':
       return (
         <svg {...common}>
@@ -1032,7 +1137,6 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
         </svg>
       );
 
-    /* RACHA FUEGO */
     case 'flame':
       return (
         <svg {...common}>
@@ -1047,7 +1151,6 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
         </svg>
       );
 
-    /* ALERTA / CLIMA */
     case 'alert':
       return (
         <svg {...common}>
@@ -1064,7 +1167,6 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
         </svg>
       );
 
-    /* FLECHAS COMPARAR / HEAD TO HEAD */
     case 'swap':
       return (
         <svg {...common}>
@@ -1073,7 +1175,6 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
         </svg>
       );
 
-    /* PELOTA DE TENIS */
     case 'ball':
     default:
       return (
