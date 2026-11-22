@@ -21,11 +21,12 @@ import {
 
 /* ==========================================================================
    CONSTANTES Y TEMAS DE PERSONALIZACIÓN DEL ESTUDIO ALIADO B2B
+   Contrato 100 % sincronizado con SedesView.jsx y Supabase.
    ========================================================================== */
 const COACH_THEME_OPTIONS = [
   { id: 'emerald', label: 'Esmeralda', swatch: '#00DC7D' },
   { id: 'gold', label: 'Oro Champán', swatch: '#E5C16C' },
-  { id: 'clay', label: 'Arcilla', swatch: '#D97B59' },
+  { id: 'clay', label: 'Arcilla', swatch: '#DE8566' },
   { id: 'royal', label: 'Azul Estadio', swatch: '#60A5FA' },
 ];
 
@@ -39,22 +40,29 @@ const QUICK_FREE_SLOTS = [
 ];
 
 const SPECIALTY_PRESETS = [
+  'Técnica & Biomecánica',
   'Saque y Efecto',
-  'Táctica en Arcilla',
-  'Derecha de Ataque',
-  'Iniciación Adultos',
+  'Topspin en Arcilla',
+  'Táctica Competitiva',
+  'Desde Cero (5ª P / 5ª B)',
   'Damas Competitivo',
   'Senior +40',
-  'Juego de Dobles',
   'Sparring Pre-Torneo',
 ];
 
 const WEATHER_QUICK_OPTS = [
   { key: 'seco', label: 'Seca', color: '#00DC7D' },
-  { key: 'humedad', label: 'Húmeda', color: '#38BDF8' },
+  { key: 'humeda', label: 'Húmeda', color: '#38BDF8' },
   { key: 'llovizna', label: 'Llovizna', color: '#E5C16C' },
   { key: 'lluvia', label: 'Lluvia', color: '#F87171' },
 ];
+
+function getAccentHex(themeId = 'emerald') {
+  return (
+    COACH_THEME_OPTIONS.find((t) => t.id === themeId || t.swatch === themeId)?.swatch ||
+    '#00DC7D'
+  );
+}
 
 function buildFallbackCoach(partner) {
   return {
@@ -62,56 +70,78 @@ function buildFallbackCoach(partner) {
     name: partner?.name || 'Romina Cutipa',
     clubId: partner?.clubId || 'club-romina',
     clubName: 'Academia Romina Cutipa',
-    title: 'Head Coach · Alta Competencia',
-    bio: 'Entrenamiento técnico en arcilla, corrección de saque y táctica de partido.',
-    photoUrl: '/assets/sede-romina-cutipa.jpg',
-    coverUrl: '/assets/torneo-altura.jpg',
+    title: 'Head Coach · Directora de Academia',
+    role: 'Head Coach · Directora de Academia',
+    bio: 'Especialista en técnica limpia sobre arcilla, corrección de saque y táctica competitiva.',
+    photoUrl: ASSETS.portadaTipsSemana,
+    photo: ASSETS.portadaTipsSemana,
+    coverUrl: ASSETS.sedeRomina,
     accentTheme: 'emerald',
-    specialties: ['Saque y Efecto', 'Táctica en Arcilla', 'Damas Competitivo'],
+    accent: '#00DC7D',
+    specialties: ['Técnica & Biomecánica', 'Topspin en Arcilla', 'Táctica Competitiva'],
     baseRate: 60,
     vipRate: 50,
     freeSlotToday: 'Hoy · 06:00 p. m.',
+    availableToday: true,
     whatsapp: '51964201001',
     profileViews: 48,
     whatsappClicks: 14,
+    gallery: [
+      { id: 'cg-1', url: ASSETS.portadaTipsSemana, caption: 'Corrección técnica en arcilla' },
+      { id: 'cg-2', url: ASSETS.sedeRomina, caption: 'Academia Romina Cutipa' },
+    ],
     videos: [
       {
         id: 'pv-1',
-        title: '2º saque con altura sin doble falta',
-        duration: '01:45',
+        title: 'Tip Gratis: Cómo controlar la pelota en altura',
+        duration: '0:42',
+        isFree: true,
         isExclusive: false,
         gemsCost: 0,
-        src: '/assets/video-coach-romina.mp4',
-        poster: '/assets/portada-tips-semana.jpg',
+        url: ASSETS.videoCoachRomina,
+        src: ASSETS.videoCoachRomina,
+        poster: ASSETS.portadaTipsSemana,
         active: true,
       },
       {
         id: 'pv-2',
-        title: 'Ángulos cortos en arcilla paso a paso',
-        duration: '05:20',
+        title: 'Masterclass: Derecha pesada con Topspin',
+        duration: '2:15',
+        isFree: false,
         isExclusive: true,
-        gemsCost: 40,
-        src: '/assets/video-coach-demo-3.mp4',
-        poster: '/assets/portada-academia-tv.jpg',
+        gemsCost: 45,
+        url: ASSETS.videoCircuito2,
+        src: ASSETS.videoCircuito2,
+        poster: ASSETS.portadaAcademiaTv,
         active: true,
       },
     ],
     packages: [
       {
         id: 'pk-1',
-        type: 'Privada 1 a 1',
+        type: 'PRIVADA 1 A 1',
         name: 'Sesión Técnica Personalizada (60 min)',
+        title: 'Sesión Técnica Personalizada (60 min)',
+        desc: 'Diagnóstico + corrección en vivo + video corto de feedback.',
         price: 60,
+        priceRegular: 60,
         vipPrice: 50,
-        badge: 'VIDEO FEEDBACK',
+        priceVip: 50,
+        badge: 'MÁS PEDIDA',
+        tag: 'MÁS PEDIDA',
       },
       {
         id: 'pk-2',
-        type: 'Pack Mensual',
-        name: 'Plan Ascenso · 8 Clases',
-        price: 440,
-        vipPrice: 380,
-        badge: 'PROMO MES',
+        type: 'PACK MENSUAL',
+        name: 'Plan Pro 8 Clases Privadas / Mes',
+        title: 'Plan Pro 8 Clases Privadas / Mes',
+        desc: 'Seguimiento mensual de ascenso de categoría + video análisis.',
+        price: 400,
+        priceRegular: 400,
+        vipPrice: 350,
+        priceVip: 350,
+        badge: 'AHORRA S/ 80',
+        tag: 'AHORRA S/ 80',
       },
     ],
     groups: [
@@ -120,21 +150,31 @@ function buildFallbackCoach(partner) {
         day: 'Mié & Vie',
         time: '06:00 p. m.',
         label: 'Grupo Competitivo 5ª A / 4ª',
-        price: 35,
-        vipPrice: 28,
+        price: 30,
+        vipPrice: 25,
         spotsUsed: 3,
         spotsTotal: 4,
+        spotsFilled: 3,
+        spotsMax: 4,
       },
       {
         id: 'grp-2',
         day: 'Sáb',
         time: '09:30 a. m.',
         label: 'Clínica de Saque y Resto',
-        price: 40,
-        vipPrice: 32,
+        price: 35,
+        vipPrice: 28,
         spotsUsed: 2,
         spotsTotal: 4,
+        spotsFilled: 2,
+        spotsMax: 4,
       },
+    ],
+    schedule: [
+      { id: 'hs-1', day: 'Hoy', time: '06:00 p. m.', status: 'open' },
+      { id: 'hs-2', day: 'Mañana', time: '08:00 a. m.', status: 'open' },
+      { id: 'hs-3', day: 'Jueves', time: '07:00 p. m.', status: 'open' },
+      { id: 'hs-4', day: 'Sábado', time: '09:00 a. m.', status: 'open' },
     ],
     students: [
       {
@@ -159,13 +199,84 @@ function buildFallbackCoach(partner) {
   };
 }
 
+function normalizeCoachForCloud(draft) {
+  const accentHex = getAccentHex(draft.accentTheme || draft.accent);
+  const freeSlot = String(draft.freeSlotToday || '').trim();
+  const availToday = Boolean(freeSlot);
+
+  // Sincronizar schedule con el turno libre de hoy + turnos propios + grupos
+  const existingSchedule = Array.isArray(draft.schedule) ? draft.schedule : [];
+  const mergedSchedule = [...existingSchedule];
+  if (freeSlot) {
+    const parts = freeSlot.split('·').map((s) => s.trim());
+    const dayStr = parts[0] || 'Hoy';
+    const timeStr = parts[1] || freeSlot;
+    const alreadyExists = mergedSchedule.some(
+      (s) => s.day === dayStr && s.time === timeStr
+    );
+    if (!alreadyExists) {
+      mergedSchedule.unshift({
+        id: `hs-free-${Date.now()}`,
+        day: dayStr,
+        time: timeStr,
+        status: 'open',
+      });
+    }
+  }
+
+  return {
+    ...draft,
+    role: draft.title || draft.role || 'Entrenador Oficial',
+    title: draft.title || draft.role || 'Entrenador Oficial',
+    photo: draft.photoUrl || draft.photo || ASSETS.portadaTipsSemana,
+    photoUrl: draft.photoUrl || draft.photo || ASSETS.portadaTipsSemana,
+    accent: accentHex,
+    availableToday: availToday,
+    freeSlotToday: freeSlot,
+    videos: (draft.videos || []).map((v) => ({
+      ...v,
+      url: v.url || v.src || ASSETS.videoCoachRomina,
+      src: v.url || v.src || ASSETS.videoCoachRomina,
+      isFree: !(Number(v.gemsCost) > 0) && !v.isExclusive,
+    })),
+    packages: (draft.packages || []).map((pk) => ({
+      ...pk,
+      title: pk.title || pk.name || 'Sesión Técnica',
+      name: pk.title || pk.name || 'Sesión Técnica',
+      priceRegular: Number(pk.priceRegular ?? pk.price ?? 60) || 60,
+      price: Number(pk.priceRegular ?? pk.price ?? 60) || 60,
+      priceVip: Number(pk.priceVip ?? pk.vipPrice ?? 50) || 50,
+      vipPrice: Number(pk.priceVip ?? pk.vipPrice ?? 50) || 50,
+      tag: pk.tag || pk.badge || '',
+      badge: pk.tag || pk.badge || '',
+    })),
+    groups: (draft.groups || []).map((g) => ({
+      ...g,
+      spotsFilled: Number(g.spotsUsed ?? g.spotsFilled ?? 0),
+      spotsMax: Number(g.spotsTotal ?? g.spotsMax ?? 4),
+    })),
+    schedule: mergedSchedule.slice(0, 12),
+  };
+}
+
 function hydrateClubDraft(club) {
   const ratesObj = club?.rates || club?.tarifas || {};
-  const rawGallery = Array.isArray(club?.gallery) && club.gallery.length > 0
-    ? club.gallery
-    : Array.isArray(club?.galeria)
-    ? club.galeria
-    : [];
+  const rawGallery =
+    Array.isArray(club?.gallery) && club.gallery.length > 0
+      ? club.gallery
+      : Array.isArray(club?.galeria)
+      ? club.galeria
+      : [];
+
+  const diaRegular = Number(club?.dayRate ?? ratesObj.diaRegular ?? ratesObj.day) || 32;
+  const diaVip = Number(club?.vipDayRate ?? ratesObj.diaVip ?? ratesObj.vipDay) || 24;
+  const nocheRegular = Number(club?.nightRate ?? ratesObj.nocheRegular ?? ratesObj.night) || 42;
+  const nocheVip = Number(club?.vipNightRate ?? ratesObj.nocheVip ?? ratesObj.vipNight) || 34;
+  const bookingUrl = club?.bookingUrl || ratesObj.bookingUrl || '';
+  const bookingVipCode = club?.vipBookingCode || ratesObj.bookingVipCode || '';
+
+  const rawCond = club?.climaBase?.conditionKey || 'seco';
+  const normalizedCond = rawCond === 'humedad' ? 'humeda' : rawCond;
 
   return {
     ...club,
@@ -173,19 +284,38 @@ function hydrateClubDraft(club) {
     courtsCount: Number(club?.courtsCount) || 4,
     whatsapp: club?.whatsapp || '',
     mapsUrl: club?.mapsUrl || club?.googleMapsUrl || '',
+    climaBase: { ...(club?.climaBase || {}), conditionKey: normalizedCond },
+    dayRate: diaRegular,
+    vipDayRate: diaVip,
+    nightRate: nocheRegular,
+    vipNightRate: nocheVip,
+    bookingUrl,
+    vipBookingCode: bookingVipCode,
     rates: {
-      diaRegular: Number(ratesObj.diaRegular) || 32,
-      diaVip: Number(ratesObj.diaVip) || 24,
-      nocheRegular: Number(ratesObj.nocheRegular) || 42,
-      nocheVip: Number(ratesObj.nocheVip) || 34,
-      bookingUrl: ratesObj.bookingUrl || '',
-      bookingVipCode: ratesObj.bookingVipCode || '',
+      diaRegular,
+      diaVip,
+      nocheRegular,
+      nocheVip,
+      day: diaRegular,
+      vipDay: diaVip,
+      night: nocheRegular,
+      vipNight: nocheVip,
+      bookingUrl,
+      bookingVipCode,
     },
     gallery: rawGallery.map((g, idx) =>
       typeof g === 'string'
-        ? { id: `cg-${idx}`, title: `Cancha ${idx + 1}`, image: g }
-        : { id: g.id || `cg-${idx}`, title: g.title || `Vista ${idx + 1}`, image: g.image || g.url }
+        ? { id: `cg-${idx}`, title: `Vista ${idx + 1}`, caption: `Vista ${idx + 1}`, image: g, url: g }
+        : {
+            id: g.id || `cg-${idx}`,
+            title: g.title || g.caption || `Vista ${idx + 1}`,
+            caption: g.caption || g.title || `Vista ${idx + 1}`,
+            image: g.image || g.url,
+            url: g.url || g.image,
+          }
     ),
+    videos: Array.isArray(club?.videos) ? club.videos : [],
+    videoTourUrl: club?.videos?.[0]?.url || '',
     vipBenefits:
       Array.isArray(club?.vipBenefits) && club.vipBenefits.length > 0
         ? club.vipBenefits
@@ -208,8 +338,82 @@ function hydrateClubDraft(club) {
   };
 }
 
+function normalizeClubForCloud(draft) {
+  const diaRegular = Number(draft.rates?.diaRegular ?? draft.dayRate) || 32;
+  const diaVip = Number(draft.rates?.diaVip ?? draft.vipDayRate) || 24;
+  const nocheRegular = Number(draft.rates?.nocheRegular ?? draft.nightRate) || 42;
+  const nocheVip = Number(draft.rates?.nocheVip ?? draft.vipNightRate) || 34;
+  const bookingUrl = String(draft.rates?.bookingUrl ?? draft.bookingUrl ?? '').trim();
+  const bookingVipCode = String(
+    draft.rates?.bookingVipCode ?? draft.vipBookingCode ?? ''
+  )
+    .trim()
+    .toUpperCase();
+
+  const videoUrl = String(draft.videoTourUrl || '').trim();
+  const nextVideos = videoUrl
+    ? [
+        {
+          id: `v-${draft.id}`,
+          title: `Video Tour · ${draft.shortName || draft.name}`,
+          duration: '0:30',
+          url: videoUrl,
+          poster: draft.gallery?.[0]?.url || draft.coverUrl || ASSETS.sedeCountry,
+        },
+      ]
+    : draft.videos || [];
+
+  return {
+    ...draft,
+    dayRate: diaRegular,
+    vipDayRate: diaVip,
+    nightRate: nocheRegular,
+    vipNightRate: nocheVip,
+    bookingUrl,
+    vipBookingCode: bookingVipCode,
+    rates: {
+      diaRegular,
+      diaVip,
+      nocheRegular,
+      nocheVip,
+      day: diaRegular,
+      vipDay: diaVip,
+      night: nocheRegular,
+      vipNight: nocheVip,
+      bookingUrl,
+      bookingVipCode,
+    },
+    gallery: (draft.gallery || []).map((g) => ({
+      ...g,
+      url: g.url || g.image,
+      image: g.image || g.url,
+      caption: g.caption || g.title || '',
+      title: g.title || g.caption || '',
+    })),
+    videos: nextVideos,
+    promos: (draft.promos || []).map((pr) => ({
+      ...pr,
+      tag: pr.tag || 'PROMO',
+      priceText: pr.priceText || pr.priceNote || '',
+      priceNote: pr.priceNote || pr.priceText || '',
+    })),
+    internalEvents: (draft.internalEvents || []).map((ev) => {
+      const used = Number(ev.spotsUsed) || 1;
+      const total = Math.max(2, Number(ev.spotsTotal) || 12);
+      return {
+        ...ev,
+        date: ev.date || ev.dateLabel || '',
+        dateLabel: ev.dateLabel || ev.date || '',
+        spots: `${used} / ${total} cupos`,
+        pct: Math.min(100, Math.round((used / total) * 100)),
+        fee: typeof ev.fee === 'number' ? `S/ ${ev.fee}` : ev.fee || 'Abierto',
+      };
+    }),
+  };
+}
+
 /* ==========================================================================
-   COMPONENTE PRINCIPAL: PartnerStudioModal (B2B CLOUD STUDIO · SUPABASE)
+   COMPONENTE PRINCIPAL: PartnerStudioModal (B2B CLOUD STUDIO · LIQUID GLASS)
    ========================================================================== */
 export default function PartnerStudioModal({
   isOpen = false,
@@ -225,16 +429,16 @@ export default function PartnerStudioModal({
   onNotify,
 }) {
   const coachPhotoRef = useRef(null);
+  const coachGalleryRef = useRef(null);
   const clubPhotoRef = useRef(null);
 
   const [studioRole, setStudioRole] = useState(partner?.role === 'CLUB' ? 'CLUB' : 'COACH');
   const [coachTab, setCoachTab] = useState('hoy'); // 'hoy' | 'clases' | 'alumnos' | 'marca'
   const [clubTab, setClubTab] = useState('estado'); // 'estado' | 'vitrina' | 'promos' | 'validar'
 
-  const [syncState, setSyncState] = useState('saved'); // 'saved' | 'saving' | 'error'
+  const [syncState, setSyncState] = useState('saved');
   const [isUploadingMedia, setIsUploadingMedia] = useState(false);
 
-  // Selector de Coach y Club activos
   const [selectedCoachId, setSelectedCoachId] = useState(
     partner?.id || coaches?.[0]?.id || 'coach-romina'
   );
@@ -247,10 +451,11 @@ export default function PartnerStudioModal({
     hydrateClubDraft((clubs || INITIAL_CLUBS)[0])
   );
 
-  // Formularios colapsables rápidos (Coach)
+  // Formularios rápidos Coach
   const [showAddPkg, setShowAddPkg] = useState(false);
-  const [pkgType, setPkgType] = useState('Privada 1 a 1');
+  const [pkgType, setPkgType] = useState('PRIVADA 1 A 1');
   const [pkgName, setPkgName] = useState('');
+  const [pkgDesc, setPkgDesc] = useState('');
   const [pkgPrice, setPkgPrice] = useState(60);
   const [pkgVipPrice, setPkgVipPrice] = useState(50);
   const [pkgBadge, setPkgBadge] = useState('PROMO SEMANA');
@@ -263,6 +468,9 @@ export default function PartnerStudioModal({
   const [grpVipPrice, setGrpVipPrice] = useState(28);
   const [grpSpots, setGrpSpots] = useState(4);
 
+  const [newSlotDay, setNewSlotDay] = useState('Mañana');
+  const [newSlotTime, setNewSlotTime] = useState('06:00 p. m.');
+
   const [showAddStudent, setShowAddStudent] = useState(false);
   const [stName, setStName] = useState('');
   const [stLevel, setStLevel] = useState('5ª B');
@@ -274,12 +482,12 @@ export default function PartnerStudioModal({
   const [vidExclusive, setVidExclusive] = useState(false);
   const [vidGems, setVidGems] = useState(40);
 
-  // Formularios colapsables rápidos (Club)
+  // Formularios rápidos Club
   const [newVipBenefit, setNewVipBenefit] = useState('');
   const [showAddPromo, setShowAddPromo] = useState(false);
   const [promoTitle, setPromoTitle] = useState('');
   const [promoSchedule, setPromoSchedule] = useState('Lun–Vie · 10:00 a. m. – 02:00 p. m.');
-  const [promoPrice, setPromoPrice] = useState('S/ 22 / hora · VIP S/ 18');
+  const [promoPrice, setPromoPrice] = useState('S/ 22 / hora');
 
   const [showAddEvent, setShowAddEvent] = useState(false);
   const [evTitle, setEvTitle] = useState('');
@@ -287,18 +495,17 @@ export default function PartnerStudioModal({
   const [evFee, setEvFee] = useState(30);
   const [evSpots, setEvSpots] = useState(12);
 
-  // Validador de Carnet VIP en Recepción
   const [vipSearch, setVipSearch] = useState('');
 
-  // Hidratar estado al abrir el estudio o cambiar de coach/club
   useEffect(() => {
     if (!isOpen) return;
     if (partner?.role === 'CLUB') setStudioRole('CLUB');
     else if (partner?.role === 'COACH') setStudioRole('COACH');
 
-    const targetCoachId = partner?.id && partner.role !== 'CLUB'
-      ? partner.id
-      : coaches?.[0]?.id || 'coach-romina';
+    const targetCoachId =
+      partner?.id && partner.role !== 'CLUB'
+        ? partner.id
+        : coaches?.[0]?.id || 'coach-romina';
     setSelectedCoachId(targetCoachId);
 
     const targetClubId = partner?.clubId || clubs?.[0]?.id || 'club-country';
@@ -312,15 +519,24 @@ export default function PartnerStudioModal({
       setCoachDraft({
         ...base,
         ...found,
+        title: found.title || found.role || base.title,
         photoUrl: found.photoUrl || found.photo || base.photoUrl,
         coverUrl: found.coverUrl || found.photoUrl || base.coverUrl,
-        packages: Array.isArray(found.packages) && found.packages.length ? found.packages : base.packages,
+        accentTheme: found.accentTheme || 'emerald',
+        accent: found.accent || getAccentHex(found.accentTheme),
+        gallery:
+          Array.isArray(found.gallery) && found.gallery.length ? found.gallery : base.gallery,
+        packages:
+          Array.isArray(found.packages) && found.packages.length ? found.packages : base.packages,
         groups: Array.isArray(found.groups) && found.groups.length ? found.groups : base.groups,
-        videos: Array.isArray(found.videos) ? found.videos : base.videos,
+        schedule:
+          Array.isArray(found.schedule) && found.schedule.length ? found.schedule : base.schedule,
+        videos: Array.isArray(found.videos) && found.videos.length ? found.videos : base.videos,
         students: Array.isArray(found.students) ? found.students : base.students,
-        specialties: Array.isArray(found.specialties) && found.specialties.length
-          ? found.specialties
-          : base.specialties,
+        specialties:
+          Array.isArray(found.specialties) && found.specialties.length
+            ? found.specialties
+            : base.specialties,
       });
     } else {
       setCoachDraft(buildFallbackCoach(partner));
@@ -328,21 +544,23 @@ export default function PartnerStudioModal({
   }, [selectedCoachId, coaches, partner]);
 
   useEffect(() => {
-    const found = (clubs || INITIAL_CLUBS).find((c) => c.id === selectedClubId) || (clubs || INITIAL_CLUBS)[0];
+    const found =
+      (clubs || INITIAL_CLUBS).find((c) => c.id === selectedClubId) || (clubs || INITIAL_CLUBS)[0];
     if (found) setClubDraft(hydrateClubDraft(found));
   }, [selectedClubId, clubs]);
 
   /* ------------------------------------------------------------------------
-     PERSISTENCIA REAL EN SUPABASE (COACH Y CLUB) CON FEEDBACK INSTANTÁNEO
+     PERSISTENCIA REAL EN SUPABASE + REFLEJO INMEDIATO EN SedesView
      ------------------------------------------------------------------------ */
-  const saveCoachToCloud = async (nextCoach, toastMessage = '') => {
-    setCoachDraft(nextCoach);
+  const saveCoachToCloud = async (nextCoachRaw, toastMessage = '') => {
+    const normalized = normalizeCoachForCloud(nextCoachRaw);
+    setCoachDraft(normalized);
     setSyncState('saving');
     try {
-      let persisted = nextCoach;
+      let persisted = normalized;
       if (isCloudReady) {
-        const res = await upsertCloudCoach(nextCoach);
-        if (res) persisted = { ...nextCoach, ...res };
+        const res = await upsertCloudCoach(normalized);
+        if (res) persisted = { ...normalized, ...res };
       }
       if (onSaveCoachChanges) onSaveCoachChanges(persisted);
       setSyncState('saved');
@@ -354,16 +572,17 @@ export default function PartnerStudioModal({
     }
   };
 
-  const saveClubToCloud = async (nextClub, toastMessage = '') => {
-    setClubDraft(nextClub);
+  const saveClubToCloud = async (nextClubRaw, toastMessage = '') => {
+    const normalized = normalizeClubForCloud(nextClubRaw);
+    setClubDraft(normalized);
     setSyncState('saving');
     try {
-      let persisted = nextClub;
+      let persisted = normalized;
       if (isCloudReady) {
-        const res = await upsertCloudClub(nextClub);
-        if (res) persisted = { ...nextClub, ...res };
+        const res = await upsertCloudClub(normalized);
+        if (res) persisted = { ...normalized, ...res };
       }
-      if (onSaveClubChanges) onSaveClubChanges(nextClub.id, persisted);
+      if (onSaveClubChanges) onSaveClubChanges(normalized.id, persisted);
       setSyncState('saved');
       if (toastMessage && onNotify) onNotify(toastMessage, 'success');
     } catch (err) {
@@ -374,7 +593,7 @@ export default function PartnerStudioModal({
   };
 
   /* ------------------------------------------------------------------------
-     SUBIDA REAL DE FOTOS A SUPABASE STORAGE 'media' (COACH & CARRUSEL CLUB)
+     SUBIDA REAL DE FOTOS A SUPABASE STORAGE 'media'
      ------------------------------------------------------------------------ */
   const handleUploadCoachPhoto = async (e) => {
     const file = e.target.files?.[0];
@@ -386,12 +605,42 @@ export default function PartnerStudioModal({
         triggerHaptic('success');
         await saveCoachToCloud(
           { ...coachDraft, photoUrl: publicUrl, photo: publicUrl, coverUrl: publicUrl },
-          'Foto profesional del Coach actualizada en la nube.'
+          'Foto de portada actualizada en vivo.'
         );
       }
     } catch {
       triggerHaptic('warning');
       if (onNotify) onNotify('No pudimos subir esa foto. Prueba con JPG o PNG.', 'warning');
+    } finally {
+      setIsUploadingMedia(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleUploadCoachGalleryPhoto = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingMedia(true);
+    try {
+      const publicUrl = await uploadCompressedMedia(file, 'coaches', `${coachDraft.id}-gal`);
+      if (publicUrl) {
+        const nextGallery = [
+          {
+            id: `cog-${Date.now()}`,
+            url: publicUrl,
+            caption: `Entrenamiento · ${coachDraft.name}`,
+          },
+          ...(coachDraft.gallery || []),
+        ].slice(0, 8);
+        triggerHaptic('success');
+        await saveCoachToCloud(
+          { ...coachDraft, gallery: nextGallery },
+          'Foto sumada a tu galería en cancha.'
+        );
+      }
+    } catch {
+      triggerHaptic('warning');
+      if (onNotify) onNotify('No pudimos subir la foto a tu galería.', 'warning');
     } finally {
       setIsUploadingMedia(false);
       e.target.value = '';
@@ -409,13 +658,20 @@ export default function PartnerStudioModal({
           {
             id: `cg-${Date.now()}`,
             title: `${clubDraft.shortName} · Foto ${clubDraft.gallery.length + 1}`,
+            caption: `${clubDraft.shortName} · Vista ${(clubDraft.gallery || []).length + 1}`,
             image: publicUrl,
+            url: publicUrl,
           },
           ...(clubDraft.gallery || []),
         ].slice(0, 8);
         triggerHaptic('success');
         await saveClubToCloud(
-          { ...clubDraft, gallery: nextGallery, coverUrl: nextGallery[0]?.image || clubDraft.coverUrl },
+          {
+            ...clubDraft,
+            gallery: nextGallery,
+            coverUrl: nextGallery[0]?.url || clubDraft.coverUrl,
+            cover: nextGallery[0]?.url || clubDraft.cover,
+          },
           'Foto agregada al carrusel de la sede.'
         );
       }
@@ -429,14 +685,38 @@ export default function PartnerStudioModal({
   };
 
   /* ------------------------------------------------------------------------
-     ACCIONES RÁPIDAS COACH PRO
+     ACCIONES COACH PRO
      ------------------------------------------------------------------------ */
   const handleSelectFreeSlot = (slotText) => {
     triggerHaptic('medium');
     saveCoachToCloud(
-      { ...coachDraft, freeSlotToday: slotText },
+      { ...coachDraft, freeSlotToday: slotText, availableToday: Boolean(slotText) },
       slotText ? `Horario libre publicado: ${slotText}` : 'Estado actualizado a Agenda completa.'
     );
+  };
+
+  const handleAddScheduleSlot = (e) => {
+    e.preventDefault();
+    if (!newSlotDay.trim() || !newSlotTime.trim()) return;
+    const created = {
+      id: `hs-${Date.now()}`,
+      day: newSlotDay.trim(),
+      time: newSlotTime.trim(),
+      status: 'open',
+    };
+    triggerHaptic('success');
+    saveCoachToCloud(
+      { ...coachDraft, schedule: [created, ...(coachDraft.schedule || [])] },
+      'Turno disponible agregado a tu agenda.'
+    );
+  };
+
+  const handleRemoveScheduleSlot = (slotId) => {
+    triggerHaptic('light');
+    saveCoachToCloud({
+      ...coachDraft,
+      schedule: (coachDraft.schedule || []).filter((s) => s.id !== slotId),
+    });
   };
 
   const handleShareFreeSlotWhatsApp = () => {
@@ -456,13 +736,20 @@ export default function PartnerStudioModal({
   const handleAddPackage = (e) => {
     e.preventDefault();
     if (pkgName.trim().length < 3) return;
+    const reg = Number(pkgPrice) || 60;
+    const vip = Math.min(Number(pkgVipPrice) || 50, reg);
     const created = {
       id: `pk-${Date.now()}`,
       type: pkgType,
       name: pkgName.trim(),
-      price: Number(pkgPrice) || 60,
-      vipPrice: Math.min(Number(pkgVipPrice) || 50, Number(pkgPrice) || 60),
+      title: pkgName.trim(),
+      desc: pkgDesc.trim() || 'Entrenamiento práctico en cancha.',
+      price: reg,
+      priceRegular: reg,
+      vipPrice: vip,
+      priceVip: vip,
       badge: pkgBadge.trim().toUpperCase(),
+      tag: pkgBadge.trim().toUpperCase(),
     };
     triggerHaptic('success');
     saveCoachToCloud(
@@ -470,6 +757,7 @@ export default function PartnerStudioModal({
       'Programa publicado en tu ficha pública.'
     );
     setPkgName('');
+    setPkgDesc('');
     setShowAddPkg(false);
   };
 
@@ -484,15 +772,20 @@ export default function PartnerStudioModal({
   const handleAddGroup = (e) => {
     e.preventDefault();
     if (grpLabel.trim().length < 3) return;
+    const reg = Number(grpPrice) || 35;
+    const vip = Math.min(Number(grpVipPrice) || 28, reg);
+    const max = Math.max(2, Number(grpSpots) || 4);
     const created = {
       id: `grp-${Date.now()}`,
       day: grpDay.trim() || 'Turno',
       time: grpTime.trim() || '',
       label: grpLabel.trim(),
-      price: Number(grpPrice) || 35,
-      vipPrice: Math.min(Number(grpVipPrice) || 28, Number(grpPrice) || 35),
+      price: reg,
+      vipPrice: vip,
       spotsUsed: 1,
-      spotsTotal: Math.max(2, Number(grpSpots) || 4),
+      spotsTotal: max,
+      spotsFilled: 1,
+      spotsMax: max,
     };
     triggerHaptic('success');
     saveCoachToCloud(
@@ -509,7 +802,8 @@ export default function PartnerStudioModal({
       if (g.id !== grpId) return g;
       const total = Number(g.spotsTotal) || 4;
       const used = Number(g.spotsUsed) || 0;
-      return { ...g, spotsUsed: Math.max(0, Math.min(total, used + delta)) };
+      const nextUsed = Math.max(0, Math.min(total, used + delta));
+      return { ...g, spotsUsed: nextUsed, spotsFilled: nextUsed };
     });
     saveCoachToCloud({ ...coachDraft, groups: nextGroups });
   };
@@ -566,29 +860,30 @@ export default function PartnerStudioModal({
   const handleToggleSpecialty = (sp) => {
     triggerHaptic('light');
     const cur = Array.isArray(coachDraft.specialties) ? coachDraft.specialties : [];
-    const next = cur.includes(sp)
-      ? cur.filter((x) => x !== sp)
-      : [...cur.slice(-2), sp]; // máximo 3 limpias
+    const next = cur.includes(sp) ? cur.filter((x) => x !== sp) : [...cur.slice(-2), sp];
     saveCoachToCloud({ ...coachDraft, specialties: next });
   };
 
   const handleAddVideo = (e) => {
     e.preventDefault();
     if (vidTitle.trim().length < 3) return;
+    const finalUrl = vidUrl.trim() || ASSETS.videoCoachRomina;
     const created = {
       id: `pv-${Date.now()}`,
       title: vidTitle.trim(),
-      duration: '01:30',
+      duration: '01:20',
+      isFree: !vidExclusive,
       isExclusive: vidExclusive,
       gemsCost: vidExclusive ? Number(vidGems) || 40 : 0,
-      src: vidUrl.trim() || '/assets/video-coach-romina.mp4',
-      poster: vidExclusive ? '/assets/portada-academia-tv.jpg' : '/assets/portada-tips-semana.jpg',
+      url: finalUrl,
+      src: finalUrl,
+      poster: vidExclusive ? ASSETS.portadaAcademiaTv : ASSETS.portadaTipsSemana,
       active: true,
     };
     triggerHaptic('success');
     saveCoachToCloud(
       { ...coachDraft, videos: [created, ...(coachDraft.videos || [])] },
-      'Video publicado en tu perfil de Coach.'
+      'Video publicado en tu vitrina de Coach.'
     );
     setVidTitle('');
     setVidUrl('');
@@ -596,7 +891,7 @@ export default function PartnerStudioModal({
   };
 
   /* ------------------------------------------------------------------------
-     ACCIONES RÁPIDAS CLUB ALIADO
+     ACCIONES CLUB ALIADO
      ------------------------------------------------------------------------ */
   const handleAddVipBenefit = (e) => {
     e.preventDefault();
@@ -629,8 +924,10 @@ export default function PartnerStudioModal({
     if (promoTitle.trim().length < 4) return;
     const created = {
       id: `pr-${Date.now()}`,
+      tag: 'HORAS VALLE',
       title: promoTitle.trim(),
       schedule: promoSchedule.trim(),
+      priceText: promoPrice.trim(),
       priceNote: promoPrice.trim(),
       active: true,
     };
@@ -646,13 +943,17 @@ export default function PartnerStudioModal({
   const handleAddClubEvent = (e) => {
     e.preventDefault();
     if (evTitle.trim().length < 4) return;
+    const max = Math.max(4, Number(evSpots) || 12);
     const created = {
       id: `ev-${Date.now()}`,
       title: evTitle.trim(),
+      date: evDate.trim(),
       dateLabel: evDate.trim(),
-      fee: Number(evFee) || 30,
+      fee: `S/ ${Number(evFee) || 30}`,
       spotsUsed: 1,
-      spotsTotal: Math.max(4, Number(evSpots) || 12),
+      spotsTotal: max,
+      spots: `1 / ${max} cupos`,
+      pct: Math.round((1 / max) * 100),
     };
     triggerHaptic('success');
     saveClubToCloud(
@@ -690,7 +991,7 @@ export default function PartnerStudioModal({
       title={studioRole === 'COACH' ? 'Estudio Coach Pro' : 'Panel de Club Aliado'}
       subtitle={
         studioRole === 'COACH'
-          ? `${coachDraft.name} · Sincronizado en vivo`
+          ? `${coachDraft.name} · Cambios en tiempo real`
           : `${clubDraft.name} · Gestión en la nube`
       }
       icon={
@@ -751,7 +1052,6 @@ export default function PartnerStudioModal({
             </div>
           </div>
 
-          {/* KPIs Reales de Retorno Comercial */}
           {studioRole === 'COACH' ? (
             <div className="tt-pst-kpi-strip">
               <div>
@@ -796,7 +1096,7 @@ export default function PartnerStudioModal({
                   <button
                     key={c.id}
                     type="button"
-                    className={`tt-pst-sel-chip ${selectedCoachId === c.id ? 'is-on' : ''}`}
+                    className={`tt-pst-sel-chip tt-pst-press ${selectedCoachId === c.id ? 'is-on' : ''}`}
                     onClick={() => {
                       triggerHaptic('light');
                       setSelectedCoachId(c.id);
@@ -836,18 +1136,14 @@ export default function PartnerStudioModal({
               ))}
             </div>
 
-            {/* COACH TAB 1: HOY (10 SEGUNDOS ENTRE CLASES) */}
+            {/* COACH TAB 1: HOY (10 SEGUNDOS ENTRE CLASES + AGENDA LIBRE) */}
             {coachTab === 'hoy' && (
               <div key="ct-hoy" className="tt-pst-section tt-pst-enter">
                 <div className="tt-pst-card">
-                  <div className="tt-pst-sec-head">
-                    <div>
-                      <span className="tt-pst-mini-kicker">PUBLICACIÓN RÁPIDA EN 1 TOQUE</span>
-                      <h3>¿Tienes una hora libre hoy?</h3>
-                    </div>
-                  </div>
+                  <span className="tt-pst-mini-kicker">PUBLICACIÓN RÁPIDA EN 1 TOQUE</span>
+                  <h3 style={{ margin: 0, fontSize: '1.05rem' }}>¿Tienes una hora libre hoy?</h3>
                   <p className="tt-pst-help">
-                    Lo que selecciones aparece al instante con punto verde arriba de tu tarjeta en Sedes & Coaches.
+                    Al activar un horario, aparece el punto verde «Libre hoy» en tu tarjeta de Sedes & Coaches.
                   </p>
 
                   <div className="tt-quick-slots-grid">
@@ -857,7 +1153,7 @@ export default function PartnerStudioModal({
                         <button
                           key={slot || 'full'}
                           type="button"
-                          className={`tt-qs-pill ${active ? 'is-active' : ''}`}
+                          className={`tt-qs-pill tt-pst-press ${active ? 'is-active' : ''}`}
                           onClick={() => handleSelectFreeSlot(slot)}
                         >
                           {slot || 'Agenda completa'}
@@ -874,13 +1170,13 @@ export default function PartnerStudioModal({
                       onChange={(e) =>
                         setCoachDraft((prev) => ({ ...prev, freeSlotToday: e.target.value }))
                       }
-                      placeholder="O escribe tu horario exacto (ej. Hoy · 04:30 p. m.)"
+                      placeholder="Ej. Hoy · 04:30 p. m."
                     />
                     <button
                       type="button"
-                      className="tt-btn tt-btn-primary tt-btn-sm"
+                      className="tt-btn tt-btn-primary tt-btn-sm tt-pst-press"
                       onClick={() =>
-                        saveCoachToCloud(coachDraft, 'Disponibilidad actualizada en tu ficha.')
+                        saveCoachToCloud(coachDraft, 'Disponibilidad publicada al instante.')
                       }
                     >
                       Publicar
@@ -889,51 +1185,62 @@ export default function PartnerStudioModal({
 
                   <button
                     type="button"
-                    className="tt-pst-wa-banner"
+                    className="tt-pst-wa-banner tt-pst-press"
                     onClick={handleShareFreeSlotWhatsApp}
                   >
                     <TTIcon name="whatsapp" size={18} />
-                    <span>Compartir mi turno libre en mis grupos de WhatsApp</span>
+                    <span>Compartir mi turno libre en WhatsApp</span>
                   </button>
                 </div>
 
-                {/* Resumen de asistencia rápida del día */}
+                {/* Horarios Libres Semanales (conectados directo a pestaña Horarios de SedesView) */}
                 <div className="tt-pst-card">
-                  <div className="tt-pst-sec-head">
-                    <div>
-                      <span className="tt-pst-mini-kicker">RESUMEN RÁPIDO</span>
-                      <h3>Estado de tus Clases</h3>
-                    </div>
-                    <button
-                      type="button"
-                      className="tt-pst-link-btn"
-                      onClick={() => setCoachTab('clases')}
-                    >
-                      Editar oferta →
+                  <span className="tt-pst-mini-kicker">AGENDA VISIBLE PARA RESERVAR</span>
+                  <h3 style={{ margin: 0, fontSize: '1.02rem' }}>
+                    Horarios Libres ({(coachDraft.schedule || []).length})
+                  </h3>
+
+                  <form onSubmit={handleAddScheduleSlot} className="tt-pst-grid-3">
+                    <input
+                      type="text"
+                      className="tt-pst-input"
+                      value={newSlotDay}
+                      onChange={(e) => setNewSlotDay(e.target.value)}
+                      placeholder="Día"
+                    />
+                    <input
+                      type="text"
+                      className="tt-pst-input"
+                      value={newSlotTime}
+                      onChange={(e) => setNewSlotTime(e.target.value)}
+                      placeholder="Hora"
+                    />
+                    <button type="submit" className="tt-btn tt-btn-primary tt-btn-sm tt-pst-press">
+                      + Sumar
                     </button>
-                  </div>
-                  <div className="tt-pst-mini-stats">
-                    <div>
-                      <strong>{(coachDraft.packages || []).length}</strong>
-                      <span>Programas</span>
-                    </div>
-                    <div>
-                      <strong>{(coachDraft.groups || []).length}</strong>
-                      <span>Grupales</span>
-                    </div>
-                    <div>
-                      <strong>{(coachDraft.students || []).length}</strong>
-                      <span>Alumnos</span>
-                    </div>
+                  </form>
+
+                  <div className="tt-slots-manage-wrap">
+                    {(coachDraft.schedule || []).map((sl) => (
+                      <span key={sl.id} className="tt-slot-manage-chip">
+                        <b>{sl.day}</b> · {sl.time}
+                        <button
+                          type="button"
+                          aria-label="Quitar horario"
+                          onClick={() => handleRemoveScheduleSlot(sl.id)}
+                        >
+                          ✕
+                        </button>
+                      </span>
+                    ))}
                   </div>
                 </div>
               </div>
             )}
 
-            {/* COACH TAB 2: CLASES, PAQUETES, PROMOS Y CUPOS EN VIVO */}
+            {/* COACH TAB 2: CLASES, PAQUETES Y CUPOS EN VIVO */}
             {coachTab === 'clases' && (
               <div key="ct-clases" className="tt-pst-section tt-pst-enter">
-                {/* Bloque 1: Clases Particulares, Packs Mensuales y Promos */}
                 <div className="tt-pst-sec-head">
                   <div>
                     <span className="tt-pst-mini-kicker">PAQUETES Y PROMOCIONES</span>
@@ -941,7 +1248,7 @@ export default function PartnerStudioModal({
                   </div>
                   <button
                     type="button"
-                    className="tt-btn tt-btn-primary tt-btn-sm"
+                    className="tt-btn tt-btn-primary tt-btn-sm tt-pst-press"
                     onClick={() => setShowAddPkg((v) => !v)}
                   >
                     {showAddPkg ? 'Cerrar' : '+ Paquete / Promo'}
@@ -956,11 +1263,11 @@ export default function PartnerStudioModal({
                         value={pkgType}
                         onChange={(e) => setPkgType(e.target.value)}
                       >
-                        <option value="Privada 1 a 1">Privada 1 a 1</option>
-                        <option value="Pack Semanal">Pack Semanal</option>
-                        <option value="Pack Mensual">Pack Mensual</option>
-                        <option value="Sparring">Sparring</option>
-                        <option value="Clínica">Clínica</option>
+                        <option value="PRIVADA 1 A 1">Privada 1 a 1</option>
+                        <option value="PACK SEMANAL">Pack Semanal</option>
+                        <option value="PACK MENSUAL">Pack Mensual</option>
+                        <option value="SPARRING">Sparring</option>
+                        <option value="CLÍNICA">Clínica</option>
                       </select>
                       <input
                         type="text"
@@ -977,6 +1284,13 @@ export default function PartnerStudioModal({
                       onChange={(e) => setPkgName(e.target.value)}
                       placeholder="Nombre (ej. Plan 4 Clases + Video)"
                       required
+                    />
+                    <input
+                      type="text"
+                      className="tt-pst-input"
+                      value={pkgDesc}
+                      onChange={(e) => setPkgDesc(e.target.value)}
+                      placeholder="Qué incluye (ej. Diagnóstico y clips por WhatsApp)"
                     />
                     <div className="tt-pst-grid-2">
                       <label className="tt-pst-lbl">
@@ -998,7 +1312,7 @@ export default function PartnerStudioModal({
                         />
                       </label>
                     </div>
-                    <button type="submit" className="tt-btn tt-btn-primary tt-btn-sm">
+                    <button type="submit" className="tt-btn tt-btn-primary tt-btn-sm tt-pst-press">
                       Guardar y Publicar
                     </button>
                   </form>
@@ -1010,11 +1324,14 @@ export default function PartnerStudioModal({
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                           <span className="tt-pgc-type">{pk.type}</span>
-                          {pk.badge && <span className="tt-pst-badge-soft">{pk.badge}</span>}
+                          {(pk.badge || pk.tag) && (
+                            <span className="tt-pst-badge-soft">{pk.badge || pk.tag}</span>
+                          )}
                         </div>
-                        <h4>{pk.name}</h4>
+                        <h4>{pk.title || pk.name}</h4>
                         <small>
-                          Regular: S/ {pk.price} · <b style={{ color: '#E5C16C' }}>VIP: S/ {pk.vipPrice}</b>
+                          Regular: S/ {pk.priceRegular ?? pk.price} ·{' '}
+                          <b style={{ color: '#E5C16C' }}>VIP: S/ {pk.priceVip ?? pk.vipPrice}</b>
                         </small>
                       </div>
                       <button
@@ -1029,7 +1346,7 @@ export default function PartnerStudioModal({
                   ))}
                 </div>
 
-                {/* Bloque 2: Clases Grupales con Cupos Vivos */}
+                {/* Horarios Grupales */}
                 <div className="tt-pst-sec-head" style={{ marginTop: 6 }}>
                   <div>
                     <span className="tt-pst-mini-kicker">CONTROL DE VACANTES EN VIVO</span>
@@ -1037,7 +1354,7 @@ export default function PartnerStudioModal({
                   </div>
                   <button
                     type="button"
-                    className="tt-btn tt-btn-ghost tt-btn-sm"
+                    className="tt-btn tt-btn-ghost tt-btn-sm tt-pst-press"
                     onClick={() => setShowAddGroup((v) => !v)}
                   >
                     {showAddGroup ? 'Cerrar' : '+ Horario'}
@@ -1057,1245 +1374,4 @@ export default function PartnerStudioModal({
                     <div className="tt-pst-grid-2">
                       <input
                         type="text"
-                        className="tt-pst-input"
-                        value={grpDay}
-                        onChange={(e) => setGrpDay(e.target.value)}
-                        placeholder="Días (ej. Mar & Jue)"
-                      />
-                      <input
-                        type="text"
-                        className="tt-pst-input"
-                        value={grpTime}
-                        onChange={(e) => setGrpTime(e.target.value)}
-                        placeholder="Hora (ej. 07:00 p. m.)"
-                      />
-                    </div>
-                    <div className="tt-pst-grid-3">
-                      <input
-                        type="number"
-                        className="tt-pst-input"
-                        value={grpPrice}
-                        onChange={(e) => setGrpPrice(e.target.value)}
-                        placeholder="S/ Reg"
-                      />
-                      <input
-                        type="number"
-                        className="tt-pst-input"
-                        value={grpVipPrice}
-                        onChange={(e) => setGrpVipPrice(e.target.value)}
-                        placeholder="S/ VIP"
-                      />
-                      <input
-                        type="number"
-                        min="2"
-                        max="12"
-                        className="tt-pst-input"
-                        value={grpSpots}
-                        onChange={(e) => setGrpSpots(e.target.value)}
-                        placeholder="Cupos"
-                      />
-                    </div>
-                    <button type="submit" className="tt-btn tt-btn-primary tt-btn-sm">
-                      Crear Horario Grupal
-                    </button>
-                  </form>
-                )}
-
-                <div className="tt-pst-cards-stack">
-                  {(coachDraft.groups || []).map((grp) => {
-                    const total = Number(grp.spotsTotal) || 4;
-                    const used = Number(grp.spotsUsed) || 0;
-                    const isFull = used >= total;
-                    const pct = Math.min(100, Math.round((used / total) * 100));
-
-                    return (
-                      <article key={grp.id} className="tt-pst-group-card">
-                        <div className="tt-pgc-top">
-                          <div>
-                            <span className="tt-pgc-type">
-                              {grp.day} {grp.time ? `· ${grp.time}` : ''}
-                            </span>
-                            <h4>{grp.label || grp.name}</h4>
-                          </div>
-                          <div className="tt-pgc-spots-badge">
-                            <strong>
-                              {used}/{total}
-                            </strong>
-                            <span>CUPOS</span>
-                          </div>
-                        </div>
-
-                        <div className="tt-pgc-bar">
-                          <div style={{ width: `${pct}%` }} />
-                        </div>
-
-                        <div className="tt-pgc-bottom">
-                          <span style={{ fontSize: '0.73rem', color: 'var(--tt-text-muted)' }}>
-                            {isFull ? 'Grupo completo' : `${total - used} vacante(s) libre(s)`}
-                          </span>
-                          <div className="tt-pgc-controls">
-                            <button
-                              type="button"
-                              className="tt-mini-step"
-                              disabled={used <= 0}
-                              onClick={() => handleStepGroupSpots(grp.id, -1)}
-                            >
-                              −
-                            </button>
-                            <button
-                              type="button"
-                              className="tt-mini-step is-plus"
-                              disabled={isFull}
-                              onClick={() => handleStepGroupSpots(grp.id, 1)}
-                            >
-                              +
-                            </button>
-                            {!isFull && (
-                              <button
-                                type="button"
-                                className="tt-pgc-wa-btn"
-                                onClick={() => handleBroadcastGroup(grp)}
-                              >
-                                <TTIcon name="whatsapp" size={14} />
-                                Convocar
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </article>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* COACH TAB 3: ALUMNOS Y ASISTENCIA */}
-            {coachTab === 'alumnos' && (
-              <div key="ct-alumnos" className="tt-pst-section tt-pst-enter">
-                <div className="tt-pst-sec-head">
-                  <div>
-                    <span className="tt-pst-mini-kicker">CONTROL PRIVADO EN CANCHA</span>
-                    <h3>Mis Alumnos ({(coachDraft.students || []).length})</h3>
-                  </div>
-                  <button
-                    type="button"
-                    className="tt-btn tt-btn-primary tt-btn-sm"
-                    onClick={() => setShowAddStudent((v) => !v)}
-                  >
-                    {showAddStudent ? 'Cerrar' : '+ Alumno'}
-                  </button>
-                </div>
-
-                {showAddStudent && (
-                  <form onSubmit={handleAddStudent} className="tt-pst-inline-form">
-                    <input
-                      type="text"
-                      className="tt-pst-input"
-                      value={stName}
-                      onChange={(e) => setStName(e.target.value)}
-                      placeholder="Nombre del alumno"
-                      required
-                    />
-                    <div className="tt-pst-grid-2">
-                      <select
-                        className="tt-pst-input"
-                        value={stLevel}
-                        onChange={(e) => setStLevel(e.target.value)}
-                      >
-                        {['5ª P', '5ª B', '5ª A', '4ª Cat.', '3ª Cat.'].map((lv) => (
-                          <option key={lv} value={lv}>
-                            {lv}
-                          </option>
-                        ))}
-                      </select>
-                      <input
-                        type="tel"
-                        className="tt-pst-input"
-                        value={stPhone}
-                        onChange={(e) => setStPhone(e.target.value)}
-                        placeholder="Celular WhatsApp (9 dígitos)"
-                      />
-                    </div>
-                    <button type="submit" className="tt-btn tt-btn-primary tt-btn-sm">
-                      Guardar Alumno
-                    </button>
-                  </form>
-                )}
-
-                <div className="tt-pst-cards-stack">
-                  {(coachDraft.students || []).map((st) => (
-                    <div key={st.id} className="tt-pst-student-row">
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <strong>{st.name}</strong>
-                          <span className="tt-st-level-chip">{st.level}</span>
-                        </div>
-                        <small>{st.groupName}</small>
-                      </div>
-
-                      <div className="tt-st-actions">
-                        <button
-                          type="button"
-                          className={`tt-st-pill ${st.attendedToday ? 'is-ok' : ''}`}
-                          onClick={() => handleToggleStudentField(st.id, 'attendedToday')}
-                        >
-                          {st.attendedToday ? '✓ Asistió' : 'Asistencia'}
-                        </button>
-
-                        <button
-                          type="button"
-                          className={`tt-st-pill ${st.feeStatus === 'AL_DIA' ? 'is-ok' : 'is-due'}`}
-                          onClick={() => handleToggleStudentField(st.id, 'feeStatus')}
-                        >
-                          {st.feeStatus === 'AL_DIA' ? 'Al día' : 'Por renovar'}
-                        </button>
-
-                        {st.whatsapp && (
-                          <a
-                            href={buildWhatsappLink(
-                              st.whatsapp,
-                              `Hola ${st.name}, te escribe Coach ${coachDraft.name} para confirmar nuestra próxima clase en ${coachDraft.clubName}.`
-                            )}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="tt-st-wa-icon"
-                            aria-label={`Escribir por WhatsApp a ${st.name}`}
-                          >
-                            <TTIcon name="whatsapp" size={15} />
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* COACH TAB 4: MI MARCA (TEMA, FOTO STORAGE, ESPECIALIDADES Y VIDEOS) */}
-            {coachTab === 'marca' && (
-              <div key="ct-marca" className="tt-pst-section tt-pst-enter">
-                {/* Foto en la nube + Estilo visual de su ficha */}
-                <div className="tt-pst-card">
-                  <span className="tt-pst-mini-kicker">ESTUDIO DE MARCA PERSONAL</span>
-                  <div className="tt-brand-photo-row">
-                    <SmartImage
-                      src={coachDraft.photoUrl}
-                      fallbackSrc={ASSETS.torneoAltura}
-                      alt={coachDraft.name}
-                      style={{
-                        width: 72,
-                        height: 88,
-                        borderRadius: 16,
-                        objectFit: 'cover',
-                        objectPosition: 'center top',
-                        border: '2px solid #00DC7D',
-                        flexShrink: 0,
-                      }}
-                    />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <strong style={{ display: 'block', fontSize: '0.9rem' }}>
-                        Foto de Portada y Perfil
-                      </strong>
-                      <small className="tt-muted" style={{ display: 'block', fontSize: '0.72rem', marginBottom: 8 }}>
-                        Se comprime y actualiza al instante para todos los jugadores.
-                      </small>
-                      <input
-                        ref={coachPhotoRef}
-                        type="file"
-                        accept="image/*"
-                        onChange={handleUploadCoachPhoto}
-                        style={{ display: 'none' }}
-                      />
-                      <button
-                        type="button"
-                        disabled={isUploadingMedia}
-                        className="tt-btn tt-btn-ghost tt-btn-sm"
-                        onClick={() => coachPhotoRef.current?.click()}
-                      >
-                        <TTIcon name="camera" size={15} />
-                        {isUploadingMedia ? 'Subiendo...' : 'Cambiar foto'}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Selector de color de acento de su tarjeta */}
-                  <div>
-                    <span className="tt-pst-field-lbl">Color de acento de tu ficha</span>
-                    <div className="tt-theme-swatches">
-                      {COACH_THEME_OPTIONS.map((opt) => (
-                        <button
-                          key={opt.id}
-                          type="button"
-                          className={`tt-swatch-pill ${coachDraft.accentTheme === opt.id ? 'is-on' : ''}`}
-                          onClick={() => {
-                            triggerHaptic('light');
-                            saveCoachToCloud({ ...coachDraft, accentTheme: opt.id });
-                          }}
-                        >
-                          <span style={{ backgroundColor: opt.swatch }} />
-                          {opt.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Especialidades táctiles (máx 3) */}
-                  <div>
-                    <span className="tt-pst-field-lbl">Especialidades destacadas (elige hasta 3)</span>
-                    <div className="tt-spec-pills">
-                      {SPECIALTY_PRESETS.map((sp) => {
-                        const on = (coachDraft.specialties || []).includes(sp);
-                        return (
-                          <button
-                            key={sp}
-                            type="button"
-                            className={`tt-spec-btn ${on ? 'is-on' : ''}`}
-                            onClick={() => handleToggleSpecialty(sp)}
-                          >
-                            {sp}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Datos editables + Botón Guardar */}
-                  <div className="tt-pst-grid-2">
-                    <label className="tt-pst-lbl">
-                      <span>Tarifa Hora Regular (S/)</span>
-                      <input
-                        type="number"
-                        className="tt-pst-input"
-                        value={coachDraft.baseRate}
-                        onChange={(e) =>
-                          setCoachDraft((prev) => ({ ...prev, baseRate: Number(e.target.value) || 0 }))
-                        }
-                      />
-                    </label>
-                    <label className="tt-pst-lbl">
-                      <span>Tarifa Socio VIP (S/)</span>
-                      <input
-                        type="number"
-                        className="tt-pst-input"
-                        value={coachDraft.vipRate}
-                        onChange={(e) =>
-                          setCoachDraft((prev) => ({ ...prev, vipRate: Number(e.target.value) || 0 }))
-                        }
-                      />
-                    </label>
-                  </div>
-
-                  <div className="tt-pst-grid-2">
-                    <label className="tt-pst-lbl">
-                      <span>Título corto</span>
-                      <input
-                        type="text"
-                        className="tt-pst-input"
-                        value={coachDraft.title || ''}
-                        onChange={(e) =>
-                          setCoachDraft((prev) => ({ ...prev, title: e.target.value }))
-                        }
-                      />
-                    </label>
-                    <label className="tt-pst-lbl">
-                      <span>WhatsApp Reservas</span>
-                      <input
-                        type="tel"
-                        className="tt-pst-input"
-                        value={coachDraft.whatsapp || ''}
-                        onChange={(e) =>
-                          setCoachDraft((prev) => ({ ...prev, whatsapp: e.target.value }))
-                        }
-                      />
-                    </label>
-                  </div>
-
-                  <button
-                    type="button"
-                    className="tt-btn tt-btn-primary"
-                    style={{ width: '100%' }}
-                    onClick={() =>
-                      saveCoachToCloud(coachDraft, 'Perfil de Coach guardado en Supabase.')
-                    }
-                  >
-                    Guardar Cambios de Mi Marca
-                  </button>
-                </div>
-
-                {/* Videos en Cancha */}
-                <div className="tt-pst-card">
-                  <div className="tt-pst-sec-head">
-                    <div>
-                      <span className="tt-pst-mini-kicker">TIPS Y MASTERCLASSES</span>
-                      <h3>Videos en Cancha ({(coachDraft.videos || []).length})</h3>
-                    </div>
-                    <button
-                      type="button"
-                      className="tt-btn tt-btn-ghost tt-btn-sm"
-                      onClick={() => setShowAddVideo((v) => !v)}
-                    >
-                      {showAddVideo ? 'Cerrar' : '+ Video'}
-                    </button>
-                  </div>
-
-                  {showAddVideo && (
-                    <form onSubmit={handleAddVideo} className="tt-pst-inline-form">
-                      <input
-                        type="text"
-                        className="tt-pst-input"
-                        value={vidTitle}
-                        onChange={(e) => setVidTitle(e.target.value)}
-                        placeholder="Título del tip en cancha"
-                        required
-                      />
-                      <input
-                        type="url"
-                        className="tt-pst-input"
-                        value={vidUrl}
-                        onChange={(e) => setVidUrl(e.target.value)}
-                        placeholder="URL MP4 o dejar vacío para demo local"
-                      />
-                      <div className="tt-pst-grid-2">
-                        <button
-                          type="button"
-                          className={`tt-pst-toggle-btn ${vidExclusive ? 'is-on' : ''}`}
-                          onClick={() => setVidExclusive((v) => !v)}
-                        >
-                          {vidExclusive ? `Masterclass (${vidGems} 💎)` : 'Tip Gratis'}
-                        </button>
-                        {vidExclusive && (
-                          <input
-                            type="number"
-                            min="20"
-                            step="10"
-                            className="tt-pst-input"
-                            value={vidGems}
-                            onChange={(e) => setVidGems(e.target.value)}
-                          />
-                        )}
-                      </div>
-                      <button type="submit" className="tt-btn tt-btn-primary tt-btn-sm">
-                        Publicar Video
-                      </button>
-                    </form>
-                  )}
-
-                  <div className="tt-pst-cards-stack">
-                    {(coachDraft.videos || []).map((v) => (
-                      <div key={v.id} className="tt-pst-vid-row">
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <strong>{v.title}</strong>
-                          <small>{v.gemsCost > 0 ? `Masterclass · ${v.gemsCost} 💎` : 'Tip Gratis'}</small>
-                        </div>
-                        <button
-                          type="button"
-                          className="tt-pst-del-btn"
-                          onClick={() =>
-                            saveCoachToCloud({
-                              ...coachDraft,
-                              videos: (coachDraft.videos || []).filter((item) => item.id !== v.id),
-                            })
-                          }
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-
-        {/* ==================================================================
-            MODO B: PANEL DE CLUB ALIADO
-            ================================================================== */}
-        {studioRole === 'CLUB' && (
-          <>
-            <div className="tt-pst-selector-row">
-              {(clubs || INITIAL_CLUBS).map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  className={`tt-pst-sel-chip ${selectedClubId === c.id ? 'is-on' : ''}`}
-                  onClick={() => {
-                    triggerHaptic('light');
-                    setSelectedClubId(c.id);
-                  }}
-                >
-                  {c.shortName}
-                </button>
-              ))}
-            </div>
-
-            <div className="tt-pst-subtabs" role="tablist">
-              <span
-                className="tt-pst-subtab-slider is-gold"
-                aria-hidden="true"
-                style={{ transform: `translateX(${Math.max(0, clubTabIdx) * 100}%)` }}
-              />
-              {[
-                { id: 'estado', label: 'Club & Web' },
-                { id: 'vitrina', label: 'Fotos & VIP' },
-                { id: 'promos', label: 'Promos' },
-                { id: 'validar', label: 'Validar VIP' },
-              ].map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={clubTab === t.id}
-                  className={`tt-pst-subtab is-gold-mode ${clubTab === t.id ? 'is-active' : ''}`}
-                  onClick={() => {
-                    triggerHaptic('light');
-                    setClubTab(t.id);
-                  }}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-
-            {/* CLUB TAB 1: CLIMA + CANAL WEB EXTERNO DE RESERVAS + TARIFAS */}
-            {clubTab === 'estado' && (
-              <div key="cl-estado" className="tt-pst-section tt-pst-enter">
-                {/* Clima rápido de recepción */}
-                <div className="tt-pst-card">
-                  <span className="tt-pst-mini-kicker">RECEPCIÓN · ESTADO DE ARCILLA EN VIVO</span>
-                  <div className="tt-pst-wq-row">
-                    {WEATHER_QUICK_OPTS.map((w) => {
-                      const active = clubDraft.climaBase?.conditionKey === w.key;
-                      return (
-                        <button
-                          key={w.key}
-                          type="button"
-                          className={`tt-pst-wq-btn ${active ? 'is-on' : ''}`}
-                          style={active ? { borderColor: w.color, color: w.color } : undefined}
-                          onClick={() => {
-                            triggerHaptic('success');
-                            if (onUpdateClubWeather) {
-                              onUpdateClubWeather({ clubId: clubDraft.id, conditionKey: w.key });
-                            }
-                            saveClubToCloud(
-                              {
-                                ...clubDraft,
-                                climaBase: { ...(clubDraft.climaBase || {}), conditionKey: w.key },
-                              },
-                              `Estado actualizado en ${clubDraft.shortName}: ${w.label}.`
-                            );
-                          }}
-                        >
-                          {w.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Canal Directo a Página Web de Reservas del Club (ej. Romina) */}
-                <div className="tt-pst-card is-highlight">
-                  <span className="tt-pst-mini-kicker">CONEXIÓN CON TU WEB DE RESERVAS</span>
-                  <h3 style={{ margin: '0 0 4px', fontSize: '1rem' }}>Enlace de Reservas Online</h3>
-                  <p className="tt-pst-help">
-                    Si tu club tiene su propia web de reservas, pégala aquí. TOTAL TENIS enviará tráfico identificado (UTM) directo a tu página y mostrará tu código de beneficio VIP.
-                  </p>
-
-                  <label className="tt-pst-lbl">
-                    <span>URL de tu página de reservas (opcional)</span>
-                    <input
-                      type="url"
-                      className="tt-pst-input"
-                      value={clubDraft.rates?.bookingUrl || ''}
-                      onChange={(e) =>
-                        setClubDraft((prev) => ({
-                          ...prev,
-                          rates: { ...prev.rates, bookingUrl: e.target.value },
-                        }))
-                      }
-                      placeholder="https://reservas.tuclub.pe"
-                    />
-                  </label>
-
-                  <div className="tt-pst-grid-2">
-                    <label className="tt-pst-lbl">
-                      <span>Código dcto. VIP en tu web</span>
-                      <input
-                        type="text"
-                        className="tt-pst-input"
-                        value={clubDraft.rates?.bookingVipCode || ''}
-                        onChange={(e) =>
-                          setClubDraft((prev) => ({
-                            ...prev,
-                            rates: { ...prev.rates, bookingVipCode: e.target.value.toUpperCase() },
-                          }))
-                        }
-                        placeholder="Ej. TOTALTENIS15"
-                      />
-                    </label>
-                    <label className="tt-pst-lbl">
-                      <span>WhatsApp del Club</span>
-                      <input
-                        type="tel"
-                        className="tt-pst-input"
-                        value={clubDraft.whatsapp || ''}
-                        onChange={(e) =>
-                          setClubDraft((prev) => ({ ...prev, whatsapp: e.target.value }))
-                        }
-                        placeholder="964..."
-                      />
-                    </label>
-                  </div>
-                </div>
-
-                {/* Tarifas y Horarios */}
-                <div className="tt-pst-card">
-                  <span className="tt-pst-mini-kicker">TARIFAS POR HORA (S/) Y HORARIO</span>
-                  <div className="tt-pst-grid-2">
-                    <label className="tt-pst-lbl">
-                      <span>Día Regular (S/)</span>
-                      <input
-                        type="number"
-                        className="tt-pst-input"
-                        value={clubDraft.rates?.diaRegular || 32}
-                        onChange={(e) =>
-                          setClubDraft((prev) => ({
-                            ...prev,
-                            rates: { ...prev.rates, diaRegular: Number(e.target.value) || 0 },
-                          }))
-                        }
-                      />
-                    </label>
-                    <label className="tt-pst-lbl">
-                      <span>Día Socio VIP (S/)</span>
-                      <input
-                        type="number"
-                        className="tt-pst-input"
-                        value={clubDraft.rates?.diaVip || 24}
-                        onChange={(e) =>
-                          setClubDraft((prev) => ({
-                            ...prev,
-                            rates: { ...prev.rates, diaVip: Number(e.target.value) || 0 },
-                          }))
-                        }
-                      />
-                    </label>
-                    <label className="tt-pst-lbl">
-                      <span>Noche LED Regular (S/)</span>
-                      <input
-                        type="number"
-                        className="tt-pst-input"
-                        value={clubDraft.rates?.nocheRegular || 42}
-                        onChange={(e) =>
-                          setClubDraft((prev) => ({
-                            ...prev,
-                            rates: { ...prev.rates, nocheRegular: Number(e.target.value) || 0 },
-                          }))
-                        }
-                      />
-                    </label>
-                    <label className="tt-pst-lbl">
-                      <span>Noche LED VIP (S/)</span>
-                      <input
-                        type="number"
-                        className="tt-pst-input"
-                        value={clubDraft.rates?.nocheVip || 34}
-                        onChange={(e) =>
-                          setClubDraft((prev) => ({
-                            ...prev,
-                            rates: { ...prev.rates, nocheVip: Number(e.target.value) || 0 },
-                          }))
-                        }
-                      />
-                    </label>
-                  </div>
-
-                  <label className="tt-pst-lbl">
-                    <span>Horario de atención</span>
-                    <input
-                      type="text"
-                      className="tt-pst-input"
-                      value={clubDraft.hours || ''}
-                      onChange={(e) =>
-                        setClubDraft((prev) => ({ ...prev, hours: e.target.value }))
-                      }
-                    />
-                  </label>
-
-                  <button
-                    type="button"
-                    className="tt-btn tt-btn-primary"
-                    style={{ width: '100%' }}
-                    onClick={() =>
-                      saveClubToCloud(clubDraft, `Datos de ${clubDraft.shortName} guardados en la nube.`)
-                    }
-                  >
-                    Guardar Configuración del Club
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* CLUB TAB 2: FOTOS CARRUSEL + BENEFICIOS VIP PROPIOS */}
-            {clubTab === 'vitrina' && (
-              <div key="cl-vitrina" className="tt-pst-section tt-pst-enter">
-                <div className="tt-pst-card">
-                  <div className="tt-pst-sec-head">
-                    <div>
-                      <span className="tt-pst-mini-kicker">CARRUSEL DE LA SEDE</span>
-                      <h3>Fotos de tus Canchas</h3>
-                    </div>
-                    <input
-                      ref={clubPhotoRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={handleUploadClubGalleryPhoto}
-                      style={{ display: 'none' }}
-                    />
-                    <button
-                      type="button"
-                      disabled={isUploadingMedia}
-                      className="tt-btn tt-btn-primary tt-btn-sm"
-                      onClick={() => clubPhotoRef.current?.click()}
-                    >
-                      <TTIcon name="camera" size={15} />
-                      {isUploadingMedia ? 'Subiendo...' : '+ Subir Foto'}
-                    </button>
-                  </div>
-
-                  <div className="tt-club-gal-grid">
-                    {(clubDraft.gallery || []).map((g) => (
-                      <div key={g.id} className="tt-club-gal-item">
-                        <SmartImage
-                          src={g.image}
-                          fallbackSrc={ASSETS.torneoApertura}
-                          alt={g.title}
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
-                        <button
-                          type="button"
-                          className="tt-club-gal-del"
-                          aria-label="Quitar foto"
-                          onClick={() => handleRemoveClubPhoto(g.id)}
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Beneficios VIP propios de este club */}
-                <div className="tt-pst-card">
-                  <span className="tt-pst-mini-kicker">BOTÓN «BENEFICIOS VIP EN ESTE CLUB»</span>
-                  <h3 style={{ margin: 0, fontSize: '1rem' }}>Ventajas Exclusivas para Socios VIP</h3>
-
-                  <div className="tt-pst-cards-stack">
-                    {(clubDraft.vipBenefits || []).map((b, idx) => (
-                      <div key={idx} className="tt-vip-ben-row">
-                        <span>• {b}</span>
-                        <button
-                          type="button"
-                          className="tt-pst-del-btn"
-                          onClick={() => handleRemoveVipBenefit(idx)}
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-
-                  <form onSubmit={handleAddVipBenefit} className="tt-pst-inline-row">
-                    <input
-                      type="text"
-                      className="tt-pst-input"
-                      value={newVipBenefit}
-                      onChange={(e) => setNewVipBenefit(e.target.value)}
-                      placeholder="Ej. -15% en alquiler Mar y Jue mañana"
-                    />
-                    <button type="submit" className="tt-btn tt-btn-primary tt-btn-sm">
-                      Añadir
-                    </button>
-                  </form>
-                </div>
-              </div>
-            )}
-
-            {/* CLUB TAB 3: PROMOS HORAS VALLE Y TORNEOS INTERNOS */}
-            {clubTab === 'promos' && (
-              <div key="cl-promos" className="tt-pst-section tt-pst-enter">
-                <div className="tt-pst-sec-head">
-                  <div>
-                    <span className="tt-pst-mini-kicker">LLENA HORARIOS VALLE</span>
-                    <h3>Promociones de Cancha</h3>
-                  </div>
-                  <button
-                    type="button"
-                    className="tt-btn tt-btn-primary tt-btn-sm"
-                    onClick={() => setShowAddPromo((v) => !v)}
-                  >
-                    {showAddPromo ? 'Cerrar' : '+ Promo'}
-                  </button>
-                </div>
-
-                {showAddPromo && (
-                  <form onSubmit={handleAddClubPromo} className="tt-pst-inline-form">
-                    <input
-                      type="text"
-                      className="tt-pst-input"
-                      value={promoTitle}
-                      onChange={(e) => setPromoTitle(e.target.value)}
-                      placeholder="Título (ej. Mañanas de Arcilla -20%)"
-                      required
-                    />
-                    <input
-                      type="text"
-                      className="tt-pst-input"
-                      value={promoSchedule}
-                      onChange={(e) => setPromoSchedule(e.target.value)}
-                      placeholder="Horario"
-                    />
-                    <input
-                      type="text"
-                      className="tt-pst-input"
-                      value={promoPrice}
-                      onChange={(e) => setPromoPrice(e.target.value)}
-                      placeholder="Tarifa promocional"
-                    />
-                    <button type="submit" className="tt-btn tt-btn-primary tt-btn-sm">
-                      Publicar Promo
-                    </button>
-                  </form>
-                )}
-
-                <div className="tt-pst-cards-stack">
-                  {(clubDraft.promos || []).map((pr) => (
-                    <article key={pr.id} className="tt-pst-pkg-card">
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <h4>{pr.title}</h4>
-                        <small>
-                          {pr.schedule} · {pr.priceNote}
-                        </small>
-                      </div>
-                      <button
-                        type="button"
-                        className="tt-pst-del-btn"
-                        onClick={() =>
-                          saveClubToCloud({
-                            ...clubDraft,
-                            promos: (clubDraft.promos || []).filter((x) => x.id !== pr.id),
-                          })
-                        }
-                      >
-                        ✕
-                      </button>
-                    </article>
-                  ))}
-                </div>
-
-                <div className="tt-pst-sec-head" style={{ marginTop: 6 }}>
-                  <div>
-                    <span className="tt-pst-mini-kicker">COMUNIDAD DEL CLUB</span>
-                    <h3>Torneos Internos</h3>
-                  </div>
-                  <button
-                    type="button"
-                    className="tt-btn tt-btn-ghost tt-btn-sm"
-                    onClick={() => setShowAddEvent((v) => !v)}
-                  >
-                    {showAddEvent ? 'Cerrar' : '+ Evento'}
-                  </button>
-                </div>
-
-                {showAddEvent && (
-                  <form onSubmit={handleAddClubEvent} className="tt-pst-inline-form">
-                    <input
-                      type="text"
-                      className="tt-pst-input"
-                      value={evTitle}
-                      onChange={(e) => setEvTitle(e.target.value)}
-                      placeholder="Ej. Noche de Dobles Americano"
-                      required
-                    />
-                    <div className="tt-pst-grid-3">
-                      <input
-                        type="text"
-                        className="tt-pst-input"
-                        value={evDate}
-                        onChange={(e) => setEvDate(e.target.value)}
-                      />
-                      <input
-                        type="number"
-                        className="tt-pst-input"
-                        value={evFee}
-                        onChange={(e) => setEvFee(e.target.value)}
-                      />
-                      <input
-                        type="number"
-                        className="tt-pst-input"
-                        value={evSpots}
-                        onChange={(e) => setEvSpots(e.target.value)}
-                      />
-                    </div>
-                    <button type="submit" className="tt-btn tt-btn-primary tt-btn-sm">
-                      Publicar Evento
-                    </button>
-                  </form>
-                )}
-
-                <div className="tt-pst-cards-stack">
-                  {(clubDraft.internalEvents || []).map((ev) => (
-                    <article key={ev.id} className="tt-pst-pkg-card">
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <span className="tt-pgc-type">{ev.dateLabel}</span>
-                        <h4>{ev.title}</h4>
-                        <small>
-                          Cuota S/ {ev.fee} · {ev.spotsUsed}/{ev.spotsTotal} inscritos
-                        </small>
-                      </div>
-                      <button
-                        type="button"
-                        className="tt-pst-del-btn"
-                        onClick={() =>
-                          saveClubToCloud({
-                            ...clubDraft,
-                            internalEvents: (clubDraft.internalEvents || []).filter(
-                              (x) => x.id !== ev.id
-                            ),
-                          })
-                        }
-                      >
-                        ✕
-                      </button>
-                    </article>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* CLUB TAB 4: VALIDADOR INSTANTÁNEO DE CARNET VIP EN RECEPCIÓN */}
-            {clubTab === 'validar' && (
-              <div key="cl-validar" className="tt-pst-section tt-pst-enter">
-                <div className="tt-pst-card">
-                  <span className="tt-pst-mini-kicker">VERIFICACIÓN EN RECEPCIÓN</span>
-                  <h3 style={{ margin: 0, fontSize: '1.1rem' }}>Validar Carnet Socio VIP</h3>
-                  <p className="tt-pst-help">
-                    Busca al jugador por nombre, código TT-2026 o celular para aplicar su tarifa preferencial al instante.
-                  </p>
-                  <input
-                    type="search"
-                    className="tt-pst-input"
-                    value={vipSearch}
-                    onChange={(e) => setVipSearch(e.target.value)}
-                    placeholder="Nombre, código TT-2026 o celular..."
-                  />
-
-                  {vipSearch.trim().length > 0 && (
-                    <div className="tt-pst-cards-stack" style={{ marginTop: 4 }}>
-                      {vipValidationMatches.length === 0 ? (
-                        <small className="tt-muted">No se encontró ningún jugador con ese dato.</small>
-                      ) : (
-                        vipValidationMatches.map((p) => (
-                          <div key={p.id} className="tt-pst-val-row">
-                            <SmartImage
-                              src={p.avatar}
-                              alt={p.name}
-                              initials={p.name}
-                              style={{
-                                width: 40,
-                                height: 40,
-                                borderRadius: '50%',
-                                objectFit: 'cover',
-                                objectPosition: 'center top',
-                              }}
-                            />
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <strong>{p.name}</strong>
-                              <small>
-                                {p.credentialId || 'Socio'} · {getCategoryByPoints(p.points).name}
-                              </small>
-                            </div>
-                            <span className={`tt-val-pill ${p.isVip ? 'is-vip' : 'is-std'}`}>
-                              {p.isVip ? '✓ VIP ACTIVO' : 'ESTÁNDAR'}
-                            </span>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-
-      <style>{`
-        .tt-ps-studio { display: flex; flex-direction: column; gap: 14px; }
-
-        .tt-pst-hero {
-          border-radius: 20px;
-          padding: 15px;
-          background: linear-gradient(135deg, #24093F 0%, #130322 100%);
-          color: #FAF9F5;
-          border: 1px solid rgba(250, 249, 245, 0.14);
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
-        .tt-pst-hero-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
-        .tt-pst-kicker { font-size: 0.58rem; font-weight: 900; letter-spacing: 0.1em; color: #00DC7D; }
-        .tt-sync-pill {
-          padding: 2px 8px;
-          border-radius: 999px;
-          background: rgba(0, 220, 125, 0.14);
-          color: #7CF5C0;
-          font-size: 0.6rem;
-          font-weight: 800;
-        }
-        .tt-sync-pill.is-saving { background: rgba(229, 193, 108, 0.2); color: #F3DC9B; }
-        .tt-sync-pill.is-error { background: rgba(248, 113, 113, 0.2); color: #FCA5A5; }
-        .tt-pst-hero h2 { margin: 3px 0 0; font-family: var(--tt-font-display); font-size: 1.44rem; line-height: 1.04; }
-
-        .tt-pst-role-switch { display: inline-flex; padding: 3px; border-radius: 999px; background: rgba(250, 249, 245, 0.1); }
-        .tt-pst-role-switch button { padding: 6px 12px; border-radius: 999px; font-size: 0.72rem; font-weight: 800; color: rgba(250, 249, 245, 0.76); }
-        .tt-pst-role-switch button.is-active { background: #FAF9F5; color: #1E0734; font-weight: 900; }
-
-        .tt-pst-kpi-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-        .tt-pst-kpi-strip > div { padding: 9px 8px; border-radius: 13px; background: rgba(250, 249, 245, 0.07); text-align: center; }
-        .tt-pst-kpi-strip span { display: block; font-size: 0.56rem; font-weight: 800; letter-spacing: 0.07em; opacity: 0.72; }
-        .tt-pst-kpi-strip strong { font-family: var(--tt-font-display); font-size: 1.28rem; line-height: 1.08; }
-        .tt-pst-kpi-strip .is-emerald strong { color: #00DC7D; }
-
-        .tt-pst-selector-row { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
-        .tt-pst-sel-chip {
-          flex-shrink: 0;
-          padding: 6px 12px;
-          border-radius: 999px;
-          background: var(--tt-surface-2);
-          border: 1px solid var(--tt-border);
-          color: var(--tt-text-muted);
-          font-size: 0.72rem;
-          font-weight: 800;
-        }
-        .tt-pst-sel-chip.is-on { background: #1E0734; border-color: #00DC7D; color: #00DC7D; }
-
-        /* Subtabs con slider suave */
-        .tt-pst-subtabs {
-          position: relative;
-          display: grid;
-          grid-template-columns: repeat(4, minmax(0, 1fr));
-          padding: 4px;
-          border-radius: 15px;
-          background: var(--tt-surface-2);
-          border: 1px solid var(--tt-border);
-        }
-        .tt-pst-subtab-slider {
-          position: absolute;
-          top: 4px;
-          bottom: 4px;
-          left: 4px;
-          width: calc((100% - 8px) / 4);
-          border-radius: 11px;
-          background: linear-gradient(135deg, #00DC7D 0%, #00B365 100%);
-          transition: transform 300ms cubic-bezier(0.22, 1.22, 0.36, 1);
-          pointer-events: none;
-          z-index: 0;
-        }
-        .tt-pst-subtab-slider.is-gold {
-          background: linear-gradient(135deg, #F3DC9B 0%, #C89F45 100%);
-        }
-        .tt-ps-studio.is-light .tt-pst-subtab-slider:not(.is-gold) { background: #1E0734; }
-        .tt-pst-subtab {
-          position: relative;
-          z-index: 1;
-          min-height: 38px;
-          padding: 0 4px;
-          border-radius: 11px;
-          font-size: 0.71rem;
-          font-weight: 800;
-          color: var(--tt-text-muted);
-          white-space: nowrap;
-        }
-        .tt-pst-subtab.is-active { color: #10021E; font-weight: 900; }
-        .tt-ps-studio.is-light .tt-pst-subtab:not(.is-gold-mode).is-active { color: #00DC7D; }
-
-        .tt-pst-section { display: flex; flex-direction: column; gap: 12px; }
-        .tt-pst-enter { animation: ttPstIn 280ms cubic-bezier(0.22, 1, 0.36, 1) both; }
-        @keyframes ttPstIn {
-          from { opacity: 0; transform: translateY(8px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-
-        .tt-pst-card {
-          padding: 14px;
-          border-radius: 18px;
-          background: var(--tt-surface-2);
-          border: 1px solid var(--tt-border);
-          display: flex;
-          flex-direction: column;
-          gap: 11px;
-        }
-        .tt-pst-card.is-highlight { border-color: rgba(0, 220, 125, 0.4); }
-        .tt-pst-sec-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; }
-        .tt-pst-mini-kicker { display: block; font-size: 0.6rem; font-weight: 900; letter-spacing: 0.08em; color: var(--tt-emerald-text); }
-        .tt-pst-sec-head h3 { margin: 2px 0 0; font-family: var(--tt-font-display); font-size: 1.2rem; line-height: 1.05; }
-        .tt-pst-help { margin: 0; font-size: 0.75rem; line-height: 1.4; color: var(--tt-text-muted); }
-        .tt-pst-link-btn { font-size: 0.74rem; font-weight: 800; color: var(--tt-emerald-text); }
-
-        .tt-quick-slots-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 7px; }
-        @media (min-width: 540px) {
-          .tt-quick-slots-grid { grid-template-columns: repeat(3, 1fr); }
-        }
-        .tt-qs-pill {
-          min-height: 38px;
-          padding: 0 10px;
-          border-radius: 12px;
-          background: var(--tt-surface);
-          border: 1px solid var(--tt-border);
-          color: var(--tt-text);
-          font-size: 0.74rem;
-          font-weight: 800;
-        }
-        .tt-qs-pill.is-active { background: #00DC7D; border-color: #00DC7D; color: #10021E; }
-
-        .tt-pst-inline-row { display: flex; gap: 8px; align-items: center; }
-        .tt-pst-wa-banner {
-          min-height: 42px;
-          padding: 0 14px;
-          border-radius: 13px;
-          background: rgba(37, 211, 102, 0.14);
-          border: 1px solid rgba(37, 211, 102, 0.38);
-          color: #16A34A;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          font-size: 0.76rem;
-          font-weight: 800;
-        }
-        .tt-ps-studio.is-dark .tt-pst-wa-banner { color: #4ADE80; }
-
-        .tt-pst-mini-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; }
-        .tt-pst-mini-stats > div { padding: 10px 6px; border-radius: 13px; background: var(--tt-surface); }
-        .tt-pst-mini-stats strong { display: block; font-family: var(--tt-font-display); font-size: 1.35rem; color: var(--tt-emerald-text); }
-        .tt-pst-mini-stats span { font-size: 0.68rem; color: var(--tt-text-muted); }
-
-        .tt-pst-inline-form {
-          padding: 13px;
-          border-radius: 16px;
-          background: var(--tt-surface-2);
-          border: 1px solid var(--tt-border);
-          display: flex;
-          flex-direction: column;
-          gap: 9px;
-        }
-        .tt-pst-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-        .tt-pst-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-        .tt-pst-lbl, .tt-pst-field-lbl { display: flex; flex-direction: column; gap: 5px; font-size: 0.72rem; font-weight: 800; color: var(--tt-text-muted); }
-        .tt-pst-input {
-          width: 100%;
-          min-height: 42px;
-          padding: 8px 12px;
-          border-radius: 12px;
-          background: var(--tt-surface);
-          border: 1px solid var(--tt-border-medium);
-          color: var(--tt-text);
-          font-size: 16px;
-        }
-        .tt-pst-toggle-btn { min-height: 42px; border-radius: 12px; background: var(--tt-surface); border: 1.5px solid var(--tt-border); color: var(--tt-text); font-size: 0.76rem; font-weight: 800; }
-        .tt-pst-toggle-btn.is-on { border-color: #E5C16C; color: #E5C16C; }
-
-        .tt-pst-cards-stack { display: flex; flex-direction: column; gap: 8px; }
-        .tt-pst-pkg-card,
-        .tt-pst-group-card,
-        .tt-pst-vid-row,
-        .tt-vip-ben-row {
-          padding: 11px 12px;
-          border-radius: 15px;
-          background: var(--tt-surface);
-          border: 1px solid var(--tt-border);
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 10px;
-        }
-        .tt-pst-group-card { flex-direction: column; align-items: stretch; gap: 9px; }
-        .tt-pst-pkg-card h4, .tt-pgc-top h4 { margin: 2px 0; font-size: 0.88rem; }
-        .tt-pst-pkg-card small, .tt-pst-vid-row small { display: block; font-size: 0.72rem; color: var(--tt-text-muted); }
-        .tt-pst-badge-soft { padding: 2px 7px; border-radius: 999px; background: rgba(0, 220, 125, 0.14); color: var(--tt-emerald-text); font-size: 0.58rem; font-weight: 900; }
-        .tt-pst-del-btn { width: 30px; height: 30px; border-radius: 50%; background: var(--tt-surface-2); color: var(--tt-text-muted); flex-shrink: 0; font-size: 0.8rem; }
-
-        .tt-pgc-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
-        .tt-pgc-type { font-size: 0.62rem; font-weight: 900; letter-spacing: 0.07em; color: var(--tt-emerald-text); text-transform: uppercase; }
-        .tt-pgc-spots-badge { padding: 5px 10px; border-radius: 11px; background: #1E0734; color: #FAF9F5; text-align: center; }
-        .tt-pgc-spots-badge strong { display: block; font-family: var(--tt-font-display); font-size: 1.1rem; line-height: 1; color: #00DC7D; }
-        .tt-pgc-spots-badge span { font-size: 0.54rem; opacity: 0.75; font-weight: 800; }
-        .tt-pgc-bar { height: 6px; border-radius: 999px; background: var(--tt-surface-2); overflow: hidden; }
-        .tt-pgc-bar > div { height: 100%; border-radius: 999px; background: #00DC7D; }
-        .tt-pgc-bottom { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
-        .tt-pgc-controls { display: flex; align-items: center; gap: 6px; }
-        .tt-mini-step { width: 32px; height: 32px; border-radius: 10px; background: var(--tt-surface-2); border: 1px solid var(--tt-border); color: var(--tt-text); font-weight: 900; }
-        .tt-mini-step.is-plus { background: #00DC7D; border-color: #00DC7D; color: #10021E; }
-        .tt-pgc-wa-btn { min-height: 32px; padding: 0 10px; border-radius: 10px; background: rgba(37, 211, 102, 0.14); border: 1px solid rgba(37, 211, 102, 0.38); color: #16A34A; font-size: 0.7rem; font-weight: 800; display: inline-flex; align-items: center; gap: 5px; }
-        .tt-ps-studio.is-dark .tt-pgc-wa-btn { color: #4ADE80; }
-
-        .tt-pst-student-row {
-          padding: 11px 12px;
-          border-radius: 15px;
-          background: var(--tt-surface);
-          border: 1px solid var(--tt-border);
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 10px;
-          flex-wrap: wrap;
-        }
-        .tt-pst-student-row small { display: block; font-size: 0.7rem; color: var(--tt-text-muted); }
-        .tt-st-level-chip { padding: 2px 7px; border-radius: 999px; background: var(--tt-surface-2); color: var(--tt-emerald-text); font-size: 0.62rem; font-weight: 900; }
-        .tt-st-actions { display: flex; align-items: center; gap: 6px; }
-        .tt-st-pill { min-height: 30px; padding: 0 9px; border-radius: 999px; background: var(--tt-surface-2); border: 1px solid var(--tt-border); color: var(--tt-text-muted); font-size: 0.68rem; font-weight: 800; }
-        .tt-st-pill.is-ok { background: rgba(0, 220, 125, 0.16); border-color: rgba(0, 220, 125, 0.45); color: var(--tt-emerald-text); }
-        .tt-st-pill.is-due { background: rgba(229, 193, 108, 0.18); border-color: rgba(229, 193, 108, 0.5); color: #B45309; }
-        .tt-ps-studio.is-dark .tt-st-pill.is-due { color: #F3DC9B; }
-        .tt-st-wa-icon { width: 30px; height: 30px; border-radius: 50%; background: rgba(37, 211, 102, 0.16); color: #22C55E; display: inline-flex; align-items: center; justify-content: center; }
-
-        /* Marca Personal Coach */
-        .tt-brand-photo-row { display: flex; align-items: center; gap: 12px; }
-        .tt-theme-swatches { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 6px; }
-        .tt-swatch-pill {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          padding: 6px 11px;
-          border-radius: 999px;
-          background: var(--tt-surface);
-          border: 1.5px solid var(--tt-border);
-          color: var(--tt-text);
-          font-size: 0.72rem;
-          font-weight: 800;
-        }
-        .tt-swatch-pill span { width: 10px; height: 10px; border-radius: 50%; }
-        .tt-swatch-pill.is-on { border-color: #00DC7D; }
-        .tt-spec-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
-        .tt-spec-btn { padding: 5px 10px; border-radius: 999px; background: var(--tt-surface); border: 1px solid var(--tt-border); color: var(--tt-text-muted); font-size: 0.71rem; font-weight: 700; }
-        .tt-spec-btn.is-on { background: rgba(0, 220, 125, 0.16); border-color: #00DC7D; color: var(--tt-emerald-text); font-weight: 800; }
-
-        /* Club Clima + Galería + Validador */
-        .tt-pst-wq-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-        .tt-pst-wq-btn { min-height: 38px; border-radius: 11px; background: var(--tt-surface); border: 1.5px solid var(--tt-border); color: var(--tt-text); font-size: 0.74rem; font-weight: 800; }
-        .tt-club-gal-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-        .tt-club-gal-item { position: relative; aspect-ratio: 4 / 3; border-radius: 12px; overflow: hidden; background: #140324; }
-        .tt-club-gal-del { position: absolute; top: 5px; right: 5px; width: 24px; height: 24px; border-radius: 50%; background: rgba(16, 3, 29, 0.85); color: #FAF9F5; font-size: 0.72rem; }
-        .tt-vip-ben-row span { font-size: 0.76rem; color: var(--tt-text); }
-
-        .tt-pst-val-row { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border-radius: 13px; background: var(--tt-surface); border: 1px solid var(--tt-border); }
-        .tt-pst-val-row strong { display: block; font-size: 0.85rem; }
-        .tt-pst-val-row small { font-size: 0.69rem; color: var(--tt-text-muted); }
-        .tt-val-pill { padding: 4px 10px; border-radius: 999px; font-size: 0.66rem; font-weight: 900; white-space: nowrap; }
-        .tt-val-pill.is-vip { background: linear-gradient(135deg, #F3DC9B 0%, #C89F45 100%); color: #1A0D00; }
-        .tt-val-pill.is-std { background: var(--tt-surface-2); color: var(--tt-text-muted); }
-      `}</style>
-    </ModalPortal>
-  );
-}
+                        className="tt-pst-input
