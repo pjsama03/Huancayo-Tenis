@@ -8,415 +8,823 @@ import {
   TTIcon,
   triggerHaptic,
 } from '../components/AppIcons';
-import {
-  APP_CONFIG,
-  INITIAL_CLUBS,
-} from '../data/playersAndClubsData';
-import { fetchLiveClubWeather } from '../utils/tenisEngine';
-import {
-  buildWhatsappLink,
-  incrementCoachMetric,
-  submitWeatherReportRpc,
-} from '../utils/cloudService';
+import { APP_CONFIG, INITIAL_CLUBS } from '../data/playersAndClubsData';
+import { buildWhatsappLink } from '../utils/cloudService';
 
 /* ==========================================================================
-   MATRIZ CLIMÁTICA (4 ESTADOS CON ICONOS 3D · REPORTE SOLO DENTRO DEL CLUB)
+   ESTADOS DE CLIMA EN VIVO (CON TUS 4 ACTIVOS 3D OFICIALES)
    ========================================================================== */
-const WEATHER_STATES = [
+const WEATHER_CONDITIONS = [
   {
     key: 'seco',
     label: 'Cancha Seca',
     shortLabel: 'Seca',
-    badge: 'Óptima',
-    color: '#00DC7D',
-    icon: ASSETS.climaSeco || '/assets/canva-clima-seco.png',
-    note: 'Tracción limpia y pique rápido.',
+    temp: '21°C',
+    note: 'Condición óptima · Lista para jugar',
+    image: ASSETS.climaSeco,
+    tone: 'emerald',
   },
   {
-    key: 'humedad',
-    label: 'Humedad Leve',
+    key: 'humeda',
+    label: 'Arcilla Húmeda',
     shortLabel: 'Húmeda',
-    badge: 'Jugable',
-    color: '#38BDF8',
-    icon: ASSETS.climaHumedad || '/assets/canva-clima-humedad.png',
-    note: 'Arcilla blanda con bote más lento.',
+    temp: '17°C',
+    note: 'Bote lento · Se juega con normalidad',
+    image: ASSETS.climaHumedad,
+    tone: 'sky',
   },
   {
     key: 'llovizna',
-    label: 'Llovizna',
+    label: 'Llovizna Ligera',
     shortLabel: 'Llovizna',
-    badge: 'Precaución',
-    color: '#E5C16C',
-    icon: ASSETS.climaLlovizna || '/assets/canva-clima-llovizna.png',
-    note: 'Líneas resbalosas. Juega con precaución.',
+    temp: '14°C',
+    note: 'Precaución · Verificar con recepción',
+    image: ASSETS.climaLlovizna,
+    tone: 'gold',
   },
   {
     key: 'lluvia',
-    label: 'Lluvia Fuerte',
+    label: 'Lluvia / Pausa',
     shortLabel: 'Lluvia',
-    badge: 'Pausada',
-    color: '#F87171',
-    icon: ASSETS.climaLluvia || '/assets/canva-clima-lluvia.png',
-    note: 'Arcilla encharcada hasta secado.',
+    temp: '12°C',
+    note: 'Canchas detenidas · Aplica reprogramación',
+    image: ASSETS.climaLluvia,
+    tone: 'danger',
   },
 ];
 
 /* ==========================================================================
-   TEMAS REFINADOS PARA TARJETAS DE COACH (ALTO CONTRASTE · CERO NEÓN CHILLÓN)
+   SEEDS DE ENRIQUECIMIENTO (HIDRATACIÓN ANTI-VACÍOS SI SUPABASE TIENE [])
+   Si el club o coach edita algo en Estudio Aliado, sus datos de Supabase ganan.
    ========================================================================== */
-const COACH_THEMES = {
-  emerald: {
-    accent: '#00DC7D',
-    accentLight: '#007A44',
-    soft: 'rgba(0, 220, 125, 0.14)',
-    border: 'rgba(0, 220, 125, 0.38)',
+const CLUB_ENRICHMENT_MAP = {
+  'club-country': {
+    logo: ASSETS.clubCountry,
+    cover: ASSETS.sedeCountry,
+    district: 'El Tambo',
+    address: 'Av. Mariscal Castilla Km 4.5, El Tambo, Huancayo',
+    hours: '06:00 a. m. – 10:00 p. m.',
+    surface: 'Arcilla Profesional',
+    courtsCount: 6,
+    dayRate: 36,
+    nightRate: 46,
+    vipDayRate: 28,
+    vipNightRate: 38,
+    whatsapp: '51964812340',
+    bookingUrl: '',
+    vipBookingCode: 'TTVIP-HUANCAS',
+    gallery: [
+      { url: ASSETS.sedeCountry, caption: 'Cancha Central de Arcilla · Vista Panorámica' },
+      { url: ASSETS.torneoApertura, caption: 'Pistas iluminadas para retos nocturnos' },
+      { url: ASSETS.torneoDoblesValle, caption: 'Zona de partidos oficiales y dobles' },
+    ],
+    videos: [
+      {
+        id: 'v-country-1',
+        title: 'Recorrido Cancha Central Los Huancas',
+        duration: '0:28',
+        url: ASSETS.videoCircuito1,
+        poster: ASSETS.sedeCountry,
+      },
+    ],
+    facilities: [
+      { icon: 'club', title: '6 canchas de arcilla', detail: 'Mantenimiento diario con polvo fino' },
+      { icon: 'sun', title: 'Iluminación LED pro', detail: 'Partidos nocturnos hasta las 10:00 p. m.' },
+      { icon: 'shield', title: 'Estacionamiento privado', detail: 'Vigilancia y vestuarios con ducha' },
+      { icon: 'shop', title: 'Cafetería & Terraza', detail: 'Hidratación y vista a la cancha central' },
+    ],
+    promos: [
+      {
+        id: 'pr-c1',
+        tag: 'HORAS VALLE',
+        title: 'Mañanas Activas · 20% OFF',
+        schedule: 'Lun a Vie · 09:00 a. m. – 12:00 p. m.',
+        priceText: 'S/ 29 / hora',
+      },
+      {
+        id: 'pr-c2',
+        tag: 'DOBLES',
+        title: 'Bono 2 Horas Dobles + Agua',
+        schedule: 'Mar y Jue · 02:00 p. m. – 05:00 p. m.',
+        priceText: 'S/ 62 total',
+      },
+    ],
+    vipBenefits: [
+      'Tarifa preferencial VIP desde S/ 28 en horario diurno',
+      'Prioridad de reserva en canchas iluminadas (6–9 p. m.)',
+      'Descuento en tarros de pelotas y encordado en sede',
+    ],
+    internalEvents: [
+      {
+        id: 'ev-c1',
+        title: 'Noche de Dobles Los Huancas',
+        date: 'Este Viernes · 7:00 p. m.',
+        spots: '10 / 16 cupos',
+        pct: 63,
+        fee: 'S/ 25',
+      },
+    ],
   },
-  gold: {
-    accent: '#E5C16C',
-    accentLight: '#9A6B16',
-    soft: 'rgba(229, 193, 108, 0.15)',
-    border: 'rgba(229, 193, 108, 0.44)',
+  'club-romina': {
+    logo: ASSETS.clubRomina,
+    cover: ASSETS.sedeRomina,
+    district: 'El Tambo',
+    address: 'Prolongación Nemesio Ráez 420, El Tambo, Huancayo',
+    hours: '06:30 a. m. – 09:30 p. m.',
+    surface: 'Arcilla Formativa',
+    courtsCount: 3,
+    dayRate: 30,
+    nightRate: 40,
+    vipDayRate: 24,
+    vipNightRate: 34,
+    whatsapp: '51964201001',
+    bookingUrl: 'https://huancayo-tenis.vercel.app',
+    vipBookingCode: 'TTVIP-CUTIPA',
+    gallery: [
+      { url: ASSETS.sedeRomina, caption: 'Canchas de arcilla · Academia Romina Cutipa' },
+      { url: ASSETS.portadaTipsSemana, caption: 'Zona de entrenamiento técnico y canastos' },
+      { url: ASSETS.torneoAltura, caption: 'Ambiente de competencia en altura' },
+    ],
+    videos: [
+      {
+        id: 'v-romina-club',
+        title: 'Tour Academia Romina Cutipa en Cancha',
+        duration: '0:32',
+        url: ASSETS.videoCircuito2,
+        poster: ASSETS.sedeRomina,
+      },
+    ],
+    facilities: [
+      { icon: 'club', title: '3 pistas de arcilla', detail: 'Piso compacto ideal para entrenamiento' },
+      { icon: 'video', title: 'Cancha con video análisis', detail: 'Soporte para grabar saque y derecha' },
+      { icon: 'users', title: 'Academia formativa', detail: 'Grupos por categoría y sparring' },
+      { icon: 'shield', title: 'Zona de calentamiento', detail: 'Conos, escaleras y estación de agua' },
+    ],
+    promos: [
+      {
+        id: 'pr-r1',
+        tag: 'HORAS VALLE',
+        title: 'Turno Mediodía Entrenamiento',
+        schedule: 'Lun a Vie · 11:00 a. m. – 02:30 p. m.',
+        priceText: 'S/ 24 / hora',
+      },
+      {
+        id: 'pr-r2',
+        tag: 'PACK 4H',
+        title: 'Bono Mensual de Práctica (4 hrs)',
+        schedule: 'Horario diurno flexible',
+        priceText: 'S/ 96 pack',
+      },
+    ],
+    vipBenefits: [
+      'Ahorro directo de S/ 6 por hora en cada reserva',
+      'Primera evaluación técnica de 15 min incluida con Academia',
+      'Acceso prioritario a clínicas de fin de semana',
+    ],
+    internalEvents: [
+      {
+        id: 'ev-r1',
+        title: 'Clínica Abierta de Topspin & Saque',
+        date: 'Sábado · 10:00 a. m.',
+        spots: '6 / 8 cupos',
+        pct: 75,
+        fee: 'S/ 35',
+      },
+    ],
   },
-  clay: {
-    accent: '#E28C6E',
-    accentLight: '#A84826',
-    soft: 'rgba(226, 140, 110, 0.15)',
-    border: 'rgba(226, 140, 110, 0.42)',
+  'club-tauro': {
+    logo: ASSETS.clubTauro,
+    cover: ASSETS.sedeTauro,
+    district: 'Huancayo Centro',
+    address: 'Av. Ferrocarril Norte 1180, Huancayo',
+    hours: '07:00 a. m. – 10:00 p. m.',
+    surface: 'Arcilla Competitiva',
+    courtsCount: 4,
+    dayRate: 32,
+    nightRate: 42,
+    vipDayRate: 26,
+    vipNightRate: 36,
+    whatsapp: '51964501220',
+    bookingUrl: '',
+    vipBookingCode: 'TTVIP-TAURO',
+    gallery: [
+      { url: ASSETS.sedeTauro, caption: 'Canchas competitivas · Club Tauro Tenis' },
+      { url: ASSETS.torneoMasterTop8, caption: 'Iluminación nocturna LED de torneo' },
+    ],
+    videos: [
+      {
+        id: 'v-tauro-1',
+        title: 'Ambiente de Retos Nocturnos · Club Tauro',
+        duration: '0:25',
+        url: ASSETS.videoCircuito3,
+        poster: ASSETS.sedeTauro,
+      },
+    ],
+    facilities: [
+      { icon: 'club', title: '4 canchas rápidas', detail: 'Arcilla firme con líneas reglamentarias' },
+      { icon: 'sun', title: 'Reflectores LED', detail: 'Visibilidad nítida para partidos nocturnos' },
+      { icon: 'trophy', title: 'Sede de Relámpagos', detail: 'Torneos cortos todos los meses' },
+      { icon: 'shield', title: 'Ubicación céntrica', detail: 'Acceso rápido y zona de descanso' },
+    ],
+    promos: [
+      {
+        id: 'pr-t1',
+        tag: 'NOCTURNO',
+        title: 'Cierre Nocturno (9 p. m. – 10 p. m.)',
+        schedule: 'Lun a Jue · Último turno LED',
+        priceText: 'S/ 35 / hora',
+      },
+    ],
+    vipBenefits: [
+      'Tarifa fija VIP S/ 26 día · S/ 36 noche con luz LED',
+      'Sin recargo al reprogramar por lluvia con 2 horas de aviso',
+      'Inscripción preferencial en Relámpagos Nocturnos',
+    ],
+    internalEvents: [
+      {
+        id: 'ev-t1',
+        title: 'Americano Nocturno de 4ª y 5ª A',
+        date: 'Jueves · 8:00 p. m.',
+        spots: '12 / 16 cupos',
+        pct: 75,
+        fee: 'S/ 30',
+      },
+    ],
   },
-  royal: {
-    accent: '#93C5FD',
-    accentLight: '#1D4ED8',
-    soft: 'rgba(147, 197, 253, 0.15)',
-    border: 'rgba(147, 197, 253, 0.4)',
+  'club-inkas': {
+    logo: ASSETS.clubInkas,
+    cover: ASSETS.sedeInkas,
+    district: 'San Carlos',
+    address: 'Jr. Los Eucaliptos 290, San Carlos, Huancayo',
+    hours: '06:30 a. m. – 08:30 p. m.',
+    surface: 'Arcilla Campestre',
+    courtsCount: 3,
+    dayRate: 28,
+    nightRate: 38,
+    vipDayRate: 22,
+    vipNightRate: 32,
+    whatsapp: '51964708811',
+    bookingUrl: '',
+    vipBookingCode: 'TTVIP-INKAS',
+    gallery: [
+      { url: ASSETS.sedeInkas, caption: 'Canchas rodeadas de eucaliptos · Los Inkas' },
+      { url: ASSETS.torneoAltura, caption: 'Vista despejada de mañana en San Carlos' },
+    ],
+    videos: [
+      {
+        id: 'v-inkas-1',
+        title: 'Mañanas de Arcilla en Club Los Inkas',
+        duration: '0:24',
+        url: ASSETS.videoCircuito4,
+        poster: ASSETS.sedeInkas,
+      },
+    ],
+    facilities: [
+      { icon: 'club', title: '3 pistas rodeadas de verde', detail: 'Entorno natural protegido del viento' },
+      { icon: 'sun', title: 'Sol de mañana ideal', detail: 'Temperatura agradable desde las 7 a. m.' },
+      { icon: 'users', title: 'Ambiente familiar', detail: 'Área social y espacio para acompañantes' },
+      { icon: 'shield', title: 'Parqueo interior', detail: 'Ingreso seguro directo a las canchas' },
+    ],
+    promos: [
+      {
+        id: 'pr-i1',
+        tag: 'MAÑANA',
+        title: 'Madrugadores Los Inkas',
+        schedule: 'Lun a Vie · 06:30 a. m. – 09:00 a. m.',
+        priceText: 'S/ 22 / hora',
+      },
+    ],
+    vipBenefits: [
+      'Tarifa Socio VIP desde S/ 22 la hora en turno diurno',
+      'Descuento en reservas continuas de fin de semana',
+      'Acceso libre a zona de calentamiento y peloteo en frontón',
+    ],
+    internalEvents: [
+      {
+        id: 'ev-i1',
+        title: 'Encuentro Social Damas & Mixto',
+        date: 'Domingo · 9:30 a. m.',
+        spots: '8 / 12 cupos',
+        pct: 67,
+        fee: 'S/ 25',
+      },
+    ],
   },
 };
 
-/* ==========================================================================
-   COACHES DE RESPALDO LIMPIOS (SI SUPABASE AÚN NO TIENE FILAS)
-   ========================================================================== */
-const FALLBACK_COACHES = [
+const COACH_ENRICHMENT_LIST = [
   {
     id: 'coach-romina',
+    matchKeys: ['romina', 'cutipa'],
     name: 'Romina Cutipa',
-    title: 'Head Coach · Alta Competencia',
-    clubId: 'club-romina',
+    role: 'Head Coach · Directora de Academia',
     clubName: 'Academia Romina Cutipa',
-    featured: true,
-    accentTheme: 'emerald',
-    photoUrl: '/assets/sede-romina-cutipa.jpg',
-    coverUrl: '/assets/torneo-altura.jpg',
-    specialties: ['Saque & Efecto', 'Táctica Arcilla', 'Damas & Adultos'],
-    baseRate: 60,
-    vipRate: 50,
-    freeSlotToday: 'Hoy · 06:00 p. m.',
     whatsapp: '51964201001',
+    photo: ASSETS.portadaTipsSemana,
+    accent: '#00DC7D',
+    experience: '10 años',
+    studentsCount: '65+ alumnos',
+    rating: '4.9',
+    availableToday: true,
+    bio: 'Especialista en técnica limpia sobre arcilla, corrección biomecánica de derecha/revés y preparación competitiva para damas y varones.',
+    specialties: ['Técnica & Biomecánica', 'Topspin en Arcilla', 'Táctica Competitiva'],
+    gallery: [
+      { url: ASSETS.portadaTipsSemana, caption: 'Corrección de empuñadura y punto de impacto' },
+      { url: ASSETS.sedeRomina, caption: 'Sesión en Academia Romina Cutipa' },
+      { url: ASSETS.portadaAcademiaTv, caption: 'Trabajo de efecto y control en altura' },
+    ],
     videos: [
       {
-        id: 'vid-rom-1',
-        title: 'Topspin profundo en altura',
-        duration: '02:18',
-        src: '/assets/video-coach-romina.mp4',
-        poster: '/assets/portada-tips-semana.jpg',
-        isExclusive: false,
+        id: 'vid-romina-1',
+        title: 'Tip Gratis: Cómo controlar la pelota en altura',
+        duration: '0:42',
+        url: ASSETS.videoCoachRomina,
+        poster: ASSETS.portadaTipsSemana,
+        isFree: true,
         gemsCost: 0,
       },
       {
-        id: 'vid-rom-2',
-        title: 'Masterclass: Ángulos en arcilla',
-        duration: '06:45',
-        src: '/assets/video-coach-demo-3.mp4',
-        poster: '/assets/portada-academia-tv.jpg',
-        isExclusive: true,
-        gemsCost: 40,
+        id: 'vid-romina-2',
+        title: 'Masterclass: Derecha pesada con Topspin',
+        duration: '2:15',
+        url: ASSETS.videoCircuito2,
+        poster: ASSETS.portadaAcademiaTv,
+        isFree: false,
+        gemsCost: 45,
       },
     ],
     packages: [
       {
         id: 'pk-r1',
-        type: 'Privada 1 a 1',
-        name: 'Sesión Técnica (60 min)',
-        price: 60,
-        vipPrice: 50,
-        badge: 'VIDEO FEEDBACK',
+        type: 'PRIVADA 1 A 1',
+        tag: 'MÁS PEDIDA',
+        title: 'Sesión Técnica Personalizada (60 min)',
+        desc: 'Diagnóstico + corrección en vivo + video corto de feedback.',
+        priceRegular: 60,
+        priceVip: 50,
+        spotsFilled: null,
+        spotsMax: null,
       },
       {
         id: 'pk-r2',
-        type: 'Grupal (Máx. 4)',
-        name: 'Grupo Competitivo 5ª A / 4ª',
-        price: 35,
-        vipPrice: 28,
-        badge: '2 CUPOS LIBRES',
+        type: 'GRUPAL',
+        tag: '3/4 CUPOS',
+        title: 'Entrenamiento Grupal Nivel 5ª A / 4ª',
+        desc: 'Peloteo intenso, situaciones de partido y juego de pies.',
+        priceRegular: 30,
+        priceVip: 25,
+        spotsFilled: 3,
+        spotsMax: 4,
       },
       {
         id: 'pk-r3',
-        type: 'Pack Mensual',
-        name: 'Plan Ascenso · 8 Clases',
-        price: 440,
-        vipPrice: 380,
-        badge: 'MÁS ELEGIDO',
+        type: 'PACK MENSUAL',
+        tag: 'AHORRA S/ 80',
+        title: 'Plan Pro 8 Clases Privadas / Mes',
+        desc: 'Seguimiento mensual de ascenso de categoría + video análisis.',
+        priceRegular: 400,
+        priceVip: 350,
+        spotsFilled: null,
+        spotsMax: null,
       },
     ],
-    groups: [
-      { id: 'sl-r1', day: 'Mar', time: '08:00 a. m.', label: 'Privada 1 a 1' },
-      { id: 'sl-r2', day: 'Mié', time: '06:00 p. m.', label: 'Grupal (2/4)' },
-      { id: 'sl-r3', day: 'Vie', time: '05:00 p. m.', label: 'Clínica Saque' },
-      { id: 'sl-r4', day: 'Sáb', time: '09:30 a. m.', label: 'Evaluación' },
+    schedule: [
+      { id: 'hs-r1', day: 'Hoy', time: '05:00 p. m.', status: 'open' },
+      { id: 'hs-r2', day: 'Hoy', time: '07:00 p. m.', status: 'open' },
+      { id: 'hs-r3', day: 'Mañana', time: '08:00 a. m.', status: 'open' },
+      { id: 'hs-r4', day: 'Mañana', time: '06:00 p. m.', status: 'few' },
+      { id: 'hs-r5', day: 'Jueves', time: '07:00 p. m.', status: 'open' },
+      { id: 'hs-r6', day: 'Sábado', time: '09:00 a. m.', status: 'open' },
     ],
   },
   {
     id: 'coach-rodrigo',
+    matchKeys: ['rodrigo', 'quispe', 'villavicencio'],
     name: 'Rodrigo Quispe',
-    title: 'Coach Competitivo · 4ª / 3ª Cat.',
-    clubId: 'club-country',
+    role: 'Coach Competitivo · Ex Top Regional',
     clubName: 'Country Club Los Huancas',
-    featured: false,
-    accentTheme: 'gold',
-    photoUrl: '/assets/sede-country-club.jpg',
-    coverUrl: '/assets/torneo-apertura.jpg',
-    specialties: ['Derecha de Ataque', 'Sparring Real', 'Senior +40'],
-    baseRate: 65,
-    vipRate: 54,
-    freeSlotToday: 'Hoy · 07:00 p. m.',
     whatsapp: '51964202002',
+    photo: ASSETS.portadaAcademiaTv,
+    accent: '#E5C16C',
+    experience: '8 años',
+    studentsCount: '48+ alumnos',
+    rating: '4.9',
+    availableToday: true,
+    bio: 'Enfoque 100 % práctico para ganar partidos reales: construcción de puntos, primer saque consistente y sparring de ritmo alto.',
+    specialties: ['Sparring Competitivo', 'Primer Saque', 'Mentalidad en Tie-Break'],
+    gallery: [
+      { url: ASSETS.portadaAcademiaTv, caption: 'Entrenamiento de impacto y aceleración' },
+      { url: ASSETS.sedeCountry, caption: 'Cancha Central Country Club Los Huancas' },
+    ],
     videos: [
       {
-        id: 'vid-rod-1',
-        title: 'Derecha invertida en arcilla',
-        duration: '03:04',
-        src: '/assets/video-coach-rodrigo.mp4',
-        poster: '/assets/portada-tips-semana.jpg',
-        isExclusive: false,
+        id: 'vid-rodrigo-1',
+        title: 'Tip Gratis: 3 claves para no fallar el 2º saque',
+        duration: '0:38',
+        url: ASSETS.videoCoachRodrigo,
+        poster: ASSETS.portadaAcademiaTv,
+        isFree: true,
         gemsCost: 0,
+      },
+      {
+        id: 'vid-rodrigo-2',
+        title: 'Masterclass: Cómo cerrar partidos en 3er set',
+        duration: '2:40',
+        url: ASSETS.videoCircuito1,
+        poster: ASSETS.sedeCountry,
+        isFree: false,
+        gemsCost: 50,
       },
     ],
     packages: [
       {
-        id: 'pk-v1',
-        type: 'Privada',
-        name: 'Clase Competitiva (60 min)',
-        price: 65,
-        vipPrice: 54,
-        badge: 'TÁCTICA',
+        id: 'pk-rd1',
+        type: 'SPARRING + COACH',
+        tag: 'COMPETITIVO',
+        title: 'Sparring Táctico + Corrección (60 min)',
+        desc: 'Sets con lectura táctica real para preparar retos oficiales.',
+        priceRegular: 65,
+        priceVip: 55,
+        spotsFilled: null,
+        spotsMax: null,
       },
       {
-        id: 'pk-v2',
-        type: 'Sparring',
-        name: 'Set con Feedback en Vivo',
-        price: 55,
-        vipPrice: 46,
-        badge: 'PRE-TORNEO',
+        id: 'pk-rd2',
+        type: 'CLÍNICA SAQUE',
+        tag: '2/4 CUPOS',
+        title: 'Clínica Intensiva de Saque y Resto',
+        desc: 'Mecánica de lanzamiento, slice abierto y devolución profunda.',
+        priceRegular: 35,
+        priceVip: 28,
+        spotsFilled: 2,
+        spotsMax: 4,
       },
       {
-        id: 'pk-v3',
-        type: 'Pack 4 Clases',
-        name: 'Pack Consolidación',
-        price: 230,
-        vipPrice: 195,
-        badge: 'PROMO MES',
+        id: 'pk-rd3',
+        type: 'PACK 4 SESIONES',
+        tag: 'AHORRA S/ 40',
+        title: 'Pack Quincenal Ascenso de Categoría',
+        desc: '4 sesiones privadas enfocadas en tu siguiente categoría.',
+        priceRegular: 220,
+        priceVip: 190,
+        spotsFilled: null,
+        spotsMax: null,
       },
     ],
-    groups: [
-      { id: 'sl-v1', day: 'Lun', time: '06:00 p. m.', label: 'Sparring' },
-      { id: 'sl-v2', day: 'Jue', time: '07:00 p. m.', label: 'Grupo 4ª/3ª' },
-      { id: 'sl-v3', day: 'Sáb', time: '08:00 a. m.', label: 'Privada' },
+    schedule: [
+      { id: 'hs-rd1', day: 'Hoy', time: '06:00 p. m.', status: 'open' },
+      { id: 'hs-rd2', day: 'Mañana', time: '07:00 a. m.', status: 'open' },
+      { id: 'hs-rd3', day: 'Mañana', time: '08:00 p. m.', status: 'open' },
+      { id: 'hs-rd4', day: 'Viernes', time: '05:00 p. m.', status: 'few' },
+      { id: 'hs-rd5', day: 'Sábado', time: '10:30 a. m.', status: 'open' },
     ],
   },
   {
     id: 'coach-carlos',
+    matchKeys: ['carlos', 'mendoza', 'mendez'],
     name: 'Carlos Mendoza',
-    title: 'Iniciación & Base Técnica 5ª',
-    clubId: 'club-tauro',
+    role: 'Coach Formativo · Especialista Principiantes',
     clubName: 'Club Tauro Tenis',
-    featured: false,
-    accentTheme: 'clay',
-    photoUrl: '/assets/sede-club-tauro.jpg',
-    coverUrl: '/assets/torneo-dobles-valle.jpg',
-    specialties: ['5ª P a 5ª A', 'Empuñaduras', 'Regularidad'],
-    baseRate: 50,
-    vipRate: 42,
-    freeSlotToday: 'Mañana · 07:00 p. m.',
     whatsapp: '51964203003',
+    photo: ASSETS.sedeTauro,
+    accent: '#DE8566',
+    experience: '7 años',
+    studentsCount: '52+ alumnos',
+    rating: '4.8',
+    availableToday: false,
+    bio: 'Metodología clara y sin frustración para pasar de nivel cero a jugar tus primeros partidos completos en menos de 6 semanas.',
+    specialties: ['Desde Cero (5ª P / 5ª B)', 'Juego de Pies', 'Dobles Recreativo'],
+    gallery: [
+      { url: ASSETS.sedeTauro, caption: 'Pistas de arcilla Club Tauro Tenis' },
+      { url: ASSETS.torneoDoblesValle, caption: 'Clases grupales de iniciación y dobles' },
+    ],
     videos: [
       {
-        id: 'vid-car-1',
-        title: '3 claves para subir de 5ª P',
-        duration: '02:45',
-        src: '/assets/video-coach-demo-4.mp4',
-        poster: '/assets/torneo-dobles-valle.jpg',
-        isExclusive: false,
+        id: 'vid-carlos-1',
+        title: 'Tip Gratis: Empuñadura fácil para empezar hoy',
+        duration: '0:45',
+        url: ASSETS.videoCoach3,
+        poster: ASSETS.sedeTauro,
+        isFree: true,
         gemsCost: 0,
       },
     ],
     packages: [
       {
         id: 'pk-c1',
-        type: 'Privada',
-        name: 'Fundamentos 1 a 1 (60 min)',
-        price: 50,
-        vipPrice: 42,
-        badge: 'IDEAL INICIO',
+        type: 'INICIACIÓN',
+        tag: 'NIVEL CERO',
+        title: 'Clase Inicial 1 a 1 (Raqueta incluida)',
+        desc: 'Te prestamos raqueta y pelotas para que pruebes sin invertir.',
+        priceRegular: 50,
+        priceVip: 42,
+        spotsFilled: null,
+        spotsMax: null,
       },
       {
         id: 'pk-c2',
-        type: 'Grupal',
-        name: 'Escuela Nocturna 5ª Cat.',
-        price: 30,
-        vipPrice: 24,
-        badge: '2 CUPOS',
+        type: 'GRUPAL MIXTO',
+        tag: '3/6 CUPOS',
+        title: 'Grupo Recreativo Tardes',
+        desc: 'Ambiente amigable, drills dinámicos y puntos cortos.',
+        priceRegular: 25,
+        priceVip: 20,
+        spotsFilled: 3,
+        spotsMax: 6,
       },
     ],
-    groups: [
-      { id: 'sl-c1', day: 'Mar', time: '07:00 p. m.', label: 'Grupal 5ª' },
-      { id: 'sl-c2', day: 'Jue', time: '07:00 p. m.', label: 'Grupal 5ª' },
-      { id: 'sl-c3', day: 'Sáb', time: '10:00 a. m.', label: 'Privada' },
+    schedule: [
+      { id: 'hs-c1', day: 'Mañana', time: '04:00 p. m.', status: 'open' },
+      { id: 'hs-c2', day: 'Miércoles', time: '06:00 p. m.', status: 'open' },
+      { id: 'hs-c3', day: 'Viernes', time: '06:00 p. m.', status: 'open' },
+      { id: 'hs-c4', day: 'Domingo', time: '09:00 a. m.', status: 'open' },
+    ],
+  },
+  {
+    id: 'coach-diego',
+    matchKeys: ['diego', 'salazar', 'inkas', 'andres'],
+    name: 'Diego Salazar',
+    role: 'Preparador Físico & Coach de Cancha',
+    clubName: 'Club Los Inkas',
+    whatsapp: '51964204004',
+    photo: ASSETS.sedeInkas,
+    accent: '#60A5FA',
+    experience: '6 años',
+    studentsCount: '35+ alumnos',
+    rating: '4.8',
+    availableToday: true,
+    bio: 'Combina tenis de fondo con agilidad, prevención de lesiones y resistencia física adaptada a la altura de Huancayo.',
+    specialties: ['Físico en Altura', 'Prevención de Lesiones', 'Revés & Defensa'],
+    gallery: [
+      { url: ASSETS.sedeInkas, caption: 'Entrenamiento matutino en Club Los Inkas' },
+      { url: ASSETS.torneoAltura, caption: 'Acondicionamiento en arcilla' },
+    ],
+    videos: [
+      {
+        id: 'vid-diego-1',
+        title: 'Tip Gratis: Calentamiento de 3 min antes de sacar',
+        duration: '0:40',
+        url: ASSETS.videoCoach4,
+        poster: ASSETS.sedeInkas,
+        isFree: true,
+        gemsCost: 0,
+      },
+    ],
+    packages: [
+      {
+        id: 'pk-d1',
+        type: 'TENIS + FÍSICO',
+        tag: 'INTEGRAL',
+        title: 'Sesión Técnica + Desplazamiento (60 min)',
+        desc: 'Mejora tu llegada a bolas abiertas y cuida rodillas/hombro.',
+        priceRegular: 55,
+        priceVip: 45,
+        spotsFilled: null,
+        spotsMax: null,
+      },
+      {
+        id: 'pk-d2',
+        type: 'PACK 6 CLASES',
+        tag: 'AHORRA S/ 45',
+        title: 'Bono Físico & Cancha (6 sesiones)',
+        desc: 'Ideal para preparar torneos de fin de semana.',
+        priceRegular: 285,
+        priceVip: 245,
+        spotsFilled: null,
+        spotsMax: null,
+      },
+    ],
+    schedule: [
+      { id: 'hs-d1', day: 'Hoy', time: '04:30 p. m.', status: 'open' },
+      { id: 'hs-d2', day: 'Jueves', time: '07:30 a. m.', status: 'open' },
+      { id: 'hs-d3', day: 'Sábado', time: '08:00 a. m.', status: 'open' },
     ],
   },
 ];
 
 /* ==========================================================================
-   NORMALIZADORES SEGUROS (SOPORTA SUPABASE + FALLBACK LOCAL SIN ERRORES)
+   HELPERS DE HIDRATACIÓN SEGURA (RESPETA SUPABASE · RELLENA SI LLEGA VACÍO)
    ========================================================================== */
-function normalizeClubData(club) {
-  const cover = club.cover || club.coverUrl || club.banner || ASSETS.torneoApertura;
-  const rawGallery =
-    Array.isArray(club.gallery) && club.gallery.length > 0
-      ? club.gallery
-      : Array.isArray(club.galeria) && club.galeria.length > 0
-      ? club.galeria
-      : [{ id: 'c-0', title: club.shortName || club.name, image: cover }];
+function appendUtm(url = '', sourceTag = 'club') {
+  const clean = String(url || '').trim();
+  if (!/^https?:\/\//i.test(clean)) return '';
+  try {
+    const u = new URL(clean);
+    if (!u.searchParams.has('utm_source')) {
+      u.searchParams.set('utm_source', 'totaltenis');
+      u.searchParams.set('utm_medium', sourceTag);
+    }
+    return u.toString();
+  } catch {
+    return clean;
+  }
+}
 
-  const gallery = rawGallery
-    .map((item, idx) =>
-      typeof item === 'string'
-        ? { id: `g-${idx}`, title: `Cancha ${idx + 1}`, image: item }
-        : {
-            id: item.id || `g-${idx}`,
-            title: item.title || `Vista ${idx + 1}`,
-            image: item.image || item.url || cover,
-          }
-    )
-    .filter((g) => Boolean(g.image));
+function getWeatherObj(key) {
+  const norm = String(key || 'seco').toLowerCase();
+  return (
+    WEATHER_CONDITIONS.find((w) => w.key === norm) ||
+    WEATHER_CONDITIONS.find((w) => norm.includes(w.key)) ||
+    WEATHER_CONDITIONS[0]
+  );
+}
 
-  const ratesObj = club.rates || club.tarifas || {};
-  const diaReg = ratesObj.diaRegular ?? ratesObj.dayRegular ?? 32;
-  const diaVip = ratesObj.diaVip ?? ratesObj.dayVip ?? Math.max(18, diaReg - 8);
-  const nocheReg = ratesObj.nocheRegular ?? ratesObj.nightRegular ?? 42;
-  const nocheVip = ratesObj.nocheVip ?? ratesObj.nightVip ?? Math.max(26, nocheReg - 8);
+function enrichClub(raw, idx = 0) {
+  const id = raw?.id || `club-${idx + 1}`;
+  const lookupKey =
+    id === 'club-cutipa'
+      ? 'club-romina'
+      : CLUB_ENRICHMENT_MAP[id]
+      ? id
+      : Object.keys(CLUB_ENRICHMENT_MAP)[idx % 4];
+  const seed = CLUB_ENRICHMENT_MAP[lookupKey] || CLUB_ENRICHMENT_MAP['club-country'];
 
-  const rawServices =
-    Array.isArray(club.services) && club.services.length > 0
-      ? club.services
-      : Array.isArray(club.instalaciones) && club.instalaciones.length > 0
-      ? club.instalaciones
-      : ['Canchas de arcilla', 'Iluminación LED', 'Estacionamiento', 'Vestuarios'];
+  const rawGallery = Array.isArray(raw?.gallery) && raw.gallery.length > 0
+    ? raw.gallery
+    : Array.isArray(raw?.galeria) && raw.galeria.length > 0
+    ? raw.galeria
+    : seed.gallery;
 
-  const services = rawServices.map((s) => (typeof s === 'string' ? s : s.label || '')).filter(Boolean);
+  const gallery = rawGallery.map((g, i) =>
+    typeof g === 'string'
+      ? { url: g, caption: `${raw?.name || 'Sede'} · Vista ${i + 1}` }
+      : { url: g.url || g.image || seed.cover, caption: g.caption || g.title || '' }
+  );
 
-  const vipBenefits =
-    Array.isArray(club.vipBenefits) && club.vipBenefits.length > 0
-      ? club.vipBenefits
-      : [
-          `Tarifa VIP: S/ ${diaVip} día · S/ ${nocheVip} noche LED`,
-          'Prioridad de reserva en horarios estelares',
-          'Beneficios exclusivos presentando tu Carnet 3D',
-        ];
+  const videos =
+    Array.isArray(raw?.videos) && raw.videos.length > 0 ? raw.videos : seed.videos;
 
-  const promos =
-    Array.isArray(club.promos) && club.promos.length > 0
-      ? club.promos
-      : Array.isArray(club.promosHorasValle)
-      ? club.promosHorasValle
-      : [];
+  const rawPromos =
+    Array.isArray(raw?.promos) && raw.promos.length > 0
+      ? raw.promos
+      : Array.isArray(raw?.promosHorasValle) && raw.promosHorasValle.length > 0
+      ? raw.promosHorasValle
+      : seed.promos;
+
+  const rawEvents =
+    Array.isArray(raw?.internalEvents) && raw.internalEvents.length > 0
+      ? raw.internalEvents
+      : Array.isArray(raw?.torneosInternos) && raw.torneosInternos.length > 0
+      ? raw.torneosInternos
+      : seed.internalEvents;
+
+  const rawVip =
+    Array.isArray(raw?.vipBenefits) && raw.vipBenefits.length > 0
+      ? raw.vipBenefits
+      : seed.vipBenefits;
+
+  const rates = raw?.rates || raw?.tarifas || {};
+  const dayRate = Number(raw?.dayRate ?? rates.day ?? rates.dia ?? seed.dayRate) || seed.dayRate;
+  const nightRate =
+    Number(raw?.nightRate ?? rates.night ?? rates.noche ?? seed.nightRate) || seed.nightRate;
+  const vipDayRate =
+    Number(raw?.vipDayRate ?? rates.vipDay ?? rates.vipDia ?? seed.vipDayRate) ||
+    Math.max(15, dayRate - 6);
+  const vipNightRate =
+    Number(raw?.vipNightRate ?? rates.vipNight ?? rates.vipNoche ?? seed.vipNightRate) ||
+    Math.max(20, nightRate - 8);
+
+  const condKey =
+    raw?.climaBase?.conditionKey || raw?.weatherCondition || raw?.weather || 'seco';
+  const weather = getWeatherObj(condKey);
+
+  const mapsUrl =
+    raw?.mapsUrl ||
+    raw?.googleMapsUrl ||
+    `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+      `${raw?.name || 'Club de Tenis'} Huancayo Peru`
+    )}`;
 
   return {
-    ...club,
-    logo: club.logo || club.logoUrl || ASSETS.logo,
-    cover,
+    id,
+    name: raw?.name || 'Sede Oficial',
+    shortName: raw?.shortName || raw?.name || 'Sede',
+    district: raw?.district || seed.district,
+    address: raw?.address || seed.address,
+    hours: raw?.hours || raw?.schedule || seed.hours,
+    surface: raw?.surface || seed.surface,
+    courtsCount: Number(raw?.courtsCount) || seed.courtsCount,
+    logo: raw?.logo || raw?.logoUrl || seed.logo,
+    cover: raw?.cover || raw?.coverUrl || raw?.image || seed.cover,
+    whatsapp: raw?.whatsapp || raw?.phone || seed.whatsapp,
+    mapsUrl,
+    bookingUrl: raw?.bookingUrl || raw?.externalBookingUrl || seed.bookingUrl || '',
+    vipBookingCode: raw?.vipBookingCode || seed.vipBookingCode,
+    dayRate,
+    nightRate,
+    vipDayRate,
+    vipNightRate,
+    weather,
     gallery,
-    rates: { diaReg, diaVip, nocheReg, nocheVip },
-    services,
-    vipBenefits,
-    promos,
-    mapsUrl:
-      club.mapsUrl ||
-      club.googleMapsUrl ||
-      `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${club.name} Huancayo Peru`)}`,
+    videos,
+    facilities: seed.facilities,
+    promos: rawPromos,
+    vipBenefits: rawVip,
+    internalEvents: rawEvents,
   };
 }
 
-function normalizeCoachData(c) {
-  const rawPackages =
-    Array.isArray(c.packages) && c.packages.length > 0
-      ? c.packages
-      : Array.isArray(c.programs) && c.programs.length > 0
-      ? c.programs
-      : Array.isArray(c.modalidades) && c.modalidades.length > 0
-      ? c.modalidades
-      : [
-          {
-            id: `${c.id}-p1`,
-            type: 'Privada 1 a 1',
-            name: 'Sesión Técnica (60 min)',
-            price: Number(c.baseRate ?? c.basePriceRegular) || 60,
-            vipPrice: Number(c.vipRate ?? c.basePriceVip) || 50,
-            badge: 'PERSONALIZADA',
-          },
-        ];
-
-  const packages = rawPackages.map((pk, idx) => ({
-    id: pk.id || `${c.id}-pk-${idx}`,
-    type: pk.type || 'Clase',
-    name: pk.name || pk.title || pk.type || 'Sesión en cancha',
-    price: Number(pk.price ?? pk.priceRegular ?? c.baseRate) || 60,
-    vipPrice: Number(pk.vipPrice ?? pk.priceVip ?? c.vipRate) || 50,
-    badge: pk.badge || pk.highlight || '',
-  }));
-
-  const rawSlots =
-    Array.isArray(c.groups) && c.groups.length > 0
-      ? c.groups
-      : Array.isArray(c.slots) && c.slots.length > 0
-      ? c.slots
-      : Array.isArray(c.horariosSemanales) && c.horariosSemanales.length > 0
-      ? c.horariosSemanales
-      : [];
-
-  const slots = rawSlots.map((sl, idx) => ({
-    id: sl.id || `${c.id}-sl-${idx}`,
-    day: sl.day || 'Turno',
-    time: sl.time || '',
-    label: sl.label || sl.slot || sl.name || 'Disponible',
-  }));
+function enrichCoach(raw, idx = 0) {
+  const hay = `${raw?.id || ''} ${raw?.name || ''}`.toLowerCase();
+  const seed =
+    COACH_ENRICHMENT_LIST.find((s) => s.matchKeys.some((k) => hay.includes(k))) ||
+    COACH_ENRICHMENT_LIST[idx % COACH_ENRICHMENT_LIST.length];
 
   const rawVideos =
-    Array.isArray(c.videos) && c.videos.length > 0
-      ? c.videos
-      : Array.isArray(c.videosEnCancha)
-      ? c.videosEnCancha
-      : [];
+    Array.isArray(raw?.videos) && raw.videos.length > 0
+      ? raw.videos
+      : Array.isArray(raw?.videosEnCancha) && raw.videosEnCancha.length > 0
+      ? raw.videosEnCancha
+      : seed.videos;
 
-  const specialties = Array.isArray(c.specialties) && c.specialties.length > 0
-    ? c.specialties
-    : c.specialty
-    ? String(c.specialty).split(',').map((s) => s.trim()).filter(Boolean)
-    : ['Técnica', 'Táctica', 'Arcilla'];
+  const videos = rawVideos.map((v, i) => ({
+    id: v.id || `${raw?.id || seed.id}-v-${i}`,
+    title: v.title || v.titulo || 'Clip en cancha',
+    duration: v.duration || v.duracion || '0:45',
+    url: v.url || v.videoUrl || seed.videos[0]?.url || ASSETS.videoCoachRomina,
+    poster: v.poster || v.thumbnail || seed.photo,
+    isFree: v.isFree !== false && !(Number(v.gemsCost) > 0),
+    gemsCost: Number(v.gemsCost) || 0,
+  }));
+
+  const rawPackages =
+    Array.isArray(raw?.packages) && raw.packages.length > 0
+      ? raw.packages
+      : Array.isArray(raw?.modalidades) && raw.modalidades.length > 0
+      ? raw.modalidades
+      : Array.isArray(raw?.programs) && raw.programs.length > 0
+      ? raw.programs
+      : seed.packages;
+
+  const packages = rawPackages.map((pk, i) => ({
+    id: pk.id || `pk-${i}`,
+    type: String(pk.type || pk.tipo || 'SESIÓN').toUpperCase(),
+    tag: String(pk.tag || pk.badge || '').toUpperCase(),
+    title: pk.title || pk.name || pk.nombre || 'Sesión Técnica',
+    desc: pk.desc || pk.description || pk.detalle || 'Entrenamiento práctico en cancha.',
+    priceRegular: Number(pk.priceRegular ?? pk.price ?? pk.precio ?? 60) || 60,
+    priceVip:
+      Number(pk.priceVip ?? pk.precioVip ?? Math.max(20, (Number(pk.priceRegular ?? pk.price ?? 60) || 60) - 10)) ||
+      50,
+    spotsFilled: pk.spotsFilled ?? pk.inscritos ?? null,
+    spotsMax: pk.spotsMax ?? pk.cupos ?? null,
+  }));
+
+  const rawSchedule =
+    Array.isArray(raw?.schedule) && raw.schedule.length > 0
+      ? raw.schedule
+      : Array.isArray(raw?.horariosSemanales) && raw.horariosSemanales.length > 0
+      ? raw.horariosSemanales
+      : Array.isArray(raw?.groups) && raw.groups.length > 0
+      ? raw.groups
+      : seed.schedule;
+
+  const schedule = rawSchedule.map((slot, i) => ({
+    id: slot.id || `sl-${i}`,
+    day: slot.day || slot.dia || 'Esta semana',
+    time: slot.time || slot.hora || slot.schedule || '06:00 p. m.',
+    status: slot.status || 'open',
+  }));
+
+  const rawSpecialties =
+    Array.isArray(raw?.specialties) && raw.specialties.length > 0
+      ? raw.specialties
+      : Array.isArray(raw?.especialidades) && raw.especialidades.length > 0
+      ? raw.especialidades
+      : seed.specialties;
+
+  const rawGallery =
+    Array.isArray(raw?.gallery) && raw.gallery.length > 0 ? raw.gallery : seed.gallery;
+
+  const minPrice = Math.min(...packages.map((p) => p.priceRegular));
+  const minVipPrice = Math.min(...packages.map((p) => p.priceVip));
 
   return {
-    ...c,
-    photo: c.photo || c.photoUrl || c.portrait || ASSETS.torneoApertura,
-    cover: c.coverUrl || c.courtBackground || c.photo || c.photoUrl || ASSETS.torneoAltura,
-    baseRate: Number(c.baseRate ?? c.basePriceRegular) || packages[0]?.price || 60,
-    vipRate: Number(c.vipRate ?? c.basePriceVip) || packages[0]?.vipPrice || 50,
-    specialties: specialties.slice(0, 3),
+    id: raw?.id || seed.id,
+    name: raw?.name || seed.name,
+    role: raw?.role || raw?.title || seed.role,
+    clubName: raw?.clubName || raw?.club || seed.clubName,
+    whatsapp: raw?.whatsapp || raw?.phone || seed.whatsapp,
+    photo: raw?.photo || raw?.photoUrl || raw?.avatar || seed.photo,
+    accent: raw?.accent || raw?.accentColor || raw?.temaColor || seed.accent,
+    experience: raw?.experience || seed.experience,
+    studentsCount: raw?.studentsCount || seed.studentsCount,
+    rating: raw?.rating || seed.rating,
+    availableToday:
+      raw?.availableToday !== undefined ? Boolean(raw.availableToday) : seed.availableToday,
+    bio: raw?.bio || raw?.description || seed.bio,
+    specialties: rawSpecialties,
+    gallery: rawGallery,
+    videos,
     packages,
-    slots,
-    videos: rawVideos,
-    accentTheme: COACH_THEMES[c.accentTheme] ? c.accentTheme : 'emerald',
+    schedule,
+    minPrice,
+    minVipPrice,
   };
 }
 
 /* ==========================================================================
-   VISTA PRINCIPAL: SedesView (SOLO SEDES Y COACHES · ESTÉTICA LIMPIA)
+   VISTA PRINCIPAL: SedesView (CLUBES & COACHES FLAGSHIP · LIQUID GLASS)
    ========================================================================== */
 export default function SedesView({
   clubs = INITIAL_CLUBS,
@@ -430,193 +838,111 @@ export default function SedesView({
   onOpenAuth,
   onNotify,
 }) {
-  // Punto 19: Solo 2 sub-pestañas ('sedes' | 'coaches') — Vision IA vive en menú ☰
-  const [activeTab, setActiveTab] = useState('sedes');
+  const [activeTab, setActiveTab] = useState('sedes'); // 'sedes' | 'coaches'
 
-  // Clima discreto y reportes locales/cloud
-  const [liveTempC, setLiveTempC] = useState(19);
-  const [clubWeatherOverrides, setClubWeatherOverrides] = useState({});
-  const [isReportingWeather, setIsReportingWeather] = useState(false);
-
-  // Acordeón "Beneficios VIP en este club" por clubId
-  const [openVipClubIds, setOpenVipClubIds] = useState({});
-
-  // Modales en Portal
+  // Estado Modal Club
   const [selectedClubId, setSelectedClubId] = useState(null);
-  const [carouselIdx, setCarouselIdx] = useState(0);
+  const [clubMediaMode, setClubMediaMode] = useState('photos'); // 'photos' | 'video'
+  const [clubSlideIdx, setClubSlideIdx] = useState(0);
+  const [clubInnerTab, setClubInnerTab] = useState('canchas'); // 'canchas' | 'vip' | 'reservar'
+  const [copiedClubCode, setCopiedClubCode] = useState(false);
+
+  // Estado Modal Coach
   const [selectedCoachId, setSelectedCoachId] = useState(null);
-  const [selectedPackageId, setSelectedPackageId] = useState(null);
+  const [coachMediaMode, setCoachMediaMode] = useState('videos'); // 'videos' | 'photos'
+  const [coachInnerTab, setCoachInnerTab] = useState('packs'); // 'packs' | 'horarios'
+  const [selectedPackId, setSelectedPackId] = useState(null);
   const [selectedSlotId, setSelectedSlotId] = useState(null);
-  const [activeVideoModal, setActiveVideoModal] = useState(null);
-  const [unlockedVideoIds, setUnlockedVideoIds] = useState([]);
+  const [playingVideo, setPlayingVideo] = useState(null);
 
-  useEffect(() => {
-    let active = true;
-    const coords = clubs?.[0]?.coordinates || { lat: -12.0651, lng: -75.2049 };
-    fetchLiveClubWeather(coords.lat, coords.lng).then((res) => {
-      if (active && res?.ok && typeof res.tempC === 'number') {
-        setLiveTempC(res.tempC);
-      }
-    });
-    return () => {
-      active = false;
-    };
-  }, [clubs]);
-
-  const normalizedClubs = useMemo(
-    () => (clubs?.length ? clubs : INITIAL_CLUBS).map(normalizeClubData),
-    [clubs]
+  const isVip = Boolean(currentUser?.isVip);
+  const unlockedVideos = useMemo(
+    () => (Array.isArray(currentUser?.unlockedVideos) ? currentUser.unlockedVideos : []),
+    [currentUser?.unlockedVideos]
   );
 
-  const normalizedCoaches = useMemo(() => {
-    const source = Array.isArray(coaches) && coaches.length > 0 ? coaches : FALLBACK_COACHES;
-    return source
-      .filter((c) => c.active !== false)
-      .map(normalizeCoachData)
-      .sort((a, b) => Number(Boolean(b.featured)) - Number(Boolean(a.featured)));
+  const enrichedClubs = useMemo(() => {
+    const src = Array.isArray(clubs) && clubs.length > 0 ? clubs : INITIAL_CLUBS;
+    return src.map((c, idx) => enrichClub(c, idx));
+  }, [clubs]);
+
+  const enrichedCoaches = useMemo(() => {
+    const src =
+      Array.isArray(coaches) && coaches.length > 0 ? coaches : COACH_ENRICHMENT_LIST;
+    return src.map((c, idx) => enrichCoach(c, idx));
   }, [coaches]);
 
   const selectedClub = useMemo(
-    () => normalizedClubs.find((c) => c.id === selectedClubId) || null,
-    [normalizedClubs, selectedClubId]
+    () => enrichedClubs.find((c) => c.id === selectedClubId) || null,
+    [enrichedClubs, selectedClubId]
   );
 
   const selectedCoach = useMemo(
-    () => normalizedCoaches.find((c) => c.id === selectedCoachId) || null,
-    [normalizedCoaches, selectedCoachId]
+    () => enrichedCoaches.find((c) => c.id === selectedCoachId) || null,
+    [enrichedCoaches, selectedCoachId]
   );
 
-  const getClubWeather = (club) => {
-    const ov = clubWeatherOverrides[club.id];
-    const key = ov?.conditionKey || club.climaBase?.conditionKey || 'seco';
-    const meta = WEATHER_STATES.find((w) => w.key === key) || WEATHER_STATES[0];
-    return {
-      ...meta,
-      reportedBy: ov?.reportedBy || club.climaBase?.reportedBy || '',
-      updatedLabel: ov?.updatedLabel || '',
-    };
-  };
+  // Sincronizar selección por defecto al abrir un Coach
+  useEffect(() => {
+    if (!selectedCoach) return;
+    setSelectedPackId(selectedCoach.packages[0]?.id || null);
+    setSelectedSlotId(selectedCoach.schedule[0]?.id || null);
+    setCoachMediaMode('videos');
+    setCoachInnerTab('packs');
+    setPlayingVideo(null);
+  }, [selectedCoachId]);
 
-  /* ------------------------------------------------------------------------
-     ACCIONES DE SEDE (CARRUSEL, ACORDEÓN VIP Y REPORTE CLIMA ANTI-FARMEO)
-     ------------------------------------------------------------------------ */
-  const openClubSheet = (club) => {
-    triggerHaptic('light');
-    setCarouselIdx(0);
+  const openClubModal = (club) => {
+    triggerHaptic('medium');
     setSelectedClubId(club.id);
+    setClubMediaMode('photos');
+    setClubSlideIdx(0);
+    setClubInnerTab('canchas');
+    setCopiedClubCode(false);
   };
 
-  const toggleClubVipBenefits = (clubId) => {
-    triggerHaptic('light');
-    setOpenVipClubIds((prev) => ({ ...prev, [clubId]: !prev[clubId] }));
+  const openCoachModal = (coach) => {
+    triggerHaptic('medium');
+    setSelectedCoachId(coach.id);
   };
 
-  const handleReportWeatherInsideClub = async (club, conditionKey) => {
-    if (isReportingWeather) return;
-    if (!currentUser?.id) {
-      if (onNotify) onNotify('Inicia sesión para reportar el estado de la cancha.', 'info');
+  const handleWeatherTap = (club, condKey) => {
+    if (!currentUser) {
+      triggerHaptic('light');
+      if (onNotify) onNotify('Inicia sesión para reportar el estado de cancha y ganar +3 Gemas.', 'info');
       if (onOpenAuth) onOpenAuth('login');
       return;
     }
-
-    setIsReportingWeather(true);
-    try {
-      const timeLabel = new Date().toLocaleTimeString('es-PE', {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-
-      if (onReportClubWeather) {
-        await onReportClubWeather({ clubId: club.id, conditionKey });
-      } else {
-        const res = await submitWeatherReportRpc({
-          playerId: currentUser.id,
-          clubId: club.id,
-          conditionKey,
-        });
-        if (onNotify) {
-          onNotify(
-            res?.message ||
-              (res?.gems_awarded > 0
-                ? `Clima actualizado en ${club.shortName}. +${res.gems_awarded} Gemas sumadas.`
-                : `Estado de cancha actualizado en ${club.shortName}.`),
-            res?.gems_awarded > 0 ? 'success' : 'info'
-          );
-        }
-      }
-
-      setClubWeatherOverrides((prev) => ({
-        ...prev,
-        [club.id]: {
-          conditionKey,
-          reportedBy: currentUser.name,
-          updatedLabel: `Hoy · ${timeLabel}`,
-        },
-      }));
-      triggerHaptic('success');
-    } catch {
-      triggerHaptic('warning');
-      if (onNotify) onNotify('No pudimos enviar el reporte ahora. Intenta nuevamente.', 'warning');
-    } finally {
-      setIsReportingWeather(false);
+    triggerHaptic('success');
+    if (onReportClubWeather) {
+      onReportClubWeather({ clubId: club.id, conditionKey: condKey });
     }
   };
 
-  /* ------------------------------------------------------------------------
-     ACCIONES DE COACH (MÉTRICAS REALES SUPABASE + RESERVA WHATSAPP +51)
-     ------------------------------------------------------------------------ */
-  const openCoachSheet = (coach) => {
+  const handleCopyVipCode = async (code) => {
     triggerHaptic('light');
-    setSelectedCoachId(coach.id);
-    setSelectedPackageId(coach.packages?.[0]?.id || null);
-    setSelectedSlotId(coach.slots?.[0]?.id || null);
-    incrementCoachMetric(coach.id, 'profile_views');
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopiedClubCode(true);
+      window.setTimeout(() => setCopiedClubCode(false), 2000);
+      if (onNotify) onNotify(`Código ${code} copiado.`, 'success');
+    } catch {
+      if (onNotify) onNotify(`Código VIP: ${code}`, 'info');
+    }
   };
 
-  const handleCoachWhatsappClick = (coach, pkg = null, slot = null) => {
+  const handlePlayCoachVideo = (video) => {
     triggerHaptic('medium');
-    incrementCoachMetric(coach.id, 'whatsapp_clicks');
-    const isVip = Boolean(currentUser?.isVip);
-    const chosenPkg = pkg || coach.packages?.[0];
-    const price = chosenPkg
-      ? isVip
-        ? chosenPkg.vipPrice
-        : chosenPkg.price
-      : isVip
-      ? coach.vipRate
-      : coach.baseRate;
-
-    const msg = [
-      `Hola Coach ${coach.name}, te escribo desde TOTAL TENIS:`,
-      chosenPkg ? `• Clase: ${chosenPkg.name} (${chosenPkg.type})` : '• Consulta de horarios disponibles',
-      slot ? `• Turno: ${slot.day} ${slot.time} (${slot.label})` : '',
-      `• Tarifa: S/ ${price} (${isVip ? 'Socio VIP' : 'Regular'})`,
-      currentUser?.name ? `• Jugador: ${currentUser.name}` : '',
-    ]
-      .filter(Boolean)
-      .join('\n');
-
-    window.open(
-      buildWhatsappLink(coach.whatsapp || APP_CONFIG.supportWhatsApp, msg),
-      '_blank',
-      'noopener,noreferrer'
-    );
-  };
-
-  const handleOpenCoachVideo = (video) => {
     const isUnlocked =
-      !video.isExclusive ||
-      unlockedVideoIds.includes(video.id) ||
-      (currentUser?.unlockedVideos || []).includes(video.id);
+      video.isFree || isVip || unlockedVideos.includes(video.id) || video.gemsCost <= 0;
 
     if (isUnlocked) {
-      triggerHaptic('light');
-      setActiveVideoModal(video);
+      setPlayingVideo(video);
       return;
     }
 
     if (!currentUser) {
-      if (onNotify) onNotify('Inicia sesión para desbloquear esta clase con Gemas.', 'info');
+      if (onNotify) onNotify('Inicia sesión para desbloquear esta Masterclass con Gemas.', 'info');
       if (onOpenAuth) onOpenAuth('login');
       return;
     }
@@ -626,7 +952,7 @@ export default function SedesView({
       triggerHaptic('warning');
       if (onNotify) {
         onNotify(
-          `Necesitas ${video.gemsCost} Gemas para ver esta clase (tienes ${myGems}).`,
+          `Te faltan ${video.gemsCost - myGems} 💎 para esta Masterclass (Gratis con Socio VIP).`,
           'warning'
         );
       }
@@ -634,44 +960,64 @@ export default function SedesView({
     }
 
     if (onUnlockMasterclassVideo) {
-      onUnlockMasterclassVideo({ videoId: video.id, gemsCost: video.gemsCost, title: video.title });
+      onUnlockMasterclassVideo({
+        videoId: video.id,
+        gemsCost: video.gemsCost,
+        title: video.title,
+      });
     }
-    setUnlockedVideoIds((prev) => Array.from(new Set([...prev, video.id])));
+    setPlayingVideo(video);
     triggerHaptic('success');
-    setActiveVideoModal(video);
+    if (onNotify) onNotify('¡Masterclass desbloqueada! Disfruta la sesión.', 'success');
   };
 
-  const activePackage = useMemo(() => {
-    if (!selectedCoach) return null;
-    return (
-      selectedCoach.packages?.find((p) => p.id === selectedPackageId) ||
-      selectedCoach.packages?.[0] ||
-      null
-    );
-  }, [selectedCoach, selectedPackageId]);
+  const handleReserveCoachClass = () => {
+    if (!selectedCoach) return;
+    const pack =
+      selectedCoach.packages.find((p) => p.id === selectedPackId) || selectedCoach.packages[0];
+    const slot =
+      selectedCoach.schedule.find((s) => s.id === selectedSlotId) || selectedCoach.schedule[0];
+    const effectivePrice = isVip ? pack?.priceVip : pack?.priceRegular;
 
-  const activeSlot = useMemo(() => {
-    if (!selectedCoach) return null;
-    return (
-      selectedCoach.slots?.find((s) => s.id === selectedSlotId) ||
-      selectedCoach.slots?.[0] ||
-      null
+    const lines = [
+      `Hola Coach ${selectedCoach.name}, te escribo desde TOTAL TENIS:`,
+      pack ? `• Modalidad: ${pack.title}` : '',
+      slot ? `• Horario que me interesa: ${slot.day} · ${slot.time}` : '',
+      effectivePrice
+        ? `• Tarifa vista en app: S/ ${effectivePrice} (${isVip ? 'Socio VIP' : 'Regular'})`
+        : '',
+      currentUser?.name ? `• Jugador: ${currentUser.name}` : '',
+      '¿Tienes disponibilidad para confirmar?',
+    ].filter(Boolean);
+
+    triggerHaptic('success');
+    window.open(
+      buildWhatsappLink(selectedCoach.whatsapp || APP_CONFIG.supportWhatsApp, lines.join('\n')),
+      '_blank',
+      'noopener,noreferrer'
     );
-  }, [selectedCoach, selectedSlotId]);
+  };
+
+  const activePack = selectedCoach
+    ? selectedCoach.packages.find((p) => p.id === selectedPackId) || selectedCoach.packages[0]
+    : null;
+  const activeSlot = selectedCoach
+    ? selectedCoach.schedule.find((s) => s.id === selectedSlotId) || selectedCoach.schedule[0]
+    : null;
 
   const isLight = theme === 'light';
 
   return (
     <section
       className={`tt-sedes-view ${isLight ? 'is-light' : 'is-dark'}`}
-      aria-label="Sedes y Coaches TOTAL TENIS"
+      aria-label="Sedes Oficiales y Entrenadores TOTAL TENIS"
     >
       {/* ====================================================================
-          1. CONMUTADOR LIMPIO DE 2 PESTAÑAS (SEDES | COACHES)
+          1. CONMUTADOR LIQUID GLASS (SEDES OFICIALES | COACHES PRO)
           ==================================================================== */}
-      <div className="tt-sd-tabs" role="tablist" aria-label="Elegir Sedes o Coaches">
+      <div className="tt-sd-switch-bar" role="tablist" aria-label="Sedes o Entrenadores">
         <span
-          className="tt-sd-tab-slider"
+          className="tt-sd-switch-slider"
           aria-hidden="true"
           style={{ transform: `translateX(${activeTab === 'sedes' ? '0%' : '100%'})` }}
         />
@@ -679,357 +1025,229 @@ export default function SedesView({
           type="button"
           role="tab"
           aria-selected={activeTab === 'sedes'}
-          className={`tt-sd-tab ${activeTab === 'sedes' ? 'is-active' : ''}`}
+          className={`tt-sd-switch-btn ${activeTab === 'sedes' ? 'is-active' : ''}`}
           onClick={() => {
             triggerHaptic('light');
             setActiveTab('sedes');
           }}
         >
-          <span>Sedes ({normalizedClubs.length})</span>
+          <TTIcon name="club" size={16} />
+          <span>Sedes ({enrichedClubs.length})</span>
         </button>
 
         <button
           type="button"
           role="tab"
           aria-selected={activeTab === 'coaches'}
-          className={`tt-sd-tab ${activeTab === 'coaches' ? 'is-active' : ''}`}
+          className={`tt-sd-switch-btn ${activeTab === 'coaches' ? 'is-active' : ''}`}
           onClick={() => {
             triggerHaptic('light');
             setActiveTab('coaches');
           }}
         >
-          <span>Coaches ({normalizedCoaches.length})</span>
+          <TTIcon name="users" size={16} />
+          <span>Coaches ({enrichedCoaches.length})</span>
         </button>
       </div>
 
       {/* ====================================================================
-          2. PESTAÑA SEDES (FOTO PROTAGONISTA · CLIMA DISCRETO · VIP DESPLEGABLE)
+          2. CINTA DISCRETA ESTUDIO ALIADO (B2B DIRECTO PARA CLUBES Y COACHES)
+          ==================================================================== */}
+      {onOpenPartnerPortal && (
+        <button
+          type="button"
+          className="tt-partner-glass-strip tt-sd-press"
+          onClick={() => {
+            triggerHaptic('medium');
+            onOpenPartnerPortal();
+          }}
+        >
+          <IconBadge name="settings" variant="purple" size={32} />
+          <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+            <strong>¿Gestionas un Club o eres Coach?</strong>
+            <small>Actualiza tarifas, horarios libres, fotos y videos desde Estudio Aliado</small>
+          </div>
+          <span className="tt-partner-strip-cta">Entrar ›</span>
+        </button>
+      )}
+
+      {/* ====================================================================
+          3A. CATÁLOGO DE SEDES OFICIALES (TARJETAS ARQUITECTÓNICAS LIQUID GLASS)
           ==================================================================== */}
       {activeTab === 'sedes' && (
-        <div key="tab-sedes" className="tt-sd-stack tt-sd-enter">
-          <div className="tt-clubs-grid">
-            {normalizedClubs.map((club, idx) => {
-              const weather = getClubWeather(club);
-              const isVipOpen = Boolean(openVipClubIds[club.id]);
-
-              return (
-                <article
-                  key={club.id}
-                  className="tt-club-card"
-                  style={{ '--sd-delay': `${idx * 65}ms` }}
-                >
-                  {/* Portada limpia con escudo real + clima discreto (cero naranja chillón) */}
-                  <div className="tt-club-hero" onClick={() => openClubSheet(club)}>
-                    <SmartImage
-                      src={club.cover}
-                      fallbackSrc={ASSETS.torneoApertura}
-                      alt={club.name}
-                      className="tt-club-hero-img"
-                    />
-                    <div className="tt-club-hero-scrim" />
-
-                    <div className="tt-club-top-row">
-                      <span className="tt-club-chip-glass">
-                        <span className="tt-emerald-dot" />
-                        Arcilla · {club.courtsCount} canchas
-                      </span>
-
-                      {/* Clima como dato discreto en esquina */}
-                      <span className="tt-club-weather-pill">
-                        <SmartImage
-                          src={weather.icon}
-                          alt={weather.shortLabel}
-                          style={{ width: 17, height: 17, objectFit: 'contain' }}
-                        />
-                        <span>
-                          {weather.shortLabel} · {liveTempC}°C
-                        </span>
-                      </span>
-                    </div>
-
-                    <div className="tt-club-bottom-row">
-                      <div className="tt-club-crest-wrap">
-                        <SmartImage
-                          src={club.logo}
-                          alt={club.shortName}
-                          initials={club.shortName}
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <h2 className="tt-club-name">{club.name}</h2>
-                        <span className="tt-club-meta">
-                          {club.district} · {club.hours}
-                        </span>
-                      </div>
-                      {club.gallery.length > 1 && (
-                        <span className="tt-club-photos-count">
-                          {club.gallery.length} fotos
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Cuerpo ultra limpio */}
-                  <div className="tt-club-body">
-                    {/* Tarifa resumida en 1 línea clara */}
-                    <div className="tt-club-rate-strip">
-                      <span>
-                        Día <strong>S/ {club.rates.diaReg}</strong>
-                      </span>
-                      <i />
-                      <span>
-                        Noche LED <strong>S/ {club.rates.nocheReg}</strong>
-                      </span>
-                      <i />
-                      <span className="is-vip-rate">
-                        VIP desde <strong>S/ {club.rates.diaVip}</strong>
-                      </span>
-                    </div>
-
-                    {/* Botón dorado sobrio desplegable: "Beneficios VIP en este club" */}
-                    <div className={`tt-vip-acc ${isVipOpen ? 'is-open' : ''}`}>
-                      <button
-                        type="button"
-                        className="tt-vip-acc-btn"
-                        aria-expanded={isVipOpen}
-                        onClick={() => toggleClubVipBenefits(club.id)}
-                      >
-                        <TTIcon name="crown" size={15} />
-                        <span>Beneficios VIP en este club</span>
-                        <em className={`tt-vip-acc-arrow ${isVipOpen ? 'is-up' : ''}`}>▾</em>
-                      </button>
-
-                      {isVipOpen && (
-                        <div className="tt-vip-acc-panel">
-                          <ul>
-                            {club.vipBenefits.map((line, i) => (
-                              <li key={i}>
-                                <TTIcon name="check" size={13} style={{ color: '#00DC7D', flexShrink: 0 }} />
-                                <span>{line}</span>
-                              </li>
-                            ))}
-                          </ul>
-                          {onOpenVipCard && (
-                            <button
-                              type="button"
-                              className="tt-vip-acc-card-link"
-                              onClick={() => {
-                                triggerHaptic('light');
-                                onOpenVipCard();
-                              }}
-                            >
-                              Ver mi Carnet VIP 3D →
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Acciones: Ver fotos/info · Google Maps · Reservar WhatsApp +51 */}
-                    <div className="tt-club-actions-row">
-                      <button
-                        type="button"
-                        className="tt-btn tt-btn-ghost tt-btn-sm"
-                        style={{ flex: 1 }}
-                        onClick={() => openClubSheet(club)}
-                      >
-                        Ver Sede y Fotos
-                      </button>
-
-                      <a
-                        href={club.mapsUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="tt-btn tt-btn-ghost tt-btn-sm"
-                        onClick={() => triggerHaptic('light')}
-                      >
-                        <TTIcon name="mapPin" size={15} style={{ color: '#00DC7D' }} />
-                        Maps
-                      </a>
-
-                      <a
-                        href={buildWhatsappLink(
-                          club.whatsapp || APP_CONFIG.supportWhatsApp,
-                          `Hola ${club.name}, te escribo desde TOTAL TENIS para reservar una cancha.`
-                        )}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="tt-btn tt-btn-primary tt-btn-sm"
-                        onClick={() => triggerHaptic('medium')}
-                      >
-                        <TTIcon name="whatsapp" size={16} />
-                        Reservar
-                      </a>
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-
-          {/* Acceso compacto para administradores de sede o entrenadores */}
-          {onOpenPartnerPortal && (
-            <button
-              type="button"
-              className="tt-partner-strip-btn"
-              onClick={() => {
-                triggerHaptic('light');
-                onOpenPartnerPortal();
-              }}
-            >
-              <div>
-                <strong>¿Administras una sede o enseñas tenis?</strong>
-                <span>Abre el Portal Aliados para gestionar fotos, horarios y promociones</span>
-              </div>
-              <TTIcon name="chevronRight" size={18} />
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* ====================================================================
-          3. PESTAÑA COACHES (DISEÑO COMERCIAL ALTO CONTRASTE · CERO MUROS TEXTO)
-          ==================================================================== */}
-      {activeTab === 'coaches' && (
-        <div key="tab-coaches" className="tt-sd-stack tt-sd-enter">
-          {normalizedCoaches.length === 0 ? (
+        <div key="tab-sedes" className="tt-sd-grid tt-sd-enter">
+          {enrichedClubs.length === 0 ? (
             <EmptyStateCard
               theme={theme}
-              title="Entrenadores próximamente"
-              description="Muy pronto verás aquí a los entrenadores oficiales y sus turnos libres."
+              title="Sin sedes disponibles"
+              description="Pronto sumaremos más clubes aliados al circuito."
             />
           ) : (
-            <div className="tt-coaches-grid">
-              {normalizedCoaches.map((coach, idx) => {
-                const palette = COACH_THEMES[coach.accentTheme] || COACH_THEMES.emerald;
-                const activeAccent = isLight ? palette.accentLight : palette.accent;
+            enrichedClubs.map((club, idx) => (
+              <article
+                key={club.id}
+                className="tt-club-card tt-sd-press"
+                style={{ '--sd-delay': `${idx * 55}ms` }}
+                onClick={() => openClubModal(club)}
+              >
+                <div className="tt-cc-hero">
+                  <SmartImage
+                    src={club.cover}
+                    fallbackSrc={ASSETS.torneoApertura}
+                    alt={club.name}
+                    priority={idx < 2}
+                    className="tt-cc-bg"
+                  />
+                  <div className="tt-cc-scrim" />
 
-                return (
-                  <article
-                    key={coach.id}
-                    className={`tt-coach-pro-card ${coach.featured ? 'is-featured' : ''}`}
-                    style={{
-                      '--coach-accent': activeAccent,
-                      '--coach-soft': palette.soft,
-                      '--coach-border': palette.border,
-                      '--sd-delay': `${idx * 70}ms`,
-                    }}
-                    onClick={() => openCoachSheet(coach)}
-                  >
-                    {/* Cabecera visual foto-protagonista */}
-                    <div className="tt-cp-media">
+                  <div className="tt-cc-top-row">
+                    <span className={`tt-cc-weather-pill is-${club.weather.tone}`}>
                       <SmartImage
-                        src={coach.photo}
-                        fallbackSrc={ASSETS.torneoAltura}
-                        alt={coach.name}
-                        className="tt-cp-img"
+                        src={club.weather.image}
+                        alt={club.weather.shortLabel}
+                        style={{ width: 18, height: 18, objectFit: 'contain' }}
                       />
-                      <div className="tt-cp-scrim" />
+                      <span>
+                        {club.weather.shortLabel} · {club.weather.temp}
+                      </span>
+                    </span>
 
-                      <div className="tt-cp-top-pills">
-                        {coach.freeSlotToday ? (
-                          <span className="tt-cp-free-pill">
-                            <span className="tt-emerald-dot" />
-                            Libre: {coach.freeSlotToday}
-                          </span>
-                        ) : (
-                          <span className="tt-cp-free-pill">Coach Oficial</span>
-                        )}
+                    {club.videos.length > 0 && (
+                      <span className="tt-cc-video-chip">
+                        <TTIcon name="play" size={12} />
+                        Video Tour
+                      </span>
+                    )}
+                  </div>
 
-                        {coach.videos.length > 0 && (
-                          <span className="tt-cp-vid-pill">
-                            ▶ {coach.videos.length} {coach.videos.length === 1 ? 'video' : 'videos'}
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="tt-cp-identity">
-                        <h3>{coach.name}</h3>
-                        <span>
-                          {coach.title} · {coach.clubName}
-                        </span>
-                      </div>
+                  <div className="tt-cc-bottom-row">
+                    <div className="tt-cc-crest">
+                      <SmartImage
+                        src={club.logo}
+                        alt={club.shortName}
+                        initials={club.shortName}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
                     </div>
-
-                    {/* Cuerpo comercial directo y escaneable */}
-                    <div className="tt-cp-body">
-                      <div className="tt-cp-tags">
-                        {coach.specialties.map((sp) => (
-                          <span key={sp} className="tt-cp-tag">
-                            {sp}
-                          </span>
-                        ))}
-                      </div>
-
-                      <div className="tt-cp-rates-bar">
-                        <div className="tt-cp-rate-box">
-                          <span>Clase desde</span>
-                          <strong>S/ {coach.baseRate}</strong>
-                        </div>
-                        <div className="tt-cp-rate-box is-vip">
-                          <span>Tarifa Socio VIP</span>
-                          <strong>S/ {coach.vipRate}</strong>
-                        </div>
-                        <div className="tt-cp-rate-box">
-                          <span>Programas</span>
-                          <strong>{coach.packages.length}</strong>
-                        </div>
-                      </div>
-
-                      <div className="tt-cp-actions">
-                        <button
-                          type="button"
-                          className="tt-btn tt-btn-ghost tt-btn-sm"
-                          style={{ flex: 1 }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openCoachSheet(coach);
-                          }}
-                        >
-                          Horarios y Videos
-                        </button>
-
-                        <button
-                          type="button"
-                          className="tt-btn tt-btn-primary tt-btn-sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleCoachWhatsappClick(coach);
-                          }}
-                        >
-                          <TTIcon name="whatsapp" size={16} />
-                          Reservar
-                        </button>
-                      </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span className="tt-cc-district">
+                        {club.district} · {club.courtsCount} canchas · {club.surface}
+                      </span>
+                      <h2 className="tt-cc-title">{club.name}</h2>
                     </div>
-                  </article>
-                );
-              })}
-            </div>
-          )}
+                  </div>
+                </div>
 
-          {onOpenPartnerPortal && (
-            <button
-              type="button"
-              className="tt-partner-strip-btn"
-              onClick={() => {
-                triggerHaptic('light');
-                onOpenPartnerPortal();
-              }}
-            >
-              <div>
-                <strong>¿Eres entrenador? Personaliza tu Estudio</strong>
-                <span>Edita tus horarios libres de hoy, paquetes, videos y ve tus clics</span>
-              </div>
-              <TTIcon name="chevronRight" size={18} />
-            </button>
+                <div className="tt-cc-body">
+                  <div className="tt-cc-rates-strip">
+                    <div>
+                      <small>DÍA</small>
+                      <strong>S/ {club.dayRate}</strong>
+                    </div>
+                    <div>
+                      <small>NOCHE LED</small>
+                      <strong>S/ {club.nightRate}</strong>
+                    </div>
+                    <div className="is-vip">
+                      <small>SOCIO VIP</small>
+                      <strong>S/ {club.vipDayRate}–{club.vipNightRate}</strong>
+                    </div>
+                  </div>
+
+                  <div className="tt-cc-foot">
+                    <span className="tt-cc-promo-hint">
+                      {club.promos[0]
+                        ? `${club.promos[0].tag}: ${club.promos[0].priceText}`
+                        : club.hours}
+                    </span>
+                    <span className="tt-cc-open-pill">Explorar Sede ›</span>
+                  </div>
+                </div>
+              </article>
+            ))
           )}
         </div>
       )}
 
       {/* ====================================================================
-          MODAL 1: FICHA DE SEDE (CARRUSEL FOTOS + CLIMA ANTI-FARMEO +3 GEMAS)
+          3B. VITRINA DE COACHES PRO (TARJETAS EDITORIALES CON ACENTO PROPIO)
+          ==================================================================== */}
+      {activeTab === 'coaches' && (
+        <div key="tab-coaches" className="tt-sd-grid tt-sd-enter">
+          {enrichedCoaches.length === 0 ? (
+            <EmptyStateCard
+              theme={theme}
+              title="Sin entrenadores publicados"
+              description="Pronto sumaremos entrenadores oficiales al directorio."
+            />
+          ) : (
+            enrichedCoaches.map((coach, idx) => (
+              <article
+                key={coach.id}
+                className="tt-coach-card tt-sd-press"
+                style={{ '--sd-delay': `${idx * 55}ms`, '--coach-accent': coach.accent }}
+                onClick={() => openCoachModal(coach)}
+              >
+                <div className="tt-co-hero">
+                  <SmartImage
+                    src={coach.photo}
+                    fallbackSrc={ASSETS.portadaTipsSemana}
+                    alt={coach.name}
+                    className="tt-co-bg"
+                  />
+                  <div className="tt-co-scrim" />
+
+                  <div className="tt-co-top-row">
+                    {coach.availableToday ? (
+                      <span className="tt-co-avail-pill is-today">
+                        <i />
+                        Libre hoy
+                      </span>
+                    ) : (
+                      <span className="tt-co-avail-pill">Ver horarios</span>
+                    )}
+
+                    <span className="tt-co-media-pill">
+                      <TTIcon name="video" size={12} />
+                      {coach.videos.length} {coach.videos.length === 1 ? 'video' : 'videos'}
+                    </span>
+                  </div>
+
+                  <div className="tt-co-bottom-row">
+                    <span className="tt-co-role">{coach.role}</span>
+                    <h2 className="tt-co-name">{coach.name}</h2>
+                    <span className="tt-co-club">
+                      <TTIcon name="mapPin" size={12} />
+                      {coach.clubName}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="tt-co-body">
+                  <div className="tt-co-tags-row">
+                    {coach.specialties.slice(0, 3).map((sp) => (
+                      <span key={sp} className="tt-co-tag">
+                        {sp}
+                      </span>
+                    ))}
+                  </div>
+
+                  <div className="tt-co-foot">
+                    <div className="tt-co-price-group">
+                      <small>Desde S/ {coach.minPrice}</small>
+                      <strong>VIP S/ {coach.minVipPrice}</strong>
+                    </div>
+                    <span className="tt-co-cta-pill">Ver Clases & Videos ›</span>
+                  </div>
+                </div>
+              </article>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* ====================================================================
+          MODAL 1: INTERIOR INMERSIVO DE CLUB (VIDEO TOUR + FOTOS + 3 PESTAÑAS)
           ==================================================================== */}
       <ModalPortal
         isOpen={Boolean(selectedClub)}
@@ -1037,344 +1255,690 @@ export default function SedesView({
         title={selectedClub?.name || 'Sede Oficial'}
         subtitle={
           selectedClub
-            ? `${selectedClub.district} · Arcilla · ${selectedClub.hours}`
+            ? `${selectedClub.district} · ${selectedClub.surface} · ${selectedClub.hours}`
             : ''
         }
-        icon={<IconBadge name="mapPin" variant="emerald" size={38} />}
+        icon={
+          selectedClub ? (
+            <div className="tt-modal-crest">
+              <SmartImage
+                src={selectedClub.logo}
+                alt={selectedClub.shortName}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            </div>
+          ) : null
+        }
         isWide
       >
         {selectedClub && (
           <div className="tt-club-modal-stack">
-            {/* Carrusel Interactivo de Fotos de la Sede */}
-            <div className="tt-club-carousel">
-              <div className="tt-cc-stage">
-                <SmartImage
-                  key={selectedClub.gallery[carouselIdx % selectedClub.gallery.length]?.image}
-                  src={selectedClub.gallery[carouselIdx % selectedClub.gallery.length]?.image}
-                  fallbackSrc={ASSETS.torneoApertura}
-                  alt={selectedClub.name}
-                  className="tt-cc-img"
-                />
-                <div className="tt-cc-scrim" />
-                <span className="tt-cc-caption">
-                  {selectedClub.gallery[carouselIdx % selectedClub.gallery.length]?.title}
-                </span>
-
-                {selectedClub.gallery.length > 1 && (
-                  <>
-                    <button
-                      type="button"
-                      className="tt-cc-arrow is-prev"
-                      aria-label="Foto anterior"
-                      onClick={() => {
-                        triggerHaptic('light');
-                        setCarouselIdx(
-                          (prev) =>
-                            (prev - 1 + selectedClub.gallery.length) % selectedClub.gallery.length
-                        );
-                      }}
-                    >
-                      ‹
-                    </button>
-                    <button
-                      type="button"
-                      className="tt-cc-arrow is-next"
-                      aria-label="Foto siguiente"
-                      onClick={() => {
-                        triggerHaptic('light');
-                        setCarouselIdx((prev) => (prev + 1) % selectedClub.gallery.length);
-                      }}
-                    >
-                      ›
-                    </button>
-                  </>
-                )}
-              </div>
-
-              {selectedClub.gallery.length > 1 && (
-                <div className="tt-cc-dots">
-                  {selectedClub.gallery.map((g, i) => (
-                    <button
-                      key={g.id || i}
-                      type="button"
-                      aria-label={`Ver foto ${i + 1}`}
-                      className={`tt-cc-dot ${
-                        i === carouselIdx % selectedClub.gallery.length ? 'is-active' : ''
-                      }`}
-                      onClick={() => {
-                        triggerHaptic('light');
-                        setCarouselIdx(i);
-                      }}
-                    />
-                  ))}
+            {/* 1. VISOR SUPERIOR MULTIMEDIA: FOTOS | VIDEO TOUR */}
+            <div className="tt-cm-stage">
+              {clubMediaMode === 'video' && selectedClub.videos[0] ? (
+                <div className="tt-cm-video-wrap">
+                  <video
+                    key={selectedClub.videos[0].url}
+                    src={selectedClub.videos[0].url}
+                    poster={selectedClub.videos[0].poster || selectedClub.cover}
+                    controls
+                    playsInline
+                    autoPlay
+                    muted
+                    className="tt-cm-video-el"
+                  />
                 </div>
-              )}
-            </div>
+              ) : (
+                <>
+                  <SmartImage
+                    src={
+                      selectedClub.gallery[clubSlideIdx % selectedClub.gallery.length]?.url ||
+                      selectedClub.cover
+                    }
+                    fallbackSrc={selectedClub.cover}
+                    alt={selectedClub.name}
+                    priority
+                    className="tt-cm-photo"
+                  />
+                  <div className="tt-cm-photo-scrim" />
 
-            {/* Tarifas claras */}
-            <div className="tt-cm-rates-card">
-              <span className="tt-cm-kicker">TARIFAS POR HORA</span>
-              <div className="tt-cm-rates-grid">
-                <div>
-                  <span>Día Regular</span>
-                  <strong>S/ {selectedClub.rates.diaReg}</strong>
-                </div>
-                <div>
-                  <span>Noche LED</span>
-                  <strong>S/ {selectedClub.rates.nocheReg}</strong>
-                </div>
-                <div className="is-vip">
-                  <span>Socio VIP</span>
-                  <strong>
-                    S/ {selectedClub.rates.diaVip} – {selectedClub.rates.nocheVip}
-                  </strong>
-                </div>
-              </div>
-              {selectedClub.address && (
-                <small className="tt-cm-hours-note">{selectedClub.address}</small>
-              )}
-            </div>
+                  {selectedClub.gallery.length > 1 && (
+                    <>
+                      <button
+                        type="button"
+                        className="tt-cm-arrow is-left tt-sd-press"
+                        aria-label="Foto anterior"
+                        onClick={() => {
+                          triggerHaptic('light');
+                          setClubSlideIdx(
+                            (prev) =>
+                              (prev - 1 + selectedClub.gallery.length) %
+                              selectedClub.gallery.length
+                          );
+                        }}
+                      >
+                        ‹
+                      </button>
+                      <button
+                        type="button"
+                        className="tt-cm-arrow is-right tt-sd-press"
+                        aria-label="Foto siguiente"
+                        onClick={() => {
+                          triggerHaptic('light');
+                          setClubSlideIdx((prev) => (prev + 1) % selectedClub.gallery.length);
+                        }}
+                      >
+                        ›
+                      </button>
+                    </>
+                  )}
 
-            {/* Instalaciones */}
-            <div>
-              <span className="tt-cm-kicker">INSTALACIONES</span>
-              <div className="tt-cm-services-grid">
-                {selectedClub.services.map((srv, idx) => (
-                  <div key={idx} className="tt-cm-service-tile">
-                    <TTIcon name="check" size={14} style={{ color: '#00DC7D', flexShrink: 0 }} />
-                    <span>{srv}</span>
+                  <div className="tt-cm-caption">
+                    <span>
+                      {selectedClub.gallery[clubSlideIdx % selectedClub.gallery.length]?.caption ||
+                        selectedClub.name}
+                    </span>
+                    {selectedClub.gallery.length > 1 && (
+                      <div className="tt-cm-dots">
+                        {selectedClub.gallery.map((_, i) => (
+                          <i
+                            key={i}
+                            className={i === clubSlideIdx % selectedClub.gallery.length ? 'is-on' : ''}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
-                ))}
-              </div>
+                </>
+              )}
+
+              {/* Switch flotante Liquid Glass: Fotos | Video Tour */}
+              {selectedClub.videos.length > 0 && (
+                <div className="tt-cm-media-pill" role="tablist">
+                  <button
+                    type="button"
+                    className={clubMediaMode === 'photos' ? 'is-on' : ''}
+                    onClick={() => {
+                      triggerHaptic('light');
+                      setClubMediaMode('photos');
+                    }}
+                  >
+                    <TTIcon name="camera" size={13} />
+                    Fotos ({selectedClub.gallery.length})
+                  </button>
+                  <button
+                    type="button"
+                    className={clubMediaMode === 'video' ? 'is-on' : ''}
+                    onClick={() => {
+                      triggerHaptic('medium');
+                      setClubMediaMode('video');
+                    }}
+                  >
+                    <TTIcon name="play" size={13} />
+                    Video Tour
+                  </button>
+                </div>
+              )}
             </div>
 
-            {/* Beneficios VIP propios de este club */}
-            <div className="tt-cm-vip-card">
-              <div style={{ flex: 1 }}>
-                <span className="tt-cm-vip-kicker">BENEFICIOS VIP EN ESTA SEDE</span>
-                <ul>
-                  {selectedClub.vipBenefits.map((b, i) => (
-                    <li key={i}>{b}</li>
-                  ))}
-                </ul>
-              </div>
-              {onOpenVipCard && (
+            {/* 2. PESTAÑAS INTERNAS DEL CLUB (ADIOS MURO LINEAL) */}
+            <div className="tt-inner-seg-bar" role="tablist">
+              <span
+                className="tt-inner-seg-slider"
+                aria-hidden="true"
+                style={{
+                  transform: `translateX(${
+                    clubInnerTab === 'canchas' ? '0%' : clubInnerTab === 'vip' ? '100%' : '200%'
+                  })`,
+                }}
+              />
+              {[
+                { id: 'canchas', label: 'Canchas & Promos' },
+                { id: 'vip', label: 'VIP & Clima' },
+                { id: 'reservar', label: 'Reservar' },
+              ].map((t) => (
                 <button
+                  key={t.id}
                   type="button"
-                  className="tt-btn tt-btn-ghost tt-btn-sm"
+                  role="tab"
+                  aria-selected={clubInnerTab === t.id}
+                  className={clubInnerTab === t.id ? 'is-active' : ''}
                   onClick={() => {
-                    setSelectedClubId(null);
-                    onOpenVipCard();
+                    triggerHaptic('light');
+                    setClubInnerTab(t.id);
                   }}
                 >
-                  Mi Carnet
+                  {t.label}
                 </button>
-              )}
+              ))}
             </div>
 
-            {/* Reporte Climático SOLO dentro del club (+3 Gemas · Anti-Farmeo 24h/3h) */}
-            <div className="tt-cm-weather-box">
-              <div className="tt-cm-weather-head">
-                <div>
-                  <span className="tt-cm-kicker" style={{ marginBottom: 2 }}>
-                    ESTADO DE CANCHA EN VIVO · +3 💎
-                  </span>
-                  <small className="tt-muted" style={{ fontSize: '0.72rem' }}>
-                    {(() => {
-                      const w = getClubWeather(selectedClub);
-                      return w.reportedBy
-                        ? `Último reporte: ${w.label} por ${w.reportedBy} ${w.updatedLabel}`
-                        : `Actual: ${w.label} (${liveTempC}°C) · 1 premio cada 24 h`;
-                    })()}
-                  </small>
+            {/* PESTAÑA A: CANCHAS, TARIFAS, PROMOS VALLE Y BENTO DE INSTALACIONES */}
+            {clubInnerTab === 'canchas' && (
+              <div key="cm-canchas" className="tt-cm-panel tt-sd-enter">
+                {/* Tarifas Contrastadas */}
+                <div className="tt-rates-showcase">
+                  <div className="tt-rate-glass-box">
+                    <span>DÍA REGULAR</span>
+                    <strong>S/ {selectedClub.dayRate}</strong>
+                    <small>por hora</small>
+                  </div>
+                  <div className="tt-rate-glass-box">
+                    <span>NOCHE LED</span>
+                    <strong>S/ {selectedClub.nightRate}</strong>
+                    <small>con luz</small>
+                  </div>
+                  <div className="tt-rate-glass-box is-vip">
+                    <span>SOCIO VIP</span>
+                    <strong>S/ {selectedClub.vipDayRate}–{selectedClub.vipNightRate}</strong>
+                    <small>ahorra S/ {selectedClub.dayRate - selectedClub.vipDayRate}/h</small>
+                  </div>
+                </div>
+
+                {/* Promociones Horas Valle */}
+                {selectedClub.promos.length > 0 && (
+                  <div className="tt-cm-section">
+                    <span className="tt-sd-kicker">PROMOCIONES ACTIVAS EN SEDE</span>
+                    <div className="tt-promos-grid">
+                      {selectedClub.promos.map((pr, i) => (
+                        <div key={pr.id || i} className="tt-promo-glass-card">
+                          <div className="tt-pgc-head">
+                            <span className="tt-pgc-tag">{pr.tag || 'PROMO'}</span>
+                            <strong className="tt-pgc-price">{pr.priceText || pr.price}</strong>
+                          </div>
+                          <strong className="tt-pgc-title">{pr.title}</strong>
+                          <small>{pr.schedule || pr.detail}</small>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Equipamiento Bento con iconos propios (Cero checkmarks repetidos) */}
+                <div className="tt-cm-section">
+                  <span className="tt-sd-kicker">EXPERIENCIA EN SEDE</span>
+                  <div className="tt-bento-facilities">
+                    {selectedClub.facilities.map((fac, i) => (
+                      <div key={i} className="tt-bento-fac-card">
+                        <IconBadge
+                          name={fac.icon}
+                          variant={i % 2 === 0 ? 'emerald' : 'purple'}
+                          size={34}
+                        />
+                        <div style={{ minWidth: 0 }}>
+                          <strong>{fac.title}</strong>
+                          <small>{fac.detail}</small>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
+            )}
 
-              <div className="tt-cm-weather-grid">
-                {WEATHER_STATES.map((st) => {
-                  const isCurrent = getClubWeather(selectedClub).key === st.key;
-                  return (
-                    <button
-                      key={st.key}
-                      type="button"
-                      disabled={isReportingWeather}
-                      className={`tt-cm-weather-btn ${isCurrent ? 'is-current' : ''}`}
-                      onClick={() => handleReportWeatherInsideClub(selectedClub, st.key)}
-                    >
+            {/* PESTAÑA B: GOLDEN TICKET VIP + EVENTOS INTERNOS + CLIMA EN VIVO (+3 💎) */}
+            {clubInnerTab === 'vip' && (
+              <div key="cm-vip" className="tt-cm-panel tt-sd-enter">
+                {/* Tarjeta Golden Ticket con relieve metálico champán (Cero viñetas •) */}
+                <div className="tt-golden-ticket-card">
+                  <span className="tt-gt-sheen" aria-hidden="true" />
+                  <div className="tt-gt-top">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
                       <SmartImage
-                        src={st.icon}
-                        alt={st.label}
-                        style={{ width: 26, height: 26, objectFit: 'contain' }}
+                        src={ASSETS.goldenTicket}
+                        fallbackSrc={ASSETS.logo}
+                        alt="Golden Ticket VIP"
+                        style={{ width: 34, height: 34, objectFit: 'contain' }}
                       />
-                      <span>{st.shortLabel}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+                      <div>
+                        <span className="tt-gt-kicker">GOLDEN TICKET · SOCIO VIP</span>
+                        <strong>Beneficios en {selectedClub.shortName}</strong>
+                      </div>
+                    </div>
+                    {onOpenVipCard && (
+                      <button
+                        type="button"
+                        className="tt-gt-carnet-btn tt-sd-press"
+                        onClick={() => {
+                          triggerHaptic('medium');
+                          onOpenVipCard();
+                        }}
+                      >
+                        Mi Carnet
+                      </button>
+                    )}
+                  </div>
 
-            {/* Botones finales: Google Maps + WhatsApp */}
-            <div style={{ display: 'flex', gap: 9 }}>
-              <a
-                href={selectedClub.mapsUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="tt-btn tt-btn-ghost"
-                style={{ flex: 1 }}
-              >
-                <TTIcon name="mapPin" size={16} style={{ color: '#00DC7D' }} />
-                Google Maps
-              </a>
-              <a
-                href={buildWhatsappLink(
-                  selectedClub.whatsapp || APP_CONFIG.supportWhatsApp,
-                  `Hola ${selectedClub.name}, quiero reservar una cancha desde TOTAL TENIS.`
+                  <div className="tt-gt-perks-grid">
+                    {selectedClub.vipBenefits.map((perk, idx) => (
+                      <div key={idx} className="tt-gt-perk-chip">
+                        <TTIcon name="crown" size={13} style={{ color: '#E5C16C', flexShrink: 0 }} />
+                        <span>{perk}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Torneos / Eventos Internos de la Sede */}
+                {selectedClub.internalEvents.length > 0 && (
+                  <div className="tt-cm-section">
+                    <span className="tt-sd-kicker">EVENTOS Y AMERICANOS DEL CLUB</span>
+                    {selectedClub.internalEvents.map((ev, i) => (
+                      <div key={ev.id || i} className="tt-internal-event-card">
+                        <div className="tt-iec-top">
+                          <div>
+                            <strong>{ev.title}</strong>
+                            <small>{ev.date}</small>
+                          </div>
+                          <span className="tt-iec-fee">{ev.fee || 'Abierto'}</span>
+                        </div>
+                        <div className="tt-iec-bar-row">
+                          <div className="tt-iec-track">
+                            <div style={{ width: `${ev.pct || 65}%` }} />
+                          </div>
+                          <span>{ev.spots}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="tt-btn tt-btn-primary"
-                style={{ flex: 1 }}
+
+                {/* Clima en Vivo con 4 iconos 3D (+3 💎 · 1 premio cada 24h) */}
+                <div className="tt-weather-box">
+                  <div className="tt-wb-head">
+                    <div>
+                      <span className="tt-sd-kicker">ESTADO DE CANCHA EN VIVO · +3 💎</span>
+                      <strong>
+                        {selectedClub.weather.label} ({selectedClub.weather.temp})
+                      </strong>
+                      <small>{selectedClub.weather.note}</small>
+                    </div>
+                    <SmartImage
+                      src={selectedClub.weather.image}
+                      alt={selectedClub.weather.label}
+                      style={{ width: 42, height: 42, objectFit: 'contain', flexShrink: 0 }}
+                    />
+                  </div>
+
+                  <div className="tt-weather-grid">
+                    {WEATHER_CONDITIONS.map((wc) => {
+                      const active = selectedClub.weather.key === wc.key;
+                      return (
+                        <button
+                          key={wc.key}
+                          type="button"
+                          className={`tt-weather-tile tt-sd-press ${active ? 'is-active' : ''}`}
+                          onClick={() => handleWeatherTap(selectedClub, wc.key)}
+                        >
+                          <SmartImage
+                            src={wc.image}
+                            alt={wc.shortLabel}
+                            style={{ width: 32, height: 32, objectFit: 'contain' }}
+                          />
+                          <span>{wc.shortLabel}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* PESTAÑA C: RESERVA ONLINE EXTERNA + WHATSAPP + GOOGLE MAPS */}
+            {clubInnerTab === 'reservar' && (
+              <div key="cm-reservar" className="tt-cm-panel tt-sd-enter">
+                <div className="tt-address-glass-card">
+                  <IconBadge name="mapPin" variant="emerald" size={38} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <strong>{selectedClub.address}</strong>
+                    <small>{selectedClub.hours}</small>
+                  </div>
+                </div>
+
+                {/* Canal Web Externa de Reservas del Club + Código VIP copiable */}
+                {selectedClub.bookingUrl && (
+                  <div className="tt-web-booking-card">
+                    <span className="tt-sd-kicker">SISTEMA DE RESERVAS ONLINE DEL CLUB</span>
+                    <div className="tt-wbc-code-row">
+                      <div>
+                        <small>CÓDIGO SOCIO VIP</small>
+                        <strong>{selectedClub.vipBookingCode}</strong>
+                      </div>
+                      <button
+                        type="button"
+                        className="tt-copy-vip-btn tt-sd-press"
+                        onClick={() => handleCopyVipCode(selectedClub.vipBookingCode)}
+                      >
+                        {copiedClubCode ? '✓ Copiado' : 'Copiar'}
+                      </button>
+                    </div>
+                    <a
+                      href={appendUtm(selectedClub.bookingUrl, selectedClub.id)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="tt-btn tt-btn-primary tt-sd-press"
+                      style={{ width: '100%' }}
+                    >
+                      <TTIcon name="externalLink" size={16} />
+                      Reservar en Web Oficial del Club
+                    </a>
+                  </div>
+                )}
+
+                <div className="tt-club-action-pair">
+                  <a
+                    href={selectedClub.mapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="tt-btn tt-btn-secondary tt-sd-press"
+                    style={{ flex: 1 }}
+                  >
+                    <TTIcon name="mapPin" size={16} />
+                    Google Maps
+                  </a>
+                  <a
+                    href={buildWhatsappLink(
+                      selectedClub.whatsapp,
+                      `Hola ${selectedClub.name}, te escribo desde TOTAL TENIS para reservar una cancha.${
+                        isVip ? ' Soy Socio VIP.' : ''
+                      }`
+                    )}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="tt-btn tt-btn-primary tt-sd-press"
+                    style={{ flex: 1.2 }}
+                  >
+                    <TTIcon name="whatsapp" size={17} />
+                    Reservar por WhatsApp
+                  </a>
+                </div>
+              </div>
+            )}
+
+            {/* Acceso rápido a Panel Club Aliado */}
+            {onOpenPartnerPortal && (
+              <button
+                type="button"
+                className="tt-modal-partner-foot-btn"
+                onClick={() => {
+                  triggerHaptic('light');
+                  setSelectedClubId(null);
+                  onOpenPartnerPortal();
+                }}
               >
-                <TTIcon name="whatsapp" size={17} />
-                Reservar por WhatsApp
-              </a>
-            </div>
+                <TTIcon name="settings" size={14} />
+                <span>¿Administras {selectedClub.shortName}? Edita tarifas, fotos y promos aquí</span>
+              </button>
+            )}
           </div>
         )}
       </ModalPortal>
 
       {/* ====================================================================
-          MODAL 2: FICHA COMERCIAL DEL COACH (PAQUETES, TURNOS Y VIDEOS)
+          MODAL 2: VITRINA INTERACTIVA DE COACH PRO (VIDEOS + FOTOS + 3 TOQUES)
           ==================================================================== */}
       <ModalPortal
         isOpen={Boolean(selectedCoach)}
-        onClose={() => setSelectedCoachId(null)}
+        onClose={() => {
+          setPlayingVideo(null);
+          setSelectedCoachId(null);
+        }}
         title={selectedCoach?.name || 'Entrenador Oficial'}
-        subtitle={selectedCoach ? `${selectedCoach.title} · ${selectedCoach.clubName}` : ''}
+        subtitle={
+          selectedCoach ? `${selectedCoach.role} · ${selectedCoach.clubName}` : ''
+        }
         icon={<IconBadge name="users" variant="emerald" size={38} />}
         isWide
       >
         {selectedCoach && (
-          <div className="tt-coach-modal-stack">
-            {/* Hero Visual Limpio */}
-            <div className="tt-coach-sheet-hero">
+          <div
+            className="tt-coach-modal-stack"
+            style={{ '--coach-accent': selectedCoach.accent || '#00DC7D' }}
+          >
+            {/* 1. HERO EDITORIAL DEL COACH + AUTORIDAD */}
+            <div className="tt-chm-hero">
               <SmartImage
                 src={selectedCoach.photo}
-                fallbackSrc={ASSETS.torneoAltura}
+                fallbackSrc={ASSETS.portadaTipsSemana}
                 alt={selectedCoach.name}
-                className="tt-csh-img"
+                className="tt-chm-bg"
               />
-              <div className="tt-csh-scrim" />
-              <div className="tt-csh-caption">
-                {selectedCoach.freeSlotToday && (
-                  <span className="tt-cp-free-pill">
-                    <span className="tt-emerald-dot" />
-                    Disponible: {selectedCoach.freeSlotToday}
-                  </span>
-                )}
-                <h3>{selectedCoach.name}</h3>
-                <div className="tt-cp-tags" style={{ marginTop: 4 }}>
-                  {selectedCoach.specialties.map((sp) => (
-                    <span key={sp} className="tt-csh-tag">
-                      {sp}
+              <div className="tt-chm-scrim" />
+
+              <div className="tt-chm-content">
+                <div className="tt-chm-badges">
+                  {selectedCoach.availableToday && (
+                    <span className="tt-co-avail-pill is-today">
+                      <i />
+                      Disponible hoy
                     </span>
+                  )}
+                  <span className="tt-chm-stat-pill">★ {selectedCoach.rating}</span>
+                  <span className="tt-chm-stat-pill">{selectedCoach.experience}</span>
+                  <span className="tt-chm-stat-pill">{selectedCoach.studentsCount}</span>
+                </div>
+
+                <p className="tt-chm-bio">{selectedCoach.bio}</p>
+
+                <div className="tt-chm-specs">
+                  {selectedCoach.specialties.map((sp) => (
+                    <span key={sp}>{sp}</span>
                   ))}
                 </div>
               </div>
             </div>
 
-            {/* Videos en Cancha */}
-            {selectedCoach.videos.length > 0 && (
-              <div>
-                <span className="tt-cm-kicker">VIDEOS EN CANCHA</span>
-                <div className="tt-coach-videos-grid">
+            {/* 2. REPRODUCTOR ACTIVO DE VIDEO (SI TOCÓ UN REEL) */}
+            {playingVideo && (
+              <div className="tt-video-theater tt-sd-enter">
+                <div className="tt-vt-head">
+                  <strong>{playingVideo.title}</strong>
+                  <button
+                    type="button"
+                    className="tt-vt-close"
+                    onClick={() => setPlayingVideo(null)}
+                  >
+                    Cerrar video ✕
+                  </button>
+                </div>
+                <video
+                  key={playingVideo.url}
+                  src={playingVideo.url}
+                  poster={playingVideo.poster}
+                  controls
+                  playsInline
+                  autoPlay
+                  className="tt-vt-player"
+                />
+              </div>
+            )}
+
+            {/* 3. CARRUSEL MULTIMEDIA: REELS EN CANCHA | FOTOS */}
+            <div className="tt-cm-section">
+              <div className="tt-media-header-row">
+                <span className="tt-sd-kicker" style={{ margin: 0 }}>
+                  CONTENIDO EN CANCHA
+                </span>
+                <div className="tt-mini-media-switch">
+                  <button
+                    type="button"
+                    className={coachMediaMode === 'videos' ? 'is-on' : ''}
+                    onClick={() => {
+                      triggerHaptic('light');
+                      setCoachMediaMode('videos');
+                    }}
+                  >
+                    ▶ Videos ({selectedCoach.videos.length})
+                  </button>
+                  <button
+                    type="button"
+                    className={coachMediaMode === 'photos' ? 'is-on' : ''}
+                    onClick={() => {
+                      triggerHaptic('light');
+                      setCoachMediaMode('photos');
+                    }}
+                  >
+                    Fotos ({selectedCoach.gallery.length})
+                  </button>
+                </div>
+              </div>
+
+              {coachMediaMode === 'videos' ? (
+                <div className="tt-reels-rail">
                   {selectedCoach.videos.map((vid) => {
-                    const unlocked =
-                      !vid.isExclusive ||
-                      unlockedVideoIds.includes(vid.id) ||
-                      (currentUser?.unlockedVideos || []).includes(vid.id);
+                    const isUnlocked =
+                      vid.isFree || isVip || unlockedVideos.includes(vid.id) || vid.gemsCost <= 0;
                     return (
                       <button
                         key={vid.id}
                         type="button"
-                        className="tt-coach-vid-card"
-                        onClick={() => handleOpenCoachVideo(vid)}
+                        className="tt-reel-card tt-sd-press"
+                        onClick={() => handlePlayCoachVideo(vid)}
                       >
                         <SmartImage
                           src={vid.poster}
-                          fallbackSrc={ASSETS.torneoApertura}
+                          fallbackSrc={selectedCoach.photo}
                           alt={vid.title}
-                          className="tt-coach-vid-poster"
+                          className="tt-reel-poster"
                         />
-                        <div className="tt-coach-vid-overlay">
-                          <span className={`tt-vid-pill ${unlocked ? 'is-free' : 'is-lock'}`}>
-                            {unlocked
-                              ? `▶ Ver · ${vid.duration || 'HD'}`
-                              : `🔒 ${vid.gemsCost} 💎`}
-                          </span>
+                        <div className="tt-reel-scrim" />
+                        <span className={`tt-reel-tag ${isUnlocked ? 'is-free' : 'is-lock'}`}>
+                          {vid.isFree
+                            ? 'TIP GRATIS'
+                            : isUnlocked
+                            ? 'DESBLOQUEADO'
+                            : `${vid.gemsCost} 💎 · VIP Gratis`}
+                        </span>
+                        <span className="tt-reel-play-btn">
+                          <TTIcon name={isUnlocked ? 'play' : 'lock'} size={20} />
+                        </span>
+                        <div className="tt-reel-foot">
                           <strong>{vid.title}</strong>
+                          <small>{vid.duration}</small>
                         </div>
                       </button>
                     );
                   })}
                 </div>
-              </div>
-            )}
+              ) : (
+                <div className="tt-coach-photos-rail">
+                  {selectedCoach.gallery.map((ph, i) => (
+                    <figure key={i} className="tt-coach-photo-tile">
+                      <SmartImage
+                        src={ph.url}
+                        fallbackSrc={selectedCoach.photo}
+                        alt={ph.caption || selectedCoach.name}
+                        className="tt-coach-photo-img"
+                      />
+                      {ph.caption && <figcaption>{ph.caption}</figcaption>}
+                    </figure>
+                  ))}
+                </div>
+              )}
+            </div>
 
-            {/* Clases y Paquetes (Tarifa Regular vs. Socio VIP — CERO equivalencia Gemas/Soles) */}
-            <div>
-              <span className="tt-cm-kicker">CLASES Y PAQUETES</span>
-              <div className="tt-programs-stack">
-                {selectedCoach.packages.map((pkg) => {
-                  const active = activePackage?.id === pkg.id;
+            {/* 4. CONSTRUCTOR DE RESERVA EN 2 PESTAÑAS (CLASES & PACKS | HORARIOS) */}
+            <div className="tt-inner-seg-bar is-two" role="tablist">
+              <span
+                className="tt-inner-seg-slider is-two"
+                aria-hidden="true"
+                style={{
+                  transform: `translateX(${coachInnerTab === 'packs' ? '0%' : '100%'})`,
+                }}
+              />
+              <button
+                type="button"
+                role="tab"
+                aria-selected={coachInnerTab === 'packs'}
+                className={coachInnerTab === 'packs' ? 'is-active' : ''}
+                onClick={() => {
+                  triggerHaptic('light');
+                  setCoachInnerTab('packs');
+                }}
+              >
+                1. Clases & Packs ({selectedCoach.packages.length})
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={coachInnerTab === 'horarios'}
+                className={coachInnerTab === 'horarios' ? 'is-active' : ''}
+                onClick={() => {
+                  triggerHaptic('light');
+                  setCoachInnerTab('horarios');
+                }}
+              >
+                2. Horarios Libres ({selectedCoach.schedule.length})
+              </button>
+            </div>
+
+            {coachInnerTab === 'packs' ? (
+              <div key="co-packs" className="tt-packs-stack tt-sd-enter">
+                {selectedCoach.packages.map((pk) => {
+                  const isPicked = activePack?.id === pk.id;
+                  const hasSpots =
+                    pk.spotsFilled !== null && pk.spotsMax !== null && pk.spotsMax > 0;
+                  const spotsPct = hasSpots
+                    ? Math.min(100, Math.round((pk.spotsFilled / pk.spotsMax) * 100))
+                    : 0;
+
                   return (
                     <button
-                      key={pkg.id}
+                      key={pk.id}
                       type="button"
-                      className={`tt-program-tile ${active ? 'is-active' : ''}`}
+                      className={`tt-pack-glass-card tt-sd-press ${isPicked ? 'is-picked' : ''}`}
                       onClick={() => {
                         triggerHaptic('light');
-                        setSelectedPackageId(pkg.id);
+                        setSelectedPackId(pk.id);
                       }}
                     >
-                      <div style={{ flex: 1, textAlign: 'left' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                          <span className="tt-prog-type">{pkg.type}</span>
-                          {pkg.badge && <span className="tt-prog-badge">{pkg.badge}</span>}
+                      <div className="tt-pk-top">
+                        <div className="tt-pk-badges">
+                          <span className="tt-pk-type">{pk.type}</span>
+                          {pk.tag && <span className="tt-pk-tag">{pk.tag}</span>}
                         </div>
-                        <strong className="tt-prog-name">{pkg.name}</strong>
+                        <div className="tt-pk-price-col">
+                          <strong>S/ {pk.priceRegular}</strong>
+                          <span>VIP S/ {pk.priceVip}</span>
+                        </div>
                       </div>
-                      <div className="tt-prog-prices">
-                        <strong>S/ {pkg.price}</strong>
-                        <small>VIP S/ {pkg.vipPrice}</small>
-                      </div>
+
+                      <h4 className="tt-pk-title">{pk.title}</h4>
+                      <p className="tt-pk-desc">{pk.desc}</p>
+
+                      {hasSpots && (
+                        <div className="tt-pk-spots-row">
+                          <div className="tt-pk-spots-track">
+                            <div style={{ width: `${spotsPct}%` }} />
+                          </div>
+                          <span>
+                            {pk.spotsFilled}/{pk.spotsMax} cupos
+                          </span>
+                        </div>
+                      )}
                     </button>
                   );
                 })}
               </div>
-            </div>
-
-            {/* Turnos disponibles */}
-            {selectedCoach.slots.length > 0 && (
-              <div>
-                <span className="tt-cm-kicker">HORARIOS DISPONIBLES</span>
+            ) : (
+              <div key="co-slots" className="tt-slots-panel tt-sd-enter">
+                <span className="tt-sd-kicker">ELIGE TU TURNO PREFERIDO PARA COORDINAR</span>
                 <div className="tt-slots-grid">
-                  {selectedCoach.slots.map((sl) => {
-                    const active = activeSlot?.id === sl.id;
+                  {selectedCoach.schedule.map((slot) => {
+                    const isPicked = activeSlot?.id === slot.id;
                     return (
                       <button
-                        key={sl.id}
+                        key={slot.id}
                         type="button"
-                        className={`tt-slot-tile ${active ? 'is-active' : ''}`}
+                        className={`tt-slot-glass-tile tt-sd-press ${isPicked ? 'is-picked' : ''}`}
                         onClick={() => {
                           triggerHaptic('light');
-                          setSelectedSlotId(sl.id);
+                          setSelectedSlotId(slot.id);
                         }}
                       >
-                        <strong>
-                          {sl.day} {sl.time ? `· ${sl.time}` : ''}
-                        </strong>
-                        <span>{sl.label}</span>
+                        <small>{slot.day}</small>
+                        <strong>{slot.time}</strong>
+                        <span>{slot.status === 'few' ? 'Último cupo' : 'Disponible'}</span>
                       </button>
                     );
                   })}
@@ -1382,70 +1946,85 @@ export default function SedesView({
               </div>
             )}
 
-            {/* Barra final de reserva directa */}
-            <div className="tt-coach-book-bar">
-              <div>
-                <span>{currentUser?.isVip ? 'Tarifa Socio VIP' : 'Tarifa Regular'}</span>
-                <strong>
-                  S/{' '}
-                  {activePackage
-                    ? currentUser?.isVip
-                      ? activePackage.vipPrice
-                      : activePackage.price
-                    : currentUser?.isVip
-                    ? selectedCoach.vipRate
-                    : selectedCoach.baseRate}
-                </strong>
+            {/* 5. BARRA DE RESERVA EN VIVO (RESUMEN + BOTÓN WHATSAPP LIQUID GLASS) */}
+            {activePack && (
+              <div className="tt-coach-reserve-dock">
+                <div className="tt-crd-summary">
+                  <small>
+                    {isVip ? 'TARIFA SOCIO VIP' : 'TARIFA REGULAR'}
+                    {activeSlot ? ` · ${activeSlot.day} ${activeSlot.time}` : ''}
+                  </small>
+                  <strong>
+                    S/ {isVip ? activePack.priceVip : activePack.priceRegular}
+                    <span>{!isVip ? ` (VIP S/ ${activePack.priceVip})` : ''}</span>
+                  </strong>
+                </div>
+
+                <button
+                  type="button"
+                  className="tt-btn tt-btn-primary tt-sd-press"
+                  onClick={handleReserveCoachClass}
+                >
+                  <TTIcon name="whatsapp" size={17} />
+                  Reservar Clase
+                </button>
               </div>
+            )}
+
+            {onOpenPartnerPortal && (
               <button
                 type="button"
-                className="tt-btn tt-btn-primary"
-                onClick={() => handleCoachWhatsappClick(selectedCoach, activePackage, activeSlot)}
+                className="tt-modal-partner-foot-btn"
+                onClick={() => {
+                  triggerHaptic('light');
+                  setSelectedCoachId(null);
+                  onOpenPartnerPortal();
+                }}
               >
-                <TTIcon name="whatsapp" size={17} />
-                Reservar por WhatsApp
+                <TTIcon name="settings" size={14} />
+                <span>¿Eres {selectedCoach.name}? Edita tus paquetes, horarios y videos aquí</span>
               </button>
-            </div>
+            )}
           </div>
         )}
       </ModalPortal>
 
       {/* ====================================================================
-          MODAL 3: REPRODUCTOR DE VIDEO EN CANCHA
-          ==================================================================== */}
-      <ModalPortal
-        isOpen={Boolean(activeVideoModal)}
-        onClose={() => setActiveVideoModal(null)}
-        title={activeVideoModal?.title || 'Video en Cancha'}
-        subtitle={`Duración: ${activeVideoModal?.duration || 'HD'}`}
-        icon={<IconBadge name="vision" variant="emerald" size={38} />}
-        isTopLayer
-        isWide
-      >
-        {activeVideoModal && (
-          <video
-            src={activeVideoModal.src}
-            poster={activeVideoModal.poster}
-            controls
-            autoPlay
-            playsInline
-            style={{ width: '100%', borderRadius: 16, backgroundColor: '#000' }}
-          />
-        )}
-      </ModalPortal>
-
-      {/* ====================================================================
-          ESTILOS LIMPIOS DE ALTO CONTRASTE (BLANCO + PÚRPURA + ESMERALDA)
+          ESTILOS FLAGSHIP (LIQUID GLASS · FÍSICA ELÁSTICA · OSCURO Y CLARO)
           ==================================================================== */}
       <style>{`
         .tt-sedes-view {
           display: flex;
           flex-direction: column;
-          gap: 14px;
+          gap: 13px;
+        }
+        .tt-sd-enter {
+          animation: ttSdIn 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+        @keyframes ttSdIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .tt-sd-press {
+          transition:
+            transform 170ms cubic-bezier(0.22, 1.38, 0.36, 1),
+            border-color 200ms ease,
+            box-shadow 220ms ease !important;
+        }
+        .tt-sd-press:active {
+          transform: scale(0.96) !important;
+        }
+        .tt-sd-kicker {
+          display: block;
+          font-size: 0.62rem;
+          font-weight: 900;
+          letter-spacing: 0.09em;
+          color: var(--tt-emerald-text);
+          margin-bottom: 7px;
         }
 
-        /* 1. CONMUTADOR DE 2 PESTAÑAS CON SLIDER ELÁSTICO */
-        .tt-sd-tabs {
+        /* 1. CONMUTADOR LIQUID GLASS */
+        .tt-sd-switch-bar {
           position: relative;
           display: grid;
           grid-template-columns: 1fr 1fr;
@@ -1453,9 +2032,11 @@ export default function SedesView({
           border-radius: 18px;
           background: var(--tt-surface-2);
           border: 1px solid var(--tt-border);
-          box-shadow: var(--tt-card-specular);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+          backdrop-filter: blur(14px);
+          -webkit-backdrop-filter: blur(14px);
         }
-        .tt-sd-tab-slider {
+        .tt-sd-switch-slider {
           position: absolute;
           top: 4px;
           bottom: 4px;
@@ -1463,87 +2044,99 @@ export default function SedesView({
           width: calc((100% - 8px) / 2);
           border-radius: 13px;
           background: linear-gradient(135deg, #00DC7D 0%, #00B365 100%);
-          box-shadow: 0 6px 16px rgba(0, 220, 125, 0.3);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 6px 16px rgba(0, 220, 125, 0.28);
           transition: transform 320ms cubic-bezier(0.22, 1.24, 0.36, 1);
           pointer-events: none;
           z-index: 0;
         }
-        .tt-sedes-view.is-light .tt-sd-tab-slider {
+        .tt-sedes-view.is-light .tt-sd-switch-slider {
           background: #1E0734;
-          box-shadow: 0 6px 16px rgba(30, 7, 52, 0.2);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 6px 16px rgba(30, 7, 52, 0.2);
         }
-        .tt-sd-tab {
+        .tt-sd-switch-btn {
           position: relative;
           z-index: 1;
           min-height: 41px;
           border-radius: 13px;
-          font-size: 0.82rem;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 7px;
+          font-size: 0.8rem;
           font-weight: 800;
           color: var(--tt-text-muted);
           transition: color 200ms ease;
         }
-        .tt-sd-tab.is-active {
-          color: #10021E;
+        .tt-sd-switch-btn.is-active { color: #10021E; font-weight: 900; }
+        .tt-sedes-view.is-light .tt-sd-switch-btn.is-active { color: #00DC7D; }
+
+        /* 2. CINTA B2B ESTUDIO ALIADO */
+        .tt-partner-glass-strip {
+          width: 100%;
+          padding: 10px 12px;
+          border-radius: 18px;
+          background: var(--tt-surface);
+          border: 1px solid var(--tt-border);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), var(--tt-shadow-sm);
+          color: var(--tt-text);
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+        .tt-partner-glass-strip strong { display: block; font-size: 0.8rem; font-weight: 800; }
+        .tt-partner-glass-strip small { display: block; font-size: 0.68rem; color: var(--tt-text-muted); margin-top: 1px; }
+        .tt-partner-strip-cta {
+          padding: 5px 10px;
+          border-radius: 999px;
+          background: rgba(0, 220, 125, 0.14);
+          border: 1px solid rgba(0, 220, 125, 0.36);
+          color: var(--tt-emerald-text);
+          font-size: 0.69rem;
           font-weight: 900;
-        }
-        .tt-sedes-view.is-light .tt-sd-tab.is-active {
-          color: #00DC7D;
+          white-space: nowrap;
         }
 
-        .tt-sd-stack { display: flex; flex-direction: column; gap: 14px; }
-        .tt-sd-enter { animation: ttSdReveal 340ms cubic-bezier(0.22, 1, 0.36, 1) both; }
-        @keyframes ttSdReveal {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
+        /* 3. GRILLA SEDES Y COACHES */
+        .tt-sd-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 13px;
+        }
+        @media (min-width: 720px) {
+          .tt-sd-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
 
-        /* 2. TARJETAS DE SEDE (FOTO PROTAGONISTA · CERO SATURACIÓN NARANJA) */
-        .tt-clubs-grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
-        @media (min-width: 760px) {
-          .tt-clubs-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-        }
-        .tt-club-card {
+        /* TARJETA CLUB */
+        .tt-club-card,
+        .tt-coach-card {
           border-radius: 24px;
           overflow: hidden;
           background: var(--tt-surface);
           border: 1px solid var(--tt-border);
-          box-shadow: var(--tt-card-specular), var(--tt-shadow-sm);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), var(--tt-shadow-sm);
+          cursor: pointer;
           display: flex;
           flex-direction: column;
-          animation: ttSdReveal 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+          animation: ttSdIn 340ms cubic-bezier(0.22, 1, 0.36, 1) both;
           animation-delay: var(--sd-delay, 0ms);
         }
-        .tt-club-hero {
+        .tt-cc-hero {
           position: relative;
-          min-height: 186px;
-          padding: 13px 14px;
+          min-height: 178px;
+          padding: 12px 14px;
           display: flex;
           flex-direction: column;
           justify-content: space-between;
-          cursor: pointer;
           background: #160428;
           overflow: hidden;
         }
-        .tt-club-hero-img {
+        .tt-cc-bg, .tt-co-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+        .tt-cc-scrim, .tt-co-scrim {
           position: absolute;
           inset: 0;
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-          transition: transform 480ms cubic-bezier(0.22, 1, 0.36, 1);
+          background: linear-gradient(180deg, rgba(16, 4, 30, 0.42) 0%, rgba(16, 4, 30, 0.16) 44%, rgba(14, 3, 26, 0.94) 100%);
         }
-        .tt-club-card:hover .tt-club-hero-img { transform: scale(1.03); }
-        .tt-club-hero-scrim {
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(
-            180deg,
-            rgba(14, 3, 26, 0.44) 0%,
-            rgba(14, 3, 26, 0.16) 44%,
-            rgba(14, 3, 26, 0.94) 100%
-          );
-        }
-        .tt-club-top-row {
+        .tt-cc-top-row, .tt-co-top-row {
           position: relative;
           z-index: 2;
           display: flex;
@@ -1551,36 +2144,43 @@ export default function SedesView({
           justify-content: space-between;
           gap: 8px;
         }
-        .tt-club-chip-glass,
-        .tt-club-weather-pill {
+        .tt-cc-weather-pill {
           display: inline-flex;
           align-items: center;
           gap: 6px;
-          padding: 5px 10px;
+          padding: 4px 10px 4px 7px;
           border-radius: 999px;
-          background: rgba(16, 4, 30, 0.76);
-          border: 1px solid rgba(250, 249, 245, 0.2);
-          backdrop-filter: blur(8px);
+          background: rgba(16, 4, 30, 0.72);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          backdrop-filter: blur(10px);
+          -webkit-backdrop-filter: blur(10px);
           color: #FAF9F5;
           font-size: 0.68rem;
           font-weight: 800;
         }
-        .tt-emerald-dot {
-          width: 7px;
-          height: 7px;
-          border-radius: 50%;
-          background: #00DC7D;
-          box-shadow: 0 0 8px rgba(0, 220, 125, 0.85);
-          flex-shrink: 0;
+        .tt-cc-weather-pill.is-emerald { border-color: rgba(0, 220, 125, 0.48); }
+        .tt-cc-video-chip, .tt-co-media-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          padding: 4px 9px;
+          border-radius: 999px;
+          background: rgba(250, 249, 245, 0.16);
+          border: 1px solid rgba(250, 249, 245, 0.28);
+          backdrop-filter: blur(10px);
+          -webkit-backdrop-filter: blur(10px);
+          color: #FAF9F5;
+          font-size: 0.65rem;
+          font-weight: 800;
         }
-        .tt-club-bottom-row {
+        .tt-cc-bottom-row {
           position: relative;
           z-index: 2;
           display: flex;
-          align-items: center;
+          align-items: flex-end;
           gap: 10px;
         }
-        .tt-club-crest-wrap {
+        .tt-cc-crest {
           width: 48px;
           height: 48px;
           border-radius: 14px;
@@ -1588,278 +2188,127 @@ export default function SedesView({
           border: 2px solid #FAF9F5;
           overflow: hidden;
           flex-shrink: 0;
-          box-shadow: 0 6px 16px rgba(0, 0, 0, 0.36);
+          box-shadow: 0 6px 14px rgba(0, 0, 0, 0.36);
         }
-        .tt-club-name {
-          margin: 0;
-          font-family: var(--tt-font-display);
-          font-size: 1.24rem;
-          font-weight: 900;
-          line-height: 1.04;
-          color: #FAF9F5;
-          text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
+        .tt-cc-district { display: block; font-size: 0.67rem; font-weight: 700; color: rgba(250, 249, 245, 0.82); }
+        .tt-cc-title { margin: 2px 0 0; font-family: var(--tt-font-display); font-weight: 900; font-size: 1.32rem; line-height: 1.04; color: #FAF9F5; text-shadow: 0 2px 10px rgba(0, 0, 0, 0.55); }
+
+        .tt-cc-body { padding: 12px 13px; display: flex; flex-direction: column; gap: 10px; }
+        .tt-cc-rates-strip {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 7px;
+          text-align: center;
         }
-        .tt-club-meta {
-          display: block;
-          margin-top: 2px;
-          font-size: 0.72rem;
-          font-weight: 600;
-          color: rgba(250, 249, 245, 0.84);
+        .tt-cc-rates-strip > div {
+          padding: 8px 5px;
+          border-radius: 13px;
+          background: var(--tt-surface-2);
+          border: 1px solid var(--tt-border);
         }
-        .tt-club-photos-count {
-          padding: 4px 8px;
+        .tt-cc-rates-strip small { display: block; font-size: 0.56rem; font-weight: 900; letter-spacing: 0.06em; color: var(--tt-text-muted); }
+        .tt-cc-rates-strip strong { font-family: var(--tt-font-display); font-size: 1.06rem; font-weight: 900; }
+        .tt-cc-rates-strip .is-vip { background: rgba(229, 193, 108, 0.12); border-color: rgba(229, 193, 108, 0.4); }
+        .tt-cc-rates-strip .is-vip strong { color: #E5C16C; }
+        .tt-sedes-view.is-light .tt-cc-rates-strip .is-vip strong { color: #8A5D10; }
+
+        .tt-cc-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .tt-cc-promo-hint { font-size: 0.7rem; font-weight: 700; color: var(--tt-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .tt-cc-open-pill {
+          padding: 5px 11px;
           border-radius: 999px;
-          background: rgba(250, 249, 245, 0.16);
-          color: #FAF9F5;
-          font-size: 0.64rem;
-          font-weight: 800;
+          background: rgba(0, 220, 125, 0.14);
+          border: 1px solid rgba(0, 220, 125, 0.36);
+          color: var(--tt-emerald-text);
+          font-size: 0.7rem;
+          font-weight: 900;
           white-space: nowrap;
         }
 
-        .tt-club-body { padding: 13px; display: flex; flex-direction: column; gap: 10px; }
-        .tt-club-rate-strip {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 6px;
-          padding: 9px 11px;
-          border-radius: 13px;
-          background: var(--tt-surface-2);
-          font-size: 0.72rem;
-          color: var(--tt-text-muted);
-          flex-wrap: wrap;
-        }
-        .tt-club-rate-strip strong { color: var(--tt-text); font-weight: 900; }
-        .tt-club-rate-strip i { width: 1px; height: 14px; background: var(--tt-border-medium); }
-        .tt-club-rate-strip .is-vip-rate strong { color: #E5C16C; }
-        .tt-sedes-view.is-light .tt-club-rate-strip .is-vip-rate strong { color: #9A6B16; }
-
-        /* Acordeón Dorado Champán Sobrio (Beneficios VIP en este club) */
-        .tt-vip-acc {
-          border-radius: 14px;
-          border: 1px solid rgba(229, 193, 108, 0.36);
-          background: rgba(229, 193, 108, 0.08);
-          overflow: hidden;
-          transition: border-color 220ms ease;
-        }
-        .tt-sedes-view.is-light .tt-vip-acc {
-          background: #FBF7EC;
-          border-color: rgba(180, 132, 34, 0.34);
-        }
-        .tt-vip-acc-btn {
-          width: 100%;
-          min-height: 40px;
-          padding: 0 12px;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          color: #F3DC9B;
-          font-size: 0.76rem;
-          font-weight: 800;
-          text-align: left;
-        }
-        .tt-sedes-view.is-light .tt-vip-acc-btn { color: #7C550E; }
-        .tt-vip-acc-btn span { flex: 1; }
-        .tt-vip-acc-arrow {
-          font-style: normal;
-          transition: transform 240ms cubic-bezier(0.22, 1.3, 0.36, 1);
-        }
-        .tt-vip-acc-arrow.is-up { transform: rotate(180deg); }
-        .tt-vip-acc-panel {
-          padding: 0 12px 11px;
-          border-top: 1px solid rgba(229, 193, 108, 0.2);
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-          animation: ttSdReveal 220ms ease both;
-        }
-        .tt-vip-acc-panel ul {
-          margin: 9px 0 0;
-          padding: 0;
-          list-style: none;
-          display: flex;
-          flex-direction: column;
-          gap: 5px;
-        }
-        .tt-vip-acc-panel li {
-          display: flex;
-          align-items: flex-start;
-          gap: 6px;
-          font-size: 0.74rem;
-          color: var(--tt-text-secondary);
-        }
-        .tt-vip-acc-card-link {
-          align-self: flex-start;
-          font-size: 0.72rem;
-          font-weight: 900;
-          color: var(--tt-emerald-text);
-        }
-
-        .tt-club-actions-row { display: flex; align-items: center; gap: 7px; }
-
-        /* 3. TARJETAS DE COACHES (ALTO CONTRASTE COMERCIAL) */
-        .tt-coaches-grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
-        @media (min-width: 740px) {
-          .tt-coaches-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-        }
-        .tt-coach-pro-card {
-          border-radius: 24px;
-          overflow: hidden;
-          background: var(--tt-surface);
-          border: 1px solid var(--tt-border);
-          box-shadow: var(--tt-card-specular), var(--tt-shadow-sm);
-          display: flex;
-          flex-direction: column;
-          cursor: pointer;
-          animation: ttSdReveal 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
-          animation-delay: var(--sd-delay, 0ms);
-        }
-        .tt-coach-pro-card.is-featured {
-          border-color: var(--coach-border);
-        }
-        .tt-cp-media {
+        /* TARJETA COACH */
+        .tt-co-hero {
           position: relative;
-          min-height: 188px;
-          padding: 13px 14px;
+          min-height: 186px;
+          padding: 12px 14px;
           display: flex;
           flex-direction: column;
           justify-content: space-between;
           background: #160428;
           overflow: hidden;
         }
-        .tt-cp-img {
-          position: absolute;
-          inset: 0;
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-          object-position: center top;
-        }
-        .tt-cp-scrim {
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(
-            180deg,
-            rgba(14, 3, 26, 0.38) 0%,
-            rgba(14, 3, 26, 0.14) 40%,
-            rgba(14, 3, 26, 0.95) 100%
-          );
-        }
-        .tt-cp-top-pills {
-          position: relative;
-          z-index: 2;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 8px;
-          flex-wrap: wrap;
-        }
-        .tt-cp-free-pill,
-        .tt-cp-vid-pill {
+        .tt-co-avail-pill {
           display: inline-flex;
           align-items: center;
           gap: 6px;
-          padding: 5px 10px;
-          border-radius: 999px;
-          background: rgba(16, 4, 30, 0.8);
-          border: 1px solid rgba(250, 249, 245, 0.22);
-          backdrop-filter: blur(8px);
-          color: #FAF9F5;
-          font-size: 0.67rem;
-          font-weight: 800;
-        }
-        .tt-cp-identity { position: relative; z-index: 2; color: #FAF9F5; }
-        .tt-cp-identity h3 {
-          margin: 0;
-          font-family: var(--tt-font-display);
-          font-size: 1.48rem;
-          line-height: 1;
-          text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
-        }
-        .tt-cp-identity span {
-          display: block;
-          margin-top: 3px;
-          font-size: 0.73rem;
-          font-weight: 600;
-          color: rgba(250, 249, 245, 0.86);
-        }
-
-        .tt-cp-body { padding: 13px; display: flex; flex-direction: column; gap: 11px; }
-        .tt-cp-tags { display: flex; flex-wrap: wrap; gap: 6px; }
-        .tt-cp-tag {
           padding: 4px 10px;
           border-radius: 999px;
+          background: rgba(16, 4, 30, 0.72);
+          border: 1px solid rgba(255, 255, 255, 0.22);
+          color: #FAF9F5;
+          font-size: 0.65rem;
+          font-weight: 900;
+          backdrop-filter: blur(8px);
+        }
+        .tt-co-avail-pill.is-today {
+          background: rgba(0, 220, 125, 0.2);
+          border-color: rgba(0, 220, 125, 0.65);
+          color: #86F7C3;
+        }
+        .tt-co-avail-pill.is-today i {
+          width: 7px;
+          height: 7px;
+          border-radius: 50%;
+          background: #00DC7D;
+          box-shadow: 0 0 8px #00DC7D;
+          animation: ttLivePulse 1.6s infinite;
+        }
+        .tt-co-bottom-row { position: relative; z-index: 2; display: flex; flex-direction: column; gap: 2px; }
+        .tt-co-role { font-size: 0.64rem; font-weight: 900; letter-spacing: 0.06em; color: var(--coach-accent, #00DC7D); text-transform: uppercase; }
+        .tt-co-name { margin: 0; font-family: var(--tt-font-display); font-size: 1.5rem; font-weight: 900; line-height: 1.02; color: #FAF9F5; }
+        .tt-co-club { display: inline-flex; align-items: center; gap: 4px; font-size: 0.71rem; font-weight: 700; color: rgba(250, 249, 245, 0.8); margin-top: 2px; }
+
+        .tt-co-body { padding: 12px 13px; display: flex; flex-direction: column; gap: 10px; }
+        .tt-co-tags-row { display: flex; flex-wrap: wrap; gap: 5px; }
+        .tt-co-tag {
+          padding: 4px 9px;
+          border-radius: 999px;
           background: var(--tt-surface-2);
           border: 1px solid var(--tt-border);
-          font-size: 0.7rem;
-          font-weight: 700;
+          font-size: 0.67rem;
+          font-weight: 800;
           color: var(--tt-text-secondary);
         }
-        .tt-cp-rates-bar {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 7px;
+        .tt-co-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 4px; border-top: 1px solid var(--tt-border); }
+        .tt-co-price-group small { display: block; font-size: 0.67rem; color: var(--tt-text-muted); font-weight: 700; }
+        .tt-co-price-group strong { font-size: 0.86rem; font-weight: 900; color: #E5C16C; }
+        .tt-sedes-view.is-light .tt-co-price-group strong { color: #8A5D10; }
+        .tt-co-cta-pill {
+          padding: 6px 12px;
+          border-radius: 999px;
+          background: linear-gradient(135deg, #00DC7D 0%, #00B365 100%);
+          color: #10021E;
+          font-size: 0.71rem;
+          font-weight: 900;
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
         }
-        .tt-cp-rate-box {
-          padding: 8px 6px;
-          border-radius: 13px;
-          background: var(--tt-surface-2);
-          text-align: center;
-        }
-        .tt-cp-rate-box span { display: block; font-size: 0.62rem; color: var(--tt-text-muted); }
-        .tt-cp-rate-box strong { font-family: var(--tt-font-display); font-size: 1.12rem; color: var(--tt-text); }
-        .tt-cp-rate-box.is-vip strong { color: var(--coach-accent); }
-        .tt-cp-actions { display: flex; align-items: center; gap: 8px; }
 
-        /* Acceso discreto al Portal Aliados */
-        .tt-partner-strip-btn {
-          width: 100%;
-          padding: 13px 15px;
-          border-radius: 18px;
-          background: var(--tt-surface);
-          border: 1px solid var(--tt-border);
-          color: var(--tt-text);
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 10px;
-          text-align: left;
-        }
-        .tt-partner-strip-btn strong { display: block; font-size: 0.82rem; }
-        .tt-partner-strip-btn span { display: block; font-size: 0.71rem; color: var(--tt-text-muted); margin-top: 2px; }
+        /* ==================================================================
+           MODAL CLUB: VISOR MULTIMEDIA + 3 PESTAÑAS LIQUID GLASS
+           ================================================================== */
+        .tt-modal-crest { width: 38px; height: 38px; border-radius: 12px; background: #FFFFFF; overflow: hidden; border: 1.5px solid var(--tt-border-medium); }
+        .tt-club-modal-stack, .tt-coach-modal-stack { display: flex; flex-direction: column; gap: 14px; }
 
-        /* 4. MODAL SEDE (CARRUSEL DE FOTOS + CLIMA INTERNO +3 GEMAS) */
-        .tt-club-modal-stack,
-        .tt-coach-modal-stack { display: flex; flex-direction: column; gap: 14px; }
-        .tt-club-carousel { display: flex; flex-direction: column; gap: 8px; }
-        .tt-cc-stage {
+        .tt-cm-stage {
           position: relative;
-          height: 205px;
-          border-radius: 18px;
+          border-radius: 20px;
           overflow: hidden;
+          aspect-ratio: 16 / 10;
           background: #140324;
+          border: 1px solid var(--tt-border);
         }
-        .tt-cc-img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-          animation: ttSdReveal 280ms ease both;
-        }
-        .tt-cc-scrim {
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(180deg, transparent 50%, rgba(14, 3, 26, 0.85) 100%);
-        }
-        .tt-cc-caption {
-          position: absolute;
-          left: 12px;
-          bottom: 10px;
-          z-index: 2;
-          color: #FAF9F5;
-          font-size: 0.76rem;
-          font-weight: 800;
-        }
-        .tt-cc-arrow {
+        .tt-cm-photo, .tt-cm-video-wrap, .tt-cm-video-el { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .tt-cm-photo-scrim { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(16, 4, 30, 0.25) 0%, transparent 45%, rgba(14, 2, 26, 0.88) 100%); pointer-events: none; }
+        .tt-cm-arrow {
           position: absolute;
           top: 50%;
           transform: translateY(-50%);
@@ -1867,178 +2316,476 @@ export default function SedesView({
           width: 34px;
           height: 34px;
           border-radius: 50%;
-          background: rgba(14, 3, 26, 0.72);
-          border: 1px solid rgba(250, 249, 245, 0.28);
+          background: rgba(16, 4, 30, 0.65);
+          border: 1px solid rgba(255, 255, 255, 0.25);
+          backdrop-filter: blur(8px);
           color: #FAF9F5;
           font-size: 1.25rem;
           display: inline-flex;
           align-items: center;
           justify-content: center;
         }
-        .tt-cc-arrow.is-prev { left: 10px; }
-        .tt-cc-arrow.is-next { right: 10px; }
-        .tt-cc-dots { display: flex; justify-content: center; gap: 6px; }
-        .tt-cc-dot {
-          width: 7px;
-          height: 7px;
-          border-radius: 999px;
-          background: var(--tt-border-medium);
-          transition: width 220ms ease, background-color 220ms ease;
+        .tt-cm-arrow.is-left { left: 10px; }
+        .tt-cm-arrow.is-right { right: 10px; }
+        .tt-cm-caption {
+          position: absolute;
+          left: 12px;
+          right: 12px;
+          bottom: 10px;
+          z-index: 2;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          color: #FAF9F5;
+          font-size: 0.74rem;
+          font-weight: 800;
         }
-        .tt-cc-dot.is-active { width: 22px; background: #00DC7D; }
+        .tt-cm-dots { display: inline-flex; gap: 4px; }
+        .tt-cm-dots i { width: 6px; height: 6px; border-radius: 999px; background: rgba(255, 255, 255, 0.4); transition: width 200ms ease; }
+        .tt-cm-dots i.is-on { width: 18px; background: #00DC7D; }
 
-        .tt-cm-kicker {
-          display: block;
-          font-size: 0.63rem;
-          font-weight: 900;
-          letter-spacing: 0.09em;
-          color: var(--tt-emerald-text);
-          margin-bottom: 7px;
+        .tt-cm-media-pill {
+          position: absolute;
+          top: 10px;
+          right: 10px;
+          z-index: 4;
+          display: inline-flex;
+          padding: 3px;
+          border-radius: 999px;
+          background: rgba(16, 4, 30, 0.72);
+          border: 1px solid rgba(255, 255, 255, 0.22);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
         }
-        .tt-cm-rates-card {
-          padding: 13px;
-          border-radius: 16px;
+        .tt-cm-media-pill button {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          padding: 5px 10px;
+          border-radius: 999px;
+          font-size: 0.68rem;
+          font-weight: 800;
+          color: rgba(250, 249, 245, 0.8);
+        }
+        .tt-cm-media-pill button.is-on { background: #00DC7D; color: #10021E; font-weight: 900; }
+
+        /* Conmutador interno 3 o 2 pestañas */
+        .tt-inner-seg-bar {
+          position: relative;
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          padding: 4px;
+          border-radius: 15px;
           background: var(--tt-surface-2);
           border: 1px solid var(--tt-border);
         }
-        .tt-cm-rates-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; }
-        .tt-cm-rates-grid > div { padding: 9px 6px; border-radius: 12px; background: var(--tt-surface); }
-        .tt-cm-rates-grid span { display: block; font-size: 0.64rem; color: var(--tt-text-muted); }
-        .tt-cm-rates-grid strong { font-size: 0.88rem; font-weight: 900; }
-        .tt-cm-rates-grid .is-vip strong { color: #E5C16C; }
-        .tt-sedes-view.is-light .tt-cm-rates-grid .is-vip strong { color: #9A6B16; }
-        .tt-cm-hours-note { display: block; margin-top: 8px; font-size: 0.72rem; color: var(--tt-text-muted); }
-
-        .tt-cm-services-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
-        .tt-cm-service-tile {
-          display: flex;
-          align-items: center;
-          gap: 7px;
-          padding: 9px 10px;
-          border-radius: 12px;
-          background: var(--tt-surface-2);
-          font-size: 0.74rem;
-          font-weight: 700;
+        .tt-inner-seg-bar.is-two { grid-template-columns: 1fr 1fr; }
+        .tt-inner-seg-slider {
+          position: absolute;
+          top: 4px;
+          bottom: 4px;
+          left: 4px;
+          width: calc((100% - 8px) / 3);
+          border-radius: 11px;
+          background: #1E0734;
+          border: 1px solid rgba(0, 220, 125, 0.4);
+          transition: transform 280ms cubic-bezier(0.22, 1.24, 0.36, 1);
+          pointer-events: none;
+          z-index: 0;
         }
-        .tt-cm-vip-card {
-          padding: 13px;
+        .tt-inner-seg-slider.is-two { width: calc((100% - 8px) / 2); }
+        .tt-inner-seg-bar button {
+          position: relative;
+          z-index: 1;
+          min-height: 37px;
+          border-radius: 11px;
+          font-size: 0.73rem;
+          font-weight: 800;
+          color: var(--tt-text-muted);
+          transition: color 180ms ease;
+        }
+        .tt-inner-seg-bar button.is-active { color: #00DC7D; font-weight: 900; }
+
+        .tt-cm-panel, .tt-cm-section { display: flex; flex-direction: column; gap: 11px; }
+
+        /* Tarifas Showcase */
+        .tt-rates-showcase { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+        .tt-rate-glass-box {
+          padding: 12px 8px;
           border-radius: 16px;
-          background: rgba(229, 193, 108, 0.1);
-          border: 1px solid rgba(229, 193, 108, 0.36);
+          background: var(--tt-surface-2);
+          border: 1px solid var(--tt-border);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+          text-align: center;
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+        .tt-rate-glass-box span { font-size: 0.56rem; font-weight: 900; letter-spacing: 0.06em; color: var(--tt-text-muted); }
+        .tt-rate-glass-box strong { font-family: var(--tt-font-display); font-size: 1.32rem; line-height: 1; }
+        .tt-rate-glass-box small { font-size: 0.64rem; color: var(--tt-text-muted); }
+        .tt-rate-glass-box.is-vip {
+          background: linear-gradient(145deg, rgba(229, 193, 108, 0.16) 0%, rgba(229, 193, 108, 0.06) 100%);
+          border-color: rgba(229, 193, 108, 0.48);
+        }
+        .tt-rate-glass-box.is-vip strong { color: #E5C16C; }
+        .tt-sedes-view.is-light .tt-rate-glass-box.is-vip strong { color: #8A5D10; }
+
+        /* Promos Horas Valle */
+        .tt-promos-grid { display: grid; grid-template-columns: 1fr; gap: 8px; }
+        @media (min-width: 560px) { .tt-promos-grid { grid-template-columns: 1fr 1fr; } }
+        .tt-promo-glass-card {
+          padding: 12px;
+          border-radius: 16px;
+          background: linear-gradient(135deg, rgba(0, 220, 125, 0.1) 0%, var(--tt-surface-2) 100%);
+          border: 1px solid rgba(0, 220, 125, 0.34);
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+        .tt-pgc-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+        .tt-pgc-tag { padding: 2px 7px; border-radius: 6px; background: #00DC7D; color: #10021E; font-size: 0.58rem; font-weight: 900; }
+        .tt-pgc-price { font-family: var(--tt-font-display); font-size: 1.08rem; color: var(--tt-emerald-text); }
+        .tt-pgc-title { font-size: 0.84rem; font-weight: 800; }
+        .tt-promo-glass-card small { font-size: 0.7rem; color: var(--tt-text-muted); }
+
+        /* Bento Instalaciones con iconos propios */
+        .tt-bento-facilities { display: grid; grid-template-columns: 1fr; gap: 8px; }
+        @media (min-width: 520px) { .tt-bento-facilities { grid-template-columns: 1fr 1fr; } }
+        .tt-bento-fac-card {
+          padding: 11px;
+          border-radius: 16px;
+          background: var(--tt-surface-2);
+          border: 1px solid var(--tt-border);
           display: flex;
           align-items: center;
           gap: 10px;
         }
-        .tt-cm-vip-kicker { display: block; font-size: 0.62rem; font-weight: 900; letter-spacing: 0.08em; color: #E5C16C; margin-bottom: 5px; }
-        .tt-sedes-view.is-light .tt-cm-vip-kicker { color: #8A5D10; }
-        .tt-cm-vip-card ul { margin: 0; padding-left: 16px; display: flex; flex-direction: column; gap: 4px; font-size: 0.75rem; color: var(--tt-text-secondary); }
+        .tt-bento-fac-card strong { display: block; font-size: 0.8rem; font-weight: 800; }
+        .tt-bento-fac-card small { display: block; font-size: 0.69rem; color: var(--tt-text-muted); margin-top: 1px; }
 
-        .tt-cm-weather-box {
-          padding: 13px;
+        /* Golden Ticket VIP Card */
+        .tt-golden-ticket-card {
+          position: relative;
+          overflow: hidden;
+          padding: 15px;
+          border-radius: 20px;
+          background: linear-gradient(135deg, #2A1905 0%, #1C0830 58%, #352106 100%);
+          color: #FAF9F5;
+          border: 1px solid rgba(229, 193, 108, 0.58);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 14px 30px rgba(8, 1, 18, 0.34);
+          display: flex;
+          flex-direction: column;
+          gap: 11px;
+        }
+        .tt-gt-sheen {
+          position: absolute;
+          inset: -35%;
+          background: linear-gradient(115deg, transparent 42%, rgba(250, 240, 202, 0.14) 50%, transparent 58%);
+          transform: translateX(-110%);
+          animation: ttGtSweep 5.5s ease-in-out infinite;
+          pointer-events: none;
+        }
+        @keyframes ttGtSweep {
+          0%, 66% { transform: translateX(-110%); }
+          100% { transform: translateX(120%); }
+        }
+        .tt-gt-top { position: relative; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .tt-gt-kicker { display: block; font-size: 0.58rem; font-weight: 900; letter-spacing: 0.09em; color: #E5C16C; }
+        .tt-gt-top strong { font-size: 0.9rem; }
+        .tt-gt-carnet-btn {
+          padding: 6px 12px;
+          border-radius: 999px;
+          background: linear-gradient(135deg, #F5E1A4 0%, #CCA046 100%);
+          color: #1A1102;
+          font-size: 0.7rem;
+          font-weight: 900;
+          flex-shrink: 0;
+        }
+        .tt-gt-perks-grid { position: relative; z-index: 2; display: flex; flex-direction: column; gap: 6px; }
+        .tt-gt-perk-chip {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 10px;
+          border-radius: 12px;
+          background: rgba(250, 249, 245, 0.08);
+          border: 1px solid rgba(250, 249, 245, 0.12);
+          font-size: 0.74rem;
+          font-weight: 700;
+        }
+
+        /* Eventos Internos */
+        .tt-internal-event-card {
+          padding: 12px;
           border-radius: 16px;
           background: var(--tt-surface-2);
           border: 1px solid var(--tt-border);
           display: flex;
           flex-direction: column;
-          gap: 10px;
+          gap: 8px;
         }
-        .tt-cm-weather-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
-        .tt-cm-weather-btn {
+        .tt-iec-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+        .tt-iec-top strong { display: block; font-size: 0.84rem; }
+        .tt-iec-top small { display: block; font-size: 0.71rem; color: var(--tt-text-muted); }
+        .tt-iec-fee { padding: 3px 9px; border-radius: 999px; background: #1E0734; color: #00DC7D; font-size: 0.7rem; font-weight: 900; }
+        .tt-iec-bar-row { display: flex; align-items: center; gap: 8px; font-size: 0.69rem; font-weight: 800; color: var(--tt-text-muted); }
+        .tt-iec-track { flex: 1; height: 6px; border-radius: 999px; background: var(--tt-surface); overflow: hidden; }
+        .tt-iec-track > div { height: 100%; border-radius: 999px; background: #00DC7D; }
+
+        /* Clima 3D */
+        .tt-weather-box {
+          padding: 13px;
+          border-radius: 18px;
+          background: var(--tt-surface-2);
+          border: 1px solid var(--tt-border);
+          display: flex;
+          flex-direction: column;
+          gap: 11px;
+        }
+        .tt-wb-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+        .tt-wb-head strong { display: block; font-size: 0.9rem; }
+        .tt-wb-head small { display: block; font-size: 0.7rem; color: var(--tt-text-muted); }
+        .tt-weather-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
+        .tt-weather-tile {
           padding: 9px 4px;
-          border-radius: 13px;
+          border-radius: 14px;
           background: var(--tt-surface);
           border: 1.5px solid var(--tt-border);
           color: var(--tt-text);
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 4px;
-          font-size: 0.68rem;
+          gap: 5px;
+          font-size: 0.69rem;
           font-weight: 800;
-          transition: transform 150ms ease, border-color 180ms ease;
         }
-        .tt-cm-weather-btn:active { transform: scale(0.94); }
-        .tt-cm-weather-btn.is-current { border-color: #00DC7D; background: rgba(0, 220, 125, 0.12); }
+        .tt-weather-tile.is-active {
+          border-color: #00DC7D;
+          background: rgba(0, 220, 125, 0.14);
+          box-shadow: 0 6px 14px rgba(0, 220, 125, 0.18);
+        }
 
-        /* 5. MODAL COACH */
-        .tt-coach-sheet-hero {
+        /* Reservar Sede */
+        .tt-address-glass-card {
+          padding: 13px;
+          border-radius: 16px;
+          background: var(--tt-surface-2);
+          border: 1px solid var(--tt-border);
+          display: flex;
+          align-items: center;
+          gap: 11px;
+        }
+        .tt-address-glass-card strong { display: block; font-size: 0.84rem; }
+        .tt-address-glass-card small { display: block; font-size: 0.72rem; color: var(--tt-text-muted); margin-top: 2px; }
+
+        .tt-web-booking-card {
+          padding: 14px;
+          border-radius: 18px;
+          background: #1A0530;
+          color: #FAF9F5;
+          border: 1px solid rgba(0, 220, 125, 0.4);
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+        .tt-wbc-code-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 11px; border-radius: 12px; background: rgba(250, 249, 245, 0.08); }
+        .tt-wbc-code-row small { display: block; font-size: 0.58rem; opacity: 0.74; letter-spacing: 0.07em; }
+        .tt-wbc-code-row strong { font-size: 0.94rem; color: #E5C16C; letter-spacing: 0.06em; }
+        .tt-copy-vip-btn { padding: 6px 12px; border-radius: 999px; background: #00DC7D; color: #10021E; font-size: 0.7rem; font-weight: 900; }
+
+        .tt-club-action-pair { display: flex; gap: 8px; flex-wrap: wrap; }
+
+        .tt-modal-partner-foot-btn {
+          width: 100%;
+          padding: 10px 12px;
+          border-radius: 13px;
+          background: var(--tt-surface-2);
+          border: 1px dashed var(--tt-border-medium);
+          color: var(--tt-text-muted);
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 7px;
+          font-size: 0.72rem;
+          font-weight: 800;
+        }
+
+        /* ==================================================================
+           MODAL COACH: HERO + REELS + CONSTRUCTOR 3 TOQUES
+           ================================================================== */
+        .tt-chm-hero {
           position: relative;
           border-radius: 20px;
           overflow: hidden;
-          height: 210px;
+          min-height: 156px;
+          padding: 14px;
           background: #160428;
-        }
-        .tt-csh-img { width: 100%; height: 100%; object-fit: cover; object-position: center top; }
-        .tt-csh-scrim { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(16, 4, 30, 0.14) 24%, rgba(16, 4, 30, 0.94) 100%); }
-        .tt-csh-caption { position: absolute; left: 14px; right: 14px; bottom: 13px; color: #FAF9F5; }
-        .tt-csh-caption h3 { margin: 6px 0 0; font-family: var(--tt-font-display); font-size: 1.55rem; line-height: 1; }
-        .tt-csh-tag { padding: 3px 9px; border-radius: 999px; background: rgba(250, 249, 245, 0.16); color: #FAF9F5; font-size: 0.66rem; font-weight: 700; }
-
-        .tt-coach-videos-grid { display: grid; grid-template-columns: 1fr; gap: 9px; }
-        @media (min-width: 560px) {
-          .tt-coach-videos-grid { grid-template-columns: 1fr 1fr; }
-        }
-        .tt-coach-vid-card { position: relative; border-radius: 15px; overflow: hidden; min-height: 114px; background: #140324; text-align: left; padding: 0; border: 1px solid var(--tt-border); }
-        .tt-coach-vid-poster { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.66; }
-        .tt-coach-vid-overlay { position: relative; z-index: 2; height: 100%; padding: 10px; background: linear-gradient(180deg, rgba(16, 3, 29, 0.2) 0%, rgba(16, 3, 29, 0.92) 100%); color: #FAF9F5; display: flex; flex-direction: column; justify-content: space-between; gap: 14px; }
-        .tt-vid-pill { align-self: flex-start; padding: 3px 9px; border-radius: 999px; font-size: 0.64rem; font-weight: 900; }
-        .tt-vid-pill.is-free { background: #00DC7D; color: #120321; }
-        .tt-vid-pill.is-lock { background: rgba(18, 3, 33, 0.84); border: 1px solid #00DC7D; color: #7CF5C0; }
-        .tt-coach-vid-overlay strong { font-size: 0.8rem; line-height: 1.24; }
-
-        .tt-programs-stack { display: flex; flex-direction: column; gap: 8px; }
-        .tt-program-tile {
-          width: 100%;
-          padding: 11px 12px;
-          border-radius: 15px;
-          background: var(--tt-surface-2);
-          border: 1.5px solid var(--tt-border);
-          color: var(--tt-text);
+          color: #FAF9F5;
           display: flex;
-          align-items: center;
-          gap: 10px;
+          flex-direction: column;
+          justify-content: flex-end;
+          border: 1px solid rgba(255, 255, 255, 0.14);
         }
-        .tt-program-tile.is-active { border-color: #00DC7D; background: rgba(0, 220, 125, 0.1); }
-        .tt-prog-type { font-size: 0.64rem; font-weight: 900; text-transform: uppercase; color: var(--tt-text-muted); }
-        .tt-prog-badge { padding: 2px 7px; border-radius: 999px; background: rgba(0, 220, 125, 0.14); color: var(--tt-emerald-text); font-size: 0.6rem; font-weight: 900; }
-        .tt-prog-name { display: block; margin-top: 3px; font-size: 0.84rem; }
-        .tt-prog-prices { text-align: right; flex-shrink: 0; }
-        .tt-prog-prices strong { display: block; font-family: var(--tt-font-display); font-size: 1.22rem; line-height: 1; color: var(--tt-text); }
-        .tt-prog-prices small { font-size: 0.68rem; font-weight: 800; color: #E5C16C; }
-        .tt-sedes-view.is-light .tt-prog-prices small { color: #9A6B16; }
+        .tt-chm-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+        .tt-chm-scrim { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(16, 4, 30, 0.42) 0%, rgba(16, 4, 30, 0.92) 100%); }
+        .tt-chm-content { position: relative; z-index: 2; display: flex; flex-direction: column; gap: 8px; }
+        .tt-chm-badges { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+        .tt-chm-stat-pill { padding: 3px 9px; border-radius: 999px; background: rgba(250, 249, 245, 0.16); backdrop-filter: blur(8px); font-size: 0.66rem; font-weight: 800; }
+        .tt-chm-bio { margin: 0; font-size: 0.77rem; line-height: 1.4; color: rgba(250, 249, 245, 0.9); }
+        .tt-chm-specs { display: flex; flex-wrap: wrap; gap: 5px; }
+        .tt-chm-specs span { padding: 3px 8px; border-radius: 8px; background: rgba(0, 220, 125, 0.16); border: 1px solid rgba(0, 220, 125, 0.36); color: #86F7C3; font-size: 0.65rem; font-weight: 800; }
 
-        .tt-slots-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
-        .tt-slot-tile {
-          padding: 9px 10px;
-          border-radius: 13px;
+        /* Video Theater */
+        .tt-video-theater { border-radius: 18px; overflow: hidden; background: #0E021A; border: 1px solid rgba(0, 220, 125, 0.45); }
+        .tt-vt-head { padding: 9px 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #FAF9F5; font-size: 0.76rem; }
+        .tt-vt-close { padding: 4px 9px; border-radius: 999px; background: rgba(250, 249, 245, 0.14); color: #FAF9F5; font-size: 0.68rem; font-weight: 800; }
+        .tt-vt-player { width: 100%; max-height: 300px; background: #000000; display: block; }
+
+        /* Carrusel Reels & Fotos */
+        .tt-media-header-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .tt-mini-media-switch { display: inline-flex; padding: 3px; border-radius: 999px; background: var(--tt-surface-2); border: 1px solid var(--tt-border); }
+        .tt-mini-media-switch button { padding: 4px 10px; border-radius: 999px; font-size: 0.68rem; font-weight: 800; color: var(--tt-text-muted); }
+        .tt-mini-media-switch button.is-on { background: #1E0734; color: #00DC7D; }
+
+        .tt-reels-rail, .tt-coach-photos-rail {
+          display: flex;
+          gap: 10px;
+          overflow-x: auto;
+          padding-bottom: 4px;
+          scrollbar-width: none;
+        }
+        .tt-reels-rail::-webkit-scrollbar, .tt-coach-photos-rail::-webkit-scrollbar { display: none; }
+        .tt-reel-card {
+          position: relative;
+          flex-shrink: 0;
+          width: 152px;
+          height: 202px;
+          border-radius: 18px;
+          overflow: hidden;
+          background: #140324;
+          border: 1px solid var(--tt-border);
+          padding: 10px;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          text-align: left;
+          color: #FAF9F5;
+        }
+        .tt-reel-poster { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+        .tt-reel-scrim { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(16, 4, 30, 0.46) 0%, rgba(16, 4, 30, 0.16) 45%, rgba(14, 2, 26, 0.94) 100%); }
+        .tt-reel-tag { position: relative; z-index: 2; align-self: flex-start; padding: 3px 7px; border-radius: 7px; font-size: 0.56rem; font-weight: 900; letter-spacing: 0.04em; }
+        .tt-reel-tag.is-free { background: #00DC7D; color: #10021E; }
+        .tt-reel-tag.is-lock { background: rgba(229, 193, 108, 0.92); color: #1A1102; }
+        .tt-reel-play-btn {
+          position: relative;
+          z-index: 2;
+          align-self: center;
+          width: 44px;
+          height: 44px;
+          border-radius: 50%;
+          background: rgba(16, 4, 30, 0.65);
+          border: 1.5px solid rgba(255, 255, 255, 0.45);
+          backdrop-filter: blur(8px);
+          color: #FAF9F5;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .tt-reel-foot { position: relative; z-index: 2; }
+        .tt-reel-foot strong { display: block; font-size: 0.74rem; line-height: 1.22; }
+        .tt-reel-foot small { display: block; font-size: 0.64rem; opacity: 0.75; margin-top: 2px; }
+
+        .tt-coach-photo-tile {
+          margin: 0;
+          flex-shrink: 0;
+          width: 210px;
+          border-radius: 16px;
+          overflow: hidden;
+          background: var(--tt-surface-2);
+          border: 1px solid var(--tt-border);
+        }
+        .tt-coach-photo-img { width: 100%; height: 132px; object-fit: cover; display: block; }
+        .tt-coach-photo-tile figcaption { padding: 7px 9px; font-size: 0.69rem; font-weight: 700; color: var(--tt-text-muted); }
+
+        /* Paquetes & Horarios Seleccionables */
+        .tt-packs-stack { display: flex; flex-direction: column; gap: 9px; }
+        .tt-pack-glass-card {
+          width: 100%;
+          padding: 13px;
+          border-radius: 17px;
           background: var(--tt-surface-2);
           border: 1.5px solid var(--tt-border);
           color: var(--tt-text);
           text-align: left;
           display: flex;
           flex-direction: column;
-          gap: 2px;
+          gap: 5px;
         }
-        .tt-slot-tile.is-active { border-color: #00DC7D; background: rgba(0, 220, 125, 0.12); }
-        .tt-slot-tile strong { font-size: 0.8rem; }
-        .tt-slot-tile span { font-size: 0.68rem; color: var(--tt-text-muted); }
+        .tt-pack-glass-card.is-picked {
+          border-color: #00DC7D;
+          background: rgba(0, 220, 125, 0.11);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 8px 20px rgba(0, 220, 125, 0.14);
+        }
+        .tt-pk-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+        .tt-pk-badges { display: flex; flex-wrap: wrap; gap: 5px; }
+        .tt-pk-type { font-size: 0.61rem; font-weight: 900; letter-spacing: 0.06em; color: var(--tt-emerald-text); }
+        .tt-pk-tag { padding: 2px 7px; border-radius: 6px; background: rgba(229, 193, 108, 0.18); color: #E5C16C; font-size: 0.58rem; font-weight: 900; }
+        .tt-sedes-view.is-light .tt-pk-tag { color: #8A5D10; background: #FBF4E0; }
+        .tt-pk-price-col { text-align: right; flex-shrink: 0; }
+        .tt-pk-price-col strong { display: block; font-family: var(--tt-font-display); font-size: 1.24rem; line-height: 1; }
+        .tt-pk-price-col span { display: block; font-size: 0.66rem; font-weight: 900; color: #E5C16C; }
+        .tt-sedes-view.is-light .tt-pk-price-col span { color: #8A5D10; }
+        .tt-pk-title { margin: 2px 0 0; font-size: 0.9rem; font-weight: 800; }
+        .tt-pk-desc { margin: 0; font-size: 0.74rem; line-height: 1.38; color: var(--tt-text-muted); }
+        .tt-pk-spots-row { margin-top: 4px; display: flex; align-items: center; gap: 8px; font-size: 0.68rem; font-weight: 800; color: var(--tt-text-muted); }
+        .tt-pk-spots-track { flex: 1; height: 6px; border-radius: 999px; background: var(--tt-surface); overflow: hidden; }
+        .tt-pk-spots-track > div { height: 100%; border-radius: 999px; background: #00DC7D; }
 
-        .tt-coach-book-bar {
-          padding: 13px 14px;
-          border-radius: 17px;
-          background: linear-gradient(135deg, #21083A 0%, #140324 100%);
+        .tt-slots-panel { display: flex; flex-direction: column; gap: 8px; }
+        .tt-slots-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+        @media (min-width: 520px) { .tt-slots-grid { grid-template-columns: repeat(3, 1fr); } }
+        .tt-slot-glass-tile {
+          padding: 11px 9px;
+          border-radius: 15px;
+          background: var(--tt-surface-2);
+          border: 1.5px solid var(--tt-border);
+          color: var(--tt-text);
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 2px;
+          text-align: center;
+        }
+        .tt-slot-glass-tile small { font-size: 0.66rem; font-weight: 800; color: var(--tt-text-muted); }
+        .tt-slot-glass-tile strong { font-family: var(--tt-font-display); font-size: 1.06rem; }
+        .tt-slot-glass-tile span { font-size: 0.62rem; font-weight: 800; color: var(--tt-emerald-text); }
+        .tt-slot-glass-tile.is-picked {
+          border-color: #00DC7D;
+          background: rgba(0, 220, 125, 0.14);
+          box-shadow: 0 6px 16px rgba(0, 220, 125, 0.16);
+        }
+
+        /* Dock de reserva final */
+        .tt-coach-reserve-dock {
+          padding: 12px 13px;
+          border-radius: 18px;
+          background: #1A0530;
           color: #FAF9F5;
-          border: 1px solid rgba(0, 220, 125, 0.34);
+          border: 1px solid rgba(0, 220, 125, 0.42);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 12px 26px rgba(8, 1, 18, 0.36);
           display: flex;
           align-items: center;
           justify-content: space-between;
           gap: 10px;
+          flex-wrap: wrap;
         }
-        .tt-coach-book-bar span { display: block; font-size: 0.66rem; opacity: 0.78; }
-        .tt-coach-book-bar strong { font-family: var(--tt-font-display); font-size: 1.55rem; line-height: 1; color: #00DC7D; }
+        .tt-crd-summary small { display: block; font-size: 0.62rem; letter-spacing: 0.06em; color: #7CF5C0; font-weight: 800; }
+        .tt-crd-summary strong { font-family: var(--tt-font-display); font-size: 1.48rem; line-height: 1; }
+        .tt-crd-summary strong span { font-family: var(--tt-font-sans); font-size: 0.68rem; font-weight: 800; color: #E5C16C; margin-left: 5px; }
 
-        html[data-tier='lite'] .tt-club-card,
-        html[data-tier='lite'] .tt-coach-pro-card { animation: none !important; }
+        html[data-tier='lite'] .tt-gt-sheen { display: none !important; }
       `}</style>
     </section>
   );
