@@ -72,23 +72,24 @@ import OnboardingTutorialModal, {
 } from './modals/OnboardingTutorialModal';
 
 /* ==========================================================================
-   ZONA DE EDICIÓN RÁPIDA (CONFIGURACIÓN GLOBAL DEL MOTOR DE LA APP)
+   CONFIGURACIÓN GLOBAL DEL MOTOR DE LA APP
    ========================================================================== */
 export const APP_RUNTIME_CONFIG = {
   themeStorageKey: 'tt_theme_pref_v2',
   firstVisitKey: 'tt_visited_before_v2',
+  rankMemoryKey: 'tt_rk_seen_ranks_v2',
   defaultTab: 'retos',
   toastDurationMs: 3800,
   tickerMessages: [
     { id: 'tk-1', text: 'Tips gratis de la semana en cancha → Ver ahora', action: 'sedes' },
     { id: 'tk-2', text: 'Top 8 del Ranking clasifican al Master Top 8', action: 'master' },
     { id: 'tk-3', text: 'Reporta el estado dentro de tu sede y suma +3 Gemas', action: 'sedes' },
-    { id: 'tk-4', text: 'Canjea tus Gemas por beneficios y stock en el Pro Shop', action: 'shop' },
+    { id: 'tk-4', text: 'Canjea tus Gemas por stock y beneficios en el Pro Shop', action: 'shop' },
   ],
 };
 
 /* ==========================================================================
-   CINTA SUPERIOR AISLADA (NO RE-RENDERIZA App NI RESETEA EL SCROLL DE MODALES)
+   CINTA SUPERIOR AISLADA (NO RE-RENDERIZA App NI RESETEA SCROLL DE MODALES)
    ========================================================================== */
 function SlimTickerBar({ onSelectTab, onOpenMaster, onOpenShop }) {
   const [idx, setIdx] = useState(0);
@@ -125,7 +126,7 @@ function SlimTickerBar({ onSelectTab, onOpenMaster, onOpenShop }) {
 }
 
 /* ==========================================================================
-   SEMILLAS DE RESPALDO (SOLO SI UNA TABLA EN SUPABASE ESTÁ VACÍA AL ARRANCAR)
+   SEMILLAS DE RESPALDO (SOLO SI UNA TABLA EN SUPABASE ESTÁ VACÍA)
    ========================================================================== */
 function buildInitialPlayers() {
   const src = PlayersData.INITIAL_PLAYERS || PlayersData.DEMO_PLAYERS || [];
@@ -188,8 +189,37 @@ function mergeListById(prevList, nextItem, prepend = true) {
   return prepend ? [nextItem, ...prevList] : [...prevList, nextItem];
 }
 
+function sortPlayersForOfficialRanking(list) {
+  return [...(list || [])]
+    .filter((p) => !p.isPaused)
+    .sort((a, b) => {
+      const diffPts = (Number(b.points) || 0) - (Number(a.points) || 0);
+      if (diffPts !== 0) return diffPts;
+      return (Number(b.wins) || 0) - (Number(a.wins) || 0);
+    });
+}
+
+function snapshotPreMatchRankMap(playersList) {
+  try {
+    const ordered = sortPlayersForOfficialRanking(playersList);
+    const rankMap = {};
+    ordered.forEach((p, idx) => {
+      rankMap[p.id] = idx + 1;
+    });
+    const raw = window.localStorage.getItem(APP_RUNTIME_CONFIG.rankMemoryKey);
+    const prevAll = raw ? JSON.parse(raw) : {};
+    window.localStorage.setItem(
+      APP_RUNTIME_CONFIG.rankMemoryKey,
+      JSON.stringify({ ...prevAll, 'ALL|ALL': rankMap })
+    );
+    return rankMap;
+  } catch {
+    return {};
+  }
+}
+
 /* ==========================================================================
-   COMPONENTE RAÍZ MAESTRO: App (CONECTADO EN VIVO A SUPABASE + ONESIGNAL)
+   COMPONENTE RAÍZ MAESTRO: App (SUPABASE REALTIME + ONESIGNAL + FLIP SYNC)
    ========================================================================== */
 export default function App() {
   const scrollContainerRef = useRef(null);
@@ -246,7 +276,7 @@ export default function App() {
   const [isAdminSession, setIsAdminSession] = useState(false);
   const [activePartner, setActivePartner] = useState(null);
 
-  // Control centralizado de los 10 Modales
+  // Control centralizado de Modales
   const [proShopModal, setProShopModal] = useState({ open: false, mode: 'shop' });
   const [h2hModal, setH2hModal] = useState({ open: false, playerA: null, playerB: null });
   const [storiesModal, setStoriesModal] = useState({ open: false, payload: null });
@@ -277,8 +307,12 @@ export default function App() {
     }, APP_RUNTIME_CONFIG.toastDurationMs);
   }, []);
 
+  const openAuthSheet = useCallback((mode = 'login') => {
+    setAuthModal({ open: true, mode });
+  }, []);
+
   /* ------------------------------------------------------------------------
-     1. TEMA Y RENDIMIENTO ADAPTATIVO POR GAMA DE CELULAR
+     1. TEMA Y RENDIMIENTO ADAPTATIVO
      ------------------------------------------------------------------------ */
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -311,7 +345,7 @@ export default function App() {
   }, []);
 
   /* ------------------------------------------------------------------------
-     2. SINCRONIZACIÓN INICIAL SUPABASE + SESIÓN REAL + SUSCRIPCIÓN REALTIME
+     2. SINCRONIZACIÓN INICIAL SUPABASE + SESIÓN REAL + REALTIME
      ------------------------------------------------------------------------ */
   const resolveSessionPlayer = useCallback((session, list) => {
     if (!session?.user) return null;
@@ -462,7 +496,6 @@ export default function App() {
     };
   }, [defaultSeeds, resolveSessionPlayer]);
 
-  /* Cargar historial de Gemas real + vincular Push cuando cambia el usuario */
   useEffect(() => {
     if (!currentUserId) {
       setGemLedger([]);
@@ -484,7 +517,7 @@ export default function App() {
   }, [currentUserId]);
 
   /* ------------------------------------------------------------------------
-     3. DERIVADOS DE ESTADO Y DETECCIÓN MULTIUSUARIO (RETOS Y CONFIRMACIÓN)
+     3. DERIVADOS DE ESTADO Y DETECCIÓN MULTIUSUARIO
      ------------------------------------------------------------------------ */
   const currentUser = useMemo(
     () => players.find((p) => p.id === currentUserId) || null,
@@ -515,7 +548,6 @@ export default function App() {
       if (c.status !== 'SCORE_PROPOSED') return false;
       const isParticipant = c.playerAId === currentUser.id || c.playerBId === currentUser.id;
       if (!isParticipant) return false;
-      // Le aparece al rival para confirmar, o al proponente si ya pasaron 24h sin respuesta
       if (c.proposedBy !== currentUser.id) return true;
       return isScoreReadyForAutoConfirm(c);
     });
@@ -583,7 +615,7 @@ export default function App() {
   }, []);
 
   /* ------------------------------------------------------------------------
-     4. ACCIONES CONECTADAS A SUPABASE + STORAGE + PUSH + CANDADO 4G
+     4. ACCIONES CONECTADAS A SUPABASE + STORAGE + PUSH + SALTO FLIP
      ------------------------------------------------------------------------ */
   const appendGemLedger = useCallback(
     async (entry, targetPlayerId = currentUserId) => {
@@ -621,14 +653,16 @@ export default function App() {
         finalPatch.whatsapp = normalizePeruPhone(finalPatch.whatsapp);
       }
 
-      // Compresión automática 800px + subida a Supabase Storage 'media'
       if (
         finalPatch.avatar &&
         (String(finalPatch.avatar).startsWith('data:image/') || finalPatch.avatar instanceof Blob)
       ) {
         try {
           const uploadedUrl = await uploadCompressedMedia(finalPatch.avatar, 'avatars', playerId);
-          if (uploadedUrl) finalPatch.avatar = uploadedUrl;
+          if (uploadedUrl) {
+            finalPatch.avatar = uploadedUrl;
+            finalPatch.fullBodyPhoto = uploadedUrl;
+          }
         } catch (err) {
           console.error('[TOTAL TENIS] Error subiendo foto a media:', err);
           showToast('No se pudo subir la foto a la nube. Intenta con otra imagen.', 'warning');
@@ -651,31 +685,28 @@ export default function App() {
     [showToast]
   );
 
-  const handleCreateChallenge = useCallback(
-    async (newChallenge) => {
-      if (!newChallenge?.id) return;
-      const res = await runWithLock(`create-challenge-${newChallenge.id}`, async () => {
-        setChallenges((prev) => mergeListById(prev, newChallenge, true));
-        await upsertCloudChallenge(newChallenge);
+  const handleCreateChallenge = useCallback(async (newChallenge) => {
+    if (!newChallenge?.id) return;
+    const res = await runWithLock(`create-challenge-${newChallenge.id}`, async () => {
+      setChallenges((prev) => mergeListById(prev, newChallenge, true));
+      await upsertCloudChallenge(newChallenge);
 
-        const challenger = playersRef.current.find((p) => p.id === newChallenge.playerAId);
-        if (newChallenge.playerBId) {
-          sendPushNotification({
-            targetPlayerIds: [newChallenge.playerBId],
-            title: '¡Nuevo desafío en TOTAL TENIS!',
-            message: `${challenger?.name || 'Un jugador'} te retó en ${
-              newChallenge.clubName || 'cancha'
-            } (${newChallenge.dateLabel || ''} ${newChallenge.timeLabel || ''}).`,
-            path: '/',
-          });
-        }
-        requestPushPermission();
-      });
+      const challenger = playersRef.current.find((p) => p.id === newChallenge.playerAId);
+      if (newChallenge.playerBId) {
+        sendPushNotification({
+          targetPlayerIds: [newChallenge.playerBId],
+          title: '¡Nuevo desafío en TOTAL TENIS!',
+          message: `${challenger?.name || 'Un jugador'} te retó en ${
+            newChallenge.clubName || 'cancha'
+          } (${newChallenge.dateLabel || ''} ${newChallenge.timeLabel || ''}).`,
+          path: '/',
+        });
+      }
+      requestPushPermission();
+    });
 
-      if (res.locked) return;
-    },
-    []
-  );
+    if (res.locked) return;
+  }, []);
 
   const handleUpdateChallenge = useCallback(
     async (challengeId, patch) => {
@@ -683,7 +714,6 @@ export default function App() {
       const current = challenges.find((c) => c.id === challengeId);
       if (!current) return;
 
-      // Seguridad multiusuario: solo contendientes o admin pueden editar un reto
       const isParticipant =
         currentUser?.id &&
         (current.playerAId === currentUser.id || current.playerBId === currentUser.id);
@@ -726,13 +756,27 @@ export default function App() {
     [challenges, currentUser?.id, effectiveIsAdmin, showToast]
   );
 
-  /* Confirmación definitiva de puntos (ejecutada UNA sola vez con candado 4G) */
+  /* Confirmación definitiva de puntos + salto automático al Ranking FLIP si cambió tu puesto */
   const applyOfficialMatchResult = useCallback(
-    async ({ challenge, winnerSide, summary, deltaA, deltaB, newPointsA, newPointsB, liveScore }) => {
+    async ({
+      challenge,
+      winnerSide,
+      summary,
+      deltaA,
+      deltaB,
+      newPointsA,
+      newPointsB,
+      liveScore,
+      autoJumpToRanking = true,
+    }) => {
       if (!challenge?.id) return;
 
       const lockRes = await runWithLock(`apply-result-${challenge.id}`, async () => {
         setBusyActionId(challenge.id);
+
+        // Guardar mapa de posiciones previo para que la animación FLIP estilo Apple siempre se dispare limpia
+        const preRankMap = snapshotPreMatchRankMap(playersRef.current);
+
         const winnerId = winnerSide === 'A' ? challenge.playerAId : challenge.playerBId;
         const finishedChallenge = {
           ...challenge,
@@ -785,18 +829,18 @@ export default function App() {
         const resA = buildUpdatedPlayer(playerA, true);
         const resB = buildUpdatedPlayer(playerB, false);
 
+        const nextPlayersList = playersRef.current
+          .map((p) => {
+            if (resA && p.id === resA.updated.id) return resA.updated;
+            if (resB && p.id === resB.updated.id) return resB.updated;
+            return p;
+          })
+          .sort((a, b) => (Number(b.points) || 0) - (Number(a.points) || 0));
+
         setChallenges((prev) =>
           prev.map((c) => (c.id === challenge.id ? finishedChallenge : c))
         );
-        setPlayers((prev) =>
-          prev
-            .map((p) => {
-              if (resA && p.id === resA.updated.id) return resA.updated;
-              if (resB && p.id === resB.updated.id) return resB.updated;
-              return p;
-            })
-            .sort((a, b) => (Number(b.points) || 0) - (Number(a.points) || 0))
-        );
+        setPlayers(nextPlayersList);
 
         await Promise.all([
           upsertCloudChallenge(finishedChallenge),
@@ -836,16 +880,41 @@ export default function App() {
 
         setDismissedScoreIds((prev) => prev.filter((id) => id !== challenge.id));
         setBusyActionId(null);
+
+        // Si el usuario actual jugó un partido oficial y cambió de puesto -> salto automático al Ranking FLIP
+        if (
+          autoJumpToRanking &&
+          challenge.mode !== 'Amistoso' &&
+          currentUserId &&
+          (challenge.playerAId === currentUserId || challenge.playerBId === currentUserId)
+        ) {
+          const postOrdered = sortPlayersForOfficialRanking(nextPlayersList);
+          const oldRank = preRankMap[currentUserId];
+          const newRankIdx = postOrdered.findIndex((p) => p.id === currentUserId);
+          const newRank = newRankIdx >= 0 ? newRankIdx + 1 : null;
+
+          if (oldRank && newRank && oldRank !== newRank) {
+            window.setTimeout(() => {
+              setActiveTab('ranking');
+              showToast(
+                newRank < oldRank
+                  ? `¡Subiste al puesto #${newRank} en el Ranking!`
+                  : `Tu posición cambió al puesto #${newRank} en el Ranking.`,
+                newRank < oldRank ? 'success' : 'info'
+              );
+            }, 320);
+          }
+        }
       });
 
       if (lockRes.locked) {
         showToast('Ya estamos procesando este marcador, espera un segundo...', 'info');
       }
     },
-    [appendGemLedger, showToast]
+    [appendGemLedger, currentUserId, showToast]
   );
 
-  /* Doble confirmación de marcador (Punto 3) */
+  /* Doble confirmación de marcador */
   const handleFinalizeMatch = useCallback(
     async ({ challenge, eloResult, liveScore }) => {
       if (!challenge || !eloResult?.ok) return;
@@ -859,7 +928,6 @@ export default function App() {
         return;
       }
 
-      // Si es Admin o el rival ya había propuesto el score, se aplica oficialmente
       const canFinalizeImmediately =
         effectiveIsAdmin ||
         (challenge.status === 'SCORE_PROPOSED' &&
@@ -876,12 +944,12 @@ export default function App() {
           newPointsA: eloResult.newPointsA,
           newPointsB: eloResult.newPointsB,
           liveScore,
+          autoJumpToRanking: true,
         });
         showToast('Marcador confirmado y puntos actualizados en vivo.', 'success');
         return;
       }
 
-      // Primer envío: queda en SCORE_PROPOSED esperando confirmación del rival
       await runWithLock(`propose-score-${challenge.id}`, async () => {
         const winnerId = eloResult.winnerSide === 'A' ? challenge.playerAId : challenge.playerBId;
         const proposedChallenge = {
@@ -931,8 +999,7 @@ export default function App() {
     async (ch) => {
       if (!ch || ch.status !== 'SCORE_PROPOSED') return;
       const meta = ch.liveScore?._meta || {};
-      const winnerSide =
-        meta.winnerSide || (ch.winnerId === ch.playerAId ? 'A' : 'B');
+      const winnerSide = meta.winnerSide || (ch.winnerId === ch.playerAId ? 'A' : 'B');
 
       await applyOfficialMatchResult({
         challenge: ch,
@@ -943,6 +1010,7 @@ export default function App() {
         newPointsA: meta.newPointsA,
         newPointsB: meta.newPointsB,
         liveScore: ch.liveScore,
+        autoJumpToRanking: true,
       });
       triggerHaptic('success');
       showToast('¡Marcador confirmado oficialmente! El ranking ya se actualizó.', 'success');
@@ -985,18 +1053,18 @@ export default function App() {
     (rival) => {
       if (!currentUser) {
         showToast('Inicia sesión para desafiar a este jugador.', 'info');
-        setAuthModal({ open: true, mode: 'login' });
+        openAuthSheet('login');
         return;
       }
       setInspectPlayerId(null);
       setActiveTab('retos');
       scrollMainToTop();
       showToast(
-        `Toca "Lanzar un reto" para pactar horario y sede con ${rival?.name || 'tu rival'}.`,
+        `Toca "Lanzar Reto" para pactar horario y sede con ${rival?.name || 'tu rival'}.`,
         'info'
       );
     },
-    [currentUser, scrollMainToTop, showToast]
+    [currentUser, openAuthSheet, scrollMainToTop, showToast]
   );
 
   const handleRequestTournamentInscription = useCallback(
@@ -1061,7 +1129,7 @@ export default function App() {
     [tournaments]
   );
 
-  /* Reporte climático anti-farmeo (Punto 10: +3 Gemas, 1/24h usuario, 3h sede) */
+  /* Reporte climático anti-farmeo (+3 Gemas, 1/24h usuario, 3h sede) */
   const handleReportClubWeather = useCallback(
     async ({ clubId, conditionKey }) => {
       if (!clubId || !conditionKey) return;
@@ -1266,7 +1334,6 @@ export default function App() {
     [appendGemLedger]
   );
 
-  /* Cierre de sesión limpio sin pantalla colgada ("Ajustando la cancha...") */
   const handleLogout = useCallback(async () => {
     triggerHaptic('medium');
     await signOutCloudAccount();
@@ -1326,10 +1393,10 @@ export default function App() {
         onOpenNotices={(tab = 'notificaciones') => setNoticesModal({ open: true, tab })}
         onOpenVipScale={(tab = 'vip') => setVipScaleModal({ open: true, tab })}
         onOpenStories={(payload = null) => setStoriesModal({ open: true, payload })}
-        onOpenAuth={(mode = 'login') => setAuthModal({ open: true, mode })}
+        onOpenAuth={openAuthSheet}
         onOpenPartnerPortal={() => {
-          if (activePartner) setPartnerModalOpen(true);
-          else setAuthModal({ open: true, mode: 'partner' });
+          if (activePartner || effectiveIsAdmin) setPartnerModalOpen(true);
+          else openAuthSheet('partner');
         }}
         onOpenLegal={(section = 'reclamaciones') => setLegalModal({ open: true, section })}
         onOpenTutorial={() => setTutorialOpen(true)}
@@ -1362,7 +1429,7 @@ export default function App() {
                 onFinalizeMatch={handleFinalizeMatch}
                 onOpenPlayerProfile={(p) => setInspectPlayerId(p.id)}
                 onOpenStoriesWithMatch={(payload) => setStoriesModal({ open: true, payload })}
-                onOpenAuth={(mode) => setAuthModal({ open: true, mode })}
+                onOpenAuth={openAuthSheet}
                 onGoToTournaments={handleOpenTournamentsAt}
                 onNotify={showToast}
               />
@@ -1404,7 +1471,7 @@ export default function App() {
                 onOpenHeadToHead={(rival) =>
                   setH2hModal({ open: true, playerA: currentUser, playerB: rival })
                 }
-                onOpenAuth={(mode) => setAuthModal({ open: true, mode })}
+                onOpenAuth={openAuthSheet}
                 onNotify={showToast}
               />
             )}
@@ -1428,11 +1495,11 @@ export default function App() {
                   })
                 }
                 onOpenPartnerPortal={() => {
-                  if (activePartner) setPartnerModalOpen(true);
-                  else setAuthModal({ open: true, mode: 'partner' });
+                  if (activePartner || effectiveIsAdmin) setPartnerModalOpen(true);
+                  else openAuthSheet('partner');
                 }}
                 onOpenVipCard={() => setVipScaleModal({ open: true, tab: 'vip' })}
-                onOpenAuth={(mode) => setAuthModal({ open: true, mode })}
+                onOpenAuth={openAuthSheet}
                 onNotify={showToast}
               />
             )}
@@ -1444,8 +1511,10 @@ export default function App() {
                 players={activePlayers}
                 clubs={activeClubs}
                 challenges={challenges}
+                seasonSnapshots={seasonSnapshots}
                 theme={theme}
                 sunlightMode={sunlightMode}
+                readOnly={false}
                 onUpdateProfile={handleUpdatePlayer}
                 onUnlockScenario={({ scenarioId, gemsCost }) =>
                   handleDeductGemsForUnlock({
@@ -1455,19 +1524,8 @@ export default function App() {
                         new Set([...(p.unlockedScenarios || ['default']), scenarioId])
                       ),
                     }),
-                    ledgerTitle: 'Escenario Grand Slam',
+                    ledgerTitle: 'Fondo de Perfil',
                     ledgerDetail: `Escenario "${scenarioId}" desbloqueado`,
-                  })
-                }
-                onUnlockBadge={({ badgeId, gemsCost, name }) =>
-                  handleDeductGemsForUnlock({
-                    gemsCost,
-                    patchPlayer: (p) => ({
-                      unlockedBadges: Array.from(new Set([...(p.unlockedBadges || []), badgeId])),
-                      activeBadgeId: badgeId,
-                    }),
-                    ledgerTitle: `Distintivo: ${name}`,
-                    ledgerDetail: 'Equipado en Mi Perfil',
                   })
                 }
                 onOpenVipCard={() => setVipScaleModal({ open: true, tab: 'vip' })}
@@ -1476,7 +1534,7 @@ export default function App() {
                 }
                 onOpenStoriesWithMatch={(payload) => setStoriesModal({ open: true, payload })}
                 onQuickChallenge={handleQuickChallengeFromAnywhere}
-                onOpenAuth={(mode) => setAuthModal({ open: true, mode })}
+                onOpenAuth={openAuthSheet}
                 onNotify={showToast}
               />
             )}
@@ -1493,8 +1551,8 @@ export default function App() {
             onOpenStories={() => setStoriesModal({ open: true, payload: null })}
             onOpenNews={(tab) => setNoticesModal({ open: true, tab })}
             onOpenPartnerPortal={() => {
-              if (activePartner) setPartnerModalOpen(true);
-              else setAuthModal({ open: true, mode: 'partner' });
+              if (activePartner || effectiveIsAdmin) setPartnerModalOpen(true);
+              else openAuthSheet('partner');
             }}
             onOpenLegal={(section) => setLegalModal({ open: true, section })}
             onOpenTutorial={() => setTutorialOpen(true)}
@@ -1503,7 +1561,7 @@ export default function App() {
         </div>
       </main>
 
-      {/* 5. BARRA DE NAVEGACIÓN INFERIOR (INTACTA) */}
+      {/* 5. BARRA DE NAVEGACIÓN INFERIOR (SELLADA INTACTA) */}
       <BottomDock
         activeTab={activeTab}
         onSelectTab={handleSelectTab}
@@ -1515,7 +1573,7 @@ export default function App() {
         sunlightMode={sunlightMode}
       />
 
-      {/* MODAL HOMOGENEIZADO DE FICHA DE RIVAL */}
+      {/* MODAL DE FICHA DE RIVAL — 100% SOLO LECTURA (SIN TUERQUITA NI CARNET) */}
       <ModalPortal
         isOpen={Boolean(inspectedPlayer)}
         onClose={() => setInspectPlayerId(null)}
@@ -1551,23 +1609,28 @@ export default function App() {
 
             <PerfilView
               player={inspectedPlayer}
-              currentUser={currentUser}
+              currentUser={null}
               players={activePlayers}
               clubs={activeClubs}
               challenges={challenges}
+              seasonSnapshots={seasonSnapshots}
               theme={theme}
               sunlightMode={sunlightMode}
-              onUpdateProfile={handleUpdatePlayer}
-              onOpenHeadToHead={(rival) => {
-                setInspectPlayerId(null);
-                setH2hModal({ open: true, playerA: currentUser, playerB: rival });
-              }}
-              onQuickChallenge={handleQuickChallengeFromAnywhere}
-              onOpenStoriesWithMatch={(payload) => {
-                setInspectPlayerId(null);
-                setStoriesModal({ open: true, payload });
-              }}
-              onOpenAuth={(mode) => setAuthModal({ open: true, mode })}
+              readOnly={true}
+              onOpenHeadToHead={
+                currentUser && currentUser.id !== inspectedPlayer.id
+                  ? (rival) => {
+                      setInspectPlayerId(null);
+                      setH2hModal({ open: true, playerA: currentUser, playerB: rival });
+                    }
+                  : undefined
+              }
+              onQuickChallenge={
+                !currentUser || currentUser.id !== inspectedPlayer.id
+                  ? handleQuickChallengeFromAnywhere
+                  : undefined
+              }
+              onOpenAuth={openAuthSheet}
               onNotify={showToast}
             />
           </div>
@@ -1660,7 +1723,7 @@ export default function App() {
         )}
       </ModalPortal>
 
-      {/* POP-UP DE DOBLE CONFIRMACIÓN DE MARCADOR (PUNTO 3) */}
+      {/* POP-UP DE DOBLE CONFIRMACIÓN DE MARCADOR */}
       <ModalPortal
         isOpen={Boolean(scoreConfirmChallenge)}
         onClose={() => {
@@ -1677,9 +1740,7 @@ export default function App() {
           <div className="tt-incoming-popup-stack">
             <div className="tt-ip-rival-card">
               <div style={{ width: '100%' }}>
-                <strong>
-                  {scoreProposer?.name || 'Tu rival'} cargó el resultado
-                </strong>
+                <strong>{scoreProposer?.name || 'Tu rival'} cargó el resultado</strong>
                 <span>
                   {scoreConfirmChallenge.clubName} · Marcador:{' '}
                   <b style={{ color: '#00DC7D' }}>{scoreConfirmChallenge.scoreSummary}</b>
@@ -1730,26 +1791,28 @@ export default function App() {
         )}
       </ModalPortal>
 
-      {/* LOS 10 MODALES PREMIUM EN CAPA GLOBAL */}
+      {/* LOS 10 MODALES GLOBALES */}
       <ProShopAndGemsModal
         isOpen={proShopModal.open}
         initialMode={proShopModal.mode}
         onClose={() => setProShopModal((s) => ({ ...s, open: false }))}
         currentUser={currentUser}
+        isAdmin={effectiveIsAdmin}
         products={products}
         clubs={activeClubs}
         gemLedger={gemLedger}
         theme={theme}
-        onProShopRedeem={({ gemsSpent, productName, cashAmount }) =>
+        onProductsUpdated={setProducts}
+        onProShopRedeem={({ gemsSpent, productName }) =>
           handleDeductGemsForUnlock({
             gemsCost: gemsSpent,
             patchPlayer: {},
             ledgerTitle: `Pro Shop: ${productName}`,
-            ledgerDetail: cashAmount > 0 ? `Copago + S/ ${cashAmount}.00` : 'Canje 100 %',
+            ledgerDetail: 'Canje en Almacén TOTAL TENIS',
           })
         }
         onOpenVipCard={() => setVipScaleModal({ open: true, tab: 'vip' })}
-        onOpenAuth={(mode) => setAuthModal({ open: true, mode })}
+        onOpenAuth={openAuthSheet}
         onNotify={showToast}
       />
 
@@ -1811,31 +1874,7 @@ export default function App() {
         clubs={activeClubs}
         theme={theme}
         onRequestVipUpgrade={handleRequestVipUpgrade}
-        onOpenAuth={(mode) => setAuthModal({ open: true, mode })}
-        onNotify={showToast}
-      />
-
-      <AuthAndOnboardingModal
-        isOpen={authModal.open}
-        initialMode={authModal.mode}
-        onClose={() => setAuthModal((s) => ({ ...s, open: false }))}
-        players={players}
-        clubs={activeClubs}
-        onLoginSuccess={(p) => {
-          if (!p?.id) return;
-          setPlayers((prev) => mergeListById(prev, p, false));
-          setCurrentUserId(p.id);
-          setIsAdminSession(Boolean(p.isAdmin));
-          linkOneSignalUser(p.id);
-          requestPushPermission();
-        }}
-        onRegisterComplete={handleRegisterComplete}
-        onResetPassword={(playerId, newPass) => handleUpdatePlayer(playerId, { password: newPass })}
-        onPartnerLoginSuccess={(partnerObj) => {
-          setActivePartner(partnerObj);
-          setPartnerModalOpen(true);
-        }}
-        onOpenLegalModal={(section) => setLegalModal({ open: true, section })}
+        onOpenAuth={openAuthSheet}
         onNotify={showToast}
       />
 
@@ -1875,6 +1914,18 @@ export default function App() {
         clubs={clubs}
         coaches={coaches}
         theme={theme}
+        onSaveCoachChanges={(updatedCoach) => {
+          if (updatedCoach?.id) {
+            setCoaches((prev) => mergeListById(prev, updatedCoach, false));
+          }
+        }}
+        onSaveClubChanges={(clubId, updatedClub) => {
+          if (clubId && updatedClub) {
+            setClubs((prev) =>
+              prev.map((c) => (c.id === clubId ? { ...c, ...updatedClub } : c))
+            );
+          }
+        }}
         onUpdateClubWeather={handleReportClubWeather}
         onNotify={showToast}
       />
@@ -1976,6 +2027,32 @@ export default function App() {
         onNavigateTab={handleSelectTab}
       />
 
+      {/* AUTH AL FINAL DEL ÁRBOL + CAPA MÁXIMA isAuthLayer PARA SUBIR SIEMPRE ENCIMA */}
+      <AuthAndOnboardingModal
+        isOpen={authModal.open}
+        initialMode={authModal.mode}
+        isAuthLayer={true}
+        onClose={() => setAuthModal((s) => ({ ...s, open: false }))}
+        players={players}
+        clubs={activeClubs}
+        onLoginSuccess={(p) => {
+          if (!p?.id) return;
+          setPlayers((prev) => mergeListById(prev, p, false));
+          setCurrentUserId(p.id);
+          setIsAdminSession(Boolean(p.isAdmin));
+          linkOneSignalUser(p.id);
+          requestPushPermission();
+        }}
+        onRegisterComplete={handleRegisterComplete}
+        onResetPassword={(playerId, newPass) => handleUpdatePlayer(playerId, { password: newPass })}
+        onPartnerLoginSuccess={(partnerObj) => {
+          setActivePartner(partnerObj);
+          setPartnerModalOpen(true);
+        }}
+        onOpenLegalModal={(section) => setLegalModal({ open: true, section })}
+        onNotify={showToast}
+      />
+
       {toast && (
         <div
           key={toast.id}
@@ -2018,11 +2095,14 @@ export default function App() {
         .tt-slim-ticker-btn {
           width: 100%;
           max-width: var(--tt-container-max, 760px);
-          min-height: 28px;
+          min-height: 29px;
           padding: 4px 12px;
           border-radius: 999px;
-          background: rgba(0, 220, 125, 0.12);
-          border: 1px solid rgba(0, 220, 125, 0.34);
+          background: rgba(0, 220, 125, 0.11);
+          border: 1px solid rgba(0, 220, 125, 0.32);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
           color: var(--tt-text);
           display: inline-flex;
           align-items: center;
@@ -2032,6 +2112,10 @@ export default function App() {
           font-weight: 800;
           white-space: nowrap;
           overflow: hidden;
+          transition: transform 160ms cubic-bezier(0.22, 1.35, 0.36, 1);
+        }
+        .tt-slim-ticker-btn:active {
+          transform: scale(0.98);
         }
         .tt-app-viewport.is-light .tt-slim-ticker-btn {
           background: #1E0734;
@@ -2068,7 +2152,7 @@ export default function App() {
           padding: 6px 12px calc(108px + env(safe-area-inset-bottom, 0px));
         }
         .tt-view-transition {
-          animation: ttViewFadeIn 200ms cubic-bezier(0.22, 1, 0.36, 1);
+          animation: ttViewFadeIn 220ms cubic-bezier(0.22, 1, 0.36, 1);
         }
         @keyframes ttViewFadeIn {
           from { opacity: 0; transform: translateY(5px); }
@@ -2142,25 +2226,27 @@ export default function App() {
           transform: translateX(-50%);
           z-index: 9999;
           max-width: min(92vw, 440px);
-          padding: 10px 15px;
+          padding: 10px 16px;
           border-radius: 999px;
-          background: rgba(20, 4, 36, 0.96);
+          background: rgba(20, 4, 36, 0.92);
+          backdrop-filter: blur(18px) saturate(160%);
+          -webkit-backdrop-filter: blur(18px) saturate(160%);
           color: #FAF9F5;
-          border: 1.5px solid rgba(0, 220, 125, 0.6);
-          box-shadow: 0 14px 32px rgba(0, 0, 0, 0.45);
+          border: 1px solid rgba(0, 220, 125, 0.52);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 14px 32px rgba(0, 0, 0, 0.45);
           display: inline-flex;
           align-items: center;
           gap: 9px;
           font-size: 0.78rem;
           font-weight: 800;
           cursor: pointer;
-          animation: ttToastDrop 220ms cubic-bezier(0.22, 1.32, 0.36, 1);
+          animation: ttToastDrop 240ms cubic-bezier(0.22, 1.32, 0.36, 1);
         }
         .tt-global-toast.is-warning {
-          border-color: #F59E0B;
+          border-color: #E5C16C;
         }
         .tt-global-toast.is-warning .tt-toast-dot {
-          background: #F59E0B;
+          background: #E5C16C;
         }
         .tt-toast-dot {
           width: 8px;
