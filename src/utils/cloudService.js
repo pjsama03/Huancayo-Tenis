@@ -2,11 +2,10 @@ import { supabase } from '../supabaseClient';
 
 /* ==========================================================================
    TOTAL TENIS · SERVICIO CLOUD EN TIEMPO REAL (SUPABASE + STORAGE + PUSH)
-   - Sincronización multiusuario (perfiles, retos, torneos, clubes, coaches,
-     productos, reclamos, historial de gemas y configuración global).
-   - Compresión inteligente en cliente (máx. 800px, ~75KB) -> Bucket 'media'.
+   - Sincronización multiusuario con respaldo automático de escudos y portadas.
+   - Compresión inteligente en cliente (máx. 800px) -> Bucket público 'media'.
    - Candado anti-doble clic en redes 4G inestables.
-   - Enlace directo con OneSignal v16 + disparador seguro vía /api/push.
+   - Enlace OneSignal v16 + disparador seguro vía /api/push.
    - Utilidades oficiales: Hora Perú (America/Lima), WhatsApp +51 y regla 24h.
    ========================================================================== */
 
@@ -15,6 +14,148 @@ export const isCloudReady = Boolean(supabase);
 const SITE_ORIGIN = 'https://huancayo-tenis.vercel.app';
 const PERU_TZ = 'America/Lima';
 const AUTO_CONFIRM_HOURS = 24;
+
+/* Respaldo blindado de los 4 escudos oficiales, portadas, galerías y beneficios VIP */
+const CLUB_VISUAL_FALLBACKS = {
+  'club-country': {
+    logo: '/assets/club-country-huancas.png',
+    cover: '/assets/sede-country-club.jpg',
+    mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Country+Club+Los+Huancas+Huancayo',
+    gallery: [
+      { id: 'cc-1', title: 'Cancha Central de Arcilla', image: '/assets/sede-country-club.jpg' },
+      { id: 'cc-2', title: 'Copa Los Huancas · Pista 1', image: '/assets/torneo-apertura.jpg' },
+      { id: 'cc-3', title: 'Superficie Polvo de Ladrillo', image: '/assets/perfil-bg-arcilla.jpg' },
+    ],
+    rates: { diaRegular: 36, diaVip: 28, nocheRegular: 46, nocheVip: 38 },
+    services: [
+      '6 canchas profesionales de arcilla',
+      'Iluminación LED nocturna hasta 10:00 p. m.',
+      'Vestuarios con ducha y casilleros',
+      'Estacionamiento privado y cafetería',
+    ],
+    vipBenefits: [
+      'Tarifa preferencial VIP: S/ 28 día · S/ 38 noche LED',
+      'Descuento especial en horas valle (Mar y Jue 10:00 a. m. – 2:00 p. m.)',
+      'Prioridad de reserva en canchas centrales para retos oficiales',
+    ],
+  },
+  'club-romina': {
+    logo: '/assets/club-romina-cutipa.png',
+    cover: '/assets/sede-romina-cutipa.jpg',
+    mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Academia+de+Tenis+Romina+Cutipa+Huancayo',
+    gallery: [
+      { id: 'rc-1', title: 'Pista Principal San Carlos', image: '/assets/sede-romina-cutipa.jpg' },
+      { id: 'rc-2', title: 'Canchas de Competencia', image: '/assets/torneo-altura.jpg' },
+      { id: 'rc-3', title: 'Entrenamiento Técnico', image: '/assets/portada-tips-semana.jpg' },
+    ],
+    rates: { diaRegular: 32, diaVip: 24, nocheRegular: 42, nocheVip: 34 },
+    services: [
+      '4 canchas de arcilla rápida con drenaje',
+      'Iluminación LED antideslumbrante',
+      'Zona de preparación física y calentamiento',
+      'Área techada con vista directa a pista',
+    ],
+    vipBenefits: [
+      'Tarifa preferencial VIP: S/ 24 día · S/ 34 noche LED',
+      'Tarifa Socio en clases grupales y clínicas de la academia',
+      'Mañanas activas VIP a S/ 16 la hora (Lun a Vie)',
+    ],
+  },
+  'club-tauro': {
+    logo: '/assets/club-tauro.png',
+    cover: '/assets/sede-club-tauro.jpg',
+    mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Tauro+Tenis+Huancayo',
+    gallery: [
+      { id: 'tt-1', title: 'Canchas Club Tauro Tenis', image: '/assets/sede-club-tauro.jpg' },
+      { id: 'tt-2', title: 'Torneos Nocturnos', image: '/assets/torneo-dobles-valle.jpg' },
+      { id: 'tt-3', title: 'Arcilla al Atardecer', image: '/assets/bienvenida-hero-claro.jpg' },
+    ],
+    rates: { diaRegular: 30, diaVip: 22, nocheRegular: 40, nocheVip: 32 },
+    services: [
+      '3 canchas de arcilla compacta',
+      'Torres LED para turnos nocturnos',
+      'Estacionamiento seguro junto a pista',
+      'Terraza social post-partido',
+    ],
+    vipBenefits: [
+      'Tarifa preferencial VIP: S/ 22 día · S/ 32 noche LED',
+      'Promo Mediodía VIP a S/ 15/h (Lun a Jue 11:00 a. m. – 3:00 p. m.)',
+      'Acceso preferente a torneos relámpago nocturnos',
+    ],
+  },
+  'club-inkas': {
+    logo: '/assets/club-los-inkas.png',
+    cover: '/assets/sede-los-inkas.jpg',
+    mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Club+Los+Inkas+Huancayo+Tenis',
+    gallery: [
+      { id: 'li-1', title: 'Canchas Campestres Los Inkas', image: '/assets/sede-los-inkas.jpg' },
+      { id: 'li-2', title: 'Vista Abierta al Valle', image: '/assets/bienvenida-hero-claro.jpg' },
+      { id: 'li-3', title: 'Cancha 1 Oficial', image: '/assets/torneo-altura.jpg' },
+    ],
+    rates: { diaRegular: 30, diaVip: 22, nocheRegular: 38, nocheVip: 30 },
+    services: [
+      '4 canchas campestres de arcilla',
+      'Iluminación LED en Canchas 1 y 2',
+      'Áreas verdes y zona familiar',
+      'Vestuarios y estacionamiento amplio',
+    ],
+    vipBenefits: [
+      'Tarifa preferencial VIP: S/ 22 día · S/ 30 noche LED',
+      'Tarifa Plana VIP a S/ 14/h los martes y miércoles',
+      'Descuento en clínicas de dobles de fin de semana',
+    ],
+  },
+};
+CLUB_VISUAL_FALLBACKS['club-cutipa'] = CLUB_VISUAL_FALLBACKS['club-romina'];
+
+const COACH_PHOTO_FALLBACKS = {
+  'coach-romina': '/assets/sede-romina-cutipa.jpg',
+  'coach-rodrigo': '/assets/sede-country-club.jpg',
+  'coach-carlos': '/assets/sede-club-tauro.jpg',
+  'coach-andrea': '/assets/sede-los-inkas.jpg',
+};
+
+function getClubFallback(clubId, clubName = '') {
+  if (CLUB_VISUAL_FALLBACKS[clubId]) return CLUB_VISUAL_FALLBACKS[clubId];
+  const lower = String(clubName || '').toLowerCase();
+  if (lower.includes('huancas') || lower.includes('country')) return CLUB_VISUAL_FALLBACKS['club-country'];
+  if (lower.includes('romina') || lower.includes('cutipa')) return CLUB_VISUAL_FALLBACKS['club-romina'];
+  if (lower.includes('tauro')) return CLUB_VISUAL_FALLBACKS['club-tauro'];
+  if (lower.includes('inka') || lower.includes('inca')) return CLUB_VISUAL_FALLBACKS['club-inkas'];
+  return {
+    logo: '/assets/logo-total-tenis.png',
+    cover: '/assets/torneo-apertura.jpg',
+    mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${clubName || 'Club de Tenis'} Huancayo`)}`,
+    gallery: [{ id: 'def-1', title: 'Cancha Oficial', image: '/assets/torneo-apertura.jpg' }],
+    rates: { diaRegular: 32, diaVip: 25, nocheRegular: 42, nocheVip: 34 },
+    services: ['Canchas de arcilla', 'Iluminación LED', 'Estacionamiento'],
+    vipBenefits: ['Tarifa preferencial en alquiler de cancha presentando tu Carnet 3D VIP'],
+  };
+}
+
+function normalizeClubGallery(rawGallery, fallbackGallery, coverUrl) {
+  const source = Array.isArray(rawGallery) && rawGallery.length > 0 ? rawGallery : fallbackGallery;
+  const normalized = (source || [])
+    .map((item, idx) => {
+      if (typeof item === 'string' && item.trim()) {
+        return { id: `gal-${idx}`, title: `Foto ${idx + 1}`, image: item.trim() };
+      }
+      if (item && (item.image || item.url)) {
+        return {
+          id: item.id || `gal-${idx}`,
+          title: item.title || `Cancha ${idx + 1}`,
+          image: item.image || item.url,
+        };
+      }
+      return null;
+    })
+    .filter(Boolean);
+
+  if (normalized.length === 0 && coverUrl) {
+    return [{ id: 'gal-cover', title: 'Vista Principal', image: coverUrl }];
+  }
+  return normalized;
+}
 
 /* Candado en memoria para impedir envíos duplicados en 4G */
 const inFlightLocks = new Set();
@@ -78,12 +219,13 @@ export function hoursLeftForAutoConfirm(challenge) {
   if (!challenge || challenge.status !== 'SCORE_PROPOSED') return 0;
   const proposedAtIso = challenge.liveScore?._meta?.proposedAt || challenge.createdAt;
   if (!proposedAtIso) return AUTO_CONFIRM_HOURS;
-  const remainingMs = AUTO_CONFIRM_HOURS * 60 * 60 * 1000 - (Date.now() - new Date(proposedAtIso).getTime());
+  const remainingMs =
+    AUTO_CONFIRM_HOURS * 60 * 60 * 1000 - (Date.now() - new Date(proposedAtIso).getTime());
   return Math.max(0, Math.ceil(remainingMs / (60 * 60 * 1000)));
 }
 
 /* --------------------------------------------------------------------------
-   2. ENLACE ONESIGNAL v16 (VINCULA ESTE CELULAR CON EL ID DEL JUGADOR)
+   2. ENLACE ONESIGNAL v16
    -------------------------------------------------------------------------- */
 export function linkOneSignalUser(playerId) {
   if (typeof window === 'undefined' || !playerId) return;
@@ -93,11 +235,11 @@ export function linkOneSignalUser(playerId) {
       try {
         await OneSignal.login(String(playerId));
       } catch {
-        // Silencioso si el navegador bloquea Service Workers (modo incógnito)
+        // Silencioso
       }
     });
   } catch {
-    // No interrumpir flujo de sesión
+    // No interrumpir flujo
   }
 }
 
@@ -113,7 +255,7 @@ export function unlinkOneSignalUser() {
       }
     });
   } catch {
-    // No interrumpir cierre de sesión
+    // No interrumpir flujo
   }
 }
 
@@ -141,7 +283,7 @@ export async function requestPushPermission() {
 }
 
 /* --------------------------------------------------------------------------
-   3. COMPRESIÓN SEGURA (iOS + ANDROID 2GB RAM) + SUBIDA A SUPABASE STORAGE
+   3. COMPRESIÓN SEGURA + SUBIDA A SUPABASE STORAGE ('media')
    -------------------------------------------------------------------------- */
 export async function compressImageToBlob(fileOrDataUrl, maxSide = 800, quality = 0.8) {
   return new Promise((resolve, reject) => {
@@ -249,7 +391,7 @@ export async function uploadCompressedMedia(fileOrDataUrl, folder = 'avatars', e
 }
 
 /* --------------------------------------------------------------------------
-   4. AUTENTICACIÓN SEGURA EN SUPABASE AUTH (CERO CRASHES AL CAMBIAR CUENTA)
+   4. AUTENTICACIÓN SEGURA EN SUPABASE AUTH
    -------------------------------------------------------------------------- */
 export async function getCloudSession() {
   if (!supabase) return null;
@@ -304,7 +446,7 @@ export async function signOutCloudAccount() {
   try {
     await supabase.auth.signOut();
   } catch {
-    // Limpieza silenciosa aunque la sesión ya hubiera expirado
+    // Limpieza silenciosa
   }
 }
 
@@ -319,10 +461,13 @@ export function onCloudAuthStateChange(callback) {
 }
 
 /* --------------------------------------------------------------------------
-   5. CONVERSORES ENTRE SQL (snake_case) Y REACT (camelCase)
+   5. CONVERSORES UNIFICADOS SQL (snake_case) <-> REACT (camelCase)
+   Garantiza que logo, cover, banner, photo y scenarioId siempre lleguen completos.
    -------------------------------------------------------------------------- */
 export function dbToPlayer(row) {
   if (!row) return null;
+  const avatar = row.avatar_url || '';
+  const scenario = row.cover_scenario || 'default';
   return {
     id: row.id,
     authId: row.auth_id || null,
@@ -330,6 +475,7 @@ export function dbToPlayer(row) {
     email: row.email || '',
     whatsapp: row.whatsapp || '',
     showWhatsapp: row.show_whatsapp !== false,
+    hideWhatsapp: row.show_whatsapp === false,
     age: Number(row.age) || 25,
     division: row.division || 'Varones',
     clubId: row.club_id || 'independiente',
@@ -346,8 +492,10 @@ export function dbToPlayer(row) {
     isAdmin: Boolean(row.is_admin),
     isPaused: Boolean(row.is_paused),
     isDemo: Boolean(row.is_demo),
-    avatar: row.avatar_url || '',
-    coverScenario: row.cover_scenario || 'default',
+    avatar,
+    fullBodyPhoto: avatar,
+    coverScenario: scenario,
+    scenarioId: scenario,
     unlockedScenarios: Array.isArray(row.unlocked_scenarios) ? row.unlocked_scenarios : ['default'],
     unlockedBadges: Array.isArray(row.unlocked_badges) ? row.unlocked_badges : [],
     activeBadgeId: row.active_badge_id || '',
@@ -355,6 +503,7 @@ export function dbToPlayer(row) {
     hand: row.hand || 'Diestro',
     backhand: row.backhand || '2 manos',
     weapon: row.weapon || 'Derecha',
+    bestStroke: row.weapon || 'Derecha (Forehand)',
     availability: row.availability || 'Noches y fines de semana',
     credentialId: row.credential_id || '',
     oneSignalId: row.onesignal_id || '',
@@ -368,7 +517,8 @@ export function playerToDb(p) {
   if (p.name !== undefined) out.name = String(p.name).trim();
   if (p.email !== undefined) out.email = String(p.email).trim().toLowerCase();
   if (p.whatsapp !== undefined) out.whatsapp = normalizePeruPhone(p.whatsapp);
-  if (p.showWhatsapp !== undefined) out.show_whatsapp = Boolean(p.showWhatsapp);
+  if (p.hideWhatsapp !== undefined) out.show_whatsapp = !p.hideWhatsapp;
+  else if (p.showWhatsapp !== undefined) out.show_whatsapp = Boolean(p.showWhatsapp);
   if (p.age !== undefined) out.age = Number(p.age) || 25;
   if (p.division !== undefined) out.division = p.division;
   if (p.clubId !== undefined) out.club_id = p.clubId;
@@ -386,14 +536,17 @@ export function playerToDb(p) {
   if (p.isPaused !== undefined) out.is_paused = Boolean(p.isPaused);
   if (p.isDemo !== undefined) out.is_demo = Boolean(p.isDemo);
   if (p.avatar !== undefined) out.avatar_url = p.avatar;
-  if (p.coverScenario !== undefined) out.cover_scenario = p.coverScenario;
+  else if (p.fullBodyPhoto !== undefined) out.avatar_url = p.fullBodyPhoto;
+  if (p.scenarioId !== undefined) out.cover_scenario = p.scenarioId;
+  else if (p.coverScenario !== undefined) out.cover_scenario = p.coverScenario;
   if (p.unlockedScenarios !== undefined) out.unlocked_scenarios = p.unlockedScenarios;
   if (p.unlockedBadges !== undefined) out.unlocked_badges = p.unlockedBadges;
   if (p.activeBadgeId !== undefined) out.active_badge_id = p.activeBadgeId;
   if (p.unlockedVideos !== undefined) out.unlocked_videos = p.unlockedVideos;
   if (p.hand !== undefined) out.hand = p.hand;
   if (p.backhand !== undefined) out.backhand = p.backhand;
-  if (p.weapon !== undefined) out.weapon = p.weapon;
+  if (p.bestStroke !== undefined) out.weapon = p.bestStroke;
+  else if (p.weapon !== undefined) out.weapon = p.weapon;
   if (p.availability !== undefined) out.availability = p.availability;
   if (p.credentialId !== undefined) out.credential_id = p.credentialId;
   if (p.oneSignalId !== undefined) out.onesignal_id = p.oneSignalId;
@@ -404,14 +557,20 @@ export function playerToDb(p) {
 export function dbToChallenge(row) {
   if (!row) return null;
   const liveScore = row.live_score && typeof row.live_score === 'object' ? row.live_score : {};
+  const meta = liveScore._meta || {};
+  const sched = row.scheduled_at || row.created_at;
   return {
     id: row.id,
     playerAId: row.player_a_id,
     playerBId: row.player_b_id,
+    judgeId: meta.judgeId || null,
     clubId: row.club_id || 'libre',
     clubName: row.club_name || 'Cancha Libre',
-    mode: row.mode || 'Oficial',
-    scheduledAt: row.scheduled_at || row.created_at,
+    mode: row.mode || 'Por puntos',
+    ballsAgreement: meta.ballsAgreement || '',
+    rescheduleCount: Number(meta.rescheduleCount) || 0,
+    scheduledAt: sched,
+    scheduledIso: sched,
     dateLabel: row.date_label || '',
     timeLabel: row.time_label || '',
     status: row.status || 'PENDING',
@@ -435,19 +594,28 @@ export function challengeToDb(c) {
   if (c.clubId !== undefined) out.club_id = c.clubId;
   if (c.clubName !== undefined) out.club_name = c.clubName;
   if (c.mode !== undefined) out.mode = c.mode;
-  if (c.scheduledAt !== undefined) out.scheduled_at = c.scheduledAt;
+  if (c.scheduledIso !== undefined) out.scheduled_at = c.scheduledIso;
+  else if (c.scheduledAt !== undefined) out.scheduled_at = c.scheduledAt;
   if (c.dateLabel !== undefined) out.date_label = c.dateLabel;
   if (c.timeLabel !== undefined) out.time_label = c.timeLabel;
   if (c.status !== undefined) out.status = c.status;
 
-  if (c.liveScore !== undefined || c.status === 'SCORE_PROPOSED') {
+  if (
+    c.liveScore !== undefined ||
+    c.status === 'SCORE_PROPOSED' ||
+    c.judgeId !== undefined ||
+    c.ballsAgreement !== undefined ||
+    c.rescheduleCount !== undefined
+  ) {
     const baseLive = c.liveScore && typeof c.liveScore === 'object' ? { ...c.liveScore } : {};
-    if (c.status === 'SCORE_PROPOSED' && !baseLive._meta?.proposedAt) {
-      baseLive._meta = {
-        ...(baseLive._meta || {}),
-        proposedAt: new Date().toISOString(),
-      };
+    const nextMeta = { ...(baseLive._meta || {}) };
+    if (c.status === 'SCORE_PROPOSED' && !nextMeta.proposedAt) {
+      nextMeta.proposedAt = new Date().toISOString();
     }
+    if (c.judgeId !== undefined) nextMeta.judgeId = c.judgeId;
+    if (c.ballsAgreement !== undefined) nextMeta.ballsAgreement = c.ballsAgreement;
+    if (c.rescheduleCount !== undefined) nextMeta.rescheduleCount = Number(c.rescheduleCount) || 0;
+    baseLive._meta = nextMeta;
     out.live_score = baseLive;
   }
 
@@ -463,6 +631,20 @@ export function challengeToDb(c) {
 
 export function dbToClub(row) {
   if (!row) return null;
+  const fb = getClubFallback(row.id, row.name);
+  const resolvedLogo = row.logo_url || fb.logo;
+  const resolvedCover = row.cover_url || fb.cover;
+  const resolvedMaps = row.maps_url || fb.mapsUrl;
+  const resolvedGallery = normalizeClubGallery(row.gallery, fb.gallery, resolvedCover);
+  const resolvedRates =
+    row.rates && Object.keys(row.rates).length > 0 ? row.rates : fb.rates;
+  const resolvedServices =
+    Array.isArray(row.services) && row.services.length > 0 ? row.services : fb.services;
+  const resolvedVipBenefits =
+    Array.isArray(row.vip_benefits) && row.vip_benefits.length > 0
+      ? row.vip_benefits
+      : fb.vipBenefits;
+
   return {
     id: row.id,
     name: row.name,
@@ -472,14 +654,21 @@ export function dbToClub(row) {
     hours: row.hours || '06:00 a. m. – 10:00 p. m.',
     surface: row.surface || 'Arcilla',
     courtsCount: Number(row.courts_count) || 4,
-    mapsUrl: row.maps_url || '',
+    mapsUrl: resolvedMaps,
+    googleMapsUrl: resolvedMaps,
     whatsapp: row.whatsapp || '',
-    coverUrl: row.cover_url || '',
-    logoUrl: row.logo_url || '',
-    gallery: Array.isArray(row.gallery) ? row.gallery : [],
-    rates: row.rates || {},
-    services: Array.isArray(row.services) ? row.services : [],
-    vipBenefits: Array.isArray(row.vip_benefits) ? row.vip_benefits : [],
+    // Alias unificados para que TODAS las pantallas muestren escudos y portadas sin fallos
+    logo: resolvedLogo,
+    logoUrl: resolvedLogo,
+    cover: resolvedCover,
+    coverUrl: resolvedCover,
+    banner: resolvedCover,
+    gallery: resolvedGallery,
+    galeria: resolvedGallery,
+    rates: resolvedRates,
+    tarifas: resolvedRates,
+    services: resolvedServices,
+    vipBenefits: resolvedVipBenefits,
     promos: Array.isArray(row.promos) ? row.promos : [],
     internalEvents: Array.isArray(row.internal_events) ? row.internal_events : [],
     climaBase: {
@@ -493,6 +682,10 @@ export function dbToClub(row) {
 
 export function dbToCoach(row) {
   if (!row) return null;
+  const resolvedPhoto =
+    row.photo_url || COACH_PHOTO_FALLBACKS[row.id] || '/assets/sede-country-club.jpg';
+  const resolvedCover = row.cover_url || resolvedPhoto;
+
   return {
     id: row.id,
     ownerProfileId: row.owner_profile_id || '',
@@ -501,8 +694,11 @@ export function dbToCoach(row) {
     name: row.name,
     title: row.title || 'Entrenador Oficial',
     bio: row.bio || '',
-    photoUrl: row.photo_url || '',
-    coverUrl: row.cover_url || '',
+    photo: resolvedPhoto,
+    photoUrl: resolvedPhoto,
+    portrait: resolvedPhoto,
+    fullBodyPhoto: resolvedPhoto,
+    coverUrl: resolvedCover,
     accentTheme: row.accent_theme || 'emerald',
     specialties: Array.isArray(row.specialties) ? row.specialties : [],
     baseRate: Number(row.base_rate) || 60,
@@ -522,6 +718,7 @@ export function dbToCoach(row) {
 
 export function dbToTournament(row) {
   if (!row) return null;
+  const resolvedBanner = row.banner_url || '/assets/torneo-apertura.jpg';
   return {
     id: row.id,
     name: row.name,
@@ -534,11 +731,13 @@ export function dbToTournament(row) {
     categoryLabel: row.category_label || 'Abierto',
     drawSize: Number(row.draw_size) || 16,
     minPlayers: Number(row.min_players) || 8,
+    minPlayersForDraw: Number(row.min_players) || 8,
     entryFee: Number(row.entry_fee) || 45,
     includesBalls: row.includes_balls !== false,
     hasConsolation: row.has_consolation !== false,
     includesItems: Array.isArray(row.includes_items) ? row.includes_items : [],
-    bannerUrl: row.banner_url || '',
+    banner: resolvedBanner,
+    bannerUrl: resolvedBanner,
     prizes: row.prizes || {},
     participantsIds: Array.isArray(row.participants_ids) ? row.participants_ids : [],
     pendingPaymentIds: Array.isArray(row.pending_payment_ids) ? row.pending_payment_ids : [],
@@ -554,6 +753,7 @@ export function dbToProduct(row) {
     name: row.name,
     subtitle: row.subtitle || '',
     description: row.description || '',
+    image: row.image_url || '',
     imageUrl: row.image_url || '',
     priceSoles: Number(row.price_soles) || 0,
     oldPriceSoles: row.old_price_soles ? Number(row.old_price_soles) : null,
@@ -571,7 +771,7 @@ export function dbToProduct(row) {
 }
 
 /* --------------------------------------------------------------------------
-   6. CARGA INICIAL COMPLETA + SEMILLA AUTOMÁTICA (INCLUYE COACHES)
+   6. CARGA INICIAL COMPLETA + SEMILLA CON LOGOS Y PORTADAS REALES
    -------------------------------------------------------------------------- */
 export async function fetchAllCloudState(fallbackSeeds = {}) {
   if (!supabase) return null;
@@ -604,7 +804,6 @@ export async function fetchAllCloudState(fallbackSeeds = {}) {
   let products = (productsRes.data || []).map(dbToProduct);
   const complaints = complaintsRes.data || [];
 
-  // Semilla inicial solo si las tablas están completamente vacías
   if (!profilesRes.error && players.length === 0 && fallbackSeeds.players?.length) {
     const demoRows = fallbackSeeds.players.map((p) => playerToDb({ ...p, isDemo: true }));
     const { data } = await supabase.from('profiles').upsert(demoRows).select();
@@ -612,32 +811,39 @@ export async function fetchAllCloudState(fallbackSeeds = {}) {
   }
 
   if (!clubsRes.error && clubs.length === 0 && fallbackSeeds.clubs?.length) {
-    const clubRows = fallbackSeeds.clubs.map((c) => ({
-      id: c.id,
-      name: c.name,
-      short_name: c.shortName || c.name,
-      district: c.district || 'Huancayo',
-      address: c.address || '',
-      hours: c.hours || '06:00 a. m. – 10:00 p. m.',
-      surface: c.surface || 'Arcilla',
-      courts_count: Number(c.courtsCount) || 4,
-      maps_url: c.mapsUrl || '',
-      whatsapp: normalizePeruPhone(c.whatsapp || ''),
-      cover_url: c.coverUrl || '',
-      logo_url: c.logoUrl || '',
-      gallery: c.gallery || [],
-      rates: c.rates || {},
-      services: c.services || [],
-      vip_benefits: c.vipBenefits || [
-        'Descuento preferencial en alquiler de cancha',
-        'Reserva prioritaria en horarios estelares',
-        'Tarifa preferencial en encordado y pelotas',
-      ],
-      promos: c.promos || [],
-      internal_events: c.internalEvents || [],
-      weather_condition: c.climaBase?.conditionKey || 'seco',
-      active: true,
-    }));
+    const clubRows = fallbackSeeds.clubs.map((c) => {
+      const fb = getClubFallback(c.id, c.name);
+      return {
+        id: c.id,
+        name: c.name,
+        short_name: c.shortName || c.name,
+        district: c.district || 'Huancayo',
+        address: c.address || '',
+        hours: c.hours || '06:00 a. m. – 10:00 p. m.',
+        surface: c.surface || 'Arcilla',
+        courts_count: Number(c.courtsCount) || 4,
+        maps_url: c.mapsUrl || c.googleMapsUrl || fb.mapsUrl,
+        whatsapp: normalizePeruPhone(c.whatsapp || ''),
+        cover_url: c.coverUrl || c.cover || c.banner || fb.cover,
+        logo_url: c.logoUrl || c.logo || fb.logo,
+        gallery: normalizeClubGallery(c.gallery || c.galeria, fb.gallery, fb.cover),
+        rates: c.rates || c.tarifas || fb.rates,
+        services:
+          Array.isArray(c.services) && c.services.length > 0
+            ? c.services
+            : Array.isArray(c.instalaciones)
+            ? c.instalaciones.map((i) => (typeof i === 'string' ? i : i.label))
+            : fb.services,
+        vip_benefits:
+          Array.isArray(c.vipBenefits) && c.vipBenefits.length > 0
+            ? c.vipBenefits
+            : fb.vipBenefits,
+        promos: c.promos || c.promosHorasValle || [],
+        internal_events: c.internalEvents || c.torneosInternos || [],
+        weather_condition: c.climaBase?.conditionKey || 'seco',
+        active: true,
+      };
+    });
     const { data } = await supabase.from('clubs').upsert(clubRows).select();
     if (data) clubs = data.map(dbToClub);
   }
@@ -650,18 +856,23 @@ export async function fetchAllCloudState(fallbackSeeds = {}) {
       club_name: co.clubName || '',
       name: co.name,
       title: co.title || 'Entrenador Oficial',
-      bio: co.bio || '',
-      photo_url: co.photoUrl || co.avatar || '',
-      cover_url: co.coverUrl || '',
+      bio: co.bio || co.specialty || '',
+      photo_url:
+        co.photoUrl || co.photo || co.portrait || COACH_PHOTO_FALLBACKS[co.id] || '',
+      cover_url: co.coverUrl || co.courtBackground || COACH_PHOTO_FALLBACKS[co.id] || '',
       accent_theme: co.accentTheme || 'emerald',
-      specialties: co.specialties || [],
-      base_rate: Number(co.baseRate) || 60,
-      vip_rate: Number(co.vipRate) || 50,
+      specialties: Array.isArray(co.specialties)
+        ? co.specialties
+        : co.specialty
+        ? String(co.specialty).split(',').map((s) => s.trim())
+        : [],
+      base_rate: Number(co.baseRate ?? co.basePriceRegular) || 60,
+      vip_rate: Number(co.vipRate ?? co.basePriceVip) || 50,
       free_slot_today: co.freeSlotToday || '',
-      videos: co.videos || [],
-      groups: co.groups || [],
-      packages: co.packages || [],
-      students: co.students || [],
+      videos: co.videos || co.videosEnCancha || [],
+      groups: co.groups || co.horariosSemanales || [],
+      packages: co.packages || co.modalidades || [],
+      students: co.students || co.alumnosActivos || [],
       whatsapp: normalizePeruPhone(co.whatsapp || ''),
       featured: Boolean(co.featured),
       active: true,
@@ -682,12 +893,12 @@ export async function fetchAllCloudState(fallbackSeeds = {}) {
       date_label: t.dateLabel || '',
       category_label: t.categoryLabel || 'Abierto',
       draw_size: Number(t.drawSize) || 16,
-      min_players: Number(t.minPlayers) || 8,
+      min_players: Number(t.minPlayers ?? t.minPlayersForDraw) || 8,
       entry_fee: Number(t.entryFee) || 45,
       includes_balls: t.includesBalls !== false,
       has_consolation: t.hasConsolation !== false,
       includes_items: t.includesItems || [],
-      banner_url: t.bannerUrl || '',
+      banner_url: t.bannerUrl || t.banner || '/assets/torneo-apertura.jpg',
       prizes: t.prizes || {},
       participants_ids: t.participantsIds || [],
       pending_payment_ids: t.pendingPaymentIds || [],
@@ -740,7 +951,7 @@ export async function fetchAllCloudState(fallbackSeeds = {}) {
 }
 
 /* --------------------------------------------------------------------------
-   7. OPERACIONES CRUD EN VIVO (PERFILES, RETOS, TORNEOS, SEDES, COACHES, TIENDA)
+   7. OPERACIONES CRUD EN VIVO
    -------------------------------------------------------------------------- */
 export async function upsertCloudPlayer(playerObj) {
   if (!supabase || !playerObj?.id) return null;
@@ -800,12 +1011,12 @@ export async function upsertCloudTournament(tournamentObj) {
     date_label: tournamentObj.dateLabel || '',
     category_label: tournamentObj.categoryLabel || 'Abierto',
     draw_size: Number(tournamentObj.drawSize) || 16,
-    min_players: Number(tournamentObj.minPlayers) || 8,
+    min_players: Number(tournamentObj.minPlayers ?? tournamentObj.minPlayersForDraw) || 8,
     entry_fee: Number(tournamentObj.entryFee) || 45,
     includes_balls: tournamentObj.includesBalls !== false,
     has_consolation: tournamentObj.hasConsolation !== false,
     includes_items: tournamentObj.includesItems || [],
-    banner_url: tournamentObj.bannerUrl || '',
+    banner_url: tournamentObj.bannerUrl || tournamentObj.banner || '',
     prizes: tournamentObj.prizes || {},
     participants_ids: tournamentObj.participantsIds || [],
     pending_payment_ids: tournamentObj.pendingPaymentIds || [],
@@ -824,6 +1035,7 @@ export async function deleteCloudTournament(tournamentId) {
 
 export async function upsertCloudClub(clubObj) {
   if (!supabase || !clubObj?.id) return null;
+  const fb = getClubFallback(clubObj.id, clubObj.name);
   const row = {
     id: clubObj.id,
     name: clubObj.name,
@@ -833,14 +1045,14 @@ export async function upsertCloudClub(clubObj) {
     hours: clubObj.hours || '06:00 a. m. – 10:00 p. m.',
     surface: clubObj.surface || 'Arcilla',
     courts_count: Number(clubObj.courtsCount) || 4,
-    maps_url: clubObj.mapsUrl || '',
+    maps_url: clubObj.mapsUrl || clubObj.googleMapsUrl || fb.mapsUrl,
     whatsapp: normalizePeruPhone(clubObj.whatsapp || ''),
-    cover_url: clubObj.coverUrl || '',
-    logo_url: clubObj.logoUrl || '',
-    gallery: clubObj.gallery || [],
-    rates: clubObj.rates || {},
-    services: clubObj.services || [],
-    vip_benefits: clubObj.vipBenefits || [],
+    cover_url: clubObj.coverUrl || clubObj.cover || clubObj.banner || fb.cover,
+    logo_url: clubObj.logoUrl || clubObj.logo || fb.logo,
+    gallery: clubObj.gallery || clubObj.galeria || fb.gallery,
+    rates: clubObj.rates || clubObj.tarifas || fb.rates,
+    services: clubObj.services || fb.services,
+    vip_benefits: clubObj.vipBenefits || fb.vipBenefits,
     promos: clubObj.promos || [],
     internal_events: clubObj.internalEvents || [],
     weather_condition: clubObj.climaBase?.conditionKey || 'seco',
@@ -862,17 +1074,17 @@ export async function upsertCloudCoach(coachObj) {
     name: coachObj.name,
     title: coachObj.title || 'Entrenador Oficial',
     bio: coachObj.bio || '',
-    photo_url: coachObj.photoUrl || '',
+    photo_url: coachObj.photoUrl || coachObj.photo || coachObj.portrait || '',
     cover_url: coachObj.coverUrl || '',
     accent_theme: coachObj.accentTheme || 'emerald',
-    specialties: coachObj.specialties || [],
+    specialties: Array.isArray(coachObj.specialties) ? coachObj.specialties : [],
     base_rate: Number(coachObj.baseRate) || 60,
     vip_rate: Number(coachObj.vipRate) || 50,
     free_slot_today: coachObj.freeSlotToday || '',
-    videos: coachObj.videos || [],
-    groups: coachObj.groups || [],
-    packages: coachObj.packages || [],
-    students: coachObj.students || [],
+    videos: Array.isArray(coachObj.videos) ? coachObj.videos : [],
+    groups: Array.isArray(coachObj.groups) ? coachObj.groups : [],
+    packages: Array.isArray(coachObj.packages) ? coachObj.packages : [],
+    students: Array.isArray(coachObj.students) ? coachObj.students : [],
     whatsapp: normalizePeruPhone(coachObj.whatsapp || ''),
     featured: Boolean(coachObj.featured),
     active: coachObj.active !== false,
@@ -903,7 +1115,7 @@ export async function upsertCloudProduct(productObj) {
     name: productObj.name,
     subtitle: productObj.subtitle || '',
     description: productObj.description || '',
-    image_url: productObj.imageUrl || '',
+    image_url: productObj.imageUrl || productObj.image || '',
     price_soles: Number(productObj.priceSoles) || 0,
     old_price_soles: productObj.oldPriceSoles ? Number(productObj.oldPriceSoles) : null,
     vip_price_soles: productObj.vipPriceSoles ? Number(productObj.vipPriceSoles) : null,
@@ -930,7 +1142,11 @@ export async function deleteCloudProduct(productId) {
 export async function incrementProductClick(productId) {
   if (!supabase || !productId) return;
   try {
-    const { data } = await supabase.from('products').select('clicks_count').eq('id', productId).single();
+    const { data } = await supabase
+      .from('products')
+      .select('clicks_count')
+      .eq('id', productId)
+      .single();
     const nextVal = (Number(data?.clicks_count) || 0) + 1;
     await supabase.from('products').update({ clicks_count: nextVal }).eq('id', productId);
   } catch {
@@ -949,7 +1165,7 @@ export async function saveCloudSetting(key, value) {
 }
 
 /* --------------------------------------------------------------------------
-   8. RPCs DE SERVIDOR: CLIMA ANTI-FARMEO, LIBRO RECLAMACIONES Y GEMAS
+   8. RPCs DE SERVIDOR: CLIMA ANTI-FARMEO, RECLAMOS Y GEMAS
    -------------------------------------------------------------------------- */
 export async function submitWeatherReportRpc({ playerId, clubId, conditionKey }) {
   if (!supabase) {
@@ -1014,7 +1230,12 @@ export async function fetchPlayerGemLedger(playerId) {
 /* --------------------------------------------------------------------------
    9. NOTIFICACIONES PUSH SEGURAS (VÍA SERVIDOR VERCEL /api/push)
    -------------------------------------------------------------------------- */
-export async function sendPushNotification({ targetPlayerIds = [], title = 'TOTAL TENIS', message = '', path = '/' }) {
+export async function sendPushNotification({
+  targetPlayerIds = [],
+  title = 'TOTAL TENIS',
+  message = '',
+  path = '/',
+}) {
   try {
     const cleanIds = Array.from(new Set((targetPlayerIds || []).filter(Boolean).map(String)));
     if (!cleanIds.length || !message) return { skipped: true };
@@ -1070,7 +1291,7 @@ export function subscribeToCloudRealtime(handlers = {}) {
     try {
       supabase.removeChannel(channel);
     } catch {
-      // ignore cleanup error
+      // ignore
     }
   };
 }
