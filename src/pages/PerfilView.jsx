@@ -18,7 +18,7 @@ import { ELO_CONFIG } from '../utils/tenisEngine';
 import { isCloudReady, uploadCompressedMedia } from '../utils/cloudService';
 
 /* ==========================================================================
-   ESCENARIOS DE PERFIL (BASE CLARO/OSCURO + 4 GRAND SLAM CANJEABLES)
+   FONDOS DE PERFIL (BASE CLARO/OSCURO + 4 GRAND SLAM CANJEABLES CON GEMAS)
    ========================================================================== */
 const PROFILE_SCENARIOS = [
   {
@@ -37,7 +37,7 @@ const PROFILE_SCENARIOS = [
     imageDark: '/assets/perfil-bg-arcilla.jpg',
     imageLight: '/assets/perfil-bg-arcilla.jpg',
     gemsCost: 60,
-    accent: '#E07A5F',
+    accent: '#DE8566',
   },
   {
     id: 'cesped',
@@ -55,64 +55,16 @@ const PROFILE_SCENARIOS = [
     imageDark: '/assets/perfil-bg-dura.jpg',
     imageLight: '/assets/perfil-bg-dura.jpg',
     gemsCost: 80,
-    accent: '#38BDF8',
+    accent: '#60A5FA',
   },
   {
     id: 'finals',
     name: 'Gala Night Finals',
-    subtitle: 'Láser esmeralda y oro',
+    subtitle: 'Láser esmeralda y champán',
     imageDark: '/assets/perfil-bg-finals.jpg',
     imageLight: '/assets/perfil-bg-finals.jpg',
     gemsCost: 120,
-    accent: '#F59E0B',
-  },
-];
-
-/* ==========================================================================
-   LOS 6 DISTINTIVOS OFICIALES (CANJEABLES CON GEMAS)
-   ========================================================================== */
-const OFFICIAL_BADGES = [
-  {
-    id: 'rey-arcilla',
-    name: 'Rey de Arcilla',
-    desc: 'Especialista en polvo de ladrillo',
-    image: '/assets/badge-rey-arcilla.png',
-    gemsCost: 40,
-  },
-  {
-    id: 'invicto',
-    name: 'Racha Imparable',
-    desc: 'Energía esmeralda de victorias',
-    image: '/assets/badge-invicto.png',
-    gemsCost: 60,
-  },
-  {
-    id: 'mata-gigantes',
-    name: 'Mata Gigantes',
-    desc: 'Vencedor ante rivales superiores',
-    image: '/assets/badge-mata-gigantes.png',
-    gemsCost: 80,
-  },
-  {
-    id: 'maestro-top8',
-    name: 'Maestro Top 8',
-    desc: 'Sello dorado de élite anual',
-    image: '/assets/badge-maestro-top8.png',
-    gemsCost: 120,
-  },
-  {
-    id: 'saque-canon',
-    name: 'Saque Cañón',
-    desc: 'Servicio de máxima potencia',
-    image: '/assets/badge-saque-canon.png',
-    gemsCost: 60,
-  },
-  {
-    id: 'veterano-oro',
-    name: 'Veterano de Oro',
-    desc: 'Blasón distinguido +40 Master',
-    image: '/assets/badge-veterano-oro.png',
-    gemsCost: 60,
+    accent: '#E5C16C',
   },
 ];
 
@@ -144,9 +96,6 @@ const TIME_WINDOWS = [
   { id: 'noche', label: 'Noche · 18:00–22:00' },
 ];
 
-/* ==========================================================================
-   COMPRESOR LIGERO EN CLIENTE PARA PREVISUALIZACIÓN INSTANTÁNEA
-   ========================================================================== */
 function compressImageFileToDataUrl(file, maxDim = 800, quality = 0.82) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -172,7 +121,7 @@ function compressImageFileToDataUrl(file, maxDim = 800, quality = 0.82) {
 }
 
 /* ==========================================================================
-   VISTA PRINCIPAL: PerfilView (CARNET UNIFICADO + STORAGE + ACABADO EDITORIAL)
+   VISTA PRINCIPAL: PerfilView (LIMPIO, AISLADO EN READONLY, LIQUID GLASS)
    ========================================================================== */
 export default function PerfilView({
   player = null,
@@ -180,10 +129,11 @@ export default function PerfilView({
   players = [],
   clubs = INITIAL_CLUBS,
   challenges = [],
+  seasonSnapshots = null,
   theme = 'dark',
+  readOnly = false,
   onUpdateProfile,
   onUnlockScenario,
-  onUnlockBadge,
   onOpenVipCard,
   onOpenHeadToHead,
   onOpenStoriesWithMatch,
@@ -194,14 +144,14 @@ export default function PerfilView({
   const fileInputRef = useRef(null);
 
   const profile = player || currentUser;
-  const isOwnProfile = Boolean(currentUser && profile && currentUser.id === profile.id);
+  const isOwnProfile = !readOnly && Boolean(currentUser && profile && currentUser.id === profile.id);
 
-  const [statsScope, setStatsScope] = useState('temporada');
+  const [statsScope, setStatsScope] = useState('temporada'); // 'temporada' | 'carrera'
   const [isPhotoStudioOpen, setIsPhotoStudioOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSavingPhoto, setIsSavingPhoto] = useState(false);
 
-  // Estado del Estudio de Foto
+  // Estudio de Foto y Fondos
   const [draftPhoto, setDraftPhoto] = useState('');
   const [draftZoom, setDraftZoom] = useState(1);
   const [draftOffsetX, setDraftOffsetX] = useState(0);
@@ -210,7 +160,7 @@ export default function PerfilView({
   const [draftSilhouetteMode, setDraftSilhouetteMode] = useState(false);
   const [draftScenarioId, setDraftScenarioId] = useState('default');
 
-  // Estado de Ajustes Táctiles
+  // Ajustes Táctiles
   const [draftHand, setDraftHand] = useState('Diestro');
   const [draftStrokes, setDraftStrokes] = useState(['Derecha (Forehand)']);
   const [draftDays, setDraftDays] = useState(['M', 'J', 'S']);
@@ -218,7 +168,6 @@ export default function PerfilView({
   const [draftClubId, setDraftClubId] = useState('independiente');
   const [draftHideWhatsapp, setDraftHideWhatsapp] = useState(false);
 
-  // Todos los hooks arriba para cumplir estrictamente Rules of Hooks al cambiar de sesión
   const category = getCategoryByPoints(profile?.points || 0);
 
   const nextCategory = useMemo(() => {
@@ -228,9 +177,11 @@ export default function PerfilView({
 
   const officialRank = useMemo(() => {
     if (!profile?.id) return null;
-    const sorted = [...(players || [])].sort(
-      (a, b) => (Number(b.points) || 0) - (Number(a.points) || 0)
-    );
+    const sorted = [...(players || [])].sort((a, b) => {
+      const diff = (Number(b.points) || 0) - (Number(a.points) || 0);
+      if (diff !== 0) return diff;
+      return (Number(b.wins) || 0) - (Number(a.wins) || 0);
+    });
     const idx = sorted.findIndex((p) => p.id === profile.id);
     return idx >= 0 ? idx + 1 : null;
   }, [players, profile?.id]);
@@ -251,27 +202,107 @@ export default function PerfilView({
     };
   }, [category, nextCategory, profile?.points]);
 
-  const recentMatches = useMemo(() => {
-    if (!profile?.id) return [];
+  const playersById = useMemo(() => {
     const map = {};
     (players || []).forEach((p) => {
       map[p.id] = p;
     });
+    return map;
+  }, [players]);
+
+  const allPlayerMatches = useMemo(() => {
+    if (!profile?.id) return [];
     return (challenges || [])
       .filter(
         (c) =>
           c.status === 'FINISHED' &&
           (c.playerAId === profile.id || c.playerBId === profile.id)
       )
-      .slice(0, 6)
       .map((c) => {
         const isA = c.playerAId === profile.id;
-        const rival = map[isA ? c.playerBId : c.playerAId];
+        const rival = playersById[isA ? c.playerBId : c.playerAId];
         const didWin = c.winnerId === profile.id;
         const delta = isA ? c.eloDeltaA : c.eloDeltaB;
         return { challenge: c, isA, rival, didWin, delta };
       });
-  }, [challenges, players, profile?.id]);
+  }, [challenges, playersById, profile?.id]);
+
+  const recentMatches = useMemo(() => allPlayerMatches.slice(0, 6), [allPlayerMatches]);
+
+  /* Métricas diferenciadas reales para Temporada 2026 vs Carrera */
+  const careerMetrics = useMemo(() => {
+    if (!profile) {
+      return { annualTotal: 0, peakPoints: 0, seasonsPlayed: 1, officialWins: 0 };
+    }
+    const currentPts = Number(profile.points) || 0;
+    let annualTotal = currentPts;
+    let peakPoints = currentPts;
+    let seasonsPlayed = 1;
+
+    if (Array.isArray(seasonSnapshots?.seasons) && seasonSnapshots.seasons.length > 0) {
+      let sum = 0;
+      let count = 0;
+      seasonSnapshots.seasons.forEach((s) => {
+        const val = s.locked
+          ? Number(s.scores?.[profile.id]) || 0
+          : s.number === seasonSnapshots.currentSeason
+          ? currentPts
+          : 0;
+        if (val > 0) {
+          sum += val;
+          count += 1;
+          if (val > peakPoints) peakPoints = val;
+        }
+      });
+      if (sum > 0) annualTotal = sum;
+      if (count > 0) seasonsPlayed = count;
+    }
+
+    return {
+      annualTotal,
+      peakPoints,
+      seasonsPlayed,
+      officialWins: Number(profile.wins) || 0,
+    };
+  }, [profile, seasonSnapshots]);
+
+  /* Logros sutiles ganados estrictamente por mérito en cancha (gratis, sin stickers IA) */
+  const earnedMerits = useMemo(() => {
+    if (!profile) return [];
+    const list = [];
+    const w = Number(profile.wins) || 0;
+    const l = Number(profile.losses) || 0;
+    const st = Number(profile.streak) || 0;
+    const pts = Number(profile.points) || 0;
+    const cal = profile.calibrationPlayed !== undefined ? Number(profile.calibrationPlayed) : w + l;
+    const isCalib = cal < ELO_CONFIG.CALIBRATION_MATCHES;
+
+    if (!isCalib && officialRank && officialRank <= 8) {
+      list.push({ id: 'top8', label: 'Maestro Top 8', icon: 'crown', tone: 'gold' });
+    }
+
+    const beatGiant =
+      allPlayerMatches.some(
+        (m) => m.didWin && m.rival && Number(m.rival.points || 0) >= pts + 250
+      ) ||
+      (Array.isArray(profile.unlockedBadges) &&
+        profile.unlockedBadges.some((b) => String(b).includes('mata-gigantes')));
+    if (beatGiant) {
+      list.push({ id: 'giant', label: 'Mata Gigantes', icon: 'challenge', tone: 'emerald' });
+    }
+
+    if (w >= 3 && l === 0) {
+      list.push({ id: 'unbeaten', label: 'Invicto', icon: 'shield', tone: 'emerald' });
+    } else if (st >= 3) {
+      list.push({ id: 'streak', label: `Racha +${st}`, icon: 'flame', tone: 'emerald' });
+    }
+
+    if (pts >= 4000) {
+      list.push({ id: 'elite', label: 'Élite Circuito', icon: 'trophy', tone: 'gold' });
+    }
+
+    return list.slice(0, 3);
+  }, [profile, officialRank, allPlayerMatches]);
 
   if (!profile) {
     return (
@@ -279,7 +310,7 @@ export default function PerfilView({
         <EmptyStateCard
           theme={theme}
           title="Tu Ficha Oficial te espera"
-          description="Crea tu cuenta (+18) o inicia sesión para personalizar tu perfil, subir tu foto de cancha, desbloquear distintivos y seguir tu progreso."
+          description="Crea tu cuenta (+18) o inicia sesión para personalizar tu perfil, subir tu foto de cancha y seguir tu progreso."
           actionLabel="Iniciar Sesión / Crear Cuenta"
           onAction={() => onOpenAuth && onOpenAuth('login')}
         />
@@ -300,28 +331,27 @@ export default function PerfilView({
   const ownedScenarios = Array.from(
     new Set(['default', ...(profile.unlockedScenarios || [])])
   );
+  const currentScenarioKey = profile.scenarioId || profile.coverScenario || 'default';
   const activeScenario =
-    PROFILE_SCENARIOS.find((s) => s.id === (profile.scenarioId || 'default')) ||
-    PROFILE_SCENARIOS[0];
+    PROFILE_SCENARIOS.find((s) => s.id === currentScenarioKey) || PROFILE_SCENARIOS[0];
   const scenarioBgImg =
     theme === 'light' ? activeScenario.imageLight : activeScenario.imageDark;
-
-  const ownedBadges = Array.from(new Set(profile.unlockedBadges || []));
-  const activeBadge = OFFICIAL_BADGES.find((b) => b.id === profile.activeBadgeId) || null;
 
   const nameParts = String(profile.name || 'Jugador').trim().split(/\s+/);
   const firstName = nameParts[0] || '';
   const lastName = nameParts.slice(1).join(' ');
 
   const openUnifiedVipModal = () => {
+    if (!isOwnProfile) return;
     triggerHaptic('medium');
     if (onOpenVipCard) onOpenVipCard();
   };
 
   /* ------------------------------------------------------------------------
-     ESTUDIO DE FOTO (CON SUBIDA REAL A SUPABASE STORAGE 'media')
+     ESTUDIO DE FOTO Y FONDOS DE PERFIL (SUBIDA REAL A STORAGE 'media')
      ------------------------------------------------------------------------ */
   const openPhotoStudio = () => {
+    if (!isOwnProfile) return;
     triggerHaptic('light');
     setDraftPhoto(profile.fullBodyPhoto || profile.avatar || '');
     setDraftZoom(profile.photoTransform?.zoom ?? 1);
@@ -329,7 +359,7 @@ export default function PerfilView({
     setDraftOffsetY(profile.photoTransform?.y ?? 0);
     setDraftRotate(profile.photoTransform?.rotate ?? 0);
     setDraftSilhouetteMode(Boolean(profile.photoTransform?.silhouette));
-    setDraftScenarioId(profile.scenarioId || 'default');
+    setDraftScenarioId(currentScenarioKey);
     setIsPhotoStudioOpen(true);
   };
 
@@ -375,7 +405,6 @@ export default function PerfilView({
     try {
       let finalPhotoUrl = draftPhoto || profile.avatar || '';
 
-      // Subir una sola vez a Supabase Storage 'media' para que avatar y fullBodyPhoto compartan URL real
       if (finalPhotoUrl && String(finalPhotoUrl).startsWith('data:image/') && isCloudReady) {
         const uploadedUrl = await uploadCompressedMedia(finalPhotoUrl, 'avatars', profile.id);
         if (uploadedUrl) {
@@ -388,6 +417,7 @@ export default function PerfilView({
           avatar: finalPhotoUrl,
           fullBodyPhoto: finalPhotoUrl,
           scenarioId: draftScenarioId,
+          coverScenario: draftScenarioId,
           photoTransform: {
             zoom: draftZoom,
             x: draftOffsetX,
@@ -399,7 +429,7 @@ export default function PerfilView({
       }
 
       triggerHaptic('success');
-      if (onNotify) onNotify('Foto y escenario guardados en tu perfil.', 'success');
+      if (onNotify) onNotify('Foto y fondo guardados en tu perfil.', 'success');
       setIsPhotoStudioOpen(false);
     } catch (err) {
       console.error('[TOTAL TENIS] Error guardando foto de perfil:', err);
@@ -410,51 +440,11 @@ export default function PerfilView({
     }
   };
 
-  const handleSelectOrUnlockBadge = (badge) => {
-    if (!isOwnProfile) return;
-    const isOwned = ownedBadges.includes(badge.id);
-
-    if (isOwned) {
-      const nextActive = profile.activeBadgeId === badge.id ? null : badge.id;
-      if (onUpdateProfile) onUpdateProfile(profile.id, { activeBadgeId: nextActive });
-      triggerHaptic('light');
-      if (onNotify) {
-        onNotify(
-          nextActive
-            ? `Distintivo "${badge.name}" equipado en tu perfil.`
-            : 'Distintivo retirado de la cabecera.',
-          'info'
-        );
-      }
-      return;
-    }
-
-    const myGems = Number(profile.gems) || 0;
-    if (myGems < badge.gemsCost) {
-      triggerHaptic('warning');
-      if (onNotify) {
-        onNotify(
-          `Te faltan ${badge.gemsCost - myGems} Gemas para canjear "${badge.name}".`,
-          'warning'
-        );
-      }
-      return;
-    }
-
-    if (onUnlockBadge) {
-      onUnlockBadge({ badgeId: badge.id, gemsCost: badge.gemsCost, name: badge.name });
-    } else if (onUpdateProfile) {
-      onUpdateProfile(profile.id, {
-        gems: Math.max(0, myGems - badge.gemsCost),
-        unlockedBadges: [...ownedBadges, badge.id],
-        activeBadgeId: badge.id,
-      });
-    }
-    triggerHaptic('success');
-    if (onNotify) onNotify(`¡Distintivo "${badge.name}" desbloqueado y equipado!`, 'success');
-  };
-
+  /* ------------------------------------------------------------------------
+     AJUSTES TÁCTILES (SOLO PERFIL PROPIO)
+     ------------------------------------------------------------------------ */
   const openTactileSettings = () => {
+    if (!isOwnProfile) return;
     triggerHaptic('light');
     setDraftHand(profile.hand || 'Diestro');
     setDraftStrokes(
@@ -536,7 +526,7 @@ export default function PerfilView({
       aria-label={`Perfil oficial de ${profile.name}`}
     >
       {/* ====================================================================
-          1. PORTADA HEROICA EDITORIAL
+          1. PORTADA HEROICA EDITORIAL (LIQUID GLASS + LOGROS SUTILES POR MÉRITO)
           ==================================================================== */}
       <header className="tt-pf-hero">
         <SmartImage
@@ -564,7 +554,7 @@ export default function PerfilView({
             ) : officialRank && officialRank <= 8 ? (
               <span className="tt-pf-pill is-master">ZONA MASTER TOP 8</span>
             ) : profile.isVip ? (
-              <span className="tt-pf-pill is-vip">SOCIO VIP ACTIVO</span>
+              <span className="tt-pf-pill is-vip">SOCIO VIP</span>
             ) : (
               <span className="tt-pf-pill is-cat">{category.name}</span>
             )}
@@ -576,8 +566,8 @@ export default function PerfilView({
                 <button
                   type="button"
                   className="tt-pf-circle-btn"
-                  aria-label="Abrir Estudio de Foto y Escenarios"
-                  title="Cambiar foto y escenario"
+                  aria-label="Cambiar foto y fondos de perfil"
+                  title="Foto y Fondos"
                   onClick={openPhotoStudio}
                 >
                   <TTIcon name="camera" size={17} />
@@ -585,8 +575,8 @@ export default function PerfilView({
                 <button
                   type="button"
                   className="tt-pf-circle-btn"
-                  aria-label="Abrir Ajustes Táctiles"
-                  title="Ajustes de perfil"
+                  aria-label="Ajustes de perfil"
+                  title="Ajustes"
                   onClick={openTactileSettings}
                 >
                   <TTIcon name="settings" size={17} />
@@ -605,7 +595,7 @@ export default function PerfilView({
                   onOpenHeadToHead(profile);
                 }}
               >
-                <TTIcon name="users" size={17} />
+                <TTIcon name="swap" size={17} />
               </button>
             )}
           </div>
@@ -644,21 +634,32 @@ export default function PerfilView({
               <span>{profile.hand || 'Diestro'}</span>
             </div>
 
-            {activeBadge && (
-              <div className="tt-pf-equipped-badge">
-                <SmartImage
-                  src={activeBadge.image}
-                  alt={activeBadge.name}
-                  style={{ width: 22, height: 22, objectFit: 'contain' }}
-                />
-                <span>{activeBadge.name}</span>
+            {/* Logros ganados por mérito en cancha: sutiles, sin fondo blanco ni stickers IA */}
+            {earnedMerits.length > 0 && (
+              <div className="tt-pf-merits-row" aria-label="Logros deportivos obtenidos">
+                {earnedMerits.map((m) => (
+                  <span key={m.id} className={`tt-merit-pill is-${m.tone}`}>
+                    <TTIcon name={m.icon} size={12} />
+                    <span>{m.label}</span>
+                  </span>
+                ))}
               </div>
             )}
 
+            {/* Conmutador real Temporada 2026 | Carrera + Carnet (solo propio) / Retar (ajeno) */}
             <div className="tt-pf-scope-row">
-              <div className="tt-pf-scope-toggle">
+              <div className="tt-pf-scope-toggle" role="tablist" aria-label="Alcance de estadísticas">
+                <span
+                  className="tt-pf-scope-slider"
+                  aria-hidden="true"
+                  style={{
+                    transform: `translateX(${statsScope === 'temporada' ? '0%' : '100%'})`,
+                  }}
+                />
                 <button
                   type="button"
+                  role="tab"
+                  aria-selected={statsScope === 'temporada'}
                   className={statsScope === 'temporada' ? 'is-active' : ''}
                   onClick={() => {
                     triggerHaptic('light');
@@ -669,6 +670,8 @@ export default function PerfilView({
                 </button>
                 <button
                   type="button"
+                  role="tab"
+                  aria-selected={statsScope === 'carrera'}
                   className={statsScope === 'carrera' ? 'is-active' : ''}
                   onClick={() => {
                     triggerHaptic('light');
@@ -707,8 +710,12 @@ export default function PerfilView({
           </div>
 
           <div
-            className={`tt-pf-portrait-stage ${photoT.silhouette ? 'is-silhouette' : ''}`}
-            onClick={() => isOwnProfile && openPhotoStudio()}
+            className={`tt-pf-portrait-stage ${photoT.silhouette ? 'is-silhouette' : ''} ${
+              isOwnProfile ? 'is-editable' : ''
+            }`}
+            onClick={() => {
+              if (isOwnProfile) openPhotoStudio();
+            }}
           >
             <SmartImage
               src={playerPhotoSrc}
@@ -723,56 +730,95 @@ export default function PerfilView({
           </div>
         </div>
 
-        {/* 4 TARJETAS GLASSMORPHISM SIMÉTRICAS (CERO SOLES EN GEMAS) */}
-        <div className="tt-pf-glass-grid">
-          <div className="tt-pf-glass-card" style={{ '--pf-delay': '0ms' }}>
-            <span>PUESTO</span>
-            <strong>{officialRank ? `#${officialRank}` : 'Nuevo'}</strong>
-            <small>{category.name}</small>
-          </div>
+        {/* 4 TARJETAS GLASSMORPHISM DINÁMICAS (CAMBIAN REALMENTE ENTRE TEMPORADA Y CARRERA) */}
+        {statsScope === 'temporada' ? (
+          <div key="scope-temp" className="tt-pf-glass-grid">
+            <div className="tt-pf-glass-card" style={{ '--pf-delay': '0ms' }}>
+              <span>PUESTO</span>
+              <strong>{officialRank ? `#${officialRank}` : 'Nuevo'}</strong>
+              <small>{category.name}</small>
+            </div>
 
-          <div className="tt-pf-glass-card is-emerald" style={{ '--pf-delay': '60ms' }}>
-            <span>PUNTOS</span>
-            <strong>{Number(profile.points || 0).toLocaleString('es-PE')}</strong>
-            <small>Escala Oficial</small>
-          </div>
+            <div className="tt-pf-glass-card is-emerald" style={{ '--pf-delay': '45ms' }}>
+              <span>PUNTOS</span>
+              <strong>{Number(profile.points || 0).toLocaleString('es-PE')}</strong>
+              <small>Temporada {new Date().getFullYear()}</small>
+            </div>
 
-          <div className="tt-pf-glass-card" style={{ '--pf-delay': '120ms' }}>
-            {played > 0 && eff >= 35 ? (
-              <>
-                <span>VICTORIAS</span>
-                <strong>{eff}%</strong>
-                <small>
-                  {wins}V – {losses}D
-                </small>
-              </>
-            ) : (
-              <>
-                <span>GOLPE FIRMA</span>
-                <strong style={{ fontSize: '0.96rem', lineHeight: 1.1 }}>
-                  {(profile.bestStroke || 'Derecha').split(' ')[0]}
-                </strong>
-                <small>{isCalibrating ? 'Partidos de prueba' : 'Compromiso 100%'}</small>
-              </>
-            )}
-          </div>
+            <div className="tt-pf-glass-card" style={{ '--pf-delay': '90ms' }}>
+              {played > 0 ? (
+                <>
+                  <span>VICTORIAS</span>
+                  <strong>{eff}%</strong>
+                  <small>
+                    {wins}V – {losses}D
+                  </small>
+                </>
+              ) : (
+                <>
+                  <span>GOLPE FIRMA</span>
+                  <strong style={{ fontSize: '0.96rem', lineHeight: 1.1 }}>
+                    {(profile.bestStroke || 'Derecha').split(' ')[0]}
+                  </strong>
+                  <small>{isCalibrating ? 'En prueba' : 'Listo en cancha'}</small>
+                </>
+              )}
+            </div>
 
-          <div className="tt-pf-glass-card is-gold" style={{ '--pf-delay': '180ms' }}>
-            {wins > 0 && streak >= 1 ? (
-              <>
-                <span>RACHA ACTIVA</span>
-                <strong>+{streak}</strong>
-                <small>{streak >= 3 ? 'En racha caliente' : 'Victorias seguidas'}</small>
-              </>
-            ) : (
-              <>
-                <span>GEMAS 💎</span>
-                <strong>{Number(profile.gems || 0).toLocaleString('es-PE')}</strong>
-                <small>Para el Pro Shop</small>
-              </>
-            )}
+            <div className="tt-pf-glass-card is-gold" style={{ '--pf-delay': '135ms' }}>
+              {wins > 0 && streak >= 1 ? (
+                <>
+                  <span>RACHA ACTIVA</span>
+                  <strong>+{streak}</strong>
+                  <small>{streak >= 3 ? 'En racha' : 'Seguidas'}</small>
+                </>
+              ) : isOwnProfile ? (
+                <>
+                  <span>GEMAS 💎</span>
+                  <strong>{Number(profile.gems || 0).toLocaleString('es-PE')}</strong>
+                  <small>Pro Shop y Fondos</small>
+                </>
+              ) : (
+                <>
+                  <span>PARTIDOS</span>
+                  <strong>{played}</strong>
+                  <small>Oficiales</small>
+                </>
+              )}
+            </div>
           </div>
-        </div>
+        ) : (
+          <div key="scope-career" className="tt-pf-glass-grid">
+            <div className="tt-pf-glass-card is-gold" style={{ '--pf-delay': '0ms' }}>
+              <span>PTS AÑO</span>
+              <strong>{careerMetrics.annualTotal.toLocaleString('es-PE')}</strong>
+              <small>Carrera Top 8</small>
+            </div>
+
+            <div className="tt-pf-glass-card is-emerald" style={{ '--pf-delay': '45ms' }}>
+              <span>MEJOR PICO</span>
+              <strong>{careerMetrics.peakPoints.toLocaleString('es-PE')}</strong>
+              <small>Máx. puntaje</small>
+            </div>
+
+            <div className="tt-pf-glass-card" style={{ '--pf-delay': '90ms' }}>
+              <span>RÉCORD TOTAL</span>
+              <strong>
+                {wins}V–{losses}D
+              </strong>
+              <small>{eff}% efectividad</small>
+            </div>
+
+            <div className="tt-pf-glass-card" style={{ '--pf-delay': '135ms' }}>
+              <span>TRAYECTORIA</span>
+              <strong>{played} PJ</strong>
+              <small>
+                {careerMetrics.seasonsPlayed}{' '}
+                {careerMetrics.seasonsPlayed === 1 ? 'temporada' : 'temporadas'}
+              </small>
+            </div>
+          </div>
+        )}
       </header>
 
       {/* ====================================================================
@@ -852,7 +898,7 @@ export default function PerfilView({
       </div>
 
       {/* ====================================================================
-          3. ADN DEPORTIVO
+          3. ADN DEPORTIVO + ACCESO RÁPIDO A FONDOS (SOLO DUEÑO)
           ==================================================================== */}
       <div className="tt-dna-grid">
         <div className="tt-dna-card">
@@ -900,54 +946,35 @@ export default function PerfilView({
         </div>
       </div>
 
-      {/* ====================================================================
-          4. VITRINA DE LOS 6 DISTINTIVOS OFICIALES
-          ==================================================================== */}
-      <div className="tt-pf-section-card">
-        <div className="tt-pf-sec-head">
-          <div>
-            <span className="tt-pf-sec-kicker">PRESTIGIO EN CANCHA · 6 DISTINTIVOS</span>
-            <h3>Insignias y Parches Oficiales</h3>
+      {/* Acceso compacto para personalizar Fondos de Perfil con Gemas (solo dueño) */}
+      {isOwnProfile && (
+        <button
+          type="button"
+          className="tt-pf-backgrounds-bar"
+          onClick={openPhotoStudio}
+        >
+          <div className="tt-pfb-thumb">
+            <SmartImage
+              src={scenarioBgImg}
+              alt={activeScenario.name}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
           </div>
-          {isOwnProfile && (
-            <button type="button" className="tt-pf-sec-action" onClick={openPhotoStudio}>
-              Escenarios Grand Slam
-            </button>
-          )}
-        </div>
-
-        <div className="tt-badges-grid">
-          {OFFICIAL_BADGES.map((badge) => {
-            const isOwned = ownedBadges.includes(badge.id);
-            const isEquipped = profile.activeBadgeId === badge.id;
-
-            return (
-              <button
-                key={badge.id}
-                type="button"
-                className={`tt-badge-tile ${isOwned ? 'is-owned' : ''} ${
-                  isEquipped ? 'is-equipped' : ''
-                }`}
-                onClick={() => handleSelectOrUnlockBadge(badge)}
-              >
-                <SmartImage
-                  src={badge.image}
-                  fallbackSrc={ASSETS.logo}
-                  alt={badge.name}
-                  className="tt-badge-img"
-                />
-                <strong>{badge.name}</strong>
-                <span className="tt-badge-state">
-                  {isEquipped ? 'Equipado' : isOwned ? 'Equipar' : `${badge.gemsCost} 💎`}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
+          <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+            <span className="tt-pf-sec-kicker">PERSONALIZACIÓN · CANJE CON GEMAS</span>
+            <strong style={{ display: 'block', fontSize: '0.88rem' }}>
+              Fondo activo: {activeScenario.name}
+            </strong>
+            <small className="tt-muted" style={{ fontSize: '0.72rem' }}>
+              Cambia tu foto o desbloquea escenarios Grand Slam
+            </small>
+          </div>
+          <TTIcon name="chevronRight" size={18} style={{ opacity: 0.6, flexShrink: 0 }} />
+        </button>
+      )}
 
       {/* ====================================================================
-          5. CARNET DIGITAL UNIFICADO (ABRE EL MISMO MODAL 3D DEL MENÚ ☰)
+          4. CARNET DIGITAL UNIFICADO (EXCLUSIVO DEL DUEÑO DEL PERFIL)
           ==================================================================== */}
       {isOwnProfile && (
         <div className="tt-pf-section-card">
@@ -1001,7 +1028,7 @@ export default function PerfilView({
                   objectFit: 'cover',
                   objectPosition: 'center top',
                   border: profile.isVip
-                    ? '2px solid #F59E0B'
+                    ? '2px solid #E5C16C'
                     : '1.5px solid rgba(250, 249, 245, 0.35)',
                 }}
               />
@@ -1038,7 +1065,7 @@ export default function PerfilView({
       )}
 
       {/* ====================================================================
-          6. ÚLTIMOS RESULTADOS
+          5. ÚLTIMOS RESULTADOS
           ==================================================================== */}
       <div className="tt-pf-section-card">
         <div className="tt-pf-sec-head">
@@ -1050,7 +1077,7 @@ export default function PerfilView({
 
         {recentMatches.length === 0 ? (
           <p className="tt-muted" style={{ margin: 0, fontSize: '0.8rem' }}>
-            Todavía no hay resultados oficiales registrados en esta temporada.
+            Todavía no hay resultados oficiales registrados.
           </p>
         ) : (
           <div className="tt-recent-list">
@@ -1117,310 +1144,314 @@ export default function PerfilView({
       </div>
 
       {/* ====================================================================
-          MODAL 1: ESTUDIO DE FOTO + 4 ESCENARIOS GRAND SLAM (SUBIDA STORAGE)
+          MODAL 1 (SOLO DUEÑO): ESTUDIO DE FOTO + FONDOS DE PERFIL
           ==================================================================== */}
-      <ModalPortal
-        isOpen={isPhotoStudioOpen}
-        onClose={() => !isSavingPhoto && setIsPhotoStudioOpen(false)}
-        title="Estudio de Foto y Escenarios"
-        subtitle="Encuadra tu retrato o cuerpo completo delante de tu cancha favorita"
-        icon={<IconBadge name="camera" variant="emerald" size={38} />}
-        isWide
-      >
-        <div className="tt-studio-stack">
-          <div className="tt-studio-preview">
-            <SmartImage
-              src={
-                (PROFILE_SCENARIOS.find((s) => s.id === draftScenarioId) || PROFILE_SCENARIOS[0])
-                  .imageDark
-              }
-              alt="Escenario seleccionado"
-              className="tt-studio-bg"
-            />
-            <div className="tt-studio-scrim" />
-            <div className={`tt-studio-subject ${draftSilhouetteMode ? 'is-silhouette' : ''}`}>
+      {isOwnProfile && (
+        <ModalPortal
+          isOpen={isPhotoStudioOpen}
+          onClose={() => !isSavingPhoto && setIsPhotoStudioOpen(false)}
+          title="Foto y Fondos de Perfil"
+          subtitle="Ajusta tu retrato o desbloquea escenarios Grand Slam con Gemas"
+          icon={<IconBadge name="camera" variant="emerald" size={38} />}
+          isWide
+        >
+          <div className="tt-studio-stack">
+            <div className="tt-studio-preview">
               <SmartImage
-                src={draftPhoto || profile.avatar}
-                alt={profile.name}
-                initials={profile.name}
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover',
-                  objectPosition: 'center top',
-                  transform: `translate(${draftOffsetX}%, ${draftOffsetY}%) scale(${draftZoom}) rotate(${draftRotate}deg)`,
-                }}
+                src={
+                  (PROFILE_SCENARIOS.find((s) => s.id === draftScenarioId) || PROFILE_SCENARIOS[0])
+                    .imageDark
+                }
+                alt="Escenario seleccionado"
+                className="tt-studio-bg"
               />
-            </div>
-
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleFilePicked}
-              style={{ display: 'none' }}
-            />
-            <button
-              type="button"
-              className="tt-studio-upload-btn"
-              disabled={isSavingPhoto}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <TTIcon name="camera" size={16} />
-              Subir foto desde mi celular
-            </button>
-          </div>
-
-          <div className="tt-studio-sliders">
-            <label>
-              <span>Zoom ({draftZoom.toFixed(2)}x)</span>
-              <input
-                type="range"
-                min="1"
-                max="2.5"
-                step="0.05"
-                value={draftZoom}
-                onChange={(e) => setDraftZoom(Number(e.target.value))}
-              />
-            </label>
-            <label>
-              <span>Desplazamiento Vertical ({draftOffsetY}%)</span>
-              <input
-                type="range"
-                min="-35"
-                max="35"
-                step="1"
-                value={draftOffsetY}
-                onChange={(e) => setDraftOffsetY(Number(e.target.value))}
-              />
-            </label>
-            <label>
-              <span>Desplazamiento Horizontal ({draftOffsetX}%)</span>
-              <input
-                type="range"
-                min="-35"
-                max="35"
-                step="1"
-                value={draftOffsetX}
-                onChange={(e) => setDraftOffsetX(Number(e.target.value))}
-              />
-            </label>
-            <label>
-              <span>Rotación ({draftRotate}°)</span>
-              <input
-                type="range"
-                min="-15"
-                max="15"
-                step="1"
-                value={draftRotate}
-                onChange={(e) => setDraftRotate(Number(e.target.value))}
-              />
-            </label>
-
-            <button
-              type="button"
-              className={`tt-silhouette-toggle ${draftSilhouetteMode ? 'is-on' : ''}`}
-              onClick={() => {
-                triggerHaptic('light');
-                setDraftSilhouetteMode((v) => !v);
-              }}
-            >
-              {draftSilhouetteMode
-                ? '✓ Efecto Silueta Editorial Activo'
-                : 'Activar Recorte / Silueta Editorial'}
-            </button>
-          </div>
-
-          <div>
-            <span className="tt-pf-sec-kicker" style={{ marginBottom: 8 }}>
-              ELIGE TU ESCENARIO DE FONDO
-            </span>
-            <div className="tt-scenarios-grid">
-              {PROFILE_SCENARIOS.map((sc) => {
-                const owned = ownedScenarios.includes(sc.id);
-                const selected = draftScenarioId === sc.id;
-                return (
-                  <button
-                    key={sc.id}
-                    type="button"
-                    className={`tt-scenario-tile ${selected ? 'is-selected' : ''}`}
-                    onClick={() => {
-                      triggerHaptic('light');
-                      setDraftScenarioId(sc.id);
-                    }}
-                  >
-                    <SmartImage src={sc.imageDark} alt={sc.name} className="tt-scenario-img" />
-                    <div className="tt-scenario-caption">
-                      <strong>{sc.name}</strong>
-                      <span>{owned ? 'Disponible' : `Canjear · ${sc.gemsCost} 💎`}</span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <button
-            type="button"
-            className="tt-btn tt-btn-primary"
-            style={{ width: '100%' }}
-            disabled={isSavingPhoto}
-            onClick={handleSavePhotoStudio}
-          >
-            {isSavingPhoto ? 'Subiendo foto en la nube...' : 'Guardar Foto y Escenario'}
-          </button>
-        </div>
-      </ModalPortal>
-
-      {/* ====================================================================
-          MODAL 2: AJUSTES 100 % TÁCTILES
-          ==================================================================== */}
-      <ModalPortal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        title="Ajustes Deportivos y Privacidad"
-        subtitle="Toca las opciones para personalizar tu ficha en segundos"
-        icon={<IconBadge name="settings" variant="purple" size={38} />}
-      >
-        <form onSubmit={handleSaveTactileSettings} className="tt-settings-stack">
-          <div className="tt-set-block">
-            <label>Mano Hábil</label>
-            <div className="tt-set-pair">
-              {['Diestro', 'Zurdo'].map((h) => (
-                <button
-                  key={h}
-                  type="button"
-                  className={`tt-tactile-pill ${draftHand === h ? 'is-on' : ''}`}
-                  onClick={() => {
-                    triggerHaptic('light');
-                    setDraftHand(h);
+              <div className="tt-studio-scrim" />
+              <div className={`tt-studio-subject ${draftSilhouetteMode ? 'is-silhouette' : ''}`}>
+                <SmartImage
+                  src={draftPhoto || profile.avatar}
+                  alt={profile.name}
+                  initials={profile.name}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    objectPosition: 'center top',
+                    transform: `translate(${draftOffsetX}%, ${draftOffsetY}%) scale(${draftZoom}) rotate(${draftRotate}deg)`,
                   }}
-                >
-                  {h}
-                </button>
-              ))}
-            </div>
-          </div>
+                />
+              </div>
 
-          <div className="tt-set-block">
-            <label>Mejor Golpe / Arma Principal (Máx. 2)</label>
-            <div className="tt-set-pills-wrap">
-              {STROKE_OPTIONS.map((st) => (
-                <button
-                  key={st}
-                  type="button"
-                  className={`tt-tactile-pill ${draftStrokes.includes(st) ? 'is-on' : ''}`}
-                  onClick={() => toggleDraftStroke(st)}
-                >
-                  {st}
-                </button>
-              ))}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFilePicked}
+                style={{ display: 'none' }}
+              />
+              <button
+                type="button"
+                className="tt-studio-upload-btn"
+                disabled={isSavingPhoto}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <TTIcon name="camera" size={16} />
+                Subir foto desde mi celular
+              </button>
             </div>
-          </div>
 
-          <div className="tt-set-block">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <label>Días Disponibles</label>
-              <div style={{ display: 'flex', gap: 5 }}>
-                <button
-                  type="button"
-                  className="tt-preset-mini"
-                  onClick={() => setDraftDays(['L', 'M', 'X', 'J', 'V'])}
-                >
-                  Lun–Vie
-                </button>
-                <button
-                  type="button"
-                  className="tt-preset-mini"
-                  onClick={() => setDraftDays(['S', 'D'])}
-                >
-                  Fin de Sem.
-                </button>
-                <button
-                  type="button"
-                  className="tt-preset-mini"
-                  onClick={() => setDraftDays(['L', 'M', 'X', 'J', 'V', 'S', 'D'])}
-                >
-                  Todos
-                </button>
+            <div className="tt-studio-sliders">
+              <label>
+                <span>Zoom ({draftZoom.toFixed(2)}x)</span>
+                <input
+                  type="range"
+                  min="1"
+                  max="2.5"
+                  step="0.05"
+                  value={draftZoom}
+                  onChange={(e) => setDraftZoom(Number(e.target.value))}
+                />
+              </label>
+              <label>
+                <span>Desplazamiento Vertical ({draftOffsetY}%)</span>
+                <input
+                  type="range"
+                  min="-35"
+                  max="35"
+                  step="1"
+                  value={draftOffsetY}
+                  onChange={(e) => setDraftOffsetY(Number(e.target.value))}
+                />
+              </label>
+              <label>
+                <span>Desplazamiento Horizontal ({draftOffsetX}%)</span>
+                <input
+                  type="range"
+                  min="-35"
+                  max="35"
+                  step="1"
+                  value={draftOffsetX}
+                  onChange={(e) => setDraftOffsetX(Number(e.target.value))}
+                />
+              </label>
+              <label>
+                <span>Rotación ({draftRotate}°)</span>
+                <input
+                  type="range"
+                  min="-15"
+                  max="15"
+                  step="1"
+                  value={draftRotate}
+                  onChange={(e) => setDraftRotate(Number(e.target.value))}
+                />
+              </label>
+
+              <button
+                type="button"
+                className={`tt-silhouette-toggle ${draftSilhouetteMode ? 'is-on' : ''}`}
+                onClick={() => {
+                  triggerHaptic('light');
+                  setDraftSilhouetteMode((v) => !v);
+                }}
+              >
+                {draftSilhouetteMode
+                  ? '✓ Efecto Silueta Editorial Activo'
+                  : 'Activar Recorte / Silueta Editorial'}
+              </button>
+            </div>
+
+            <div>
+              <span className="tt-pf-sec-kicker" style={{ marginBottom: 8 }}>
+                FONDOS DE PERFIL DISPONIBLES (TU SALDO: {Number(profile.gems || 0).toLocaleString('es-PE')} 💎)
+              </span>
+              <div className="tt-scenarios-grid">
+                {PROFILE_SCENARIOS.map((sc) => {
+                  const owned = ownedScenarios.includes(sc.id);
+                  const selected = draftScenarioId === sc.id;
+                  return (
+                    <button
+                      key={sc.id}
+                      type="button"
+                      className={`tt-scenario-tile ${selected ? 'is-selected' : ''}`}
+                      onClick={() => {
+                        triggerHaptic('light');
+                        setDraftScenarioId(sc.id);
+                      }}
+                    >
+                      <SmartImage src={sc.imageDark} alt={sc.name} className="tt-scenario-img" />
+                      <div className="tt-scenario-caption">
+                        <strong>{sc.name}</strong>
+                        <span>{owned ? 'Disponible' : `Canjear · ${sc.gemsCost} 💎`}</span>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            <div className="tt-days-circle-row">
-              {WEEK_DAYS.map((d) => (
-                <button
-                  key={d.id}
-                  type="button"
-                  className={`tt-day-circle-btn ${draftDays.includes(d.id) ? 'is-on' : ''}`}
-                  onClick={() => toggleDraftDay(d.id)}
-                >
-                  {d.label}
-                </button>
-              ))}
-            </div>
-
-            <div className="tt-times-stack">
-              {TIME_WINDOWS.map((tw) => (
-                <button
-                  key={tw.id}
-                  type="button"
-                  className={`tt-tactile-pill ${draftTimes.includes(tw.id) ? 'is-on' : ''}`}
-                  onClick={() => toggleDraftTime(tw.id)}
-                >
-                  {tw.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="tt-set-block">
-            <label htmlFor="tt-set-club">Club o Sede Representada</label>
-            <select
-              id="tt-set-club"
-              className="tt-set-select"
-              value={draftClubId}
-              onChange={(e) => setDraftClubId(e.target.value)}
-            >
-              <option value="independiente">Jugador Independiente</option>
-              {(clubs || []).map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="tt-privacy-row">
-            <div>
-              <strong>Ocultar WhatsApp al público</strong>
-              <small>Solo se mostrará cuando aceptes un partido oficial.</small>
-            </div>
             <button
               type="button"
-              className={`tt-privacy-toggle ${draftHideWhatsapp ? 'is-on' : ''}`}
-              onClick={() => {
-                triggerHaptic('light');
-                setDraftHideWhatsapp((v) => !v);
-              }}
+              className="tt-btn tt-btn-primary"
+              style={{ width: '100%' }}
+              disabled={isSavingPhoto}
+              onClick={handleSavePhotoStudio}
             >
-              {draftHideWhatsapp ? 'Privado' : 'Visible'}
+              {isSavingPhoto ? 'Subiendo foto en la nube...' : 'Guardar Foto y Fondo'}
             </button>
           </div>
+        </ModalPortal>
+      )}
 
-          <button type="submit" className="tt-btn tt-btn-primary" style={{ width: '100%' }}>
-            Guardar Ajustes
-          </button>
-        </form>
-      </ModalPortal>
+      {/* ====================================================================
+          MODAL 2 (SOLO DUEÑO): AJUSTES 100 % TÁCTILES
+          ==================================================================== */}
+      {isOwnProfile && (
+        <ModalPortal
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+          title="Ajustes Deportivos y Privacidad"
+          subtitle="Personaliza tu ficha en segundos"
+          icon={<IconBadge name="settings" variant="purple" size={38} />}
+        >
+          <form onSubmit={handleSaveTactileSettings} className="tt-settings-stack">
+            <div className="tt-set-block">
+              <label>Mano Hábil</label>
+              <div className="tt-set-pair">
+                {['Diestro', 'Zurdo'].map((h) => (
+                  <button
+                    key={h}
+                    type="button"
+                    className={`tt-tactile-pill ${draftHand === h ? 'is-on' : ''}`}
+                    onClick={() => {
+                      triggerHaptic('light');
+                      setDraftHand(h);
+                    }}
+                  >
+                    {h}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="tt-set-block">
+              <label>Mejor Golpe / Arma Principal (Máx. 2)</label>
+              <div className="tt-set-pills-wrap">
+                {STROKE_OPTIONS.map((st) => (
+                  <button
+                    key={st}
+                    type="button"
+                    className={`tt-tactile-pill ${draftStrokes.includes(st) ? 'is-on' : ''}`}
+                    onClick={() => toggleDraftStroke(st)}
+                  >
+                    {st}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="tt-set-block">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <label>Días Disponibles</label>
+                <div style={{ display: 'flex', gap: 5 }}>
+                  <button
+                    type="button"
+                    className="tt-preset-mini"
+                    onClick={() => setDraftDays(['L', 'M', 'X', 'J', 'V'])}
+                  >
+                    Lun–Vie
+                  </button>
+                  <button
+                    type="button"
+                    className="tt-preset-mini"
+                    onClick={() => setDraftDays(['S', 'D'])}
+                  >
+                    Fin de Sem.
+                  </button>
+                  <button
+                    type="button"
+                    className="tt-preset-mini"
+                    onClick={() => setDraftDays(['L', 'M', 'X', 'J', 'V', 'S', 'D'])}
+                  >
+                    Todos
+                  </button>
+                </div>
+              </div>
+
+              <div className="tt-days-circle-row">
+                {WEEK_DAYS.map((d) => (
+                  <button
+                    key={d.id}
+                    type="button"
+                    className={`tt-day-circle-btn ${draftDays.includes(d.id) ? 'is-on' : ''}`}
+                    onClick={() => toggleDraftDay(d.id)}
+                  >
+                    {d.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="tt-times-stack">
+                {TIME_WINDOWS.map((tw) => (
+                  <button
+                    key={tw.id}
+                    type="button"
+                    className={`tt-tactile-pill ${draftTimes.includes(tw.id) ? 'is-on' : ''}`}
+                    onClick={() => toggleDraftTime(tw.id)}
+                  >
+                    {tw.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="tt-set-block">
+              <label htmlFor="tt-set-club">Club o Sede Representada</label>
+              <select
+                id="tt-set-club"
+                className="tt-set-select"
+                value={draftClubId}
+                onChange={(e) => setDraftClubId(e.target.value)}
+              >
+                <option value="independiente">Jugador Independiente</option>
+                {(clubs || []).map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="tt-privacy-row">
+              <div>
+                <strong>Ocultar WhatsApp al público</strong>
+                <small>Solo se mostrará cuando aceptes un partido oficial.</small>
+              </div>
+              <button
+                type="button"
+                className={`tt-privacy-toggle ${draftHideWhatsapp ? 'is-on' : ''}`}
+                onClick={() => {
+                  triggerHaptic('light');
+                  setDraftHideWhatsapp((v) => !v);
+                }}
+              >
+                {draftHideWhatsapp ? 'Privado' : 'Visible'}
+              </button>
+            </div>
+
+            <button type="submit" className="tt-btn tt-btn-primary" style={{ width: '100%' }}>
+              Guardar Ajustes
+            </button>
+          </form>
+        </ModalPortal>
+      )}
 
       <style>{`
         .tt-perfil-view {
           display: flex;
           flex-direction: column;
-          gap: 15px;
+          gap: 14px;
         }
 
-        /* 1. PORTADA HEROICA EDITORIAL */
+        /* 1. PORTADA HEROICA EDITORIAL LIQUID GLASS */
         .tt-pf-hero {
           position: relative;
           border-radius: 26px;
@@ -1428,8 +1459,8 @@ export default function PerfilView({
           padding: 16px;
           background: #1A0530;
           color: #FAF9F5;
-          border: 1px solid rgba(0, 220, 125, 0.3);
-          box-shadow: var(--tt-card-specular), 0 18px 42px rgba(8, 1, 18, 0.42);
+          border: 1px solid rgba(255, 255, 255, 0.14);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 18px 42px rgba(8, 1, 18, 0.42);
           display: flex;
           flex-direction: column;
           gap: 14px;
@@ -1440,8 +1471,8 @@ export default function PerfilView({
           inset: 0;
           background: linear-gradient(
             180deg,
-            rgba(22, 4, 40, 0.56) 0%,
-            rgba(20, 4, 36, 0.68) 54%,
+            rgba(22, 4, 40, 0.52) 0%,
+            rgba(20, 4, 36, 0.66) 54%,
             rgba(14, 2, 26, 0.96) 100%
           );
         }
@@ -1469,9 +1500,19 @@ export default function PerfilView({
           z-index: 1;
         }
         .tt-pf-top-bar { position: relative; z-index: 3; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-        .tt-pf-pill { display: inline-flex; align-items: center; padding: 5px 11px; border-radius: 999px; font-size: 0.65rem; font-weight: 900; letter-spacing: 0.08em; }
-        .tt-pf-pill.is-master { background: #00DC7D; color: #120321; }
-        .tt-pf-pill.is-vip { background: linear-gradient(135deg, #FBBF24 0%, #D97706 100%); color: #1E1102; }
+        .tt-pf-pill {
+          display: inline-flex;
+          align-items: center;
+          padding: 5px 11px;
+          border-radius: 999px;
+          font-size: 0.64rem;
+          font-weight: 900;
+          letter-spacing: 0.08em;
+          backdrop-filter: blur(10px);
+          -webkit-backdrop-filter: blur(10px);
+        }
+        .tt-pf-pill.is-master { background: #00DC7D; color: #10021E; }
+        .tt-pf-pill.is-vip { background: linear-gradient(135deg, #F5E1A4 0%, #CCA046 100%); color: #1A1102; }
         .tt-pf-pill.is-calib { background: rgba(56, 189, 248, 0.24); border: 1px solid rgba(56, 189, 248, 0.55); color: #BAE6FD; }
         .tt-pf-pill.is-cat { background: rgba(250, 249, 245, 0.16); border: 1px solid rgba(250, 249, 245, 0.26); color: #FAF9F5; }
         .tt-pf-top-actions { display: flex; gap: 7px; }
@@ -1479,56 +1520,113 @@ export default function PerfilView({
           width: 38px;
           height: 38px;
           border-radius: 50%;
-          background: rgba(18, 3, 33, 0.66);
-          border: 1px solid rgba(250, 249, 245, 0.25);
+          background: rgba(18, 3, 33, 0.56);
+          border: 1px solid rgba(250, 249, 245, 0.24);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
           color: #FAF9F5;
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          backdrop-filter: blur(8px);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
           transition: transform 170ms cubic-bezier(0.22, 1.4, 0.36, 1);
         }
-        .tt-pf-circle-btn:active { transform: scale(0.9); }
-        .tt-pf-circle-btn.is-emerald { background: #00DC7D; border-color: #00DC7D; color: #120321; }
+        .tt-pf-circle-btn:active { transform: scale(0.88); }
+        .tt-pf-circle-btn.is-emerald { background: #00DC7D; border-color: #00DC7D; color: #10021E; }
 
         .tt-pf-hero-main { position: relative; z-index: 2; display: grid; grid-template-columns: 1.2fr 0.85fr; align-items: end; gap: 10px; }
         .tt-pf-identity { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
         .tt-pf-name-stack { margin: 0; font-family: var(--tt-font-display); font-weight: 900; text-transform: uppercase; line-height: 0.92; display: flex; flex-direction: column; }
         .tt-pf-firstname { font-size: clamp(1.5rem, 6.2vw, 2.25rem); color: #FAF9F5; }
-        .tt-pf-lastname { font-size: clamp(1.65rem, 6.8vw, 2.5rem); color: #00DC7D; text-shadow: 0 4px 18px rgba(0, 220, 125, 0.34); }
+        .tt-pf-lastname { font-size: clamp(1.65rem, 6.8vw, 2.5rem); color: #00DC7D; text-shadow: 0 4px 18px rgba(0, 220, 125, 0.32); }
         .tt-pf-meta-line { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 0.76rem; font-weight: 700; color: rgba(250, 249, 245, 0.88); }
-        .tt-pf-equipped-badge {
-          align-self: flex-start;
+
+        /* Logros sutiles ganados por mérito (cero fondo blanco, cero aire videojuego) */
+        .tt-pf-merits-row { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 2px; }
+        .tt-merit-pill {
           display: inline-flex;
           align-items: center;
-          gap: 6px;
-          padding: 4px 10px;
+          gap: 4px;
+          padding: 3px 9px;
           border-radius: 999px;
-          background: rgba(245, 158, 11, 0.18);
-          border: 1px solid rgba(245, 158, 11, 0.52);
-          color: #FDE68A;
-          font-size: 0.7rem;
+          font-size: 0.65rem;
           font-weight: 800;
+          letter-spacing: 0.02em;
+          backdrop-filter: blur(10px);
+          -webkit-backdrop-filter: blur(10px);
         }
+        .tt-merit-pill.is-emerald {
+          background: rgba(0, 220, 125, 0.16);
+          border: 1px solid rgba(0, 220, 125, 0.44);
+          color: #86F7C3;
+        }
+        .tt-merit-pill.is-gold {
+          background: rgba(229, 193, 108, 0.16);
+          border: 1px solid rgba(229, 193, 108, 0.48);
+          color: #F3DC9B;
+        }
+
+        /* Conmutador Temporada 2026 | Carrera con slider elástico Liquid Glass */
         .tt-pf-scope-row { margin-top: 4px; display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
-        .tt-pf-scope-toggle { display: inline-flex; padding: 3px; border-radius: 999px; background: rgba(250, 249, 245, 0.12); border: 1px solid rgba(250, 249, 245, 0.18); }
-        .tt-pf-scope-toggle button { padding: 5px 10px; border-radius: 999px; font-size: 0.67rem; font-weight: 800; color: rgba(250, 249, 245, 0.78); }
-        .tt-pf-scope-toggle button.is-active { background: #FAF9F5; color: #1E0734; }
+        .tt-pf-scope-toggle {
+          position: relative;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          padding: 3px;
+          border-radius: 999px;
+          background: rgba(250, 249, 245, 0.12);
+          border: 1px solid rgba(250, 249, 245, 0.2);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+        }
+        .tt-pf-scope-slider {
+          position: absolute;
+          top: 3px;
+          bottom: 3px;
+          left: 3px;
+          width: calc((100% - 6px) / 2);
+          border-radius: 999px;
+          background: #FAF9F5;
+          box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
+          transition: transform 280ms cubic-bezier(0.22, 1.24, 0.36, 1);
+          pointer-events: none;
+          z-index: 0;
+        }
+        .tt-pf-scope-toggle button {
+          position: relative;
+          z-index: 1;
+          padding: 5px 10px;
+          border-radius: 999px;
+          font-size: 0.66rem;
+          font-weight: 800;
+          color: rgba(250, 249, 245, 0.8);
+          white-space: nowrap;
+          transition: color 200ms ease;
+        }
+        .tt-pf-scope-toggle button.is-active { color: #1E0734; font-weight: 900; }
+
         .tt-pf-pass-mini {
           display: inline-flex;
           align-items: center;
           gap: 5px;
           padding: 6px 11px;
           border-radius: 999px;
-          background: rgba(245, 158, 11, 0.24);
-          border: 1px solid rgba(252, 227, 138, 0.65);
-          color: #FDE68A;
+          background: rgba(229, 193, 108, 0.18);
+          border: 1px solid rgba(229, 193, 108, 0.56);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24);
+          backdrop-filter: blur(10px);
+          -webkit-backdrop-filter: blur(10px);
+          color: #F3DC9B;
           font-size: 0.68rem;
           font-weight: 900;
-          transition: transform 160ms cubic-bezier(0.22, 1.35, 0.36, 1);
+          transition: transform 170ms cubic-bezier(0.22, 1.38, 0.36, 1);
         }
-        .tt-pf-pass-mini:active { transform: scale(0.93); }
-        .tt-pf-pass-mini.is-reto { background: #00DC7D; border-color: #00DC7D; color: #120321; }
+        .tt-pf-pass-mini:active { transform: scale(0.92); }
+        .tt-pf-pass-mini.is-reto {
+          background: linear-gradient(135deg, #00DC7D 0%, #00B365 100%);
+          border-color: transparent;
+          color: #10021E;
+        }
 
         .tt-pf-portrait-stage {
           width: 100%;
@@ -1536,11 +1634,11 @@ export default function PerfilView({
           max-height: 215px;
           border-radius: 20px;
           overflow: hidden;
-          border: 2px solid rgba(0, 220, 125, 0.5);
+          border: 2px solid rgba(0, 220, 125, 0.46);
           background: rgba(20, 4, 36, 0.5);
           box-shadow: 0 14px 28px rgba(0, 0, 0, 0.45);
-          cursor: pointer;
         }
+        .tt-pf-portrait-stage.is-editable { cursor: pointer; }
         .tt-pf-portrait-stage.is-silhouette {
           border-color: transparent;
           background: transparent;
@@ -1550,7 +1648,7 @@ export default function PerfilView({
         }
         .tt-pf-portrait-img { width: 100%; height: 100%; object-fit: cover; object-position: center top; }
 
-        /* 2. LAS 4 TARJETAS GLASSMORPHISM CON ENTRADA ESCALONADA */
+        /* 2. LAS 4 TARJETAS GLASSMORPHISM (ANIMADAS AL CAMBIAR TEMPORADA / CARRERA) */
         .tt-pf-glass-grid {
           position: relative;
           z-index: 2;
@@ -1565,9 +1663,10 @@ export default function PerfilView({
           padding: 11px 10px;
           border-radius: 16px;
           background: rgba(250, 249, 245, 0.1);
-          border: 1px solid rgba(250, 249, 245, 0.16);
-          backdrop-filter: blur(14px);
-          -webkit-backdrop-filter: blur(14px);
+          border: 1px solid rgba(250, 249, 245, 0.18);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+          backdrop-filter: blur(16px) saturate(140%);
+          -webkit-backdrop-filter: blur(16px) saturate(140%);
           display: flex;
           flex-direction: column;
           align-items: center;
@@ -1575,18 +1674,18 @@ export default function PerfilView({
           text-align: center;
           min-height: 82px;
           gap: 2px;
-          animation: ttGlassPop 420ms cubic-bezier(0.22, 1.18, 0.36, 1) both;
+          animation: ttGlassPop 360ms cubic-bezier(0.22, 1.18, 0.36, 1) both;
           animation-delay: var(--pf-delay, 0ms);
         }
         @keyframes ttGlassPop {
-          from { opacity: 0; transform: translateY(10px) scale(0.96); }
+          from { opacity: 0; transform: translateY(8px) scale(0.96); }
           to { opacity: 1; transform: translateY(0) scale(1); }
         }
-        .tt-pf-glass-card span { font-size: 0.6rem; font-weight: 800; letter-spacing: 0.08em; opacity: 0.74; }
-        .tt-pf-glass-card strong { font-family: var(--tt-font-display); font-size: 1.48rem; font-weight: 900; line-height: 1; color: #FAF9F5; }
+        .tt-pf-glass-card span { font-size: 0.59rem; font-weight: 800; letter-spacing: 0.08em; opacity: 0.76; }
+        .tt-pf-glass-card strong { font-family: var(--tt-font-display); font-size: 1.46rem; font-weight: 900; line-height: 1; color: #FAF9F5; }
         .tt-pf-glass-card.is-emerald strong { color: #00DC7D; }
-        .tt-pf-glass-card.is-gold strong { color: #FDE68A; }
-        .tt-pf-glass-card small { font-size: 0.66rem; opacity: 0.78; }
+        .tt-pf-glass-card.is-gold strong { color: #F3DC9B; }
+        .tt-pf-glass-card small { font-size: 0.65rem; opacity: 0.78; }
 
         /* 3. PARTIDOS DE PRUEBA Y TERMÓMETRO 3D */
         .tt-pf-progress-stack { display: flex; flex-direction: column; gap: 10px; }
@@ -1596,7 +1695,7 @@ export default function PerfilView({
           padding: 15px;
           background: var(--tt-surface);
           border: 1px solid var(--tt-border);
-          box-shadow: var(--tt-card-specular), var(--tt-shadow-sm);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), var(--tt-shadow-sm);
           display: flex;
           flex-direction: column;
           gap: 10px;
@@ -1609,7 +1708,7 @@ export default function PerfilView({
         .tt-calib-hint { margin: 0; font-size: 0.74rem; color: var(--tt-text-muted); }
 
         .tt-thermo-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
-        .tt-thermo-kicker { display: block; font-size: 0.64rem; font-weight: 900; letter-spacing: 0.09em; color: var(--tt-emerald-text); }
+        .tt-thermo-kicker { display: block; font-size: 0.63rem; font-weight: 900; letter-spacing: 0.09em; color: var(--tt-emerald-text); }
         .tt-thermo-head strong { font-size: 0.92rem; }
         .tt-thermo-pct { font-family: var(--tt-font-display); font-size: 1.3rem; font-weight: 900; }
         .tt-thermo-track-wrap { position: relative; padding: 10px 0; }
@@ -1620,7 +1719,7 @@ export default function PerfilView({
           background: #FFFFFF;
           transition: width 520ms cubic-bezier(0.22, 1, 0.36, 1);
         }
-        .tt-perfil-view.is-light .tt-thermo-fill { background: #0A1633; }
+        .tt-perfil-view.is-light .tt-thermo-fill { background: #1E0734; }
         .tt-thermo-ball-pin {
           position: absolute;
           top: 50%;
@@ -1635,7 +1734,7 @@ export default function PerfilView({
         }
         .tt-thermo-scale { display: flex; justify-content: space-between; font-size: 0.7rem; font-weight: 700; color: var(--tt-text-muted); }
 
-        /* 4. ADN DEPORTIVO */
+        /* 4. ADN DEPORTIVO + BARRA DE FONDOS */
         .tt-dna-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
         @media (min-width: 640px) {
           .tt-dna-grid { grid-template-columns: 1fr 1fr; }
@@ -1645,7 +1744,7 @@ export default function PerfilView({
           padding: 14px;
           background: var(--tt-surface);
           border: 1px solid var(--tt-border);
-          box-shadow: var(--tt-card-specular), var(--tt-shadow-sm);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), var(--tt-shadow-sm);
           display: flex;
           flex-direction: column;
           gap: 10px;
@@ -1657,21 +1756,44 @@ export default function PerfilView({
         .tt-dna-chip { padding: 5px 10px; border-radius: 999px; background: var(--tt-surface-2); border: 1px solid var(--tt-border); font-size: 0.74rem; font-weight: 800; }
         .tt-dna-days-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
         .tt-dna-day { height: 30px; border-radius: 10px; background: var(--tt-surface-2); color: var(--tt-text-muted); font-size: 0.72rem; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; }
-        .tt-dna-day.is-on { background: #00DC7D; color: #120321; }
+        .tt-dna-day.is-on { background: #00DC7D; color: #10021E; }
 
-        /* 5. SECCIONES + 6 DISTINTIVOS */
+        .tt-pf-backgrounds-bar {
+          width: 100%;
+          padding: 11px 13px;
+          border-radius: 20px;
+          background: var(--tt-surface);
+          border: 1px solid var(--tt-border);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), var(--tt-shadow-sm);
+          color: var(--tt-text);
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          transition: transform 170ms cubic-bezier(0.22, 1.38, 0.36, 1), border-color 200ms ease;
+        }
+        .tt-pf-backgrounds-bar:active { transform: scale(0.97); border-color: #00DC7D; }
+        .tt-pfb-thumb {
+          width: 54px;
+          height: 54px;
+          border-radius: 14px;
+          overflow: hidden;
+          border: 1.5px solid rgba(0, 220, 125, 0.45);
+          flex-shrink: 0;
+        }
+
+        /* 5. SECCIONES + CARNET DIGITAL */
         .tt-pf-section-card {
           border-radius: 22px;
           padding: 15px;
           background: var(--tt-surface);
           border: 1px solid var(--tt-border);
-          box-shadow: var(--tt-card-specular), var(--tt-shadow-sm);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), var(--tt-shadow-sm);
           display: flex;
           flex-direction: column;
           gap: 12px;
         }
         .tt-pf-sec-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; }
-        .tt-pf-sec-kicker { display: block; font-size: 0.63rem; font-weight: 900; letter-spacing: 0.09em; color: var(--tt-emerald-text); }
+        .tt-pf-sec-kicker { display: block; font-size: 0.62rem; font-weight: 900; letter-spacing: 0.09em; color: var(--tt-emerald-text); }
         .tt-pf-sec-head h3 { margin: 2px 0 0; font-family: var(--tt-font-display); font-size: 1.24rem; line-height: 1.05; }
         .tt-pf-sec-action {
           padding: 6px 11px;
@@ -1682,36 +1804,16 @@ export default function PerfilView({
           font-size: 0.72rem;
           font-weight: 800;
           white-space: nowrap;
+          transition: transform 160ms cubic-bezier(0.22, 1.38, 0.36, 1);
         }
+        .tt-pf-sec-action:active { transform: scale(0.94); }
         .tt-pf-sec-action.is-gold {
-          background: rgba(245, 158, 11, 0.16);
-          border-color: rgba(245, 158, 11, 0.5);
-          color: #D97706;
+          background: rgba(229, 193, 108, 0.14);
+          border-color: rgba(229, 193, 108, 0.44);
+          color: #9A6B16;
         }
-        .tt-perfil-view.is-dark .tt-pf-sec-action.is-gold { color: #FDE68A; }
+        .tt-perfil-view.is-dark .tt-pf-sec-action.is-gold { color: #F3DC9B; }
 
-        .tt-badges-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-        .tt-badge-tile {
-          padding: 10px 6px;
-          border-radius: 16px;
-          background: var(--tt-surface-2);
-          border: 1.5px solid var(--tt-border);
-          color: var(--tt-text);
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          text-align: center;
-          gap: 5px;
-          transition: transform 180ms cubic-bezier(0.22, 1.4, 0.36, 1), border-color 200ms ease;
-        }
-        .tt-badge-tile:active { transform: scale(0.93); }
-        .tt-badge-tile.is-equipped { border-color: #00DC7D; background: rgba(0, 220, 125, 0.12); }
-        .tt-badge-img { width: 48px; height: 48px; object-fit: contain; }
-        .tt-badge-tile strong { font-size: 0.72rem; line-height: 1.15; }
-        .tt-badge-state { font-size: 0.64rem; font-weight: 900; padding: 2px 8px; border-radius: 999px; background: rgba(30, 7, 52, 0.14); color: var(--tt-text-muted); }
-        .tt-badge-tile.is-equipped .tt-badge-state { background: #00DC7D; color: #120321; }
-
-        /* 6. WALLET CARD PREVIEW (ABRE EL MODAL 3D UNIFICADO) */
         .tt-wallet-card {
           position: relative;
           aspect-ratio: 1.58 / 1;
@@ -1722,20 +1824,20 @@ export default function PerfilView({
           padding: 16px 18px;
           background: linear-gradient(135deg, #1E0734 0%, #11031F 60%, #1F120A 100%);
           color: #FAF9F5;
-          border: 1px solid rgba(250, 249, 245, 0.2);
-          box-shadow: 0 18px 36px rgba(6, 1, 14, 0.44);
+          border: 1px solid rgba(250, 249, 245, 0.22);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 18px 36px rgba(6, 1, 14, 0.44);
           display: flex;
           flex-direction: column;
           justify-content: space-between;
           overflow: hidden;
           cursor: pointer;
-          transition: transform 220ms cubic-bezier(0.22, 1.3, 0.36, 1);
+          transition: transform 200ms cubic-bezier(0.22, 1.32, 0.36, 1);
         }
         .tt-wallet-card:active { transform: scale(0.97); }
         .tt-wallet-card.is-vip-gold {
           background: linear-gradient(135deg, #2B1A04 0%, #523308 32%, #1D0A2E 78%, #3B2305 100%);
-          border-color: rgba(252, 227, 138, 0.72);
-          box-shadow: 0 18px 38px rgba(245, 158, 11, 0.24);
+          border-color: rgba(243, 220, 155, 0.68);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 18px 38px rgba(229, 193, 108, 0.22);
         }
         .tt-wc-foil-sheen {
           position: absolute;
@@ -1754,14 +1856,14 @@ export default function PerfilView({
         .tt-wc-top, .tt-wc-mid, .tt-wc-bottom { position: relative; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
         .tt-wc-brand { font-family: var(--tt-font-display); font-style: italic; font-weight: 900; font-size: 1.1rem; letter-spacing: 0.06em; }
         .tt-wc-tier { padding: 4px 10px; border-radius: 999px; background: rgba(250, 249, 245, 0.14); font-size: 0.65rem; font-weight: 900; letter-spacing: 0.09em; }
-        .tt-wc-tier.is-vip { background: linear-gradient(135deg, #FEF08A 0%, #F59E0B 100%); color: #1E1102; }
+        .tt-wc-tier.is-vip { background: linear-gradient(135deg, #F5E1A4 0%, #CCA046 100%); color: #1A1102; }
         .tt-wc-holder { display: block; font-size: 0.96rem; letter-spacing: 0.08em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .tt-wc-code { display: block; margin-top: 2px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.72rem; color: #00DC7D; }
         .tt-wc-bottom small { display: block; font-size: 0.56rem; letter-spacing: 0.08em; color: #7CF5C0; font-weight: 800; }
         .tt-wc-bottom strong { font-size: 0.78rem; letter-spacing: 0.05em; }
         .tt-wc-qr-box { padding: 4px; border-radius: 10px; background: #FAF9F5; display: inline-flex; }
 
-        /* 7. ÚLTIMOS RESULTADOS */
+        /* 6. ÚLTIMOS RESULTADOS */
         .tt-recent-list { display: flex; flex-direction: column; gap: 9px; }
         .tt-recent-card { border-radius: 16px; padding: 12px; background: #1B0630; color: #FAF9F5; border: 1px solid rgba(250, 249, 245, 0.12); display: flex; flex-direction: column; gap: 6px; }
         .tt-rc-top { display: flex; justify-content: space-between; font-size: 0.68rem; font-weight: 800; opacity: 0.78; }
@@ -1774,7 +1876,7 @@ export default function PerfilView({
         .tt-rc-foot { margin-top: 2px; padding-top: 7px; border-top: 1px solid rgba(250, 249, 245, 0.1); display: flex; justify-content: space-between; align-items: center; font-size: 0.7rem; color: rgba(250, 249, 245, 0.74); }
         .tt-rc-story-btn { padding: 4px 10px; border-radius: 999px; background: rgba(0, 220, 125, 0.18); color: #00DC7D; font-weight: 800; font-size: 0.68rem; }
 
-        /* 8. ESTUDIO DE FOTO & AJUSTES */
+        /* 7. ESTUDIO DE FOTO & AJUSTES */
         .tt-studio-stack,
         .tt-settings-stack { display: flex; flex-direction: column; gap: 14px; }
         .tt-studio-preview { position: relative; height: 230px; border-radius: 20px; overflow: hidden; background: #140324; display: flex; align-items: center; justify-content: center; }
@@ -1789,7 +1891,8 @@ export default function PerfilView({
         .tt-silhouette-toggle { min-height: 40px; border-radius: 13px; background: var(--tt-surface-2); border: 1.5px solid var(--tt-border); color: var(--tt-text); font-size: 0.78rem; font-weight: 800; }
         .tt-silhouette-toggle.is-on { border-color: #00DC7D; background: rgba(0, 220, 125, 0.14); color: var(--tt-emerald-text); }
         .tt-scenarios-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
-        .tt-scenario-tile { position: relative; border-radius: 14px; overflow: hidden; height: 82px; border: 2px solid transparent; padding: 0; text-align: left; }
+        .tt-scenario-tile { position: relative; border-radius: 14px; overflow: hidden; height: 84px; border: 2px solid transparent; padding: 0; text-align: left; transition: transform 160ms ease, border-color 180ms ease; }
+        .tt-scenario-tile:active { transform: scale(0.96); }
         .tt-scenario-tile.is-selected { border-color: #00DC7D; }
         .tt-scenario-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
         .tt-scenario-caption { position: relative; z-index: 2; height: 100%; padding: 8px; background: linear-gradient(180deg, rgba(16, 3, 29, 0.15) 0%, rgba(16, 3, 29, 0.9) 100%); color: #FAF9F5; display: flex; flex-direction: column; justify-content: flex-end; }
@@ -1799,15 +1902,16 @@ export default function PerfilView({
         .tt-set-block { display: flex; flex-direction: column; gap: 7px; }
         .tt-set-block label { font-size: 0.75rem; font-weight: 800; color: var(--tt-text-muted); }
         .tt-set-pair, .tt-set-pills-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
-        .tt-tactile-pill { min-height: 40px; padding: 7px 10px; border-radius: 12px; background: var(--tt-surface-2); border: 1.5px solid var(--tt-border); color: var(--tt-text); font-size: 0.76rem; font-weight: 700; }
+        .tt-tactile-pill { min-height: 40px; padding: 7px 10px; border-radius: 12px; background: var(--tt-surface-2); border: 1.5px solid var(--tt-border); color: var(--tt-text); font-size: 0.76rem; font-weight: 700; transition: transform 150ms ease; }
+        .tt-tactile-pill:active { transform: scale(0.95); }
         .tt-tactile-pill.is-on { border-color: #00DC7D; background: rgba(0, 220, 125, 0.16); color: var(--tt-emerald-text); font-weight: 800; }
         .tt-perfil-view.is-light .tt-tactile-pill.is-on { background: #1E0734; border-color: #1E0734; color: #00DC7D; }
         .tt-preset-mini { padding: 3px 8px; border-radius: 999px; background: var(--tt-surface-2); color: var(--tt-text-muted); font-size: 0.66rem; font-weight: 800; }
         .tt-days-circle-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
         .tt-day-circle-btn { height: 38px; border-radius: 50%; background: var(--tt-surface-2); border: 1.5px solid var(--tt-border); color: var(--tt-text); font-weight: 800; font-size: 0.78rem; }
-        .tt-day-circle-btn.is-on { background: #00DC7D; border-color: #00DC7D; color: #120321; }
+        .tt-day-circle-btn.is-on { background: #00DC7D; border-color: #00DC7D; color: #10021E; }
         .tt-times-stack { display: flex; flex-direction: column; gap: 6px; margin-top: 2px; }
-        .tt-set-select { min-height: 44px; padding: 0 12px; border-radius: 13px; background: var(--tt-surface-2); border: 1px solid var(--tt-border); color: var(--tt-text); font-size: 0.86rem; }
+        .tt-set-select { min-height: 44px; padding: 0 12px; border-radius: 13px; background: var(--tt-surface-2); border: 1px solid var(--tt-border); color: var(--tt-text); font-size: 16px; }
         .tt-privacy-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px; border-radius: 14px; background: var(--tt-surface-2); }
         .tt-privacy-row strong { display: block; font-size: 0.82rem; }
         .tt-privacy-row small { display: block; font-size: 0.7rem; color: var(--tt-text-muted); }
