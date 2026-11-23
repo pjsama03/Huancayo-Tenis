@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ASSETS,
   IconBadge,
@@ -8,7 +8,11 @@ import {
   triggerHaptic,
 } from '../components/AppIcons';
 import { INITIAL_CLUBS, getCategoryByPoints } from '../data/playersAndClubsData';
-import { buildWhatsappLink } from '../utils/cloudService';
+import {
+  applyCategoryFloorResetToPlayers,
+  buildWhatsappLink,
+  getCategoryFloorPoints,
+} from '../utils/cloudService';
 
 export const ADMIN_SUITE_EDITABLE_CONFIG = {
   adminPin: '1234',
@@ -31,10 +35,17 @@ const ADMIN_TABS = [
   { id: 'respaldo', label: 'Respaldo' },
 ];
 
+const ECOSYSTEM_DASHBOARDS = [
+  { id: 'r2', label: 'Cloudflare R2', hint: '10 GB gratis · $0 tráfico', url: 'https://dash.cloudflare.com/' },
+  { id: 'vercel', label: 'Vercel Usage', hint: '10 GB builds · 100 GB red', url: 'https://vercel.com/dashboard' },
+  { id: 'supa', label: 'Supabase BD', hint: '500 MB SQL · 1 GB fotos', url: 'https://supabase.com/dashboard' },
+  { id: 'push', label: 'OneSignal', hint: 'Push iOS / Android', url: 'https://dashboard.onesignal.com/' },
+];
+
 const MONTHS_ES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
 /* ==========================================================================
-   MOTOR DE CALENDARIO DE TEMPORADAS (~90 DÍAS + MANDO MANUAL COMPLETO)
+   MOTOR DE CALENDARIO DE TEMPORADAS (~90 DÍAS + MANDO MANUAL + EXCEPCIONES)
    ========================================================================== */
 function getTodayIsoPeru() {
   try {
@@ -101,7 +112,6 @@ function buildProjectedSeasonSnapshots(baseSnap, activeNum, startIso, durationDa
   const updated = currentList.map((s) => ({ ...s }));
   const targetIdx = targetNum - 1;
 
-  // Fijar temporada elegida como activa y abierta
   const activeEnd = addDaysIso(startIso, safeDays - 1);
   updated[targetIdx] = {
     ...updated[targetIdx],
@@ -112,7 +122,6 @@ function buildProjectedSeasonSnapshots(baseSnap, activeNum, startIso, durationDa
     closedAt: null,
   };
 
-  // Proyectar hacia adelante (T+1 ... T4) automáticamente cada ~90 días
   for (let i = targetIdx + 1; i < 4; i += 1) {
     const nextStart = addDaysIso(updated[i - 1].endDate, 1);
     const nextEnd = addDaysIso(nextStart, safeDays - 1);
@@ -126,7 +135,6 @@ function buildProjectedSeasonSnapshots(baseSnap, activeNum, startIso, durationDa
     };
   }
 
-  // Proyectar fechas hacia atrás solo si las temporadas previas no tenían fecha exacta
   for (let i = targetIdx - 1; i >= 0; i -= 1) {
     const prevEnd = addDaysIso(updated[i + 1].startDate, -1);
     const prevStart = addDaysIso(prevEnd, -(safeDays - 1));
@@ -189,7 +197,9 @@ function reopenPreviousSeasonSnapshot(baseSnap) {
   const list = ensureFourSeasons(baseSnap);
   const prevNum = curNum > 1 ? curNum - 1 : 4;
   const nextYear =
-    curNum === 1 ? Math.max(2025, (Number(baseSnap?.year) || new Date().getFullYear()) - 1) : baseSnap?.year || new Date().getFullYear();
+    curNum === 1
+      ? Math.max(2025, (Number(baseSnap?.year) || new Date().getFullYear()) - 1)
+      : baseSnap?.year || new Date().getFullYear();
 
   const updated = list.map((s) =>
     s.number === prevNum ? { ...s, locked: false, closedAt: null } : s
@@ -233,7 +243,7 @@ function downloadExcelCsv(filename, headers, rows) {
 }
 
 /* ==========================================================================
-   COMPONENTE PRINCIPAL: AdminSuiteModal (BLINDADO OSCURO + CONTROL TEMPORADAS)
+   COMPONENTE PRINCIPAL: AdminSuiteModal (BLINDADO OSCURO + ECOSISTEMA R2)
    ========================================================================== */
 export default function AdminSuiteModal({
   isOpen = false,
@@ -255,6 +265,7 @@ export default function AdminSuiteModal({
   onAdminApproveTournamentPayment,
   onAdminCreateTournament,
   onAdminCloseSeason,
+  onAdminResetFloorPoints,
   onAdminResolveDispute,
   onAdminToggleClubActive,
   onAdminSaveSponsors,
@@ -273,13 +284,19 @@ export default function AdminSuiteModal({
   const [editPoints, setEditPoints] = useState('');
   const [editGems, setEditGems] = useState('');
 
-  // Control Total de Temporadas
+  // Control Total de Temporadas + Excepciones ("Modo Dios")
   const normalizedSeasons = useMemo(() => ensureFourSeasons(seasonSnapshots), [seasonSnapshots]);
   const [calSeasonNum, setCalSeasonNum] = useState(Number(seasonSnapshots?.currentSeason) || 4);
   const [calStartDate, setCalStartDate] = useState(getTodayIsoPeru());
   const [calDurationDays, setCalDurationDays] = useState(Number(seasonSnapshots?.durationDays) || 90);
   const [calAutoAdvance, setCalAutoAdvance] = useState(seasonSnapshots?.autoAdvance !== false);
-  const [confirmResetSeason, setConfirmResetSeason] = useState(false);
+  const [closeWithFloorReset, setCloseWithFloorReset] = useState(true);
+  const [confirmFloorReset, setConfirmFloorReset] = useState(false);
+  const [confirmClearSnap, setConfirmClearSnap] = useState(false);
+  const [isResettingPoints, setIsResettingPoints] = useState(false);
+
+  // Monitor del Ecosistema (Cloudflare R2 en Vivo)
+  const [r2Stats, setR2Stats] = useState({ loading: false, error: '', data: null });
 
   // Torneo Personalizable
   const [showNewTourney, setShowNewTourney] = useState(false);
@@ -317,12 +334,35 @@ export default function AdminSuiteModal({
   const [hasDownloadedBackup, setHasDownloadedBackup] = useState(false);
   const [confirmPurgeDemo, setConfirmPurgeDemo] = useState(false);
 
+  const fetchR2LiveStats = useCallback(async () => {
+    setR2Stats((prev) => ({ ...prev, loading: true, error: '' }));
+    try {
+      const res = await fetch('/api/r2-media', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'stats' }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json?.ok) {
+        throw new Error(json?.error || `Error ${res.status} leyendo Cloudflare R2.`);
+      }
+      setR2Stats({ loading: false, error: '', data: json });
+    } catch (err) {
+      setR2Stats({
+        loading: false,
+        error: err?.message || 'No se pudo consultar Cloudflare R2 ahora.',
+        data: null,
+      });
+    }
+  }, []);
+
   useEffect(() => {
     if (!isOpen) return;
     if (isUnlockedInitially) setIsUnlocked(true);
     setPinInput('');
     setPinError('');
-    setConfirmResetSeason(false);
+    setConfirmFloorReset(false);
+    setConfirmClearSnap(false);
     setConfirmPurgeDemo(false);
 
     const curNum = Number(seasonSnapshots?.currentSeason) || 4;
@@ -342,6 +382,12 @@ export default function AdminSuiteModal({
     }
   }, [isOpen, isUnlockedInitially, seasonSnapshots]);
 
+  useEffect(() => {
+    if (isOpen && isUnlocked && activeTab === 'respaldo') {
+      fetchR2LiveStats();
+    }
+  }, [isOpen, isUnlocked, activeTab, fetchR2LiveStats]);
+
   const playersMap = useMemo(() => {
     const m = {};
     (players || []).forEach((p) => {
@@ -351,6 +397,15 @@ export default function AdminSuiteModal({
   }, [players]);
 
   const demoCount = useMemo(() => (players || []).filter((p) => p.isDemo).length, [players]);
+  const minorsCount = useMemo(() => (players || []).filter((p) => p.isTutelado).length, [players]);
+
+  const floorResetImpactCount = useMemo(
+    () =>
+      (players || []).filter(
+        (p) => !p.isTutorOnly && Number(p.points || 0) !== getCategoryFloorPoints(p.points)
+      ).length,
+    [players]
+  );
 
   const pendingVipPlayers = useMemo(
     () => (players || []).filter((p) => p.vipStatus === 'PENDING_PAYMENT' && !p.isVip),
@@ -381,7 +436,7 @@ export default function AdminSuiteModal({
     return [...(players || [])]
       .filter((p) => {
         if (!q) return true;
-        return `${p.name || ''} ${p.email || ''} ${p.whatsapp || ''} ${p.credentialId || ''}`
+        return `${p.name || ''} ${p.email || ''} ${p.whatsapp || ''} ${p.credentialId || ''} ${p.tutorName || ''}`
           .toLowerCase()
           .includes(q);
       })
@@ -425,7 +480,27 @@ export default function AdminSuiteModal({
     }
   };
 
-  /* Acciones Temporadas */
+  /* ------------------------------------------------------------------------
+     ACCIONES TEMPORADAS + RESET REAL AL PISO DE CATEGORÍA (300+)
+     ------------------------------------------------------------------------ */
+  const executeFloorReset = async () => {
+    setIsResettingPoints(true);
+    try {
+      if (onAdminResetFloorPoints) {
+        await onAdminResetFloorPoints();
+      } else {
+        await applyCategoryFloorResetToPlayers(players);
+      }
+      return true;
+    } catch (err) {
+      console.error('[TOTAL TENIS] Error aplicando reset al piso:', err);
+      if (onNotify) onNotify('No se pudo completar el reset al piso en la nube.', 'warning');
+      return false;
+    } finally {
+      setIsResettingPoints(false);
+    }
+  };
+
   const handleSaveSeasonCalendar = (e) => {
     e.preventDefault();
     const nextSnap = buildProjectedSeasonSnapshots(
@@ -439,21 +514,53 @@ export default function AdminSuiteModal({
     triggerHaptic('success');
     if (onNotify) {
       onNotify(
-        `Calendario guardado: Temporada ${nextSnap.currentSeason} inicia ${calStartDate} (${nextSnap.durationDays} días c/u).`,
+        `Calendario guardado: Temporada ${nextSnap.currentSeason} inicia ${calStartDate} (${nextSnap.durationDays} días). Cierre automático 00:00 Perú: ${
+          calAutoAdvance ? 'ON' : 'OFF'
+        }.`,
         'success'
       );
     }
   };
 
-  const handleCloseCurrentSeason = () => {
+  const handleCloseCurrentSeason = async () => {
+    if (isResettingPoints) return;
+    // 1. Congela primero los puntos reales para la carrera anual Master Top 8
     const nextSnap = closeActiveSeasonSnapshot(seasonSnapshots, players);
-    if (onAdminCloseSeason) onAdminCloseSeason(nextSnap);
+    if (onAdminCloseSeason) await onAdminCloseSeason(nextSnap);
+
+    // 2. Aplica el Reset al Piso de Categoría (5000 / 4000 / 3000 / 2000 / 1000 / 300 / 0)
+    if (closeWithFloorReset) {
+      await executeFloorReset();
+    }
+
     triggerHaptic('success');
     if (onNotify) {
       onNotify(
-        `Temporada cerrada. Ahora está activa la Temporada ${nextSnap.currentSeason} (${nextSnap.year}).`,
+        closeWithFloorReset
+          ? `Temporada cerrada (foto Master Top 8 guardada). Puntos ajustados al piso de categoría y Temporada ${nextSnap.currentSeason} abierta.`
+          : `Temporada cerrada sin modificar puntos. Ahora está activa T${nextSnap.currentSeason} (${nextSnap.year}).`,
         'success'
       );
+    }
+  };
+
+  const handleManualFloorResetNow = async () => {
+    if (isResettingPoints) return;
+    if (!confirmFloorReset) {
+      triggerHaptic('warning');
+      setConfirmFloorReset(true);
+      return;
+    }
+    setConfirmFloorReset(false);
+    const ok = await executeFloorReset();
+    if (ok) {
+      triggerHaptic('success');
+      if (onNotify) {
+        onNotify(
+          `Reset al Piso aplicado: ${floorResetImpactCount} jugadores bajaron al piso de su categoría (300 / 1,000 / 2,000 / 3,000 / 4,000 / 5,000).`,
+          'success'
+        );
+      }
     }
   };
 
@@ -469,21 +576,18 @@ export default function AdminSuiteModal({
     }
   };
 
-  const handleResetCurrentSeason = () => {
-    if (!confirmResetSeason) {
+  const handleClearCurrentSnapshot = () => {
+    if (!confirmClearSnap) {
       triggerHaptic('warning');
-      setConfirmResetSeason(true);
+      setConfirmClearSnap(true);
       return;
     }
     const nextSnap = resetCurrentSeasonSnapshot(seasonSnapshots);
     if (onAdminCloseSeason) onAdminCloseSeason(nextSnap);
-    setConfirmResetSeason(false);
+    setConfirmClearSnap(false);
     triggerHaptic('success');
     if (onNotify) {
-      onNotify(
-        `Temporada ${nextSnap.currentSeason} reiniciada en la carrera anual (el Ranking ELO sigue intacto).`,
-        'info'
-      );
+      onNotify(`Foto congelada de T${nextSnap.currentSeason} limpiada sin alterar el ELO vivo.`, 'info');
     }
   };
 
@@ -500,7 +604,7 @@ export default function AdminSuiteModal({
     if (onAdminUpdatePlayer) {
       onAdminUpdatePlayer(p.id, {
         email: editEmail.trim().toLowerCase(),
-        points: Math.max(100, Number(editPoints) || p.points || 100),
+        points: Math.max(0, Number(editPoints) || 0),
         gems: Math.max(0, Number(editGems) || 0),
       });
     }
@@ -569,10 +673,12 @@ export default function AdminSuiteModal({
     triggerHaptic('success');
     downloadExcelCsv(
       `TotalTenis-Jugadores-${getTodayIsoPeru()}.csv`,
-      ['Credencial', 'Nombre', 'Correo', 'WhatsApp', 'Edad', 'Rama', 'Club', 'Categoria', 'Puntos', 'V', 'D', 'Gemas', 'Plan', 'Estado'],
+      ['Credencial', 'Nombre', 'Tipo_Cuenta', 'Tutor', 'Correo', 'WhatsApp', 'Edad', 'Rama', 'Club', 'Categoria', 'Puntos', 'V', 'D', 'Gemas', 'Plan', 'Estado'],
       (players || []).map((p) => [
         p.credentialId || p.id,
         p.name,
+        p.isTutelado ? 'TUTELADA (-18)' : p.isTutorOnly ? 'SOLO TUTOR' : 'TITULAR (+18)',
+        p.tutorName || '',
         p.email || '',
         p.whatsapp || '',
         p.age || '',
@@ -626,6 +732,15 @@ export default function AdminSuiteModal({
     }
   };
 
+  const r2MB = Number(r2Stats.data?.totalMB) || 0;
+  const r2GB = (r2MB / 1024).toFixed(2);
+  const r2Pct = Number(r2Stats.data?.pct) || 0;
+  const r2Status = r2Stats.data?.blocked
+    ? { label: 'FRENO 8.5 GB ACTIVO', cls: 'is-danger' }
+    : r2MB >= 5120
+    ? { label: 'ALERTA > 5 GB', cls: 'is-gold' }
+    : { label: 'SEGURO · S/ 0.00', cls: 'is-emerald' };
+
   return (
     <ModalPortal
       isOpen={isOpen}
@@ -643,7 +758,7 @@ export default function AdminSuiteModal({
               <TTIcon name="shield" size={34} style={{ color: '#00DC7D' }} />
             </div>
             <h3>Acceso Restringido del Organizador</h3>
-            <p>Ingresa tu PIN maestro para aprobar pagos, controlar temporadas, gestionar cuentas y exportar respaldos.</p>
+            <p>Ingresa tu PIN maestro para aprobar pagos, controlar temporadas, vigilar el ecosistema y exportar respaldos.</p>
             <input
               type="password"
               inputMode="numeric"
@@ -665,7 +780,7 @@ export default function AdminSuiteModal({
         ) : (
           <div className="tt-adm-body">
             <div className="tt-adm-kpi-grid">
-              <div><span>JUGADORES</span><strong>{players.length}</strong><small>{demoCount} demo</small></div>
+              <div><span>JUGADORES</span><strong>{players.length}</strong><small>{demoCount} demo · {minorsCount} juv.</small></div>
               <div className="is-gold"><span>SOCIOS VIP</span><strong>{players.filter((p) => p.isVip).length}</strong><small>{pendingVipPlayers.length} pendientes</small></div>
               <div className="is-emerald"><span>PAGOS TORNEO</span><strong>{pendingTournamentRequests.length}</strong><small>en revisión</small></div>
               <div><span>TEMPORADA</span><strong>T{seasonSnapshots?.currentSeason || 4}</strong><small>{seasonSnapshots?.year || new Date().getFullYear()}</small></div>
@@ -782,7 +897,7 @@ export default function AdminSuiteModal({
                   className="tt-adm-input"
                   value={accountSearch}
                   onChange={(e) => setAccountSearch(e.target.value)}
-                  placeholder="Buscar por nombre, correo, WhatsApp o código..."
+                  placeholder="Buscar por nombre, correo, WhatsApp, código o tutor..."
                 />
 
                 <div className="tt-adm-list">
@@ -801,11 +916,17 @@ export default function AdminSuiteModal({
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                               <strong>{p.name}</strong>
                               {p.isVip && <span className="tt-adm-tag-gold">VIP</span>}
+                              {p.isTutelado && <span className="tt-adm-tag-sky">TUTELADA (-18)</span>}
+                              {p.isTutorOnly && <span className="tt-adm-tag-sky">SOLO TUTOR</span>}
                               {p.isDemo && <span className="tt-adm-tag-emerald">DEMO</span>}
                               {p.isPaused && <span className="tt-adm-tag-red">PAUSADO</span>}
                             </div>
                             <small>
-                              {getCategoryByPoints(p.points).name} · {Number(p.points || 0)} pts · {Number(p.gems || 0)} 💎 · {p.email || 'Sin correo'}
+                              {p.isTutorOnly
+                                ? `Padre/Tutor · ${p.email || p.whatsapp}`
+                                : `${getCategoryByPoints(p.points).name} · ${Number(p.points || 0)} pts (piso ${getCategoryFloorPoints(p.points)}) · ${Number(p.gems || 0)} 💎 · ${
+                                    p.isTutelado ? `Tutor: ${p.tutorName || 'Verificado'}` : p.email || 'Sin correo'
+                                  }`}
                             </small>
                           </div>
                         </div>
@@ -854,23 +975,23 @@ export default function AdminSuiteModal({
               </div>
             )}
 
-            {/* 3. CONTROL TOTAL DE TEMPORADAS (~90 DÍAS + MANDO MANUAL) + TORNEOS + DISPUTAS */}
+            {/* 3. TEMPORADAS AUTÓNOMAS 00:00 + RESET AL PISO (300+) + EXCEPCIONES "MODO DIOS" */}
             {activeTab === 'temporadas' && (
               <div className="tt-adm-stack">
                 <form onSubmit={handleSaveSeasonCalendar} className="tt-adm-panel is-highlight tt-adm-form-stack">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <span className="tt-adm-kicker" style={{ margin: 0 }}>
-                      CALENDARIO Y MANDO MANUAL DE TEMPORADAS
+                      CALENDARIO AUTÓNOMO (CIERRE 00:00 PERÚ)
                     </span>
                     <button
                       type="button"
-                      className={`tt-adm-chip ${calAutoAdvance ? 'is-emerald' : ''}`}
+                      className={`tt-adm-chip ${calAutoAdvance ? 'is-emerald' : 'is-danger'}`}
                       onClick={() => {
                         triggerHaptic('light');
                         setCalAutoAdvance((v) => !v);
                       }}
                     >
-                      Auto-cierre: {calAutoAdvance ? 'ON' : 'OFF'}
+                      Auto-cierre 00:00: {calAutoAdvance ? 'ON' : 'OFF'}
                     </button>
                   </div>
 
@@ -933,33 +1054,74 @@ export default function AdminSuiteModal({
                   </div>
 
                   <p className="tt-adm-subcopy">
-                    Al guardar, esta temporada dura {calDurationDays} días (cierra el <b>{addDaysIso(calStartDate, Math.max(14, calDurationDays) - 1)}</b>) y las siguientes se calculan solas en el reloj de Torneos y Ranking.
+                    Al llegar a las <b>00:00 del día siguiente al {addDaysIso(calStartDate, Math.max(14, calDurationDays) - 1)}</b> (hora Perú), la app cierra sola, guarda el puntaje real para el <b>Master Top 8</b> y ajusta a cada jugador al <b>piso de su categoría</b> (300 / 1,000 / 2,000 / 3,000 / 4,000 / 5,000).
                   </p>
 
                   <button type="submit" className="tt-adm-btn-emerald">
                     Programar y Guardar Calendario en Vivo
                   </button>
+                </form>
 
-                  {/* 3 Botones de mando manual directo */}
-                  <div className="tt-adm-grid-2">
-                    <button type="button" className="tt-adm-btn-gold is-sm" onClick={handleCloseCurrentSeason}>
-                      Cerrar T{seasonSnapshots?.currentSeason || 4} y Avanzar
-                    </button>
-                    <button type="button" className="tt-adm-btn-ghost is-sm" onClick={handleReopenPrevSeason}>
-                      ↺ Reabrir Anterior
+                {/* PANEL DE EXCEPCIONES ("MODO DIOS" · CONTROL MANUAL DIRECTO) */}
+                <div className="tt-adm-panel tt-adm-form-stack">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span className="tt-adm-kicker" style={{ margin: 0, color: '#F3DC9B' }}>
+                      PANEL DE EXCEPCIONES · CONTROL MANUAL ADMIN
+                    </span>
+                    <button
+                      type="button"
+                      className={`tt-adm-chip ${closeWithFloorReset ? 'is-emerald' : 'is-gold'}`}
+                      onClick={() => {
+                        triggerHaptic('light');
+                        setCloseWithFloorReset((v) => !v);
+                      }}
+                    >
+                      Reset Piso al cerrar: {closeWithFloorReset ? 'SÍ' : 'NO'}
                     </button>
                   </div>
 
                   <button
                     type="button"
-                    className="tt-adm-btn-danger is-sm"
-                    onClick={handleResetCurrentSeason}
+                    disabled={isResettingPoints}
+                    className="tt-adm-btn-gold"
+                    onClick={handleCloseCurrentSeason}
                   >
-                    {confirmResetSeason
-                      ? `Toca de nuevo para confirmar Reset de T${seasonSnapshots?.currentSeason || 4}`
-                      : `Resetear cierre de T${seasonSnapshots?.currentSeason || 4} (conserva Ranking ELO)`}
+                    {isResettingPoints
+                      ? 'Procesando cierre...'
+                      : closeWithFloorReset
+                      ? `Cerrar T${seasonSnapshots?.currentSeason || 4}, Avanzar y Resetear al Piso (300+)`
+                      : `Cerrar T${seasonSnapshots?.currentSeason || 4} y Avanzar (sin bajar puntos)`}
                   </button>
-                </form>
+
+                  <div className="tt-adm-floor-legend">
+                    <span>Pisos oficiales:</span>
+                    <b>5ª P ≥300→300 (&lt;300→0)</b> · <b>5ª B→1,000</b> · <b>5ª A→2,000</b> · <b>4ª→3,000</b> · <b>3ª→4,000</b> · <b>2ª→5,000</b>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={isResettingPoints}
+                    className="tt-adm-btn-danger"
+                    onClick={handleManualFloorResetNow}
+                  >
+                    {isResettingPoints
+                      ? 'Reseteando puntos...'
+                      : confirmFloorReset
+                      ? `Confirmar: bajar ${floorResetImpactCount} jugadores a su piso ahora`
+                      : `⬇ Resetear Puntos al Piso Ahora (${floorResetImpactCount} jugadores)`}
+                  </button>
+
+                  <div className="tt-adm-grid-2">
+                    <button type="button" className="tt-adm-btn-ghost is-sm" onClick={handleReopenPrevSeason}>
+                      ↺ Reabrir Anterior
+                    </button>
+                    <button type="button" className="tt-adm-btn-ghost is-sm" onClick={handleClearCurrentSnapshot}>
+                      {confirmClearSnap
+                        ? `Confirmar limpiar foto T${seasonSnapshots?.currentSeason || 4}`
+                        : `Limpiar foto T${seasonSnapshots?.currentSeason || 4}`}
+                    </button>
+                  </div>
+                </div>
 
                 {/* Crear Torneo */}
                 <div className="tt-adm-panel">
@@ -1154,18 +1316,81 @@ export default function AdminSuiteModal({
               </div>
             )}
 
-            {/* 7. RESPALDO EXCEL + PURGA DE CUENTAS DEMO */}
+            {/* 7. MONITOR DEL ECOSISTEMA (R2 EN VIVO) + RESPALDO EXCEL + PURGA DEMO */}
             {activeTab === 'respaldo' && (
               <div className="tt-adm-stack">
+                {/* Monitor Real del Ecosistema (Cloudflare R2 + Accesos Directos) */}
+                <div className={`tt-adm-panel ${r2Stats.data?.blocked ? 'is-alert' : 'is-highlight'} tt-adm-form-stack`}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span className="tt-adm-kicker" style={{ margin: 0 }}>
+                      MONITOR DEL ECOSISTEMA · CLOUDFLARE R2
+                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {r2Stats.data && (
+                        <span className={`tt-adm-chip ${r2Status.cls}`}>{r2Status.label}</span>
+                      )}
+                      <button
+                        type="button"
+                        disabled={r2Stats.loading}
+                        className="tt-adm-chip"
+                        onClick={() => {
+                          triggerHaptic('light');
+                          fetchR2LiveStats();
+                        }}
+                      >
+                        {r2Stats.loading ? '...' : '↻ Medir'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {r2Stats.error ? (
+                    <p className="tt-adm-subcopy" style={{ color: '#FCA5A5' }}>
+                      {r2Stats.error}
+                    </p>
+                  ) : r2Stats.data ? (
+                    <>
+                      <div className="tt-adm-mem-row">
+                        <span>Videos en R2 ({r2Stats.data.objectCount} archivos)</span>
+                        <strong>{r2MB >= 1024 ? `${r2GB} GB` : `${r2MB} MB`} / {r2Stats.data.maxGB} GB (freno)</strong>
+                      </div>
+                      <div className="tt-adm-bar">
+                        <div
+                          className={r2Stats.data.blocked ? 'is-danger' : r2MB >= 5120 ? 'is-warn' : ''}
+                          style={{ width: `${Math.max(2, r2Pct)}%` }}
+                        />
+                      </div>
+                      <p className="tt-adm-subcopy">
+                        Cuota gratuita real R2: <b>10 GB</b> + tráfico ilimitado ($0). El servidor bloquea nuevas subidas automáticamente a los <b>8.5 GB</b> para garantizar cero facturas sorpresa.
+                      </p>
+                    </>
+                  ) : (
+                    <p className="tt-adm-subcopy">Consultando almacenamiento real en Cloudflare R2...</p>
+                  )}
+
+                  <div className="tt-adm-eco-grid">
+                    {ECOSYSTEM_DASHBOARDS.map((item) => (
+                      <a
+                        key={item.id}
+                        href={item.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="tt-adm-eco-link"
+                      >
+                        <strong>{item.label} ↗</strong>
+                        <small>{item.hint}</small>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+
                 <div className={`tt-adm-panel ${storageStats.isWarning ? 'is-alert' : ''}`}>
-                  <span className="tt-adm-kicker">CAPACIDAD OPERATIVA</span>
+                  <span className="tt-adm-kicker">CAPACIDAD OPERATIVA (SUPABASE)</span>
                   <div className="tt-adm-mem-row"><span>Jugadores</span><strong>{storageStats.pCount} / {ADMIN_SUITE_EDITABLE_CONFIG.maxPlayersCapacity.toLocaleString('es-PE')}</strong></div>
                   <div className="tt-adm-bar"><div style={{ width: `${Math.max(2, storageStats.pPct)}%` }} /></div>
                   <div className="tt-adm-mem-row" style={{ marginTop: 9 }}><span>Partidos</span><strong>{storageStats.mCount} / {ADMIN_SUITE_EDITABLE_CONFIG.maxMatchesBuffer.toLocaleString('es-PE')}</strong></div>
                   <div className="tt-adm-bar"><div style={{ width: `${Math.max(2, storageStats.mPct)}%` }} /></div>
                 </div>
 
-                {/* Purga de cuentas demo justo antes de abrir la Beta */}
                 {onAdminPurgeDemoPlayers && (
                   <div className="tt-adm-panel is-highlight tt-adm-form-stack">
                     <span className="tt-adm-kicker">LIMPIEZA PRE-LANZAMIENTO BETA</span>
@@ -1249,6 +1474,27 @@ export default function AdminSuiteModal({
         .tt-adm-kicker { display: block; font-size: 0.6rem; font-weight: 900; letter-spacing: 0.09em; color: #00DC7D; margin-bottom: 8px; }
         .tt-adm-empty, .tt-adm-subcopy { margin: 0; font-size: 0.75rem; line-height: 1.42; color: rgba(250, 249, 245, 0.76); }
 
+        .tt-adm-floor-legend {
+          padding: 8px 10px; border-radius: 11px;
+          background: rgba(16, 4, 30, 0.65); border: 1px solid rgba(250, 249, 245, 0.1);
+          font-size: 0.67rem; line-height: 1.45; color: rgba(250, 249, 245, 0.78);
+        }
+        .tt-adm-floor-legend span { color: #7CF5C0; font-weight: 800; margin-right: 4px; }
+        .tt-adm-floor-legend b { color: #FAF9F5; }
+
+        .tt-adm-eco-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 2px; }
+        .tt-adm-eco-link {
+          padding: 9px 10px; border-radius: 12px;
+          background: rgba(16, 4, 30, 0.72); border: 1px solid rgba(250, 249, 245, 0.14);
+          color: #FAF9F5; text-decoration: none;
+          display: flex; flex-direction: column; gap: 2px;
+          transition: border-color 160ms ease, transform 160ms ease;
+        }
+        .tt-adm-eco-link:hover { border-color: #00DC7D; }
+        .tt-adm-eco-link:active { transform: scale(0.96); }
+        .tt-adm-eco-link strong { font-size: 0.74rem; color: #7CF5C0; }
+        .tt-adm-eco-link small { font-size: 0.63rem; color: rgba(250, 249, 245, 0.68); }
+
         .tt-adm-seasons-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
         .tt-adm-q-tile { padding: 8px 4px; border-radius: 12px; background: rgba(16, 4, 30, 0.7); border: 1px solid rgba(255, 255, 255, 0.12); text-align: center; display: flex; flex-direction: column; gap: 2px; }
         .tt-adm-q-tile.is-cur { border-color: #00DC7D; background: rgba(0, 220, 125, 0.14); }
@@ -1288,21 +1534,24 @@ export default function AdminSuiteModal({
         .tt-adm-btn-gold { background: linear-gradient(135deg, #F5E1A4 0%, #CCA046 100%); color: #1A1102; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.48); }
         .tt-adm-btn-ghost { background: rgba(250, 249, 245, 0.12); color: #FAF9F5; }
         .tt-adm-btn-danger { background: rgba(248, 113, 113, 0.18); border: 1px solid rgba(248, 113, 113, 0.48); color: #FECACA; }
-        .tt-adm-btn-danger:disabled { opacity: 0.45; cursor: not-allowed; }
+        .tt-adm-btn-danger:disabled, .tt-adm-btn-gold:disabled { opacity: 0.45; cursor: not-allowed; }
 
         .tt-adm-chip { padding: 5px 10px; border-radius: 999px; background: rgba(250, 249, 245, 0.1); border: 1px solid rgba(250, 249, 245, 0.18); color: #FAF9F5; font-size: 0.68rem; font-weight: 800; }
         .tt-adm-chip.is-emerald { background: rgba(0, 220, 125, 0.18); border-color: #00DC7D; color: #7CF5C0; }
         .tt-adm-chip.is-gold { background: rgba(229, 193, 108, 0.2); border-color: #E5C16C; color: #F3DC9B; }
         .tt-adm-chip.is-danger { background: rgba(248, 113, 113, 0.18); border-color: #F87171; color: #FECACA; }
 
-        .tt-adm-tag-gold, .tt-adm-tag-emerald, .tt-adm-tag-red { padding: 2px 7px; border-radius: 999px; font-size: 0.56rem; font-weight: 900; }
+        .tt-adm-tag-gold, .tt-adm-tag-emerald, .tt-adm-tag-red, .tt-adm-tag-sky { padding: 2px 7px; border-radius: 999px; font-size: 0.56rem; font-weight: 900; }
         .tt-adm-tag-gold { background: #E5C16C; color: #1A1102; }
         .tt-adm-tag-emerald { background: #00DC7D; color: #10021E; }
         .tt-adm-tag-red { background: #EF4444; color: #FFFFFF; }
+        .tt-adm-tag-sky { background: rgba(56, 189, 248, 0.22); border: 1px solid rgba(125, 211, 252, 0.55); color: #E0F2FE; }
 
         .tt-adm-mem-row { display: flex; justify-content: space-between; font-size: 0.75rem; margin-bottom: 5px; }
         .tt-adm-bar { height: 7px; border-radius: 999px; background: rgba(250, 249, 245, 0.14); overflow: hidden; }
-        .tt-adm-bar > div { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #00DC7D 0%, #E5C16C 100%); }
+        .tt-adm-bar > div { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #00DC7D 0%, #E5C16C 100%); transition: width 260ms ease; }
+        .tt-adm-bar > div.is-warn { background: linear-gradient(90deg, #E5C16C 0%, #F59E0B 100%); }
+        .tt-adm-bar > div.is-danger { background: linear-gradient(90deg, #F87171 0%, #DC2626 100%); }
       `}</style>
     </ModalPortal>
   );
