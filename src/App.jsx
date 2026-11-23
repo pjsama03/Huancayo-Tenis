@@ -4,7 +4,9 @@ import * as PlayersData from './data/playersAndClubsData';
 import * as StoreData from './data/storeAndTournamentsData';
 import * as Engine from './utils/tenisEngine';
 import {
+  applyCategoryFloorResetToPlayers,
   buildWhatsappLink,
+  createTuteladoProfile,
   dbToChallenge,
   dbToClub,
   dbToCoach,
@@ -17,6 +19,7 @@ import {
   fetchPlayerGemLedger,
   formatPeruDate,
   getCloudSession,
+  getEffectiveContactPhone,
   hoursLeftForAutoConfirm,
   insertGemLedgerEntry,
   isCloudReady,
@@ -30,6 +33,7 @@ import {
   saveCloudSetting,
   sendPushNotification,
   signOutCloudAccount,
+  startMinorEmancipation,
   submitOfficialComplaintRpc,
   submitWeatherReportRpc,
   subscribeToCloudRealtime,
@@ -88,6 +92,10 @@ export const APP_RUNTIME_CONFIG = {
   ],
 };
 
+const MONTHS_ES_SHORT = [
+  'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic',
+];
+
 /* ==========================================================================
    CINTA SUPERIOR AISLADA (NO RE-RENDERIZA App NI RESETEA SCROLL DE MODALES)
    ========================================================================== */
@@ -126,7 +134,7 @@ function SlimTickerBar({ onSelectTab, onOpenMaster, onOpenShop }) {
 }
 
 /* ==========================================================================
-   SEMILLAS DE RESPALDO (SOLO SI UNA TABLA EN SUPABASE ESTÁ VACÍA)
+   SEMILLAS DE RESPALDO Y UTILIDADES DE TEMPORADA / TUTELA
    ========================================================================== */
 function buildInitialPlayers() {
   const src = PlayersData.INITIAL_PLAYERS || PlayersData.DEMO_PLAYERS || [];
@@ -171,13 +179,104 @@ function buildInitialSnapshots(playersList) {
   return {
     year,
     currentSeason: 4,
+    durationDays: 90,
+    autoAdvance: true,
     seasons: [
-      { number: 1, label: 'Temporada 1', period: 'Ene – Mar', locked: true, scores: scoresT1 },
-      { number: 2, label: 'Temporada 2', period: 'Abr – Jun', locked: true, scores: scoresT2 },
-      { number: 3, label: 'Temporada 3', period: 'Jul – Sep', locked: true, scores: scoresT3 },
-      { number: 4, label: 'Temporada 4', period: 'Oct – Dic', locked: false, scores: {} },
+      { number: 1, label: 'Temporada 1', period: 'Ene – Mar', startDate: `${year}-01-01`, endDate: `${year}-03-31`, locked: true, scores: scoresT1 },
+      { number: 2, label: 'Temporada 2', period: 'Abr – Jun', startDate: `${year}-04-01`, endDate: `${year}-06-30`, locked: true, scores: scoresT2 },
+      { number: 3, label: 'Temporada 3', period: 'Jul – Sep', startDate: `${year}-07-01`, endDate: `${year}-09-30`, locked: true, scores: scoresT3 },
+      { number: 4, label: 'Temporada 4', period: 'Oct – Dic', startDate: `${year}-10-01`, endDate: `${year}-12-31`, locked: false, scores: {} },
     ],
   };
+}
+
+function addDaysIsoUtc(isoDate, deltaDays) {
+  const [y, m, d] = String(isoDate || new Date().toISOString().slice(0, 10))
+    .split('-')
+    .map((n) => Number(n) || 1);
+  const dt = new Date(Date.UTC(y, m - 1, d + deltaDays));
+  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, '0')}-${String(
+    dt.getUTCDate()
+  ).padStart(2, '0')}`;
+}
+
+function formatShortRangeEs(startIso, endIso) {
+  const fmt = (iso) => {
+    const p = String(iso || '').split('-');
+    if (p.length !== 3) return '';
+    return `${String(Number(p[2])).padStart(2, '0')} ${MONTHS_ES_SHORT[Math.max(0, Math.min(11, Number(p[1]) - 1))]}`;
+  };
+  return `${fmt(startIso)} – ${fmt(endIso)}`;
+}
+
+function buildAutonomousNextSeasonSnap(baseSnap, playersList) {
+  const curNum = Math.max(1, Math.min(4, Number(baseSnap?.currentSeason) || 1));
+  const year = Number(baseSnap?.year) || new Date().getFullYear();
+  const durationDays = Math.max(14, Number(baseSnap?.durationDays) || 90);
+  const list = Array.isArray(baseSnap?.seasons) ? baseSnap.seasons : [];
+
+  const frozenScores = {};
+  (playersList || []).forEach((p) => {
+    if (!p.isTutorOnly) frozenScores[p.id] = Number(p.points) || 0;
+  });
+
+  const closedList = list.map((s) =>
+    Number(s.number) === curNum
+      ? { ...s, locked: true, closedAt: new Date().toISOString(), scores: frozenScores }
+      : s
+  );
+
+  const isYearEnd = curNum >= 4;
+  if (!isYearEnd) {
+    return {
+      ...baseSnap,
+      year,
+      currentSeason: curNum + 1,
+      durationDays,
+      autoAdvance: baseSnap?.autoAdvance !== false,
+      seasons: closedList,
+    };
+  }
+
+  const lastEnd = closedList.find((s) => Number(s.number) === 4)?.endDate || `${year}-12-31`;
+  let cursorStart = addDaysIsoUtc(lastEnd, 1);
+  const nextYearSeasons = [1, 2, 3, 4].map((num) => {
+    const sStart = cursorStart;
+    const sEnd = addDaysIsoUtc(sStart, durationDays - 1);
+    cursorStart = addDaysIsoUtc(sEnd, 1);
+    return {
+      number: num,
+      label: `Temporada ${num}`,
+      startDate: sStart,
+      endDate: sEnd,
+      period: formatShortRangeEs(sStart, sEnd),
+      locked: false,
+      closedAt: null,
+      scores: {},
+    };
+  });
+
+  return {
+    ...baseSnap,
+    year: year + 1,
+    currentSeason: 1,
+    durationDays,
+    autoAdvance: baseSnap?.autoAdvance !== false,
+    seasons: nextYearSeasons,
+  };
+}
+
+function resolvePushRecipients(targetIds = [], allPlayers = []) {
+  const out = new Set();
+  (targetIds || []).forEach((id) => {
+    if (!id) return;
+    out.add(String(id));
+    const found = (allPlayers || []).find((p) => p.id === id);
+    if (found?.isTutelado && found.tutorId) {
+      out.add(String(found.tutorId));
+    }
+  });
+  return Array.from(out);
 }
 
 function mergeListById(prevList, nextItem, prepend = true) {
@@ -191,7 +290,7 @@ function mergeListById(prevList, nextItem, prepend = true) {
 
 function sortPlayersForOfficialRanking(list) {
   return [...(list || [])]
-    .filter((p) => !p.isPaused)
+    .filter((p) => !p.isPaused && !p.isTutorOnly)
     .sort((a, b) => {
       const diffPts = (Number(b.points) || 0) - (Number(a.points) || 0);
       if (diffPts !== 0) return diffPts;
@@ -219,12 +318,13 @@ function snapshotPreMatchRankMap(playersList) {
 }
 
 /* ==========================================================================
-   COMPONENTE RAÍZ MAESTRO: App (SUPABASE REALTIME + ONESIGNAL + FLIP SYNC)
+   COMPONENTE RAÍZ MAESTRO: App (SUPABASE REALTIME + AUTÓNOMO 00:00 + TUTELA)
    ========================================================================== */
 export default function App() {
   const scrollContainerRef = useRef(null);
   const toastTimerRef = useRef(null);
   const playersRef = useRef([]);
+  const seasonAutoCloseKeyRef = useRef('');
 
   const defaultSeeds = useMemo(() => {
     const seededPlayers = buildInitialPlayers();
@@ -246,6 +346,7 @@ export default function App() {
   const [products, setProducts] = useState(defaultSeeds.products);
   const [seasonSnapshots, setSeasonSnapshots] = useState(defaultSeeds.seasonSnapshots);
   const [currentUserId, setCurrentUserId] = useState(null);
+  const [tutorParentId, setTutorParentId] = useState(null);
   const [gemLedger, setGemLedger] = useState([]);
   const [complaints, setComplaints] = useState([]);
   const [notices, setNotices] = useState([]);
@@ -353,7 +454,7 @@ export default function App() {
     const email = String(session.user.email || '').trim().toLowerCase();
     return (
       (list || []).find((p) => p.authId && p.authId === authId) ||
-      (list || []).find((p) => p.email && p.email.toLowerCase() === email) ||
+      (list || []).find((p) => !p.isTutelado && p.email && p.email.toLowerCase() === email) ||
       null
     );
   }, []);
@@ -395,6 +496,7 @@ export default function App() {
         const matched = resolveSessionPlayer(session, loadedPlayers);
         if (matched) {
           setCurrentUserId(matched.id);
+          setTutorParentId(matched.isTutelado ? matched.tutorId : matched.id);
           setIsAdminSession(Boolean(matched.isAdmin));
           linkOneSignalUser(matched.id);
         }
@@ -409,12 +511,14 @@ export default function App() {
       if (!mounted) return;
       if (event === 'SIGNED_OUT' || !session?.user) {
         setCurrentUserId(null);
+        setTutorParentId(null);
         setIsAdminSession(false);
         return;
       }
       const matched = resolveSessionPlayer(session, playersRef.current);
       if (matched) {
         setCurrentUserId(matched.id);
+        setTutorParentId(matched.isTutelado ? matched.tutorId : matched.id);
         setIsAdminSession(Boolean(matched.isAdmin));
         linkOneSignalUser(matched.id);
       }
@@ -501,8 +605,8 @@ export default function App() {
       setGemLedger([]);
       return;
     }
-    linkOneSignalUser(currentUserId);
     const activeObj = playersRef.current.find((p) => p.id === currentUserId);
+    linkOneSignalUser(activeObj?.isTutelado && activeObj.tutorId ? activeObj.tutorId : currentUserId);
     if (activeObj?.isAdmin) setIsAdminSession(true);
 
     let alive = true;
@@ -517,44 +621,63 @@ export default function App() {
   }, [currentUserId]);
 
   /* ------------------------------------------------------------------------
-     3. DERIVADOS DE ESTADO Y DETECCIÓN MULTIUSUARIO
+     3. CIERRE AUTÓNOMO 00:00 (HORA PERÚ) + RESET AL PISO DE CATEGORÍA (300+)
+     Funciona de forma independiente sin depender de que el Admin abra la app.
+     ------------------------------------------------------------------------ */
+  useEffect(() => {
+    if (!cloudSynced || !seasonSnapshots?.autoAdvance) return undefined;
+
+    const checkAndCloseIfMidnightPassed = async () => {
+      const curNum = Number(seasonSnapshots.currentSeason) || 1;
+      const list = Array.isArray(seasonSnapshots.seasons) ? seasonSnapshots.seasons : [];
+      const curObj = list.find((s) => Number(s.number) === curNum);
+      if (!curObj || curObj.locked || !curObj.endDate) return;
+
+      const todayPeru = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
+      if (todayPeru <= curObj.endDate) return;
+
+      const cycleKey = `${seasonSnapshots.year}-T${curNum}-${curObj.endDate}`;
+      if (seasonAutoCloseKeyRef.current === cycleKey) return;
+      seasonAutoCloseKeyRef.current = cycleKey;
+
+      await runWithLock(`auto-close-season-${cycleKey}`, async () => {
+        const nextSnap = buildAutonomousNextSeasonSnap(seasonSnapshots, playersRef.current);
+        setSeasonSnapshots(nextSnap);
+        try {
+          await saveCloudSetting('season_snapshots', nextSnap);
+          const resetList = await applyCategoryFloorResetToPlayers(playersRef.current);
+          setPlayers(
+            [...resetList].sort((a, b) => (Number(b.points) || 0) - (Number(a.points) || 0))
+          );
+        } catch (err) {
+          console.error('[TOTAL TENIS] Error en cierre autónomo 00:00:', err);
+          seasonAutoCloseKeyRef.current = '';
+        }
+      });
+    };
+
+    checkAndCloseIfMidnightPassed();
+    const timer = window.setInterval(checkAndCloseIfMidnightPassed, 60000);
+    return () => window.clearInterval(timer);
+  }, [cloudSynced, seasonSnapshots]);
+  /* ------------------------------------------------------------------------
+     4. DERIVADOS DE ESTADO, TUTELA FAMILIAR Y DETECCIÓN MULTIUSUARIO
      ------------------------------------------------------------------------ */
   const currentUser = useMemo(
     () => players.find((p) => p.id === currentUserId) || null,
     [players, currentUserId]
   );
 
-  const effectiveIsAdmin = Boolean(isAdminSession || currentUser?.isAdmin);
-  /* Auto-cierre silencioso cuando el Admin dejó activo autoAdvance y venció endDate (hora Perú) */
-  useEffect(() => {
-    if (!cloudSynced || !effectiveIsAdmin || !seasonSnapshots?.autoAdvance) return;
-    const curNum = Number(seasonSnapshots.currentSeason) || 1;
-    const list = Array.isArray(seasonSnapshots.seasons) ? seasonSnapshots.seasons : [];
-    const curObj = list.find((s) => Number(s.number) === curNum);
-    if (!curObj || curObj.locked || !curObj.endDate) return;
+  const activeTutorParent = useMemo(() => {
+    const parentId = currentUser?.isTutelado ? currentUser.tutorId : tutorParentId;
+    if (!parentId) return null;
+    return players.find((p) => p.id === parentId) || null;
+  }, [players, currentUser, tutorParentId]);
 
-    const todayPeru = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
-    if (todayPeru <= curObj.endDate) return;
+  const effectiveIsAdmin = Boolean(
+    isAdminSession || currentUser?.isAdmin || activeTutorParent?.isAdmin
+  );
 
-    const frozenScores = {};
-    playersRef.current.forEach((p) => {
-      if (!p.isTutorOnly) frozenScores[p.id] = Number(p.points) || 0;
-    });
-    const nextSeasons = list.map((s) =>
-      Number(s.number) === curNum
-        ? { ...s, locked: true, closedAt: new Date().toISOString(), scores: frozenScores }
-        : s
-    );
-    const isYearEnd = curNum >= 4;
-    const nextSnap = {
-      ...seasonSnapshots,
-      year: isYearEnd ? (Number(seasonSnapshots.year) || new Date().getFullYear()) + 1 : seasonSnapshots.year,
-      currentSeason: isYearEnd ? 1 : curNum + 1,
-      seasons: nextSeasons,
-    };
-    setSeasonSnapshots(nextSnap);
-    saveCloudSetting('season_snapshots', nextSnap).catch(() => {});
-  }, [cloudSynced, effectiveIsAdmin, seasonSnapshots]);
   const activePlayers = useMemo(() => players.filter((p) => !p.isPaused), [players]);
   const activeClubs = useMemo(() => clubs.filter((c) => c.active !== false), [clubs]);
   const inspectedPlayer = useMemo(
@@ -645,7 +768,74 @@ export default function App() {
   }, []);
 
   /* ------------------------------------------------------------------------
-     4. ACCIONES CONECTADAS A SUPABASE + STORAGE + PUSH + SALTO FLIP
+     5. GESTIÓN FAMILIAR (-18), EMANCIPACIÓN (+18) Y RESET AL PISO ADMIN
+     ------------------------------------------------------------------------ */
+  const handleCreateTutelado = useCallback(async (tutorPlayer, childData) => {
+    const created = await createTuteladoProfile(tutorPlayer, childData);
+    if (created?.id) {
+      setPlayers((prev) =>
+        mergeListById(prev, created, false).sort(
+          (a, b) => (Number(b.points) || 0) - (Number(a.points) || 0)
+        )
+      );
+    }
+    return created;
+  }, []);
+
+  const handleSwitchActiveProfile = useCallback(
+    (targetProfileId) => {
+      if (!targetProfileId) return;
+      const target = playersRef.current.find((p) => p.id === targetProfileId);
+      if (!target) return;
+
+      const rootParentId =
+        tutorParentId || (currentUser?.isTutelado ? currentUser.tutorId : currentUser?.id);
+
+      const allowed =
+        target.id === rootParentId ||
+        (target.isTutelado && target.tutorId === rootParentId) ||
+        effectiveIsAdmin;
+
+      if (!allowed) {
+        showToast('No tienes permisos para cambiar a esa cuenta.', 'warning');
+        return;
+      }
+
+      if (!currentUser?.isTutelado && currentUser?.id) {
+        setTutorParentId(currentUser.id);
+      }
+      setCurrentUserId(target.id);
+      setDismissedIncomingIds([]);
+      setDismissedScoreIds([]);
+      triggerHaptic('medium');
+      showToast(
+        target.isTutelado
+          ? `Gestionando subcuenta juvenil de ${target.name}.`
+          : `Volviste a tu cuenta titular (${target.name.split(' ')[0]}).`,
+        'info'
+      );
+    },
+    [currentUser, tutorParentId, effectiveIsAdmin, showToast]
+  );
+
+  const handleStartEmancipation = useCallback(async (minorId) => {
+    const updated = await startMinorEmancipation(minorId);
+    if (updated?.id) {
+      setPlayers((prev) =>
+        prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p))
+      );
+    }
+    return updated;
+  }, []);
+
+  const handleAdminResetFloorPoints = useCallback(async () => {
+    const resetList = await applyCategoryFloorResetToPlayers(playersRef.current);
+    setPlayers([...resetList].sort((a, b) => (Number(b.points) || 0) - (Number(a.points) || 0)));
+    return resetList;
+  }, []);
+
+  /* ------------------------------------------------------------------------
+     6. ACCIONES CONECTADAS A SUPABASE + STORAGE + PUSH (CON TUTOR) + FLIP
      ------------------------------------------------------------------------ */
   const appendGemLedger = useCallback(
     async (entry, targetPlayerId = currentUserId) => {
@@ -724,7 +914,7 @@ export default function App() {
       const challenger = playersRef.current.find((p) => p.id === newChallenge.playerAId);
       if (newChallenge.playerBId) {
         sendPushNotification({
-          targetPlayerIds: [newChallenge.playerBId],
+          targetPlayerIds: resolvePushRecipients([newChallenge.playerBId], playersRef.current),
           title: '¡Nuevo desafío en TOTAL TENIS!',
           message: `${challenger?.name || 'Un jugador'} te retó en ${
             newChallenge.clubName || 'cancha'
@@ -766,7 +956,7 @@ export default function App() {
         if (patch.status === 'SCHEDULED' && current.status !== 'SCHEDULED') {
           const acceptor = playersRef.current.find((p) => p.id === current.playerBId);
           sendPushNotification({
-            targetPlayerIds: [current.playerAId],
+            targetPlayerIds: resolvePushRecipients([current.playerAId], playersRef.current),
             title: '¡Desafío aceptado!',
             message: `${acceptor?.name || 'Tu rival'} aceptó el partido en ${current.clubName}.`,
             path: '/',
@@ -775,7 +965,7 @@ export default function App() {
           const targetId =
             currentUser?.id === current.playerAId ? current.playerBId : current.playerAId;
           sendPushNotification({
-            targetPlayerIds: [targetId],
+            targetPlayerIds: resolvePushRecipients([targetId], playersRef.current),
             title: 'Desafío cancelado',
             message: `El reto programado en ${current.clubName} fue cancelado.`,
             path: '/',
@@ -804,7 +994,6 @@ export default function App() {
       const lockRes = await runWithLock(`apply-result-${challenge.id}`, async () => {
         setBusyActionId(challenge.id);
 
-        // Guardar mapa de posiciones previo para que la animación FLIP estilo Apple siempre se dispare limpia
         const preRankMap = snapshotPreMatchRankMap(playersRef.current);
 
         const winnerId = winnerSide === 'A' ? challenge.playerAId : challenge.playerBId;
@@ -902,7 +1091,10 @@ export default function App() {
         }
 
         sendPushNotification({
-          targetPlayerIds: [challenge.playerAId, challenge.playerBId],
+          targetPlayerIds: resolvePushRecipients(
+            [challenge.playerAId, challenge.playerBId],
+            playersRef.current
+          ),
           title: 'Marcador oficial confirmado',
           message: `Resultado final ${finishedChallenge.scoreSummary}. Tu puntaje en el ranking ya se actualizó.`,
           path: '/',
@@ -911,7 +1103,6 @@ export default function App() {
         setDismissedScoreIds((prev) => prev.filter((id) => id !== challenge.id));
         setBusyActionId(null);
 
-        // Si el usuario actual jugó un partido oficial y cambió de puesto -> salto automático al Ranking FLIP
         if (
           autoJumpToRanking &&
           challenge.mode !== 'Amistoso' &&
@@ -1010,7 +1201,7 @@ export default function App() {
         const rivalId =
           currentUser?.id === challenge.playerAId ? challenge.playerBId : challenge.playerAId;
         sendPushNotification({
-          targetPlayerIds: [rivalId],
+          targetPlayerIds: resolvePushRecipients([rivalId], playersRef.current),
           title: 'Confirma tu marcador en TOTAL TENIS',
           message: `${currentUser?.name || 'Tu rival'} registró ${eloResult.summary}. Ábrelo para confirmar o impugnar.`,
           path: '/',
@@ -1067,7 +1258,7 @@ export default function App() {
         const otherId =
           currentUser?.id === ch.playerAId ? ch.playerBId : ch.playerAId;
         sendPushNotification({
-          targetPlayerIds: [otherId],
+          targetPlayerIds: resolvePushRecipients([otherId], playersRef.current),
           title: 'Marcador en revisión',
           message: `${currentUser?.name || 'Tu rival'} observó el resultado ${ch.scoreSummary}. El Comité revisará el caso.`,
           path: '/',
@@ -1128,7 +1319,7 @@ export default function App() {
       try {
         await upsertCloudTournament(updated);
         sendPushNotification({
-          targetPlayerIds: [playerId],
+          targetPlayerIds: resolvePushRecipients([playerId], playersRef.current),
           title: '¡Cupo de torneo confirmado!',
           message: `Tu inscripción en ${target.name} fue validada. Ya figuras en el cuadro oficial.`,
           path: '/',
@@ -1296,7 +1487,7 @@ export default function App() {
           );
         }
         sendPushNotification({
-          targetPlayerIds: [playerId],
+          targetPlayerIds: resolvePushRecipients([playerId], playersRef.current),
           title: enableVip ? '¡Bienvenido a Socio VIP!' : 'Actualización de membresía',
           message: enableVip
             ? `Tu Pase Socio VIP está activo con +${bonusGems} Gemas acreditadas.`
@@ -1331,6 +1522,7 @@ export default function App() {
         )
       );
       setCurrentUserId(cleanPlayer.id);
+      setTutorParentId(cleanPlayer.isTutelado ? cleanPlayer.tutorId : cleanPlayer.id);
       setIsAdminSession(Boolean(cleanPlayer.isAdmin));
       setActiveTab('perfil');
       linkOneSignalUser(cleanPlayer.id);
@@ -1368,6 +1560,7 @@ export default function App() {
     triggerHaptic('medium');
     await signOutCloudAccount();
     setCurrentUserId(null);
+    setTutorParentId(null);
     setIsAdminSession(false);
     setActivePartner(null);
     setGemLedger([]);
@@ -1390,6 +1583,10 @@ export default function App() {
   const scoreWinner = scoreConfirmChallenge
     ? players.find((p) => p.id === scoreConfirmChallenge.winnerId)
     : null;
+  const popupChallengerPhone = getEffectiveContactPhone(popupChallenger, players);
+  const popupWaText = popupChallenger?.isTutelado
+    ? `Hola ${popupChallenger.tutorName || 'Padre/Madre'}, recibí el reto de ${popupChallenger.name} en TOTAL TENIS para ${popupChallenge?.clubName || ''} (${popupChallenge?.dateLabel || ''} ${popupChallenge?.timeLabel || ''}). ¿Coordinamos otra hora o sede?`
+    : `Hola ${popupChallenger?.name || ''}, recibí tu reto en TOTAL TENIS para ${popupChallenge?.clubName || ''} (${popupChallenge?.dateLabel || ''} ${popupChallenge?.timeLabel || ''}). ¿Coordinamos otra hora o sede?`;
 
   return (
     <div className={`tt-app-viewport ${theme === 'light' ? 'is-light' : 'is-dark'}`}>
@@ -1545,7 +1742,11 @@ export default function App() {
                 theme={theme}
                 sunlightMode={sunlightMode}
                 readOnly={false}
+                activeTutorParent={activeTutorParent}
                 onUpdateProfile={handleUpdatePlayer}
+                onCreateTutelado={handleCreateTutelado}
+                onSwitchActiveProfile={handleSwitchActiveProfile}
+                onStartEmancipation={handleStartEmancipation}
                 onUnlockScenario={({ scenarioId, gemsCost }) =>
                   handleDeductGemsForUnlock({
                     gemsCost,
@@ -1667,7 +1868,7 @@ export default function App() {
         )}
       </ModalPortal>
 
-      {/* POP-UP AUTOMÁTICO DE RETO ENTRANTE */}
+      {/* POP-UP AUTOMÁTICO DE RETO ENTRANTE (WHATSAPP ENRUTADO AL TUTOR SI APLICA) */}
       <ModalPortal
         isOpen={Boolean(popupChallenge)}
         onClose={() => {
@@ -1725,21 +1926,20 @@ export default function App() {
                 Aceptar Desafío Ahora
               </button>
 
-              <a
-                href={buildWhatsappLink(
-                  popupChallenger?.whatsapp,
-                  `Hola ${popupChallenger?.name || ''}, recibí tu reto en TOTAL TENIS para ${
-                    popupChallenge.clubName
-                  } (${popupChallenge.dateLabel} ${popupChallenge.timeLabel}). ¿Coordinamos otra hora o sede?`
-                )}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="tt-btn tt-btn-secondary"
-                onClick={() => setDismissedIncomingIds((prev) => [...prev, popupChallenge.id])}
-              >
-                <TTIcon name="whatsapp" size={17} />
-                Contraproponer Hora / Sede por WhatsApp
-              </a>
+              {popupChallengerPhone && (
+                <a
+                  href={buildWhatsappLink(popupChallengerPhone, popupWaText)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="tt-btn tt-btn-secondary"
+                  onClick={() => setDismissedIncomingIds((prev) => [...prev, popupChallenge.id])}
+                >
+                  <TTIcon name="whatsapp" size={17} />
+                  {popupChallenger?.isTutelado
+                    ? 'Contraproponer vía WhatsApp Tutor'
+                    : 'Contraproponer Hora / Sede por WhatsApp'}
+                </a>
+              )}
 
               <button
                 type="button"
@@ -1974,6 +2174,7 @@ export default function App() {
         onUnlockAdminSession={(val) => setIsAdminSession(Boolean(val))}
         onSwitchSandboxUser={(p) => {
           setCurrentUserId(p.id);
+          setTutorParentId(p.isTutelado ? p.tutorId : p.id);
           showToast(`Modo pruebas activo: viendo la app como ${p.name}.`, 'info');
         }}
         onAdminUpdatePlayer={handleUpdatePlayer}
@@ -2014,6 +2215,7 @@ export default function App() {
             // continuar
           }
         }}
+        onAdminResetFloorPoints={handleAdminResetFloorPoints}
         onAdminResolveDispute={async (chId, action) => {
           const target = challenges.find((c) => c.id === chId);
           if (!target) return;
@@ -2069,6 +2271,7 @@ export default function App() {
           if (!p?.id) return;
           setPlayers((prev) => mergeListById(prev, p, false));
           setCurrentUserId(p.id);
+          setTutorParentId(p.isTutelado ? p.tutorId : p.id);
           setIsAdminSession(Boolean(p.isAdmin));
           linkOneSignalUser(p.id);
           requestPushPermission();
