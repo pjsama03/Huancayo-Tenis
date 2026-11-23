@@ -151,8 +151,12 @@ function mapInitialSubTab(subTab) {
    - Nunca se reinicia al abrir/cerrar la app.
    - Vive aislado en estado local para no re-renderizar la vista ni romper el scroll.
    ========================================================================== */
-function getRealSeasonTargetMs(seasonNumber, snapshotYear) {
+function getRealSeasonTargetMs(seasonNumber, snapshotYear, customEndDate = null) {
   const now = Date.now();
+  if (customEndDate) {
+    const parsed = new Date(`${customEndDate}T23:59:59-05:00`).getTime();
+    if (!Number.isNaN(parsed) && parsed > now) return parsed;
+  }
   const y = Number(snapshotYear) || new Date().getFullYear();
   const quarterEndIsoMap = {
     1: `${y}-03-31T23:59:59-05:00`,
@@ -160,6 +164,22 @@ function getRealSeasonTargetMs(seasonNumber, snapshotYear) {
     3: `${y}-09-30T23:59:59-05:00`,
     4: `${y}-12-31T23:59:59-05:00`,
   };
+  let target = new Date(quarterEndIsoMap[seasonNumber] || quarterEndIsoMap[4]).getTime();
+
+  if (Number.isNaN(target) || target <= now) {
+    const d = new Date();
+    const curY = d.getFullYear();
+    const curQ = Math.floor(d.getMonth() / 3) + 1;
+    const endMap = {
+      1: `${curY}-03-31T23:59:59-05:00`,
+      2: `${curY}-06-30T23:59:59-05:00`,
+      3: `${curY}-09-30T23:59:59-05:00`,
+      4: `${curY}-12-31T23:59:59-05:00`,
+    };
+    target = new Date(endMap[curQ]).getTime();
+  }
+  return target;
+}
   let target = new Date(quarterEndIsoMap[seasonNumber] || quarterEndIsoMap[4]).getTime();
 
   // Si la fecha configurada ya pasó, calcula automáticamente el fin del trimestre calendario real actual
