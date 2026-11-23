@@ -525,6 +525,36 @@ export default function App() {
   );
 
   const effectiveIsAdmin = Boolean(isAdminSession || currentUser?.isAdmin);
+  /* Auto-cierre silencioso cuando el Admin dejó activo autoAdvance y venció endDate (hora Perú) */
+  useEffect(() => {
+    if (!cloudSynced || !effectiveIsAdmin || !seasonSnapshots?.autoAdvance) return;
+    const curNum = Number(seasonSnapshots.currentSeason) || 1;
+    const list = Array.isArray(seasonSnapshots.seasons) ? seasonSnapshots.seasons : [];
+    const curObj = list.find((s) => Number(s.number) === curNum);
+    if (!curObj || curObj.locked || !curObj.endDate) return;
+
+    const todayPeru = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
+    if (todayPeru <= curObj.endDate) return;
+
+    const frozenScores = {};
+    playersRef.current.forEach((p) => {
+      if (!p.isTutorOnly) frozenScores[p.id] = Number(p.points) || 0;
+    });
+    const nextSeasons = list.map((s) =>
+      Number(s.number) === curNum
+        ? { ...s, locked: true, closedAt: new Date().toISOString(), scores: frozenScores }
+        : s
+    );
+    const isYearEnd = curNum >= 4;
+    const nextSnap = {
+      ...seasonSnapshots,
+      year: isYearEnd ? (Number(seasonSnapshots.year) || new Date().getFullYear()) + 1 : seasonSnapshots.year,
+      currentSeason: isYearEnd ? 1 : curNum + 1,
+      seasons: nextSeasons,
+    };
+    setSeasonSnapshots(nextSnap);
+    saveCloudSetting('season_snapshots', nextSnap).catch(() => {});
+  }, [cloudSynced, effectiveIsAdmin, seasonSnapshots]);
   const activePlayers = useMemo(() => players.filter((p) => !p.isPaused), [players]);
   const activeClubs = useMemo(() => clubs.filter((c) => c.active !== false), [clubs]);
   const inspectedPlayer = useMemo(
