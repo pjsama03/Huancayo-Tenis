@@ -50,8 +50,121 @@ const WEATHER_OPTS = [
   { key: 'lluvia', label: 'Lluvia', color: '#F87171' },
 ];
 
+const VIDEO_QUOTAS = {
+  COACH: { maxCount: 4, maxMB: 25, maxSec: 90 },
+  CLUB: { maxCount: 2, maxMB: 40, maxSec: 90 },
+};
+
 const themeHex = (id) =>
   COACH_THEMES.find((t) => t.id === id || t.hex === id)?.hex || '#00DC7D';
+
+function formatDurationSec(sec) {
+  const s = Math.max(1, Math.round(Number(sec) || 0));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+function readVideoDurationSec(file) {
+  return new Promise((resolve) => {
+    try {
+      const url = URL.createObjectURL(file);
+      const vid = document.createElement('video');
+      vid.preload = 'metadata';
+      const done = (val) => {
+        URL.revokeObjectURL(url);
+        resolve(val);
+      };
+      vid.onloadedmetadata = () => done(Number.isFinite(vid.duration) ? vid.duration : 0);
+      vid.onerror = () => done(0);
+      vid.src = url;
+    } catch {
+      resolve(0);
+    }
+  });
+}
+
+function detectVideoMime(file) {
+  const allowed = ['video/mp4', 'video/quicktime', 'video/webm'];
+  if (file?.type && allowed.includes(file.type.toLowerCase())) return file.type.toLowerCase();
+  const ext = (file?.name || '').split('.').pop()?.toLowerCase() || '';
+  if (ext === 'mov') return 'video/quicktime';
+  if (ext === 'webm') return 'video/webm';
+  return 'video/mp4';
+}
+
+async function uploadVideoDirectToR2({ file, ownerType, ownerId, currentCount, onProgress }) {
+  const quota = VIDEO_QUOTAS[ownerType] || VIDEO_QUOTAS.COACH;
+  const maxBytes = quota.maxMB * 1024 * 1024;
+  if (currentCount >= quota.maxCount) {
+    throw new Error(`Límite alcanzado (${quota.maxCount} videos). Borra uno para subir otro.`);
+  }
+  if (!file || file.size > maxBytes) {
+    throw new Error(`El video pesa más de ${quota.maxMB} MB. Recórtalo o baja la resolución a 1080p/720p.`);
+  }
+
+  const durationSec = await readVideoDurationSec(file);
+  if (durationSec > quota.maxSec + 2) {
+    throw new Error(`El video dura ${formatDurationSec(durationSec)}. El máximo permitido es ${quota.maxSec} s.`);
+  }
+
+  const contentType = detectVideoMime(file);
+  const presignRes = await fetch('/api/r2-media', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      action: 'presign',
+      ownerType,
+      ownerId,
+      contentType,
+      sizeBytes: file.size,
+      currentCount,
+    }),
+  });
+  const data = await presignRes.json().catch(() => ({}));
+  if (!presignRes.ok || !data?.uploadUrl) {
+    throw new Error(data?.error || 'No se pudo autorizar la subida de video.');
+  }
+
+  await new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', data.uploadUrl, true);
+    xhr.setRequestHeader('Content-Type', contentType);
+    xhr.upload.onprogress = (ev) => {
+      if (ev.lengthComputable && onProgress) {
+        onProgress(Math.min(99, Math.round((ev.loaded / ev.total) * 100)));
+      }
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        if (onProgress) onProgress(100);
+        resolve();
+      } else {
+        reject(new Error(`Error al subir video a R2 (${xhr.status}). Verifica CORS en Cloudflare.`));
+      }
+    };
+    xhr.onerror = () => reject(new Error('Sin conexión al subir el video. Intenta de nuevo.'));
+    xhr.send(file);
+  });
+
+  return {
+    publicUrl: data.publicUrl,
+    r2Key: data.r2Key,
+    duration: durationSec > 0 ? formatDurationSec(durationSec) : '0:45',
+    sizeBytes: file.size,
+  };
+}
+
+async function deleteVideoFromR2(r2Key) {
+  if (!r2Key || !String(r2Key).startsWith('uploads/')) return;
+  try {
+    await fetch('/api/r2-media', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'delete', r2Key }),
+    });
+  } catch {
+    // silencioso si ya no existe
+  }
+}
 
 function buildBaseCoach(partner) {
   return {
@@ -212,7 +325,6 @@ function hydrateClub(c) {
     vipNightRate: nocVip,
     bookingUrl,
     vipBookingCode: bookingVipCode,
-    videoTourUrl: c?.videos?.[0]?.url || '',
     rates: {
       diaRegular: diaReg,
       diaVip,
@@ -258,7 +370,6 @@ function normalizeClub(d) {
   const bookingVipCode = String(d.rates?.bookingVipCode ?? d.vipBookingCode ?? '')
     .trim()
     .toUpperCase();
-  const vUrl = String(d.videoTourUrl || '').trim();
 
   return {
     ...d,
@@ -280,17 +391,7 @@ function normalizeClub(d) {
       bookingUrl,
       bookingVipCode,
     },
-    videos: vUrl
-      ? [
-          {
-            id: `v-${d.id}`,
-            title: `Video Tour · ${d.shortName || d.name}`,
-            duration: '0:30',
-            url: vUrl,
-            poster: d.gallery?.[0]?.url || d.coverUrl || ASSETS.sedeCountry,
-          },
-        ]
-      : d.videos || [],
+    videos: Array.isArray(d.videos) ? d.videos : [],
     promos: (d.promos || []).map((pr) => ({
       ...pr,
       tag: pr.tag || 'PROMO',
@@ -327,13 +428,16 @@ export default function PartnerStudioModal({
 }) {
   const coachPhotoRef = useRef(null);
   const coachGalRef = useRef(null);
+  const coachVidRef = useRef(null);
   const clubPhotoRef = useRef(null);
+  const clubVidRef = useRef(null);
 
   const [role, setRole] = useState(partner?.role === 'CLUB' ? 'CLUB' : 'COACH');
   const [coachTab, setCoachTab] = useState('hoy');
   const [clubTab, setClubTab] = useState('estado');
   const [syncState, setSyncState] = useState('saved');
   const [uploading, setUploading] = useState(false);
+  const [videoPct, setVideoPct] = useState(null);
 
   const [coachId, setCoachId] = useState(partner?.id || coaches?.[0]?.id || 'coach-romina');
   const [coachDraft, setCoachDraft] = useState(() => buildBaseCoach(partner));
@@ -341,7 +445,7 @@ export default function PartnerStudioModal({
   const [clubDraft, setClubDraft] = useState(() => hydrateClub((clubs || INITIAL_CLUBS)[0]));
 
   // Estados de formularios compactos
-  const [openForm, setOpenForm] = useState(null); // 'pkg'|'grp'|'st'|'vid'|'promo'|'ev'
+  const [openForm, setOpenForm] = useState(null);
   const [fTitle, setFTitle] = useState('');
   const [fSub, setFSub] = useState('');
   const [fA, setFA] = useState('60');
@@ -349,6 +453,7 @@ export default function PartnerStudioModal({
   const [fC, setFC] = useState('4');
   const [fFlag, setFFlag] = useState(false);
 
+  const [clubVidTitle, setClubVidTitle] = useState('');
   const [slotDay, setSlotDay] = useState('Mañana');
   const [slotTime, setSlotTime] = useState('06:00 p. m.');
   const [newBenefit, setNewBenefit] = useState('');
@@ -361,6 +466,7 @@ export default function PartnerStudioModal({
     setCoachId(partner?.id && partner.role !== 'CLUB' ? partner.id : coaches?.[0]?.id || 'coach-romina');
     setClubId(partner?.clubId || clubs?.[0]?.id || 'club-country');
     setOpenForm(null);
+    setVideoPct(null);
   }, [isOpen, partner, coaches, clubs]);
 
   useEffect(() => {
@@ -378,7 +484,7 @@ export default function PartnerStudioModal({
       packages: found.packages?.length ? found.packages : base.packages,
       groups: found.groups?.length ? found.groups : base.groups,
       schedule: found.schedule?.length ? found.schedule : base.schedule,
-      videos: found.videos?.length ? found.videos : base.videos,
+      videos: Array.isArray(found.videos) ? found.videos : base.videos,
       students: Array.isArray(found.students) ? found.students : base.students,
       specialties: found.specialties?.length ? found.specialties : base.specialties,
     });
@@ -438,6 +544,79 @@ export default function PartnerStudioModal({
     }
   };
 
+  const handleCoachVideoFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setVideoPct(5);
+    try {
+      const uploaded = await uploadVideoDirectToR2({
+        file,
+        ownerType: 'COACH',
+        ownerId: coachDraft.id,
+        currentCount: (coachDraft.videos || []).length,
+        onProgress: setVideoPct,
+      });
+      const titleClean = fTitle.trim() || file.name.replace(/\.[^.]+$/, '').slice(0, 48) || 'Tip en cancha';
+      const newVid = {
+        id: `pv-${Date.now()}`,
+        title: titleClean,
+        duration: uploaded.duration,
+        isFree: !fFlag,
+        isExclusive: fFlag,
+        gemsCost: fFlag ? Math.max(10, Number(fA) || 40) : 0,
+        url: uploaded.publicUrl,
+        src: uploaded.publicUrl,
+        r2Key: uploaded.r2Key,
+        sizeBytes: uploaded.sizeBytes,
+        poster: fFlag ? ASSETS.portadaAcademiaTv : coachDraft.photoUrl || ASSETS.portadaTipsSemana,
+        active: true,
+      };
+      triggerHaptic('success');
+      await saveCoach({ ...coachDraft, videos: [newVid, ...(coachDraft.videos || [])] }, 'Video publicado en vivo.');
+      setOpenForm(null);
+    } catch (err) {
+      triggerHaptic('warning');
+      if (onNotify) onNotify(err?.message || 'No se pudo subir el video.', 'warning');
+    } finally {
+      setVideoPct(null);
+      e.target.value = '';
+    }
+  };
+
+  const handleClubVideoFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setVideoPct(5);
+    try {
+      const uploaded = await uploadVideoDirectToR2({
+        file,
+        ownerType: 'CLUB',
+        ownerId: clubDraft.id,
+        currentCount: (clubDraft.videos || []).length,
+        onProgress: setVideoPct,
+      });
+      const titleClean = clubVidTitle.trim() || `Video Tour · ${clubDraft.shortName || clubDraft.name}`;
+      const newVid = {
+        id: `cv-${Date.now()}`,
+        title: titleClean,
+        duration: uploaded.duration,
+        url: uploaded.publicUrl,
+        r2Key: uploaded.r2Key,
+        sizeBytes: uploaded.sizeBytes,
+        poster: clubDraft.gallery?.[0]?.url || clubDraft.coverUrl || ASSETS.sedeCountry,
+      };
+      triggerHaptic('success');
+      await saveClub({ ...clubDraft, videos: [newVid, ...(clubDraft.videos || [])] }, 'Trailer del club publicado.');
+      setClubVidTitle('');
+    } catch (err) {
+      triggerHaptic('warning');
+      if (onNotify) onNotify(err?.message || 'No se pudo subir el trailer.', 'warning');
+    } finally {
+      setVideoPct(null);
+      e.target.value = '';
+    }
+  };
+
   const toggleForm = (id, defaults = {}) => {
     triggerHaptic('light');
     if (openForm === id) return setOpenForm(null);
@@ -472,7 +651,7 @@ export default function PartnerStudioModal({
       isOpen={isOpen}
       onClose={onClose}
       title={role === 'COACH' ? 'Estudio Coach Pro' : 'Panel de Club Aliado'}
-      subtitle={role === 'COACH' ? `${coachDraft.name} · En vivo` : `${clubDraft.name} · En vivo`}
+      subtitle={role === 'COACH' ? `${coachDraft.name} · Autónomo en vivo` : `${clubDraft.name} · Autónomo en vivo`}
       icon={
         <IconBadge
           name={role === 'COACH' ? 'users' : 'shield'}
@@ -524,9 +703,9 @@ export default function PartnerStudioModal({
               </>
             ) : (
               <>
-                <div><span>FOTOS</span><strong>{(clubDraft.gallery || []).length}</strong></div>
+                <div><span>FOTOS</span><strong>{(clubDraft.gallery || []).length}/8</strong></div>
                 <div className="is-emerald"><span>SOCIOS VIP</span><strong>{(players || []).filter((p) => p.isVip).length}</strong></div>
-                <div><span>RESERVAS</span><strong>{clubDraft.rates?.bookingUrl ? 'Web + WA' : 'WhatsApp'}</strong></div>
+                <div><span>TRAILERS</span><strong>{(clubDraft.videos || []).length}/{VIDEO_QUOTAS.CLUB.maxCount}</strong></div>
               </>
             )}
           </div>
@@ -600,11 +779,7 @@ export default function PartnerStudioModal({
                       onChange={(e) => setCoachDraft((p) => ({ ...p, freeSlotToday: e.target.value }))}
                       placeholder="Ej. Hoy · 04:30 p. m."
                     />
-                    <button
-                      type="button"
-                      className="tt-btn tt-btn-primary tt-btn-sm tt-pst-press"
-                      onClick={() => saveCoach(coachDraft, 'Disponibilidad publicada.')}
-                    >
+                    <button type="button" className="tt-btn tt-btn-primary tt-btn-sm tt-pst-press" onClick={() => saveCoach(coachDraft, 'Disponibilidad publicada.')}>
                       Publicar
                     </button>
                   </div>
@@ -647,17 +822,7 @@ export default function PartnerStudioModal({
                     {(coachDraft.schedule || []).map((sl) => (
                       <span key={sl.id} className="tt-slot-chip">
                         <b>{sl.day}</b> · {sl.time}
-                        <button
-                          type="button"
-                          onClick={() =>
-                            saveCoach({
-                              ...coachDraft,
-                              schedule: (coachDraft.schedule || []).filter((x) => x.id !== sl.id),
-                            })
-                          }
-                        >
-                          ✕
-                        </button>
+                        <button type="button" onClick={() => saveCoach({ ...coachDraft, schedule: (coachDraft.schedule || []).filter((x) => x.id !== sl.id) })}>✕</button>
                       </span>
                     ))}
                   </div>
@@ -669,11 +834,7 @@ export default function PartnerStudioModal({
               <div className="tt-pst-sec">
                 <div className="tt-pst-head">
                   <div><span className="tt-pst-mk">OFERTA COMERCIAL</span><h3>Clases & Packs</h3></div>
-                  <button
-                    type="button"
-                    className="tt-btn tt-btn-primary tt-btn-sm tt-pst-press"
-                    onClick={() => toggleForm('pkg', { a: '60', b: '50', c: 'PROMO' })}
-                  >
+                  <button type="button" className="tt-btn tt-btn-primary tt-btn-sm tt-pst-press" onClick={() => toggleForm('pkg', { a: '60', b: '50', c: 'PROMO' })}>
                     {openForm === 'pkg' ? 'Cerrar' : '+ Paquete'}
                   </button>
                 </div>
@@ -730,26 +891,14 @@ export default function PartnerStudioModal({
                         <strong>{pk.title || pk.name}</strong>
                         <small>Regular S/ {pk.priceRegular ?? pk.price} · VIP S/ {pk.priceVip ?? pk.vipPrice}</small>
                       </div>
-                      <button
-                        type="button"
-                        className="tt-pst-del"
-                        onClick={() =>
-                          saveCoach({ ...coachDraft, packages: (coachDraft.packages || []).filter((x) => x.id !== pk.id) })
-                        }
-                      >
-                        ✕
-                      </button>
+                      <button type="button" className="tt-pst-del" onClick={() => saveCoach({ ...coachDraft, packages: (coachDraft.packages || []).filter((x) => x.id !== pk.id) })}>✕</button>
                     </div>
                   ))}
                 </div>
 
                 <div className="tt-pst-head" style={{ marginTop: 4 }}>
                   <div><span className="tt-pst-mk">CUPOS EN VIVO</span><h3>Grupales</h3></div>
-                  <button
-                    type="button"
-                    className="tt-btn tt-btn-ghost tt-btn-sm tt-pst-press"
-                    onClick={() => toggleForm('grp', { sub: 'Mar & Jue · 7 p. m.', a: '35', b: '28', c: '4' })}
-                  >
+                  <button type="button" className="tt-btn tt-btn-ghost tt-btn-sm tt-pst-press" onClick={() => toggleForm('grp', { sub: 'Mar & Jue · 7 p. m.', a: '35', b: '28', c: '4' })}>
                     {openForm === 'grp' ? 'Cerrar' : '+ Grupal'}
                   </button>
                 </div>
@@ -832,11 +981,7 @@ export default function PartnerStudioModal({
               <div className="tt-pst-sec">
                 <div className="tt-pst-head">
                   <div><span className="tt-pst-mk">PADRÓN PRIVADO</span><h3>Alumnos ({(coachDraft.students || []).length})</h3></div>
-                  <button
-                    type="button"
-                    className="tt-btn tt-btn-primary tt-btn-sm tt-pst-press"
-                    onClick={() => toggleForm('st', { sub: '5ª B' })}
-                  >
+                  <button type="button" className="tt-btn tt-btn-primary tt-btn-sm tt-pst-press" onClick={() => toggleForm('st', { sub: '5ª B' })}>
                     {openForm === 'st' ? 'Cerrar' : '+ Alumno'}
                   </button>
                 </div>
@@ -938,13 +1083,7 @@ export default function PartnerStudioModal({
                           )
                         }
                       />
-                      <button
-                        type="button"
-                        disabled={uploading}
-                        className="tt-btn tt-btn-ghost tt-btn-sm tt-pst-press"
-                        style={{ marginTop: 6 }}
-                        onClick={() => coachPhotoRef.current?.click()}
-                      >
+                      <button type="button" disabled={uploading} className="tt-btn tt-btn-ghost tt-btn-sm tt-pst-press" style={{ marginTop: 6 }} onClick={() => coachPhotoRef.current?.click()}>
                         <TTIcon name="camera" size={14} /> {uploading ? 'Subiendo...' : 'Cambiar foto'}
                       </button>
                     </div>
@@ -973,10 +1112,7 @@ export default function PartnerStudioModal({
                           className={`tt-spec-pill ${on ? 'is-on' : ''}`}
                           onClick={() => {
                             const cur = coachDraft.specialties || [];
-                            saveCoach({
-                              ...coachDraft,
-                              specialties: on ? cur.filter((x) => x !== sp) : [...cur.slice(-2), sp],
-                            });
+                            saveCoach({ ...coachDraft, specialties: on ? cur.filter((x) => x !== sp) : [...cur.slice(-2), sp] });
                           }}
                         >
                           {sp}
@@ -995,10 +1131,10 @@ export default function PartnerStudioModal({
                   </button>
                 </div>
 
-                {/* Galería + Videos del Coach */}
+                {/* Galería de Fotos del Coach (Supabase Storage) */}
                 <div className="tt-pst-card">
                   <div className="tt-pst-head">
-                    <div><span className="tt-pst-mk">GALERÍA EN CANCHA</span><h3>Fotos ({(coachDraft.gallery || []).length})</h3></div>
+                    <div><span className="tt-pst-mk">GALERÍA EN CANCHA</span><h3>Fotos ({(coachDraft.gallery || []).length}/8)</h3></div>
                     <input
                       ref={coachGalRef}
                       type="file"
@@ -1013,7 +1149,7 @@ export default function PartnerStudioModal({
                         )
                       }
                     />
-                    <button type="button" disabled={uploading} className="tt-btn tt-btn-ghost tt-btn-sm" onClick={() => coachGalRef.current?.click()}>
+                    <button type="button" disabled={uploading || (coachDraft.gallery || []).length >= 8} className="tt-btn tt-btn-ghost tt-btn-sm" onClick={() => coachGalRef.current?.click()}>
                       + Foto
                     </button>
                   </div>
@@ -1021,66 +1157,60 @@ export default function PartnerStudioModal({
                     {(coachDraft.gallery || []).map((g, i) => (
                       <div key={g.id || i} className="tt-gal-item">
                         <SmartImage src={g.url || g.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        <button
-                          type="button"
-                          onClick={() => saveCoach({ ...coachDraft, gallery: (coachDraft.gallery || []).filter((_, idx) => idx !== i) })}
-                        >
-                          ✕
-                        </button>
+                        <button type="button" onClick={() => saveCoach({ ...coachDraft, gallery: (coachDraft.gallery || []).filter((_, idx) => idx !== i) })}>✕</button>
                       </div>
                     ))}
                   </div>
                 </div>
 
+                {/* Videos Autónomos del Coach -> Cloudflare R2 */}
                 <div className="tt-pst-card">
                   <div className="tt-pst-head">
-                    <div><span className="tt-pst-mk">REELS Y MASTERCLASSES</span><h3>Videos ({(coachDraft.videos || []).length})</h3></div>
-                    <button type="button" className="tt-btn tt-btn-ghost tt-btn-sm" onClick={() => toggleForm('vid', { a: '40' })}>
-                      {openForm === 'vid' ? 'Cerrar' : '+ Video'}
+                    <div>
+                      <span className="tt-pst-mk">SUBIDA DIRECTA R2 · MÁX. {VIDEO_QUOTAS.COACH.maxMB} MB · {VIDEO_QUOTAS.COACH.maxSec}S</span>
+                      <h3>Videos ({(coachDraft.videos || []).length}/{VIDEO_QUOTAS.COACH.maxCount})</h3>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={videoPct !== null}
+                      className="tt-btn tt-btn-primary tt-btn-sm tt-pst-press"
+                      onClick={() => toggleForm('vid', { a: '40' })}
+                    >
+                      {openForm === 'vid' ? 'Cerrar' : '+ Subir Video'}
                     </button>
                   </div>
 
                   {openForm === 'vid' && (
-                    <form
-                      className="tt-pst-form"
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        if (fTitle.trim().length < 3) return;
-                        const u = fSub.trim() || ASSETS.videoCoachRomina;
-                        saveCoach(
-                          {
-                            ...coachDraft,
-                            videos: [
-                              {
-                                id: `pv-${Date.now()}`,
-                                title: fTitle.trim(),
-                                duration: '01:15',
-                                isFree: !fFlag,
-                                isExclusive: fFlag,
-                                gemsCost: fFlag ? Number(fA) || 40 : 0,
-                                url: u,
-                                src: u,
-                                poster: fFlag ? ASSETS.portadaAcademiaTv : ASSETS.portadaTipsSemana,
-                                active: true,
-                              },
-                              ...(coachDraft.videos || []),
-                            ],
-                          },
-                          'Video publicado en tu vitrina.'
-                        );
-                        setOpenForm(null);
-                      }}
-                    >
-                      <input className="tt-pst-in" value={fTitle} onChange={(e) => setFTitle(e.target.value)} placeholder="Título del tip en cancha" required />
-                      <input type="url" className="tt-pst-in" value={fSub} onChange={(e) => setFSub(e.target.value)} placeholder="URL MP4 directa (opcional)" />
+                    <div className="tt-pst-form">
+                      <input className="tt-pst-in" value={fTitle} onChange={(e) => setFTitle(e.target.value)} placeholder="Título del tip o clase (ej. 2º saque con efecto)" />
                       <div className="tt-pst-g2">
                         <button type="button" className={`tt-qs-pill ${fFlag ? 'is-on' : ''}`} onClick={() => setFFlag((v) => !v)}>
                           {fFlag ? `Masterclass (${fA} 💎)` : 'Tip Gratis'}
                         </button>
                         {fFlag && <input type="number" className="tt-pst-in" value={fA} onChange={(e) => setFA(e.target.value)} placeholder="Gemas" />}
                       </div>
-                      <button type="submit" className="tt-btn tt-btn-primary tt-btn-sm">Publicar Video</button>
-                    </form>
+
+                      <input
+                        ref={coachVidRef}
+                        type="file"
+                        accept="video/mp4,video/quicktime,video/webm"
+                        style={{ display: 'none' }}
+                        onChange={handleCoachVideoFile}
+                      />
+                      <button
+                        type="button"
+                        disabled={videoPct !== null || (coachDraft.videos || []).length >= VIDEO_QUOTAS.COACH.maxCount}
+                        className="tt-btn tt-btn-primary tt-pst-press"
+                        onClick={() => coachVidRef.current?.click()}
+                      >
+                        <TTIcon name="video" size={16} />
+                        {videoPct !== null ? `Subiendo video... ${videoPct}%` : 'Elegir Video del Celular (MP4 / MOV)'}
+                      </button>
+
+                      {videoPct !== null && (
+                        <div className="tt-up-bar"><div style={{ width: `${videoPct}%` }} /></div>
+                      )}
+                    </div>
                   )}
 
                   <div className="tt-pst-list">
@@ -1088,12 +1218,17 @@ export default function PartnerStudioModal({
                       <div key={v.id} className="tt-pst-item">
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <strong>{v.title}</strong>
-                          <small>{v.gemsCost > 0 ? `Masterclass · ${v.gemsCost} 💎` : 'Tip Gratis'}</small>
+                          <small>
+                            {v.duration || '0:45'} · {v.gemsCost > 0 ? `Masterclass · ${v.gemsCost} 💎` : 'Tip Gratis'}
+                          </small>
                         </div>
                         <button
                           type="button"
                           className="tt-pst-del"
-                          onClick={() => saveCoach({ ...coachDraft, videos: (coachDraft.videos || []).filter((x) => x.id !== v.id) })}
+                          onClick={async () => {
+                            await deleteVideoFromR2(v.r2Key);
+                            saveCoach({ ...coachDraft, videos: (coachDraft.videos || []).filter((x) => x.id !== v.id) }, 'Video eliminado.');
+                          }}
                         >
                           ✕
                         </button>
@@ -1126,7 +1261,7 @@ export default function PartnerStudioModal({
               <span className="tt-pst-slider is-gold" style={{ transform: `translateX(${Math.max(0, clIdx) * 100}%)` }} />
               {[
                 { id: 'estado', l: 'Club & Web' },
-                { id: 'vitrina', l: 'Fotos & VIP' },
+                { id: 'vitrina', l: 'Fotos & Video' },
                 { id: 'promos', l: 'Promos' },
                 { id: 'validar', l: 'Validar VIP' },
               ].map((t) => (
@@ -1176,9 +1311,7 @@ export default function PartnerStudioModal({
                     type="url"
                     className="tt-pst-in"
                     value={clubDraft.rates?.bookingUrl || ''}
-                    onChange={(e) =>
-                      setClubDraft((p) => ({ ...p, bookingUrl: e.target.value, rates: { ...p.rates, bookingUrl: e.target.value } }))
-                    }
+                    onChange={(e) => setClubDraft((p) => ({ ...p, bookingUrl: e.target.value, rates: { ...p.rates, bookingUrl: e.target.value } }))}
                     placeholder="URL de reservas del club (ej. https://reservas.tuclub.pe)"
                   />
                   <div className="tt-pst-g2">
@@ -1194,13 +1327,7 @@ export default function PartnerStudioModal({
                       }
                       placeholder="Código VIP (ej. TTVIP15)"
                     />
-                    <input
-                      type="tel"
-                      className="tt-pst-in"
-                      value={clubDraft.whatsapp || ''}
-                      onChange={(e) => setClubDraft((p) => ({ ...p, whatsapp: e.target.value }))}
-                      placeholder="WhatsApp del club"
-                    />
+                    <input type="tel" className="tt-pst-in" value={clubDraft.whatsapp || ''} onChange={(e) => setClubDraft((p) => ({ ...p, whatsapp: e.target.value }))} placeholder="WhatsApp del club" />
                   </div>
                   <div className="tt-pst-g2">
                     <label className="tt-pst-lbl">Día Regular (S/)
@@ -1226,9 +1353,10 @@ export default function PartnerStudioModal({
 
             {clubTab === 'vitrina' && (
               <div className="tt-pst-sec">
+                {/* Galería de Fotos del Club */}
                 <div className="tt-pst-card">
                   <div className="tt-pst-head">
-                    <div><span className="tt-pst-mk">CARRUSEL Y VIDEO TOUR</span><h3>Fotos ({(clubDraft.gallery || []).length})</h3></div>
+                    <div><span className="tt-pst-mk">CARRUSEL DE SEDE</span><h3>Fotos ({(clubDraft.gallery || []).length}/8)</h3></div>
                     <input
                       ref={clubPhotoRef}
                       type="file"
@@ -1244,7 +1372,7 @@ export default function PartnerStudioModal({
                         })
                       }
                     />
-                    <button type="button" disabled={uploading} className="tt-btn tt-btn-primary tt-btn-sm tt-pst-press" onClick={() => clubPhotoRef.current?.click()}>
+                    <button type="button" disabled={uploading || (clubDraft.gallery || []).length >= 8} className="tt-btn tt-btn-primary tt-btn-sm tt-pst-press" onClick={() => clubPhotoRef.current?.click()}>
                       <TTIcon name="camera" size={14} /> {uploading ? 'Subiendo...' : '+ Foto'}
                     </button>
                   </div>
@@ -1257,13 +1385,69 @@ export default function PartnerStudioModal({
                       </div>
                     ))}
                   </div>
+                </div>
+
+                {/* Video Tours / Trailers del Club -> Cloudflare R2 */}
+                <div className="tt-pst-card">
+                  <div className="tt-pst-head">
+                    <div>
+                      <span className="tt-pst-mk">VIDEO TOUR DIRECTO R2 · MÁX. {VIDEO_QUOTAS.CLUB.maxMB} MB · {VIDEO_QUOTAS.CLUB.maxSec}S</span>
+                      <h3>Trailers ({(clubDraft.videos || []).length}/{VIDEO_QUOTAS.CLUB.maxCount})</h3>
+                    </div>
+                  </div>
 
                   <div className="tt-pst-row">
-                    <input type="url" className="tt-pst-in" value={clubDraft.videoTourUrl || ''} onChange={(e) => setClubDraft((p) => ({ ...p, videoTourUrl: e.target.value }))} placeholder="URL MP4 Video Tour del club" />
-                    <button type="button" className="tt-btn tt-btn-ghost tt-btn-sm" onClick={() => saveClub(clubDraft, 'Video Tour guardado.')}>Guardar</button>
+                    <input
+                      className="tt-pst-in"
+                      value={clubVidTitle}
+                      onChange={(e) => setClubVidTitle(e.target.value)}
+                      placeholder="Título (ej. Recorrido Cancha Central LED)"
+                    />
+                    <input
+                      ref={clubVidRef}
+                      type="file"
+                      accept="video/mp4,video/quicktime,video/webm"
+                      style={{ display: 'none' }}
+                      onChange={handleClubVideoFile}
+                    />
+                    <button
+                      type="button"
+                      disabled={videoPct !== null || (clubDraft.videos || []).length >= VIDEO_QUOTAS.CLUB.maxCount}
+                      className="tt-btn tt-btn-primary tt-btn-sm tt-pst-press"
+                      style={{ whiteSpace: 'nowrap' }}
+                      onClick={() => clubVidRef.current?.click()}
+                    >
+                      <TTIcon name="video" size={14} /> {videoPct !== null ? `${videoPct}%` : '+ Video'}
+                    </button>
+                  </div>
+
+                  {videoPct !== null && (
+                    <div className="tt-up-bar"><div style={{ width: `${videoPct}%` }} /></div>
+                  )}
+
+                  <div className="tt-pst-list">
+                    {(clubDraft.videos || []).map((v) => (
+                      <div key={v.id} className="tt-pst-item">
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <strong>{v.title}</strong>
+                          <small>{v.duration || '0:30'} · Visible en Video Tour</small>
+                        </div>
+                        <button
+                          type="button"
+                          className="tt-pst-del"
+                          onClick={async () => {
+                            await deleteVideoFromR2(v.r2Key);
+                            saveClub({ ...clubDraft, videos: (clubDraft.videos || []).filter((x) => x.id !== v.id) }, 'Trailer eliminado.');
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
+                {/* Beneficios VIP Golden Ticket */}
                 <div className="tt-pst-card">
                   <span className="tt-pst-mk">GOLDEN TICKET · BENEFICIOS VIP</span>
                   <div className="tt-pst-list">
@@ -1457,7 +1641,7 @@ export default function PartnerStudioModal({
         .tt-pst-slider { position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc((100% - 8px) / 4); border-radius: 11px; background: linear-gradient(135deg, #00DC7D 0%, #00B365 100%); transition: transform 280ms cubic-bezier(0.22, 1.24, 0.36, 1); pointer-events: none; }
         .tt-pst-slider.is-gold { background: linear-gradient(135deg, #F3DC9B 0%, #C89F45 100%); }
         .tt-ps-studio.is-light .tt-pst-slider:not(.is-gold) { background: #1E0734; }
-        .tt-pst-tab { position: relative; z-index: 1; min-height: 36px; font-size: 0.71rem; font-weight: 800; color: var(--tt-text-muted); }
+        .tt-pst-tab { position: relative; z-index: 1; min-height: 36px; font-size: 0.7rem; font-weight: 800; color: var(--tt-text-muted); }
         .tt-pst-tab.is-active { color: #10021E; font-weight: 900; }
         .tt-ps-studio.is-light .tt-pst-tab:not(.is-gold).is-active { color: #00DC7D; }
 
@@ -1472,6 +1656,9 @@ export default function PartnerStudioModal({
         .tt-pst-g4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
         .tt-pst-lbl { display: flex; flex-direction: column; gap: 4px; font-size: 0.7rem; font-weight: 800; color: var(--tt-text-muted); }
         .tt-pst-in { width: 100%; min-height: 41px; padding: 8px 11px; border-radius: 12px; background: var(--tt-surface); border: 1px solid var(--tt-border-medium); color: var(--tt-text); font-size: 16px; font-family: inherit; }
+
+        .tt-up-bar { height: 7px; border-radius: 999px; background: var(--tt-surface); overflow: hidden; border: 1px solid var(--tt-border); }
+        .tt-up-bar > div { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #00DC7D 0%, #E5C16C 100%); transition: width 180ms ease; }
 
         .tt-qs-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 7px; }
         @media (min-width: 540px) { .tt-qs-grid { grid-template-columns: repeat(3, 1fr); } }
