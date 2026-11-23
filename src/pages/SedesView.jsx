@@ -138,7 +138,7 @@ const CLUB_ENRICHMENT_MAP = {
     vipDayRate: 24,
     vipNightRate: 34,
     whatsapp: '51964201001',
-    bookingUrl: 'https://huancayo-tenis.vercel.app',
+    bookingUrl: '',
     vipBookingCode: 'TTVIP-CUTIPA',
     gallery: [
       { url: ASSETS.sedeRomina, caption: 'Canchas de arcilla · Academia Romina Cutipa' },
