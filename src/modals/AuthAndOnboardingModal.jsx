@@ -7,6 +7,12 @@ import {
   triggerHaptic,
 } from '../components/AppIcons';
 import {
+  CALIBRATION_FLASHCARDS,
+  ClaimEmancipationView,
+  FlashCardCourtIllustration,
+  computeCalibrationSeed,
+} from '../components/AuthOnboardingParts';
+import {
   APP_CONFIG,
   INITIAL_CLUBS,
   getCategoryByPoints,
@@ -14,6 +20,7 @@ import {
 import { ELO_CONFIG } from '../utils/tenisEngine';
 import {
   buildWhatsappLink,
+  claimEmancipatedProfile,
   isCloudReady,
   normalizePeruPhone,
   sendCloudPasswordReset,
@@ -21,6 +28,8 @@ import {
   signUpCloudAccount,
   upsertCloudPlayer,
 } from '../utils/cloudService';
+
+export { CALIBRATION_FLASHCARDS };
 
 /* ==========================================================================
    CONFIGURACIÓN DEL PORTAL DE ACCESO (TOTAL TENIS)
@@ -48,221 +57,6 @@ export const AUTH_ONBOARDING_EDITABLE_CONFIG = {
   },
 };
 
-/* ==========================================================================
-   4 TARJETAS RÁPIDAS DE CALIBRACIÓN (CON NUEVA TARJETA 4 DE CONTROL/EFECTOS)
-   ========================================================================== */
-export const CALIBRATION_FLASHCARDS = [
-  {
-    id: 'fc-contact',
-    stepLabel: 'TARJETA 1 DE 4',
-    kicker: 'TU CONTACTO CON LA RAQUETA',
-    question: '¿Qué tan seguido has jugado tenis antes?',
-    helper: 'Esto solo sirve para sugerirte rivales de tu mismo ritmo desde el primer día.',
-    scene: 'net',
-    options: [
-      {
-        level: 1,
-        score: 0,
-        badge: 'NIVEL CERO',
-        title: 'Empiezo totalmente de cero',
-        desc: 'Nunca he jugado tenis o recién voy a tomar mis primeras clases.',
-        reassurance: '¡Bienvenido! Te ubicaremos con jugadores nuevos para que disfrutes desde el día 1.',
-      },
-      {
-        level: 2,
-        score: 1,
-        badge: 'PRIMEROS PELOTEOS',
-        title: 'He jugado muy pocas veces',
-        desc: 'Sé agarrar la raqueta y pasar algunas pelotas suaves por encima de la red.',
-        reassurance: 'Perfecto: ya rompiste el hielo y pronto ganarás consistencia en cancha.',
-      },
-      {
-        level: 3,
-        score: 2,
-        badge: 'RITMO FRECUENTE',
-        title: 'Juego seguido con amigos o clases',
-        desc: 'Logro mantener intercambios largos de un lado al otro de la cancha.',
-        reassurance: '¡Excelente base! Tendrás partidos muy parejos desde la primera semana.',
-      },
-      {
-        level: 4,
-        score: 3,
-        badge: 'EXPERIENCIA',
-        title: 'Juego hace años y compito',
-        desc: 'Tengo buen ritmo, controlo los golpes y juego partidos exigentes seguido.',
-        reassurance: 'Gran nivel: tus primeros 5 partidos de prueba afinarán tu puesto arriba.',
-      },
-    ],
-  },
-  {
-    id: 'fc-serve',
-    stepLabel: 'TARJETA 2 DE 4',
-    kicker: 'EMPEZAR EL PUNTO (EL SAQUE)',
-    question: 'Cuando te toca sacar para iniciar el punto, ¿cómo lo haces?',
-    helper: 'Piensa en tu saque real durante un set o un peloteo formal.',
-    scene: 'serve',
-    options: [
-      {
-        level: 1,
-        score: 0,
-        badge: 'NIVEL CERO',
-        title: 'Todavía no sé sacar',
-        desc: 'Prefiero soltarla suave desde abajo o aún estoy aprendiendo el movimiento.',
-        reassurance: 'Sin problema: en la categoría inicial muchos empiezan sacando suave.',
-      },
-      {
-        level: 2,
-        score: 1,
-        badge: 'SAQUE SEGURO',
-        title: 'La paso suave por arriba para que entre',
-        desc: 'No busco fuerza todavía; mi meta es meterla en el cuadro sin fallar.',
-        reassurance: 'Muy inteligente: asegurar la bola en juego te hará ganar muchos puntos.',
-      },
-      {
-        level: 3,
-        score: 2,
-        badge: 'SAQUE FIRME',
-        title: 'Tengo un saque cómodo y casi no fallo',
-        desc: 'El primero va con buena velocidad y tengo un segundo saque seguro.',
-        reassurance: '¡Sólido! Un segundo saque confiable marca diferencia en partidos reales.',
-      },
-      {
-        level: 4,
-        score: 3,
-        badge: 'SAQUE DE ATAQUE',
-        title: 'Saco fuerte buscando esquinas o efecto',
-        desc: 'Dirijo la pelota con potencia o efecto (slice/kick) para empezar atacando.',
-        reassurance: 'Armamento pesado: te mediremos contra rivales que puedan devolver ese ritmo.',
-      },
-    ],
-  },
-  {
-    id: 'fc-movement',
-    stepLabel: 'TARJETA 3 DE 4',
-    kicker: 'PELOTEANDO EN MOVIMIENTO',
-    question: 'Si la pelota viene a los costados y te hace correr, ¿qué pasa?',
-    helper: 'Imagina un intercambio real donde tu rival te mueve de esquina a esquina.',
-    scene: 'rally',
-    options: [
-      {
-        level: 1,
-        score: 0,
-        badge: 'NIVEL CERO',
-        title: 'Recién aprendo a calcular el bote',
-        desc: 'A veces me cuesta llegar a tiempo o calcular dónde va a picar la pelota.',
-        reassurance: 'Totalmente normal al inicio; el ojo se entrena rapidísimo jugando.',
-      },
-      {
-        level: 2,
-        score: 1,
-        badge: 'DEVOLUCIÓN BÁSICA',
-        title: 'Llego y la devuelvo al centro como puedo',
-        desc: 'Pongo la raqueta para cruzarla de vuelta, aunque sin mucha dirección.',
-        reassurance: '¡Buen reflejo! Pasar una pelota más que el rival siempre suma.',
-      },
-      {
-        level: 3,
-        score: 2,
-        badge: 'AGUANTE EN CANCHA',
-        title: 'Llego bien y sostengo el intercambio',
-        desc: 'Corro a las esquinas, devuelvo alto o cruzado y cambio de dirección.',
-        reassurance: 'Consistencia de club: ya juegas puntos completos con estrategia.',
-      },
-      {
-        level: 4,
-        score: 3,
-        badge: 'CONTRAATAQUE',
-        title: 'Llego cómodo y respondo atacando',
-        desc: 'Incluso en carrera puedo responder profundo y buscar el espacio libre.',
-        reassurance: 'Ritmo competitivo alto: listo para medirse en la parte alta del circuito.',
-      },
-    ],
-  },
-  {
-    id: 'fc-control',
-    stepLabel: 'TARJETA 4 DE 4',
-    kicker: 'CONTROL DE GOLPES Y PARTIDOS',
-    question: 'En un partido real, ¿cómo controlas la dirección, efectos y presión?',
-    helper: 'Última tarjeta: con esto armamos tu categoría inicial lista para jugar.',
-    scene: 'trophy',
-    options: [
-      {
-        level: 1,
-        score: 0,
-        badge: 'NIVEL CERO',
-        title: 'Recién empiezo y estoy aprendiendo el juego',
-        desc: 'Aún no juego sets completos; quiero aprender reglas y sumar mis primeros partidos.',
-        reassurance: '¡Perfecto! La app te acompaña en tus primeros 5 partidos sin presión.',
-      },
-      {
-        level: 2,
-        score: 1,
-        badge: 'GOLPE BÁSICO',
-        title: 'Paso la pelota plana y juego sets ocasionales',
-        desc: 'Busco meter la bola dentro de la cancha; aún no uso mucho efecto ni estrategia.',
-        reassurance: 'Ideal para arrancar tus 5 partidos de prueba con rivales parejos.',
-      },
-      {
-        level: 3,
-        score: 2,
-        badge: 'EFECTO Y DIRECCIÓN',
-        title: 'Uso topspin o slice y juego sets seguido',
-        desc: 'Dirijo cruzado o paralelo, juego partidos de club y manejo bien el marcador.',
-        reassurance: '¡Tienes ritmo real de partido! Te sentirás como en casa en nuestra cartelera.',
-      },
-      {
-        level: 4,
-        score: 3,
-        badge: 'NIVEL TORNEO',
-        title: 'Compito en cuadros con estrategia y efectos',
-        desc: 'Controlo altura, profundidad, cambio de ritmo y manejo la presión en tie-breaks.',
-        reassurance: 'Perfil competitivo confirmado: arrancas listo para desafiar a los líderes.',
-      },
-    ],
-  },
-];
-
-function computeCalibrationSeed(answersMap) {
-  const totalScore = CALIBRATION_FLASHCARDS.reduce((acc, card) => {
-    const picked = answersMap[card.id];
-    return acc + (picked ? Number(picked.score) || 0 : 0);
-  }, 0);
-
-  if (totalScore <= 2) {
-    return {
-      points: 300,
-      headline: 'Ritmo Inicial · Bienvenida sin presión',
-      summary: 'Arrancas en la base ideal para disfrutar tus primeros peloteos y partidos en cancha.',
-    };
-  }
-  if (totalScore <= 5) {
-    return {
-      points: 850,
-      headline: 'Ritmo En Progreso · Base Firme',
-      summary: 'Ya pasas la bola con soltura y estás listo para disputar partidos con rivales de tu mismo paso.',
-    };
-  }
-  if (totalScore <= 8) {
-    return {
-      points: 1450,
-      headline: 'Ritmo Consolidado de Club',
-      summary: 'Mantienes peloteos largos y juegas sets completos. Tus primeros 5 partidos de prueba afinarán tu puesto oficial.',
-    };
-  }
-  if (totalScore <= 10) {
-    return {
-      points: 2200,
-      headline: 'Ritmo Competitivo de Cancha',
-      summary: 'Buen control de golpes y ritmo real de partido. Estás en zona competitiva para escalar rápido.',
-    };
-  }
-  return {
-    points: Math.min(3100, AUTH_ONBOARDING_EDITABLE_CONFIG.maxSeedPointsFromQuiz),
-    headline: 'Ritmo Avanzado · Desafío de Altura',
-    summary: 'Arrancas en el tope provisional del cuestionario. Tus 5 partidos de prueba validarán tu entrada a la zona alta.',
-  };
-}
-
 function generateMathCaptcha() {
   const a = Math.floor(Math.random() * 19) + 11;
   const b = Math.floor(Math.random() * 19) + 10;
@@ -280,7 +74,11 @@ function maskEmailSafely(email = '') {
 }
 
 function translateAuthError(rawError) {
-  const msg = String(rawError?.message || rawError || '').toLowerCase();
+  const raw = String(rawError?.message || rawError || '').trim();
+  const msg = raw.toLowerCase();
+  if (msg.includes('código de emancipación') || msg.includes('emancipación')) {
+    return raw;
+  }
   if (msg.includes('invalid login credentials')) {
     return 'Correo o contraseña incorrectos. Verifica tus datos o recupera tu cuenta abajo.';
   }
@@ -309,60 +107,6 @@ function mapAvailabilityLabel(slotId) {
 }
 
 /* ==========================================================================
-   ILUSTRACIÓN SVG DE MINI-CANCHA POR TARJETA
-   ========================================================================== */
-function FlashCardCourtIllustration({ scene = 'net', selectedLevel = 0 }) {
-  const accent = selectedLevel >= 3 ? '#00DC7D' : selectedLevel === 2 ? '#38BDF8' : '#E5C16C';
-
-  return (
-    <div className="tt-fc-svg-stage" aria-hidden="true">
-      <svg viewBox="0 0 280 96" fill="none" className="tt-fc-svg">
-        <rect x="4" y="6" width="272" height="84" rx="16" fill="#18052B" stroke="rgba(250,249,245,0.14)" strokeWidth="1.5" />
-        <rect x="24" y="18" width="232" height="60" rx="6" stroke="rgba(250,249,245,0.22)" strokeWidth="1.5" />
-        <line x1="140" y1="14" x2="140" y2="82" stroke="#FAF9F5" strokeWidth="2.5" strokeDasharray="4 3" />
-        <line x1="78" y1="18" x2="78" y2="78" stroke="rgba(250,249,245,0.16)" strokeWidth="1.2" />
-        <line x1="202" y1="18" x2="202" y2="78" stroke="rgba(250,249,245,0.16)" strokeWidth="1.2" />
-        <line x1="78" y1="48" x2="202" y2="48" stroke="rgba(250,249,245,0.16)" strokeWidth="1.2" />
-
-        {scene === 'net' && (
-          <>
-            <path d="M44 64 Q 140 12 232 54" stroke={accent} strokeWidth="3" strokeDasharray="6 4" strokeLinecap="round" />
-            <circle cx="44" cy="64" r="6" fill="#FAF9F5" />
-            <circle cx="232" cy="54" r="7" fill={accent} className="tt-fc-ball-pulse" />
-          </>
-        )}
-
-        {scene === 'serve' && (
-          <>
-            <path d="M28 68 Q 108 14 176 34" stroke={accent} strokeWidth="3.2" strokeLinecap="round" />
-            <rect x="140" y="18" width="62" height="30" fill="rgba(0,220,125,0.16)" stroke="#00DC7D" strokeWidth="1.5" />
-            <circle cx="28" cy="68" r="5.5" fill="#FAF9F5" />
-            <circle cx="176" cy="34" r="7" fill={accent} className="tt-fc-ball-pulse" />
-          </>
-        )}
-
-        {scene === 'rally' && (
-          <>
-            <path d="M42 28 L 236 66 L 46 68 L 234 28" stroke={accent} strokeWidth="2.6" strokeDasharray="5 4" strokeLinecap="round" strokeLinejoin="round" />
-            <circle cx="234" cy="28" r="7" fill={accent} className="tt-fc-ball-pulse" />
-            <circle cx="46" cy="68" r="5" fill="#FAF9F5" />
-          </>
-        )}
-
-        {scene === 'trophy' && (
-          <>
-            <path d="M38 66 Q 138 14 238 30" stroke="#00DC7D" strokeWidth="2.8" strokeLinecap="round" />
-            <path d="M38 30 Q 138 72 238 62" stroke="#E5C16C" strokeWidth="2.4" strokeDasharray="5 4" strokeLinecap="round" />
-            <circle cx="238" cy="30" r="6.5" fill="#00DC7D" className="tt-fc-ball-pulse" />
-            <circle cx="238" cy="62" r="5.5" fill="#E5C16C" />
-          </>
-        )}
-      </svg>
-    </div>
-  );
-}
-
-/* ==========================================================================
    COMPONENTE PRINCIPAL: AuthAndOnboardingModal (BOTTOM-SHEET z-index 9500)
    ========================================================================== */
 export default function AuthAndOnboardingModal({
@@ -377,7 +121,7 @@ export default function AuthAndOnboardingModal({
   onNotify,
 }) {
   const [accountKind, setAccountKind] = useState('player'); // 'player' | 'partner'
-  const [viewMode, setViewMode] = useState(initialMode); // 'login' | 'register' | 'forgot' | 'flashcards' | 'result' | 'verifyEmail'
+  const [viewMode, setViewMode] = useState(initialMode); // 'login' | 'register' | 'forgot' | 'claim18' | 'flashcards' | 'result' | 'verifyEmail'
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [inlineError, setInlineError] = useState('');
@@ -390,7 +134,7 @@ export default function AuthAndOnboardingModal({
   const [loginPassword, setLoginPassword] = useState('');
   const [showLoginPass, setShowLoginPass] = useState(false);
 
-  // Registro Tenista
+  // Registro Tenista (+18 o Solo Padre/Madre Tutor)
   const [regFirstName, setRegFirstName] = useState('');
   const [regLastName, setRegLastName] = useState('');
   const [regEmail, setRegEmail] = useState('');
@@ -403,6 +147,7 @@ export default function AuthAndOnboardingModal({
   const [regAvailability, setRegAvailability] = useState('noche');
   const [regPassword, setRegPassword] = useState('');
   const [showRegPass, setShowRegPass] = useState(false);
+  const [regTutorOnly, setRegTutorOnly] = useState(false);
   // OBLIGATORIO INDECOPI / LEY N° 29733: Siempre arranca desmarcado
   const [regLegalAccepted, setRegLegalAccepted] = useState(false);
 
@@ -441,6 +186,7 @@ export default function AuthAndOnboardingModal({
     setIsSubmitting(false);
     setRegLegalAccepted(false);
     setRegWhatsappConfirmed(false);
+    setRegTutorOnly(false);
     setCaptcha(generateMathCaptcha());
     setCaptchaInput('');
     setRecoveryTab('password');
@@ -487,7 +233,7 @@ export default function AuthAndOnboardingModal({
       return { valid: false, message: 'Confirma que tu celular de WhatsApp es correcto' };
     }
     if (!numericAge || numericAge < AUTH_ONBOARDING_EDITABLE_CONFIG.minAgeAllowed || numericAge > 90) {
-      return { valid: false, message: 'Registro exclusivo para mayores de 18 años' };
+      return { valid: false, message: 'Registro titular exclusivo para mayores de 18 años' };
     }
     if (regPassword.length < 6) {
       return { valid: false, message: 'Crea una contraseña (mín. 6 caracteres)' };
@@ -498,7 +244,12 @@ export default function AuthAndOnboardingModal({
     if (!regLegalAccepted) {
       return { valid: false, message: 'Marca los Términos y Privacidad para seguir' };
     }
-    return { valid: true, message: 'Continuar a las 4 Tarjetas Rápidas →' };
+    return {
+      valid: true,
+      message: regTutorOnly
+        ? 'Crear Cuenta de Padre / Tutor →'
+        : 'Continuar a las 4 Tarjetas Rápidas →',
+    };
   }, [
     regFirstName,
     regLastName,
@@ -510,10 +261,11 @@ export default function AuthAndOnboardingModal({
     captchaInput,
     captcha,
     regLegalAccepted,
+    regTutorOnly,
   ]);
 
   const demoPlayersForQuickLogin = useMemo(
-    () => (players || []).filter((p) => p.isDemo).slice(0, 4),
+    () => (players || []).filter((p) => p.isDemo && !p.isTutelado).slice(0, 4),
     [players]
   );
 
@@ -527,7 +279,7 @@ export default function AuthAndOnboardingModal({
   };
 
   /* ------------------------------------------------------------------------
-     1. INICIO DE SESIÓN REAL (CORREO O CELULAR REGISTRADO)
+     1. INICIO DE SESIÓN REAL (CORREO O CELULAR REGISTRADO · PROTEGE MENORES)
      ------------------------------------------------------------------------ */
   const handlePlayerLoginSubmit = async (e) => {
     e.preventDefault();
@@ -545,6 +297,7 @@ export default function AuthAndOnboardingModal({
     if (!targetEmail.includes('@')) {
       const digits = rawId.replace(/\D/g, '');
       const matchedByPhone = (players || []).find((p) => {
+        if (p.isTutelado) return false;
         const pDigits = String(p.whatsapp || '').replace(/\D/g, '');
         return digits.length >= 9 && pDigits && pDigits.endsWith(digits.slice(-9));
       });
@@ -572,7 +325,7 @@ export default function AuthAndOnboardingModal({
 
       let matchedPlayer =
         (players || []).find((p) => authId && p.authId === authId) ||
-        (players || []).find((p) => String(p.email || '').toLowerCase() === targetEmail) ||
+        (players || []).find((p) => !p.isTutelado && String(p.email || '').toLowerCase() === targetEmail) ||
         null;
 
       if (!matchedPlayer && authUser) {
@@ -588,16 +341,18 @@ export default function AuthAndOnboardingModal({
           division: meta.division || 'Varones',
           clubId: meta.clubId || 'independiente',
           clubName: meta.clubName || 'Independiente',
-          points: 1200,
+          points: meta.isTutorOnly ? 300 : 1200,
           wins: 0,
           losses: 0,
           streak: 0,
-          calibrationPlayed: 0,
+          calibrationPlayed: meta.isTutorOnly ? 5 : 0,
           gems: AUTH_ONBOARDING_EDITABLE_CONFIG.welcomeGems,
           isVip: false,
           vipStatus: 'STANDARD',
           isAdmin: false,
           isDemo: false,
+          isTutelado: false,
+          isTutorOnly: Boolean(meta.isTutorOnly),
           hand: meta.hand || 'Diestro',
           backhand: '2 manos',
           weapon: 'Derecha',
@@ -630,7 +385,7 @@ export default function AuthAndOnboardingModal({
   };
 
   /* ------------------------------------------------------------------------
-     2. PORTAL ALIADOS (COACHES & CLUBES)
+     2. PORTAL ALIADOS (COACHES & CLUBES · 8 PINs)
      ------------------------------------------------------------------------ */
   const handlePartnerLoginSubmit = (e) => {
     e.preventDefault();
@@ -652,8 +407,112 @@ export default function AuthAndOnboardingModal({
   };
 
   /* ------------------------------------------------------------------------
-     3. REGISTRO PASO 1 -> TARJETAS RÁPIDAS -> SUPABASE AUTH + PROFILES
+     3. REGISTRO (+18): DIRECTO SI ES "SOLO PADRE/TUTOR" O 4 TARJETAS RÁPIDAS
      ------------------------------------------------------------------------ */
+  const executeCloudRegistration = async (base, seedPoints, isTutorOnlyFlag = false) => {
+    if (isSubmitting) return;
+    setInlineError('');
+    setIsSubmitting(true);
+
+    try {
+      const signUpRes = await signUpCloudAccount({
+        email: base.email,
+        password: base.password,
+        metadata: {
+          name: base.name,
+          whatsapp: base.whatsapp,
+          age: base.age,
+          division: base.division,
+          clubId: base.clubId,
+          clubName: base.clubName,
+          hand: base.hand,
+          isTutorOnly: isTutorOnlyFlag,
+        },
+      });
+
+      const authUser = signUpRes?.user;
+      const hasImmediateSession = Boolean(signUpRes?.session);
+      const authId = authUser?.id || null;
+
+      const newPlayer = {
+        id: authId || `player-${Date.now()}`,
+        authId,
+        credentialId: `TT-${new Date().getFullYear()}-${String(
+          Math.floor(1000 + Math.random() * 8999)
+        )}`,
+        name: base.name,
+        email: base.email,
+        whatsapp: normalizePeruPhone(base.whatsapp),
+        showWhatsapp: true,
+        hideWhatsapp: false,
+        age: base.age,
+        division: base.division,
+        clubId: base.clubId,
+        clubName: base.clubName,
+        hand: base.hand,
+        backhand: '2 manos',
+        weapon: 'Derecha',
+        bestStroke: 'Derecha (Forehand)',
+        bestStrokes: ['Derecha (Forehand)'],
+        availability: base.availabilityLabel,
+        availabilityDays: base.availabilityDays,
+        availabilityTimes: [base.availabilitySlot],
+        points: isTutorOnlyFlag ? 300 : seedPoints,
+        wins: 0,
+        losses: 0,
+        streak: 0,
+        calibrationPlayed: isTutorOnlyFlag ? 5 : 0,
+        rankTrend: 0,
+        gems: AUTH_ONBOARDING_EDITABLE_CONFIG.welcomeGems,
+        weeklyGemsEarned: 0,
+        isVip: false,
+        vipStatus: 'STANDARD',
+        isAdmin: false,
+        isPaused: false,
+        isDemo: false,
+        isTutelado: false,
+        isTutorOnly: isTutorOnlyFlag,
+        avatar: '',
+        coverScenario: 'default',
+        unlockedScenarios: ['default'],
+        unlockedBadges: [],
+        activeBadgeId: '',
+        unlockedVideos: [],
+      };
+
+      if (!hasImmediateSession) {
+        await upsertCloudPlayer(newPlayer).catch(() => {});
+        setVerifyTargetEmail(base.email);
+        setViewMode('verifyEmail');
+        triggerHaptic('success');
+        if (onNotify) {
+          onNotify('Te enviamos un correo para confirmar tu cuenta.', 'success');
+        }
+        return;
+      }
+
+      triggerHaptic('success');
+      triggerSmoothSuccess(() => {
+        if (onRegisterComplete) onRegisterComplete(newPlayer);
+        if (onNotify) {
+          onNotify(
+            isTutorOnlyFlag
+              ? '¡Cuenta Padre/Tutor lista! Ahora entra a Perfil para afiliar a tus hijos (-18).'
+              : `¡Cuenta creada! Recibiste +${AUTH_ONBOARDING_EDITABLE_CONFIG.welcomeGems} Gemas de bienvenida.`,
+            'success'
+          );
+        }
+      });
+    } catch (err) {
+      triggerHaptic('warning');
+      const friendly = translateAuthError(err);
+      setInlineError(friendly);
+      if (onNotify) onNotify(friendly, 'warning');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleStartCalibrationQuiz = (e) => {
     e.preventDefault();
     setInlineError('');
@@ -666,7 +525,7 @@ export default function AuthAndOnboardingModal({
 
     const cleanEmail = regEmail.trim().toLowerCase();
     const exists = (players || []).some(
-      (p) => !p.isDemo && String(p.email || '').toLowerCase() === cleanEmail
+      (p) => !p.isDemo && !p.isTutelado && String(p.email || '').toLowerCase() === cleanEmail
     );
     if (exists) {
       triggerHaptic('warning');
@@ -675,7 +534,7 @@ export default function AuthAndOnboardingModal({
     }
 
     const chosenClub = (clubs || []).find((c) => c.id === regClubId);
-    setPendingRegisteredData({
+    const draftBase = {
       firstName: regFirstName.trim(),
       lastName: regLastName.trim(),
       name: `${regFirstName.trim()} ${regLastName.trim()}`,
@@ -690,7 +549,15 @@ export default function AuthAndOnboardingModal({
       availabilityLabel: mapAvailabilityLabel(regAvailability),
       availabilityDays: ['M', 'J', 'S'],
       password: regPassword,
-    });
+    };
+
+    setPendingRegisteredData(draftBase);
+
+    // Si es Solo Padre / Tutor, crea su cuenta de inmediato sin forzar el cuestionario tenístico
+    if (regTutorOnly) {
+      executeCloudRegistration(draftBase, 300, true);
+      return;
+    }
 
     triggerHaptic('medium');
     setFcIndex(0);
@@ -723,97 +590,66 @@ export default function AuthAndOnboardingModal({
   };
 
   const calibrationResult = useMemo(() => {
-    const seed = computeCalibrationSeed(fcAnswers);
+    const seed = computeCalibrationSeed(fcAnswers, AUTH_ONBOARDING_EDITABLE_CONFIG.maxSeedPointsFromQuiz);
     const cat = getCategoryByPoints(seed.points);
     return { ...seed, category: cat };
   }, [fcAnswers]);
 
-  const handleFinalizeRegistration = async () => {
-    if (isSubmitting || !pendingRegisteredData) return;
+  const handleFinalizeRegistration = () => {
+    if (!pendingRegisteredData) return;
+    executeCloudRegistration(pendingRegisteredData, calibrationResult.points, false);
+  };
+
+  /* ------------------------------------------------------------------------
+     4. EMANCIPACIÓN +18 (RECLAMAR CUENTA TUTELADA SIN PERDER PUNTOS)
+     ------------------------------------------------------------------------ */
+  const handleClaimEmancipationSubmit = async ({ code, email, whatsapp, password }) => {
+    if (isSubmitting) return;
     setInlineError('');
     setIsSubmitting(true);
 
-    const base = pendingRegisteredData;
     try {
-      const signUpRes = await signUpCloudAccount({
-        email: base.email,
-        password: base.password,
-        metadata: {
-          name: base.name,
-          whatsapp: base.whatsapp,
-          age: base.age,
-          division: base.division,
-          clubId: base.clubId,
-          clubName: base.clubName,
-          hand: base.hand,
-        },
+      if (!isCloudReady) {
+        throw new Error('Necesitas conexión a internet para transferir tu cuenta.');
+      }
+
+      const authRes = await signUpCloudAccount({
+        email,
+        password,
+        metadata: { emancipatedFromCode: code },
+      });
+      const authId = authRes?.user?.id;
+      if (!authId) {
+        throw new Error('No se pudo crear tu acceso independiente. Intenta de nuevo.');
+      }
+
+      const claimedProfile = await claimEmancipatedProfile({
+        code,
+        authId,
+        email,
+        whatsapp,
       });
 
-      const authUser = signUpRes?.user;
-      const hasImmediateSession = Boolean(signUpRes?.session);
-      const authId = authUser?.id || null;
-
-      const newPlayer = {
-        id: authId || `player-${Date.now()}`,
-        authId,
-        credentialId: `TT-${new Date().getFullYear()}-${String(
-          Math.floor(1000 + Math.random() * 8999)
-        )}`,
-        name: base.name,
-        email: base.email,
-        whatsapp: normalizePeruPhone(base.whatsapp),
-        showWhatsapp: true,
-        hideWhatsapp: false,
-        age: base.age,
-        division: base.division,
-        clubId: base.clubId,
-        clubName: base.clubName,
-        hand: base.hand,
-        backhand: '2 manos',
-        weapon: 'Derecha',
-        bestStroke: 'Derecha (Forehand)',
-        bestStrokes: ['Derecha (Forehand)'],
-        availability: base.availabilityLabel,
-        availabilityDays: base.availabilityDays,
-        availabilityTimes: [base.availabilitySlot],
-        points: calibrationResult.points,
-        wins: 0,
-        losses: 0,
-        streak: 0,
-        calibrationPlayed: 0,
-        rankTrend: 0,
-        gems: AUTH_ONBOARDING_EDITABLE_CONFIG.welcomeGems,
-        weeklyGemsEarned: 0,
-        isVip: false,
-        vipStatus: 'STANDARD',
-        isAdmin: false,
-        isPaused: false,
-        isDemo: false,
-        avatar: '',
-        coverScenario: 'default',
-        unlockedScenarios: ['default'],
-        unlockedBadges: [],
-        activeBadgeId: '',
-        unlockedVideos: [],
-      };
+      const hasImmediateSession = Boolean(authRes?.session);
+      triggerHaptic('success');
 
       if (!hasImmediateSession) {
-        await upsertCloudPlayer(newPlayer).catch(() => {});
-        setVerifyTargetEmail(base.email);
+        setVerifyTargetEmail(email);
         setViewMode('verifyEmail');
-        triggerHaptic('success');
         if (onNotify) {
-          onNotify('Te enviamos un correo para confirmar tu cuenta.', 'success');
+          onNotify('Tu historial fue transferido. Confirma tu correo para iniciar sesión.', 'success');
         }
         return;
       }
 
-      triggerHaptic('success');
       triggerSmoothSuccess(() => {
-        if (onRegisterComplete) onRegisterComplete(newPlayer);
+        if (onRegisterComplete) onRegisterComplete(claimedProfile);
+        else if (onLoginSuccess) onLoginSuccess(claimedProfile);
         if (onNotify) {
           onNotify(
-            `¡Cuenta creada! Recibiste +${AUTH_ONBOARDING_EDITABLE_CONFIG.welcomeGems} Gemas de bienvenida.`,
+            `¡Cuenta independiente +18 activada! Conservaste tus ${Number(
+              claimedProfile.points || 0
+            ).toLocaleString('es-PE')} pts e historial.`,
             'success'
           );
         }
@@ -829,7 +665,7 @@ export default function AuthAndOnboardingModal({
   };
 
   /* ------------------------------------------------------------------------
-     4. RECUPERACIÓN COMPLETA: CONTRASEÑA + CORREO OLVIDADO POR CELULAR
+     5. RECUPERACIÓN COMPLETA: CONTRASEÑA + CORREO OLVIDADO POR CELULAR
      ------------------------------------------------------------------------ */
   const handleSendResetEmail = async (e, overrideEmail = null) => {
     if (e) e.preventDefault();
@@ -875,6 +711,7 @@ export default function AuthAndOnboardingModal({
 
     const last9 = digits.slice(-9);
     const match = (players || []).find((p) => {
+      if (p.isTutelado) return false;
       const pDigits = String(p.whatsapp || '').replace(/\D/g, '');
       return pDigits.length >= 9 && pDigits.endsWith(last9) && p.email;
     });
@@ -902,7 +739,8 @@ export default function AuthAndOnboardingModal({
     viewMode === 'register' ||
     viewMode === 'flashcards' ||
     viewMode === 'result' ||
-    viewMode === 'verifyEmail';
+    viewMode === 'verifyEmail' ||
+    viewMode === 'claim18';
 
   return createPortal(
     <div
@@ -946,11 +784,17 @@ export default function AuthAndOnboardingModal({
                   onClick={() => {
                     triggerHaptic('light');
                     setInlineError('');
-                    if (viewMode === 'forgot' || viewMode === 'verifyEmail') setViewMode('login');
-                    else if (viewMode === 'flashcards' && fcIndex > 0) setFcIndex((i) => i - 1);
-                    else if (viewMode === 'flashcards') setViewMode('register');
-                    else if (viewMode === 'result') setViewMode('flashcards');
-                    else if (onClose) onClose();
+                    if (viewMode === 'forgot' || viewMode === 'verifyEmail' || viewMode === 'claim18') {
+                      setViewMode('login');
+                    } else if (viewMode === 'flashcards' && fcIndex > 0) {
+                      setFcIndex((i) => i - 1);
+                    } else if (viewMode === 'flashcards') {
+                      setViewMode('register');
+                    } else if (viewMode === 'result') {
+                      setViewMode('flashcards');
+                    } else if (onClose) {
+                      onClose();
+                    }
                   }}
                 >
                   ‹ {viewMode === 'login' ? 'Volver' : 'Atrás'}
@@ -1031,7 +875,7 @@ export default function AuthAndOnboardingModal({
                           setAccountKind('player');
                         }}
                       >
-                        Soy Tenista
+                        Soy Tenista / Padre
                       </button>
                       <button
                         type="button"
@@ -1062,7 +906,7 @@ export default function AuthAndOnboardingModal({
                   <form onSubmit={handlePartnerLoginSubmit} className="tt-auth-form">
                     <h1 className="tt-auth-h1">Estudio Coach & Clubes</h1>
                     <p className="tt-auth-lead">
-                      Ingresa con tu clave de Aliado para gestionar horarios libres de hoy, paquetes, fotos y promociones.
+                      Ingresa con tu clave de Aliado para gestionar horarios libres de hoy, paquetes, fotos, videos y promociones.
                     </p>
 
                     <div className="tt-auth-field">
@@ -1100,12 +944,12 @@ export default function AuthAndOnboardingModal({
                   </form>
                 )}
 
-                {/* VISTA B: LOGIN DE TENISTA */}
+                {/* VISTA B: LOGIN DE TENISTA / PADRE */}
                 {accountKind === 'player' && viewMode === 'login' && (
                   <div className="tt-auth-form">
                     <h1 className="tt-auth-h1">Inicia sesión</h1>
                     <p className="tt-auth-lead">
-                      Entra con tu correo o celular para lanzar retos, reportar clima y canjear tus Gemas.
+                      Entra con tu correo o celular para lanzar retos, gestionar subcuentas juveniles y canjear tus Gemas.
                     </p>
 
                     <form onSubmit={handlePlayerLoginSubmit} className="tt-auth-inner-form">
@@ -1182,7 +1026,27 @@ export default function AuthAndOnboardingModal({
                         setViewMode('register');
                       }}
                     >
-                      Crear cuenta gratis en 1 minuto
+                      Crear cuenta gratis (+18 / Padre Tutor)
+                    </button>
+
+                    {/* ACCESO ARMONIZADO DE EMANCIPACIÓN +18 */}
+                    <button
+                      type="button"
+                      className="tt-auth-claim18-card"
+                      onClick={() => {
+                        triggerHaptic('light');
+                        setInlineError('');
+                        setViewMode('claim18');
+                      }}
+                    >
+                      <span className="tt-claim18-icon" aria-hidden="true">
+                        <TTIcon name="shield" size={16} />
+                      </span>
+                      <div className="tt-claim18-copy">
+                        <strong>¿Cumpliste 18 años? Reclama tu cuenta</strong>
+                        <small>Transfiere tu perfil tutelado con el código de tu padre sin perder puntos.</small>
+                      </div>
+                      <span className="tt-claim18-arrow" aria-hidden="true">→</span>
                     </button>
 
                     {AUTH_ONBOARDING_EDITABLE_CONFIG.enableDemoQuickLogin &&
@@ -1209,12 +1073,12 @@ export default function AuthAndOnboardingModal({
                   </div>
                 )}
 
-                {/* VISTA C: REGISTRO GRATIS (+18 Y CHECKBOX LEGAL PERÚ) */}
+                {/* VISTA C: REGISTRO GRATIS (+18, OPCIÓN SOLO TUTOR Y CHECKBOX LEGAL PERÚ) */}
                 {accountKind === 'player' && viewMode === 'register' && (
                   <form onSubmit={handleStartCalibrationQuiz} className="tt-auth-form">
                     <h1 className="tt-auth-h1">Crea tu cuenta gratis</h1>
                     <p className="tt-auth-lead">
-                      Solo te toma 1 minuto. Luego responderás 4 tarjetas rápidas para juntarte con rivales de tu mismo ritmo.
+                      Exclusivo mayores de 18 años. Los menores participan mediante subcuenta tutelada desde el perfil del padre o madre.
                     </p>
 
                     <div className="tt-auth-grid-2">
@@ -1310,85 +1174,126 @@ export default function AuthAndOnboardingModal({
                           required
                         />
                       </div>
-                      <div className="tt-auth-field">
-                        <label>Rama</label>
-                        <div className="tt-auth-mini-pair">
-                          {['Varones', 'Damas'].map((div) => (
-                            <button
-                              key={div}
-                              type="button"
-                              className={`tt-mini-choice ${regDivision === div ? 'is-on' : ''}`}
-                              onClick={() => {
-                                triggerHaptic('light');
-                                setRegDivision(div);
-                              }}
-                            >
-                              {div}
-                            </button>
-                          ))}
+                      {!regTutorOnly ? (
+                        <div className="tt-auth-field">
+                          <label>Rama</label>
+                          <div className="tt-auth-mini-pair">
+                            {['Varones', 'Damas'].map((div) => (
+                              <button
+                                key={div}
+                                type="button"
+                                className={`tt-mini-choice ${regDivision === div ? 'is-on' : ''}`}
+                                onClick={() => {
+                                  triggerHaptic('light');
+                                  setRegDivision(div);
+                                }}
+                              >
+                                {div}
+                              </button>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    </div>
-
-                    <div className="tt-auth-grid-2">
-                      <div className="tt-auth-field">
-                        <label htmlFor="tt-reg-club">Club o Sede Habitual</label>
-                        <select
-                          id="tt-reg-club"
-                          className="tt-auth-input"
-                          value={regClubId}
-                          onChange={(e) => setRegClubId(e.target.value)}
-                        >
-                          <option value="independiente">Jugador Independiente</option>
-                          {(clubs || []).map((c) => (
-                            <option key={c.id} value={c.id}>
-                              {c.shortName || c.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="tt-auth-field">
-                        <label>Mano Hábil</label>
-                        <div className="tt-auth-mini-pair">
-                          {['Diestro', 'Zurdo'].map((h) => (
-                            <button
-                              key={h}
-                              type="button"
-                              className={`tt-mini-choice ${regHand === h ? 'is-on' : ''}`}
-                              onClick={() => {
-                                triggerHaptic('light');
-                                setRegHand(h);
-                              }}
-                            >
-                              {h}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="tt-auth-field">
-                      <label>¿En qué horario sueles jugar?</label>
-                      <div className="tt-auth-tri-pills">
-                        {[
-                          { id: 'manana', label: 'Mañanas' },
-                          { id: 'tarde', label: 'Tardes' },
-                          { id: 'noche', label: 'Noches / Fin sem.' },
-                        ].map((slot) => (
-                          <button
-                            key={slot.id}
-                            type="button"
-                            className={`tt-mini-choice ${regAvailability === slot.id ? 'is-on' : ''}`}
-                            onClick={() => {
-                              triggerHaptic('light');
-                              setRegAvailability(slot.id);
-                            }}
+                      ) : (
+                        <div className="tt-auth-field">
+                          <label htmlFor="tt-reg-club-tutor">Club habitual de tus hijos</label>
+                          <select
+                            id="tt-reg-club-tutor"
+                            className="tt-auth-input"
+                            value={regClubId}
+                            onChange={(e) => setRegClubId(e.target.value)}
                           >
-                            {slot.label}
-                          </button>
-                        ))}
-                      </div>
+                            <option value="independiente">Independiente</option>
+                            {(clubs || []).map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.shortName || c.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
                     </div>
+
+                    {/* OPCIÓN MODO SOLO PADRE / MADRE TUTOR (EN ARMONÍA CON EL DISEÑO EDITORIAL) */}
+                    <label className={`tt-tutor-mode-card ${regTutorOnly ? 'is-active' : ''}`}>
+                      <input
+                        type="checkbox"
+                        checked={regTutorOnly}
+                        onChange={(e) => {
+                          triggerHaptic('light');
+                          setRegTutorOnly(e.target.checked);
+                        }}
+                      />
+                      <div className="tt-tmc-copy">
+                        <strong>Soy solo Padre / Madre Tutor</strong>
+                        <span>
+                          No competiré en el ranking adulto; solo crearé y gestionaré la cuenta deportiva de mi hijo/a menor de 18 años.
+                        </span>
+                      </div>
+                    </label>
+
+                    {!regTutorOnly && (
+                      <>
+                        <div className="tt-auth-grid-2">
+                          <div className="tt-auth-field">
+                            <label htmlFor="tt-reg-club">Club o Sede Habitual</label>
+                            <select
+                              id="tt-reg-club"
+                              className="tt-auth-input"
+                              value={regClubId}
+                              onChange={(e) => setRegClubId(e.target.value)}
+                            >
+                              <option value="independiente">Jugador Independiente</option>
+                              {(clubs || []).map((c) => (
+                                <option key={c.id} value={c.id}>
+                                  {c.shortName || c.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="tt-auth-field">
+                            <label>Mano Hábil</label>
+                            <div className="tt-auth-mini-pair">
+                              {['Diestro', 'Zurdo'].map((h) => (
+                                <button
+                                  key={h}
+                                  type="button"
+                                  className={`tt-mini-choice ${regHand === h ? 'is-on' : ''}`}
+                                  onClick={() => {
+                                    triggerHaptic('light');
+                                    setRegHand(h);
+                                  }}
+                                >
+                                  {h}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="tt-auth-field">
+                          <label>¿En qué horario sueles jugar?</label>
+                          <div className="tt-auth-tri-pills">
+                            {[
+                              { id: 'manana', label: 'Mañanas' },
+                              { id: 'tarde', label: 'Tardes' },
+                              { id: 'noche', label: 'Noches / Fin sem.' },
+                            ].map((slot) => (
+                              <button
+                                key={slot.id}
+                                type="button"
+                                className={`tt-mini-choice ${regAvailability === slot.id ? 'is-on' : ''}`}
+                                onClick={() => {
+                                  triggerHaptic('light');
+                                  setRegAvailability(slot.id);
+                                }}
+                              >
+                                {slot.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    )}
 
                     <div className="tt-auth-field">
                       <label htmlFor="tt-reg-pass">Crea tu contraseña (mín. 6 caracteres)</label>
@@ -1475,11 +1380,12 @@ export default function AuthAndOnboardingModal({
 
                     <button
                       type="submit"
+                      disabled={isSubmitting}
                       className={`tt-auth-primary-pill ${
                         regValidation.valid ? 'is-purple' : 'is-disabled-hint'
                       }`}
                     >
-                      {regValidation.message}
+                      {isSubmitting ? 'Creando cuenta...' : regValidation.message}
                     </button>
                   </form>
                 )}
@@ -1663,6 +1569,20 @@ export default function AuthAndOnboardingModal({
                       </a>
                     </div>
                   </div>
+                )}
+
+                {/* VISTA D2: RECLAMAR CUENTA TUTELADA AL CUMPLIR 18 AÑOS */}
+                {viewMode === 'claim18' && (
+                  <ClaimEmancipationView
+                    isSubmitting={isSubmitting}
+                    onSubmitClaim={handleClaimEmancipationSubmit}
+                    onValidationError={(msg) => setInlineError(msg)}
+                    onOpenLegal={(doc) => setInlineLegalDoc(doc)}
+                    onBackToLogin={() => {
+                      setInlineError('');
+                      setViewMode('login');
+                    }}
+                  />
                 )}
 
                 {/* VISTA E: LAS 4 TARJETAS RÁPIDAS */}
@@ -1885,7 +1805,9 @@ export default function AuthAndOnboardingModal({
 
                 <div className="tt-auth-poster-bottom">
                   <h2>
-                    {isRegisterOrQuiz
+                    {viewMode === 'claim18'
+                      ? 'TU HISTORIAL JUVENIL AHORA ES 100 % TUYO'
+                      : isRegisterOrQuiz
                       ? 'CREA TU CUENTA GRATIS Y DESBLOQUEA TU CANCHA'
                       : 'ENTRA A CANCHA Y COMPITE EN VIVO'}
                   </h2>
@@ -1921,17 +1843,17 @@ export default function AuthAndOnboardingModal({
                 {inlineLegalDoc === 'terms' ? (
                   <>
                     <p><strong>1. Naturaleza del Servicio:</strong> TOTAL TENIS es una plataforma tecnológica deportiva de gestión de rankings, retos y torneos recreativos; no presta servicios médicos ni supervisión presencial permanente en sedes de terceros.</p>
-                    <p><strong>2. Exención de Responsabilidad Física:</strong> El usuario participa bajo su propia responsabilidad física. TOTAL TENIS queda exento de responsabilidad civil, médica o penal por lesiones o accidentes ocurridos en cancha.</p>
-                    <p><strong>3. Política de No Reembolso:</strong> Los pagos por torneos o membresía VIP son ventas directas finales y no son reembolsables por cancelación con menos de 24 h o inasistencia (walkover).</p>
-                    <p><strong>4. Derecho de Admisión y Sanciones:</strong> El Comité puede suspender o retirar cuentas por suplantación, arreglo de marcadores o conducta antideportiva.</p>
-                    <p><strong>5. Ranking Oficial:</strong> TOTAL TENIS administra el sistema de puntaje para garantizar la equidad competitiva del circuito.</p>
+                    <p><strong>2. Titularidad (+18) y Menores Tutelados:</strong> El registro directo es exclusivo para mayores de 18 años. Los menores participan únicamente mediante Subcuenta Tutelada administrada por su padre, madre o apoderado legal, con transferencia íntegra de puntos al cumplir 18 años.</p>
+                    <p><strong>3. Exención de Responsabilidad Física:</strong> El usuario (o el padre/tutor en el caso de menores) participa bajo su propia responsabilidad física. TOTAL TENIS queda exento de responsabilidad civil, médica o penal por lesiones o accidentes ocurridos en cancha.</p>
+                    <p><strong>4. Política de No Reembolso y Gemas:</strong> Los pagos por torneos o membresía VIP son ventas directas finales y no son reembolsables por cancelación con menos de 24 h o inasistencia (walkover). Las Gemas son puntos de fidelidad sin valor monetario ni equivalencia en soles.</p>
+                    <p><strong>5. Derecho de Admisión y Ranking Oficial:</strong> El Comité puede suspender o retirar cuentas por suplantación, arreglo de marcadores o conducta antideportiva, y administra las temporadas con cierre autónomo a las 00:00 y reinicio al piso de categoría.</p>
                   </>
                 ) : (
                   <>
                     <p><strong>1. Datos Recopilados:</strong> Nombre, celular WhatsApp, correo electrónico, foto de perfil, club, edad (+18) y resultados deportivos.</p>
-                    <p><strong>2. Finalidad:</strong> Operar el ranking oficial, coordinar partidos entre rivales autorizados, validar pagos y enviar avisos del circuito.</p>
-                    <p><strong>3. Privacidad de WhatsApp:</strong> Puedes restringir desde tus ajustes que tu teléfono solo sea visible para rivales con reto aceptado.</p>
-                    <p><strong>4. Derechos ARCO (Ley N° 29733):</strong> Puedes solicitar acceso, rectificación o eliminación definitiva de tus datos a través del soporte oficial de TOTAL TENIS.</p>
+                    <p><strong>2. Protección Especial de Menores (-18):</strong> En subcuentas tuteladas no almacenamos correo, contraseña ni teléfono propio del menor. Todo contacto deportivo se enruta exclusivamente al WhatsApp del padre/madre titular.</p>
+                    <p><strong>3. Finalidad y Privacidad de WhatsApp:</strong> Operar el ranking oficial, coordinar partidos entre rivales autorizados, validar pagos y enviar avisos del circuito. Puedes restringir tu teléfono desde tus ajustes.</p>
+                    <p><strong>4. Derechos ARCO (Ley N° 29733):</strong> Puedes solicitar acceso, rectificación o eliminación definitiva de tus datos a través del Libro de Reclamaciones o el soporte oficial de TOTAL TENIS.</p>
                   </>
                 )}
               </div>
@@ -2199,6 +2121,7 @@ export default function AuthAndOnboardingModal({
           color: #1E0734;
           font-size: 16px;
           font-weight: 600;
+          box-sizing: border-box;
         }
         .tt-auth-input:focus { outline: none; border-color: #00B365; background: #FFFFFF; }
         .tt-pass-wrap { position: relative; display: flex; align-items: center; }
@@ -2243,7 +2166,68 @@ export default function AuthAndOnboardingModal({
           cursor: pointer;
         }
         .tt-phone-confirm-check input,
-        .tt-legal-check input { width: 19px; height: 19px; margin-top: 2px; accent-color: #00B365; flex-shrink: 0; }
+        .tt-legal-check input,
+        .tt-tutor-mode-card input {
+          width: 19px;
+          height: 19px;
+          margin-top: 2px;
+          accent-color: #00B365;
+          flex-shrink: 0;
+        }
+
+        /* Tarjeta Solo Padre / Tutor en armonía con el diseño blanco/púrpura/esmeralda */
+        .tt-tutor-mode-card {
+          display: flex;
+          align-items: flex-start;
+          gap: 10px;
+          padding: 11px 13px;
+          border-radius: 15px;
+          background: #F6F4FA;
+          border: 1.5px solid rgba(30, 7, 52, 0.14);
+          color: #1E0734;
+          cursor: pointer;
+          transition: border-color 180ms ease, background-color 180ms ease;
+        }
+        .tt-tutor-mode-card.is-active {
+          background: #EEF8FF;
+          border-color: #0284C7;
+        }
+        .tt-tmc-copy { display: flex; flex-direction: column; gap: 2px; }
+        .tt-tmc-copy strong { font-size: 0.79rem; color: #1E0734; }
+        .tt-tmc-copy span { font-size: 0.71rem; line-height: 1.38; color: rgba(30, 7, 52, 0.74); }
+
+        /* Tarjeta de acceso Emancipación +18 en Login */
+        .tt-auth-claim18-card {
+          width: 100%;
+          padding: 11px 12px;
+          border-radius: 15px;
+          background: linear-gradient(135deg, #F6F4FA 0%, #EEF8FF 100%);
+          border: 1.5px solid rgba(30, 7, 52, 0.14);
+          color: #1E0734;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          text-align: left;
+          transition: transform 160ms cubic-bezier(0.22, 1.35, 0.36, 1), border-color 180ms ease;
+        }
+        .tt-auth-claim18-card:active { transform: scale(0.97); }
+        .tt-auth-claim18-card:hover { border-color: #00B365; }
+        .tt-claim18-icon {
+          width: 34px;
+          height: 34px;
+          border-radius: 11px;
+          background: #1E0734;
+          color: #00DC7D;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+        .tt-claim18-copy { flex: 1; min-width: 0; }
+        .tt-claim18-copy strong { display: block; font-size: 0.78rem; color: #1E0734; }
+        .tt-claim18-copy small { display: block; font-size: 0.69rem; line-height: 1.3; color: rgba(30, 7, 52, 0.72); margin-top: 1px; }
+        .tt-claim18-arrow { font-size: 0.95rem; font-weight: 900; color: #007A44; flex-shrink: 0; }
+
         .tt-captcha-box {
           display: flex;
           align-items: center;
