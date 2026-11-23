@@ -1056,9 +1056,13 @@ export default function TorneosView({
             </div>
 
             {/* Contador físico Split-Flap en tiempo real (hora Perú, nunca se reinicia) */}
-            <SeasonFlipCountdown
+           <SeasonFlipCountdown
               seasonNumber={safeSnapshots.currentSeason}
               year={safeSnapshots.year}
+              customEndDate={
+                (safeSnapshots.seasons.find((s) => s.number === safeSnapshots.currentSeason) || {})
+                  .endDate || null
+              }
             />
 
             {/* Pestañas limpias internas */}
