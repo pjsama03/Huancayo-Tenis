@@ -234,10 +234,10 @@ function FlipUnit({ value, label }) {
   );
 }
 
-function SeasonFlipCountdown({ seasonNumber = 4, year = 2026 }) {
+function SeasonFlipCountdown({ seasonNumber = 4, year = 2026, customEndDate = null }) {
   const targetMs = useMemo(
-    () => getRealSeasonTargetMs(seasonNumber, year),
-    [seasonNumber, year]
+    () => getRealSeasonTargetMs(seasonNumber, year, customEndDate),
+    [seasonNumber, year, customEndDate]
   );
   const [parts, setParts] = useState(() => computeRemainingParts(targetMs));
 
