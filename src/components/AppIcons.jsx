@@ -2,33 +2,45 @@ import React, { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 /* ==========================================================================
-   1. MAPA MAESTRO DE ACTIVOS (public/assets/)
-   Conserva el 100% de las rutas existentes + alias verificados de sedes.
+   CLOUDFLARE R2 · CDN DE VIDEOS MP4 ($0 HASTA 10 GB · TRÁFICO ILIMITADO)
+   ========================================================================== */
+export const R2_MEDIA_BASE_URL = 'https://pub-b9f6464ba7f04b679c870f63fb7997ff.r2.dev';
+
+export function resolveMediaUrl(url) {
+  if (typeof url !== 'string' || !url) return url;
+  if (url.startsWith('/assets/video-')) {
+    return `${R2_MEDIA_BASE_URL}/${url.replace(/^\/assets\//, '')}`;
+  }
+  return url;
+}
+
+/* ==========================================================================
+   1. MAPA MAESTRO DE ACTIVOS (IMÁGENES EN public/assets/ + VIDEOS EN R2)
    ========================================================================== */
 export const ASSETS = {
   // Identidad Oficial TOTAL TENIS
   logo: '/assets/logo-total-tenis.png',
   logoLight: '/assets/logo-total-tenis.png',
+  logoOscuro: '/assets/logo-total-tenis.png',
+  logoBlanco: '/assets/logo-total-tenis.png',
   splashDark: '/assets/splash-fondo-oscuro.jpg',
   bienvenidaClaro: '/assets/bienvenida-hero-claro.jpg',
   bienvenidaOscuro: '/assets/bienvenida-hero-oscuro.jpg',
   loginPoster: '/assets/login-poster-esmeralda.jpg',
   registroPoster: '/assets/registro-poster-purpura.jpg',
 
-  // Barra Inferior Definitiva (Tus 5 PNGs exactos)
+  // Barra Inferior Definitiva (5 PNGs)
   navRetos: '/assets/nav-retos.png',
   navRanking: '/assets/nav-ranking.png',
   navTorneos: '/assets/nav-torneos.png',
   navSedes: '/assets/nav-sedes.png',
   navPerfil: '/assets/nav-perfil.png',
 
-  // Escudos Oficiales de los 4 Clubes
+  // Escudos y Portadas Oficiales de los 4 Clubes
   clubCountry: '/assets/club-country-huancas.png',
   clubTauro: '/assets/club-tauro.png',
   clubRomina: '/assets/club-romina-cutipa.png',
   clubInkas: '/assets/club-los-inkas.png',
-
-  // Portadas Oficiales de las 4 Sedes
   sedeCountry: '/assets/sede-country-club.jpg',
   sedeRomina: '/assets/sede-romina-cutipa.jpg',
   sedeTauro: '/assets/sede-club-tauro.jpg',
@@ -52,11 +64,11 @@ export const ASSETS = {
   torneoDoblesValle: '/assets/torneo-dobles-valle.jpg',
   torneoMasterTop8: '/assets/torneo-master-top8.jpg',
 
-  // Trofeos Oficiales Transparentes
+  // Trofeos Oficiales
   trofeoCampeonGira: '/assets/trofeo-campeon-gira.png',
   trofeoMasterTop8: '/assets/trofeo-master-top8.png',
 
-  // Insignias de respaldo (ya no se muestran en vitrina ni tienda)
+  // Insignias de respaldo
   badgeInvicto: '/assets/badge-invicto.png',
   badgeMaestroTop8: '/assets/badge-maestro-top8.png',
   badgeMataGigantes: '/assets/badge-mata-gigantes.png',
@@ -85,13 +97,12 @@ export const ASSETS = {
   raquetaPro: '/assets/raqueta-3d-pro.png',
   raquetaOscura: '/assets/raqueta-3d-oscura.png',
 
-  // Ranuras Listas para Carnet VIP Canva Pro
+  // Carnet VIP
   carnetVipAnverso: '/assets/carnet-vip-anverso.png',
   carnetVipReverso: '/assets/carnet-vip-reverso.png',
 
-  // Ranuras Pro Shop
+  // Pro Shop
   proshopCuerda: '/assets/proshop-cuerda.png',
-  proshopEncordado: '/assets/proshop-encordado.png',
   proshopPelotas: '/assets/proshop-pelotas.png',
   proshopOvergrip: '/assets/proshop-overgrip.png',
   proshopAntivibrador: '/assets/proshop-antivibrador.png',
@@ -105,15 +116,15 @@ export const ASSETS = {
   gifCelebracion1: '/assets/gif-celebracion-1.gif',
   gifCelebracion2: '/assets/gif-celebracion-2.gif',
 
-  // Videos MP4 Bajo Demanda (preload="none" y playsInline)
-  videoCoachRodrigo: '/assets/video-coach-rodrigo.mp4',
-  videoCoachRomina: '/assets/video-coach-romina.mp4',
-  videoCoach3: '/assets/video-coach-demo-3.mp4',
-  videoCoach4: '/assets/video-coach-demo-4.mp4',
-  videoCircuito1: '/assets/video-circuito-horizontal.mp4',
-  videoCircuito2: '/assets/video-coach-horizontal-2.mp4',
-  videoCircuito3: '/assets/video-horizontal-3.mp4',
-  videoCircuito4: '/assets/video-horizontal-4.mp4',
+  // Videos MP4 servidos desde Cloudflare R2 (cero peso en Vercel)
+  videoCoachRodrigo: `${R2_MEDIA_BASE_URL}/video-coach-rodrigo.mp4`,
+  videoCoachRomina: `${R2_MEDIA_BASE_URL}/video-coach-romina.mp4`,
+  videoCoach3: `${R2_MEDIA_BASE_URL}/video-coach-demo-3.mp4`,
+  videoCoach4: `${R2_MEDIA_BASE_URL}/video-coach-demo-4.mp4`,
+  videoCircuito1: `${R2_MEDIA_BASE_URL}/video-circuito-horizontal.mp4`,
+  videoCircuito2: `${R2_MEDIA_BASE_URL}/video-coach-horizontal-2.mp4`,
+  videoCircuito3: `${R2_MEDIA_BASE_URL}/video-horizontal-3.mp4`,
+  videoCircuito4: `${R2_MEDIA_BASE_URL}/video-horizontal-4.mp4`,
 };
 
 /* ==========================================================================
@@ -136,7 +147,7 @@ export function triggerHaptic(type = 'light') {
 }
 
 /* ==========================================================================
-   3. HOOK SCROLL-REVEAL PROGRESIVO (CERO LAG EN GAMA BAJA)
+   3. HOOK SCROLL-REVEAL PROGRESIVO
    ========================================================================== */
 export function useScrollReveal(ref, { startRevealed = true } = {}) {
   const [progress, setProgress] = useState(startRevealed ? 1 : 0.25);
@@ -185,7 +196,7 @@ export function useScrollReveal(ref, { startRevealed = true } = {}) {
 }
 
 /* ==========================================================================
-   4. COMPONENTE <SmartImage /> (CARGA PRIORITARIA + AUTO-RESPALDO)
+   4. COMPONENTE <SmartImage /> (PRELOAD PRIORITARIO + AUTO-FALLBACK)
    ========================================================================== */
 function buildExtensionCandidates(src, fallbackSrc) {
   const list = [];
@@ -265,7 +276,7 @@ export function SmartImage({
       style={style}
       loading={priority ? 'eager' : 'lazy'}
       decoding={priority ? 'sync' : 'async'}
-      fetchPriority={priority ? 'high' : 'auto'}
+      fetchPriority={priority ? 'high' : undefined}
       onError={() => {
         if (idx + 1 < candidates.length) {
           setIdx(idx + 1);
@@ -279,84 +290,9 @@ export function SmartImage({
 }
 
 /* ==========================================================================
-   5. MOTOR UNIVERSAL <ModalPortal /> EN document.body
-   - SCROLL BLINDADO: jamás vuelve a scrollTop = 0 al interactuar dentro.
-   - CAPA AUTH EXCLUSIVA (isAuthLayer): siempre encima de cualquier modal.
-   - BOTTOM-SHEET SUAVE (isBottomSheet / isAuthLayer): desliza desde abajo.
+   5. MOTOR UNIVERSAL <ModalPortal /> (SCROLL BLINDADO + CAPA MÁXIMA AUTH)
    ========================================================================== */
 let openModalCount = 0;
-
-function ensureModalLayerStyles() {
-  if (typeof document === 'undefined') return;
-  if (document.getElementById('tt-portal-layer-styles')) return;
-
-  const styleEl = document.createElement('style');
-  styleEl.id = 'tt-portal-layer-styles';
-  styleEl.textContent = `
-    .tt-modal-backdrop.is-top-layer {
-      z-index: 2500 !important;
-    }
-    .tt-modal-backdrop.is-auth-layer {
-      z-index: 9500 !important;
-      animation: ttAuthBackdropIn 220ms ease-out both !important;
-    }
-    .tt-modal-backdrop.is-bottom-sheet {
-      align-items: flex-end !important;
-      padding: 0 !important;
-    }
-    .tt-modal-backdrop.is-bottom-sheet .tt-modal-sheet {
-      width: 100% !important;
-      max-width: 560px !important;
-      max-height: 90dvh !important;
-      border-radius: 28px 28px 0 0 !important;
-      margin: 0 auto !important;
-      padding-bottom: env(safe-area-inset-bottom, 0px);
-      animation: ttBottomSheetSlideUp 360ms cubic-bezier(0.22, 1.12, 0.36, 1) both !important;
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.24),
-        0 -16px 48px rgba(8, 1, 18, 0.55) !important;
-      backdrop-filter: blur(22px) saturate(160%) !important;
-      -webkit-backdrop-filter: blur(22px) saturate(160%) !important;
-    }
-    @media (min-width: 640px) {
-      .tt-modal-backdrop.is-bottom-sheet {
-        align-items: center !important;
-        padding: 18px !important;
-      }
-      .tt-modal-backdrop.is-bottom-sheet .tt-modal-sheet {
-        border-radius: 26px !important;
-        max-height: 88dvh !important;
-      }
-    }
-    .tt-sheet-grabber-wrap {
-      display: flex;
-      justify-content: center;
-      padding: 9px 0 2px;
-      flex-shrink: 0;
-    }
-    .tt-sheet-grabber {
-      width: 40px;
-      height: 4px;
-      border-radius: 999px;
-      background: rgba(148, 163, 184, 0.45);
-    }
-    .tt-modal-close-btn {
-      transition: transform 160ms cubic-bezier(0.22, 1.4, 0.36, 1), background-color 180ms ease;
-    }
-    .tt-modal-close-btn:active {
-      transform: scale(0.88);
-    }
-    @keyframes ttAuthBackdropIn {
-      from { opacity: 0; }
-      to { opacity: 1; }
-    }
-    @keyframes ttBottomSheetSlideUp {
-      from { opacity: 0.4; transform: translateY(100%); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-  `;
-  document.head.appendChild(styleEl);
-}
 
 export function ModalPortal({
   isOpen,
@@ -369,7 +305,6 @@ export function ModalPortal({
   isWide = false,
   isTopLayer = false,
   isAuthLayer = false,
-  isBottomSheet = false,
   forceDarkAdmin = false,
   hideHeader = false,
   headerExtra = null,
@@ -377,7 +312,6 @@ export function ModalPortal({
   const bodyRef = useRef(null);
   const onCloseRef = useRef(onClose);
 
-  // Mantener referencia actualizada sin re-disparar el efecto de apertura/scroll
   useEffect(() => {
     onCloseRef.current = onClose;
   }, [onClose]);
@@ -385,15 +319,12 @@ export function ModalPortal({
   useEffect(() => {
     if (!isOpen || typeof document === 'undefined') return undefined;
 
-    ensureModalLayerStyles();
-
     openModalCount += 1;
     const prevOverflow = document.body.style.overflow;
     if (openModalCount === 1) {
       document.body.style.overflow = 'hidden';
     }
 
-    // Solo al abrir el modal (transición false -> true), posicionar scroll al inicio
     const raf = window.requestAnimationFrame(() => {
       if (bodyRef.current) bodyRef.current.scrollTop = 0;
     });
@@ -415,13 +346,18 @@ export function ModalPortal({
 
   if (!isOpen || typeof document === 'undefined') return null;
 
-  const useSheetMode = Boolean(isBottomSheet || isAuthLayer);
+  const layerStyle = isAuthLayer
+    ? { zIndex: 9500 }
+    : isTopLayer
+    ? { zIndex: 2500 }
+    : undefined;
 
   return createPortal(
     <div
       className={`tt-modal-backdrop ${isFullscreen ? 'is-fullscreen' : ''} ${
         isTopLayer ? 'is-top-layer' : ''
-      } ${isAuthLayer ? 'is-auth-layer' : ''} ${useSheetMode ? 'is-bottom-sheet' : ''}`}
+      } ${isAuthLayer ? 'is-auth-layer' : ''}`}
+      style={layerStyle}
       role="dialog"
       aria-modal="true"
       aria-label={typeof title === 'string' ? title : 'Ventana TOTAL TENIS'}
@@ -438,12 +374,6 @@ export function ModalPortal({
         }`}
         onClick={(e) => e.stopPropagation()}
       >
-        {useSheetMode && (
-          <div className="tt-sheet-grabber-wrap" aria-hidden="true">
-            <span className="tt-sheet-grabber" />
-          </div>
-        )}
-
         {!hideHeader && (
           <div className="tt-modal-head">
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
@@ -488,7 +418,7 @@ export function ModalPortal({
                   aria-label="Cerrar ventana"
                   onClick={() => {
                     triggerHaptic('light');
-                    onClose();
+                    if (onCloseRef.current) onCloseRef.current();
                   }}
                 >
                   <TTIcon name="close" size={18} />
@@ -508,7 +438,7 @@ export function ModalPortal({
 }
 
 /* ==========================================================================
-   6. TARJETA DE ESTADO VACÍO (CON TUS ACTIVOS estado-vacio-claro / oscuro)
+   6. TARJETA DE ESTADO VACÍO
    ========================================================================== */
 export function EmptyStateCard({
   theme = 'dark',
@@ -565,14 +495,14 @@ export function EmptyStateCard({
 }
 
 /* ==========================================================================
-   7. LAURELES CEREMONIALES DE PODIO (#1 CHAMPÁN, #2 PLATA, #3 BRONCE)
+   7. LAURELES CEREMONIALES DE PODIO (#1 ORO, #2 PLATA, #3 BRONCE)
    ========================================================================== */
 export function LaurelBadge({ rank = 1, size = 56 }) {
   const uid = useId();
   const palettes = {
-    1: { a: '#FAF0CA', b: '#E5C16C', c: '#9A6B16', text: '#FAF0CA', glow: 'rgba(229,193,108,0.4)' },
-    2: { a: '#FFFFFF', b: '#CBD5E1', c: '#64748B', text: '#F8FAFC', glow: 'rgba(203,213,225,0.34)' },
-    3: { a: '#F5D8C6', b: '#C6835E', c: '#7C3D21', text: '#F5D8C6', glow: 'rgba(198,131,94,0.34)' },
+    1: { a: '#FAF0CA', b: '#E5C16C', c: '#A67C23', text: '#FFF4C2', glow: 'rgba(229,193,108,0.4)' },
+    2: { a: '#FFFFFF', b: '#CBD5E1', c: '#64748B', text: '#F8FAFC', glow: 'rgba(203,213,225,0.35)' },
+    3: { a: '#F5D8C6', b: '#D49A7A', c: '#8C4A2B', text: '#FCE2D2', glow: 'rgba(212,154,122,0.35)' },
   };
   const p = palettes[rank] || palettes[1];
   const gradId = `laurel-${rank}-${uid}`;
@@ -599,24 +529,14 @@ export function LaurelBadge({ rank = 1, size = 56 }) {
             <stop offset="100%" stopColor={p.c} />
           </linearGradient>
         </defs>
-        <path
-          d="M27 54C16 49 10 38 11 25C12 17 16 11 22 8"
-          stroke={`url(#${gradId})`}
-          strokeWidth="2.4"
-          strokeLinecap="round"
-        />
+        <path d="M27 54C16 49 10 38 11 25C12 17 16 11 22 8" stroke={`url(#${gradId})`} strokeWidth="2.4" strokeLinecap="round" />
         <ellipse cx="14" cy="43" rx="5.2" ry="2.6" transform="rotate(-35 14 43)" fill={`url(#${gradId})`} />
         <ellipse cx="10.5" cy="34" rx="5.4" ry="2.6" transform="rotate(-12 10.5 34)" fill={`url(#${gradId})`} />
         <ellipse cx="11.5" cy="24" rx="5.2" ry="2.5" transform="rotate(14 11.5 24)" fill={`url(#${gradId})`} />
         <ellipse cx="15.5" cy="15" rx="4.8" ry="2.4" transform="rotate(36 15.5 15)" fill={`url(#${gradId})`} />
         <ellipse cx="21" cy="49" rx="4.8" ry="2.3" transform="rotate(-55 21 49)" fill={`url(#${gradId})`} />
 
-        <path
-          d="M37 54C48 49 54 38 53 25C52 17 48 11 42 8"
-          stroke={`url(#${gradId})`}
-          strokeWidth="2.4"
-          strokeLinecap="round"
-        />
+        <path d="M37 54C48 49 54 38 53 25C52 17 48 11 42 8" stroke={`url(#${gradId})`} strokeWidth="2.4" strokeLinecap="round" />
         <ellipse cx="50" cy="43" rx="5.2" ry="2.6" transform="rotate(35 50 43)" fill={`url(#${gradId})`} />
         <ellipse cx="53.5" cy="34" rx="5.4" ry="2.6" transform="rotate(12 53.5 34)" fill={`url(#${gradId})`} />
         <ellipse cx="52.5" cy="24" rx="5.2" ry="2.5" transform="rotate(-14 52.5 24)" fill={`url(#${gradId})`} />
@@ -649,29 +569,29 @@ export function LaurelBadge({ rank = 1, size = 56 }) {
 }
 
 /* ==========================================================================
-   8. LIBRERÍA DE INSIGNIAS VECTORIALES DE DOBLE CAPA (ACABADO LIQUID GLASS)
+   8. LIBRERÍA DE INSIGNIAS VECTORIALES DE DOBLE CAPA
    ========================================================================== */
 export function IconBadge({ name, variant = 'emerald', size = 40 }) {
   const styles = {
     emerald: {
       bg: 'linear-gradient(135deg, #00DC7D 0%, #00A85D 100%)',
-      color: '#10021E',
-      shadow: 'inset 0 1px 0 rgba(255,255,255,0.45), 0 6px 16px rgba(0, 220, 125, 0.32)',
+      color: '#120321',
+      shadow: '0 6px 16px rgba(0, 220, 125, 0.32)',
     },
     gold: {
-      bg: 'linear-gradient(135deg, #F5E1A4 0%, #E5C16C 52%, #B5882B 100%)',
+      bg: 'linear-gradient(135deg, #F5E1A4 0%, #E5C16C 52%, #A67C23 100%)',
       color: '#1A1102',
-      shadow: 'inset 0 1px 0 rgba(255,255,255,0.5), 0 6px 16px rgba(229, 193, 108, 0.34)',
+      shadow: '0 6px 16px rgba(229, 193, 108, 0.32)',
     },
     purple: {
       bg: 'linear-gradient(135deg, #431870 0%, #1E0734 100%)',
       color: '#00DC7D',
-      shadow: 'inset 0 1px 0 rgba(255,255,255,0.22), 0 6px 16px rgba(30, 7, 52, 0.36)',
+      shadow: '0 6px 16px rgba(30, 7, 52, 0.34)',
     },
     clay: {
-      bg: 'linear-gradient(135deg, #DE8566 0%, #B44D2B 100%)',
+      bg: 'linear-gradient(135deg, #E07A5F 0%, #C85A32 100%)',
       color: '#FFFFFF',
-      shadow: 'inset 0 1px 0 rgba(255,255,255,0.34), 0 6px 16px rgba(180, 77, 43, 0.32)',
+      shadow: '0 6px 16px rgba(200, 90, 50, 0.32)',
     },
   };
   const v = styles[variant] || styles.emerald;
@@ -707,7 +627,6 @@ export function IconBadge({ name, variant = 'emerald', size = 40 }) {
 }
 
 export function TTIcon({ name, size = 20, className = '', style = {} }) {
-  const uid = useId();
   const common = {
     width: size,
     height: size,
@@ -719,117 +638,22 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
   };
 
   switch (name) {
-    case 'gem': {
-      const g1 = `gem-top-${uid}`;
-      const g2 = `gem-bot-${uid}`;
-      return (
-        <svg {...common}>
-          <defs>
-            <linearGradient id={g1} x1="3" y1="3" x2="21" y2="12" gradientUnits="userSpaceOnUse">
-              <stop offset="0%" stopColor="#A7F3D0" />
-              <stop offset="55%" stopColor="#00DC7D" />
-              <stop offset="100%" stopColor="#059669" />
-            </linearGradient>
-            <linearGradient id={g2} x1="4" y1="9" x2="20" y2="22" gradientUnits="userSpaceOnUse">
-              <stop offset="0%" stopColor="#34D399" />
-              <stop offset="50%" stopColor="#00B868" />
-              <stop offset="100%" stopColor="#065F46" />
-            </linearGradient>
-          </defs>
-          <polygon points="7,3 17,3 22,9.5 12,21.5 2,9.5" fill={`url(#${g2})`} />
-          <polygon points="7,3 17,3 22,9.5 2,9.5" fill={`url(#${g1})`} />
-          <polygon points="7,3 12,9.5 17,3" fill="rgba(255,255,255,0.42)" />
-          <polygon points="12,9.5 17,9.5 12,21.5" fill="rgba(0,0,0,0.16)" />
-          <polygon points="7,9.5 12,9.5 12,21.5" fill="rgba(255,255,255,0.22)" />
-          <path d="M5.5 7.5L8 4.5" stroke="#FFFFFF" strokeWidth="1.2" strokeLinecap="round" opacity="0.85" />
-        </svg>
-      );
-    }
-
-    case 'camera':
-      return (
-        <svg {...common}>
-          <path
-            d="M4.5 8.5C4.5 7.4 5.4 6.5 6.5 6.5H8.3L9.6 4.7C9.9 4.3 10.4 4 10.9 4H13.1C13.6 4 14.1 4.3 14.4 4.7L15.7 6.5H17.5C18.6 6.5 19.5 7.4 19.5 8.5V17.5C19.5 18.6 18.6 19.5 17.5 19.5H6.5C5.4 19.5 4.5 18.6 4.5 17.5V8.5Z"
-            fill="currentColor"
-            fillOpacity="0.16"
-            stroke="currentColor"
-            strokeWidth="1.9"
-            strokeLinejoin="round"
-          />
-          <circle cx="12" cy="13" r="3.2" stroke="currentColor" strokeWidth="1.9" />
-          <circle cx="16.8" cy="9.5" r="0.9" fill="currentColor" />
-        </svg>
-      );
-
-    case 'play':
-      return (
-        <svg {...common}>
-          <circle cx="12" cy="12" r="9" fill="currentColor" fillOpacity="0.16" stroke="currentColor" strokeWidth="1.9" />
-          <polygon points="10,8.5 16.5,12 10,15.5" fill="currentColor" />
-        </svg>
-      );
-
-    case 'lock':
-      return (
-        <svg {...common}>
-          <rect x="5" y="10.5" width="14" height="9.5" rx="2.5" fill="currentColor" fillOpacity="0.16" stroke="currentColor" strokeWidth="1.9" />
-          <path d="M8.2 10.5V7.8C8.2 5.7 9.9 4 12 4C14.1 4 15.8 5.7 15.8 7.8V10.5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
-          <circle cx="12" cy="15.2" r="1.3" fill="currentColor" />
-        </svg>
-      );
-
-    case 'externalLink':
-      return (
-        <svg {...common}>
-          <path d="M14 4.5H19.5V10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          <path d="M10.5 13.5L19.5 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-          <path d="M18 13.5V17.5C18 18.6 17.1 19.5 16 19.5H6.5C5.4 19.5 4.5 18.6 4.5 17.5V8C4.5 6.9 5.4 6 6.5 6H10.5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
-        </svg>
-      );
-
     case 'claimsBook':
       return (
         <svg {...common}>
-          <path
-            d="M4.5 5.5C4.5 4.1 5.6 3 7 3H18.5C19.3 3 20 3.7 20 4.5V18.5C20 19.3 19.3 20 18.5 20H7C5.6 20 4.5 18.9 4.5 17.5V5.5Z"
-            fill="currentColor"
-            fillOpacity="0.18"
-            stroke="currentColor"
-            strokeWidth="1.9"
-          />
+          <path d="M4.5 5.5C4.5 4.1 5.6 3 7 3H18.5C19.3 3 20 3.7 20 4.5V18.5C20 19.3 19.3 20 18.5 20H7C5.6 20 4.5 18.9 4.5 17.5V5.5Z" fill="currentColor" fillOpacity="0.18" stroke="currentColor" strokeWidth="1.9" />
           <path d="M8 3V20" stroke="currentColor" strokeWidth="1.7" />
-          <path d="M11 8.5H16.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-          <path d="M11 12H15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-          <path
-            d="M11.2 15.8L12.7 17.2L16.3 13.8"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
+          <path d="M11 8.5H16.5M11 12H15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          <path d="M11.2 15.8L12.7 17.2L16.3 13.8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       );
 
     case 'stories':
       return (
         <svg {...common}>
-          <rect
-            x="5.5"
-            y="2.5"
-            width="13"
-            height="19"
-            rx="3.2"
-            fill="currentColor"
-            fillOpacity="0.16"
-            stroke="currentColor"
-            strokeWidth="1.9"
-          />
+          <rect x="5.5" y="2.5" width="13" height="19" rx="3.2" fill="currentColor" fillOpacity="0.16" stroke="currentColor" strokeWidth="1.9" />
           <circle cx="12" cy="11.5" r="3.4" stroke="currentColor" strokeWidth="1.8" />
-          <path
-            d="M17.5 4.2L18.4 6L20.2 6.8L18.4 7.6L17.5 9.4L16.6 7.6L14.8 6.8L16.6 6L17.5 4.2Z"
-            fill="currentColor"
-          />
+          <path d="M17.5 4.2L18.4 6L20.2 6.8L18.4 7.6L17.5 9.4L16.6 7.6L14.8 6.8L16.6 6L17.5 4.2Z" fill="currentColor" />
           <path d="M9.5 18H14.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
         </svg>
       );
@@ -837,58 +661,73 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
     case 'trophy':
       return (
         <svg {...common}>
-          <path
-            d="M7 4H17V9.5C17 12.6 14.8 15 12 15C9.2 15 7 12.6 7 9.5V4Z"
-            fill="currentColor"
-            fillOpacity="0.22"
-            stroke="currentColor"
-            strokeWidth="1.9"
-            strokeLinejoin="round"
-          />
-          <path d="M7 6H4.5C4.5 9.2 5.6 11 7.5 11.4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-          <path d="M17 6H19.5C19.5 9.2 18.4 11 16.5 11.4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-          <path d="M12 15V19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-          <path d="M8.5 20H15.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+          <path d="M7 4H17V9.5C17 12.6 14.8 15 12 15C9.2 15 7 12.6 7 9.5V4Z" fill="currentColor" fillOpacity="0.22" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
+          <path d="M7 6H4.5C4.5 9.2 5.6 11 7.5 11.4M17 6H19.5C19.5 9.2 18.4 11 16.5 11.4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          <path d="M12 15V19M8.5 20H15.5" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" />
         </svg>
       );
 
     case 'crown':
       return (
         <svg {...common}>
-          <path
-            d="M3.5 17.5L5.2 7.5L9.5 11.5L12 5.5L14.5 11.5L18.8 7.5L20.5 17.5H3.5Z"
-            fill="currentColor"
-            fillOpacity="0.24"
-            stroke="currentColor"
-            strokeWidth="1.9"
-            strokeLinejoin="round"
-          />
+          <path d="M3.5 17.5L5.2 7.5L9.5 11.5L12 5.5L14.5 11.5L18.8 7.5L20.5 17.5H3.5Z" fill="currentColor" fillOpacity="0.24" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
           <path d="M5 20H19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        </svg>
+      );
+
+    case 'gem':
+      return (
+        <svg {...common}>
+          <path d="M6.5 4H17.5L21 9.5L12 20.5L3 9.5L6.5 4Z" fill="currentColor" fillOpacity="0.22" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
+          <path d="M3 9.5H21M8.5 4L7 9.5L12 20.5L17 9.5L15.5 4" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
         </svg>
       );
 
     case 'shop':
       return (
         <svg {...common}>
-          <path
-            d="M5 8.5H19L18 20H6L5 8.5Z"
-            fill="currentColor"
-            fillOpacity="0.18"
-            stroke="currentColor"
-            strokeWidth="1.9"
-            strokeLinejoin="round"
-          />
+          <path d="M5 8.5H19L18 20H6L5 8.5Z" fill="currentColor" fillOpacity="0.18" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
           <path d="M8.5 8.5V6.5C8.5 4.6 10 3 12 3C14 3 15.5 4.6 15.5 6.5V8.5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
           <path d="M9.5 13C10.1 14.3 11 15 12 15C13 15 13.9 14.3 14.5 13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+      );
+
+    case 'camera':
+      return (
+        <svg {...common}>
+          <path d="M4 8.5C4 7.4 4.9 6.5 6 6.5H8.2L9.6 4.5H14.4L15.8 6.5H18C19.1 6.5 20 7.4 20 8.5V17.5C20 18.6 19.1 19.5 18 19.5H6C4.9 19.5 4 18.6 4 17.5V8.5Z" fill="currentColor" fillOpacity="0.16" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
+          <circle cx="12" cy="13" r="3.2" stroke="currentColor" strokeWidth="1.9" />
+        </svg>
+      );
+
+    case 'play':
+      return (
+        <svg {...common}>
+          <polygon points="7,4.8 19.5,12 7,19.2" fill="currentColor" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+        </svg>
+      );
+
+    case 'lock':
+      return (
+        <svg {...common}>
+          <rect x="5" y="10.5" width="14" height="10" rx="2.8" fill="currentColor" fillOpacity="0.18" stroke="currentColor" strokeWidth="1.9" />
+          <path d="M8 10.5V7.5C8 5.3 9.8 3.5 12 3.5C14.2 3.5 16 5.3 16 7.5V10.5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+          <circle cx="12" cy="15.5" r="1.3" fill="currentColor" />
+        </svg>
+      );
+
+    case 'externalLink':
+      return (
+        <svg {...common}>
+          <path d="M14 4H20V10M20 4L11 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M18 13.5V18.5C18 19.3 17.3 20 16.5 20H5.5C4.7 20 4 19.3 4 18.5V7.5C4 6.7 4.7 6 5.5 6H10.5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
         </svg>
       );
 
     case 'menu':
       return (
         <svg {...common}>
-          <path d="M4 7H20" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
-          <path d="M4 12H16.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
-          <path d="M4 17H20" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+          <path d="M4 7H20M4 12H16.5M4 17H20" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
         </svg>
       );
 
@@ -902,16 +741,8 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
     case 'bell':
       return (
         <svg {...common}>
-          <path
-            d="M6.2 15.8L7.2 10.2C7.6 7.4 9.6 5.5 12 5.5C14.4 5.5 16.4 7.4 16.8 10.2L17.8 15.8H6.2Z"
-            fill="currentColor"
-            fillOpacity="0.16"
-            stroke="currentColor"
-            strokeWidth="1.9"
-            strokeLinejoin="round"
-          />
-          <path d="M4.5 16H19.5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
-          <path d="M10 19C10.5 20.1 11.2 20.6 12 20.6C12.8 20.6 13.5 20.1 14 19" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+          <path d="M6.2 15.8L7.2 10.2C7.6 7.4 9.6 5.5 12 5.5C14.4 5.5 16.4 7.4 16.8 10.2L17.8 15.8H6.2Z" fill="currentColor" fillOpacity="0.16" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
+          <path d="M4.5 16H19.5M10 19C10.5 20.1 11.2 20.6 12 20.6C12.8 20.6 13.5 20.1 14 19" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
         </svg>
       );
 
@@ -919,26 +750,14 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
       return (
         <svg {...common}>
           <circle cx="12" cy="12" r="4.2" fill="currentColor" fillOpacity="0.22" stroke="currentColor" strokeWidth="1.9" />
-          <path
-            d="M12 2.5V5M12 19V21.5M4.5 12H2M22 12H19.5M5.6 5.6L7.4 7.4M16.6 16.6L18.4 18.4M18.4 5.6L16.6 7.4M7.4 16.6L5.6 18.4"
-            stroke="currentColor"
-            strokeWidth="1.9"
-            strokeLinecap="round"
-          />
+          <path d="M12 2.5V5M12 19V21.5M4.5 12H2M22 12H19.5M5.6 5.6L7.4 7.4M16.6 16.6L18.4 18.4M18.4 5.6L16.6 7.4M7.4 16.6L5.6 18.4" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
         </svg>
       );
 
     case 'moon':
       return (
         <svg {...common}>
-          <path
-            d="M19.5 14.5A7.8 7.8 0 0 1 9.5 4.5A8 8 0 1 0 19.5 14.5Z"
-            fill="currentColor"
-            fillOpacity="0.22"
-            stroke="currentColor"
-            strokeWidth="1.9"
-            strokeLinejoin="round"
-          />
+          <path d="M19.5 14.5A7.8 7.8 0 0 1 9.5 4.5A8 8 0 1 0 19.5 14.5Z" fill="currentColor" fillOpacity="0.22" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
         </svg>
       );
 
@@ -964,14 +783,7 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
     case 'mapPin':
       return (
         <svg {...common}>
-          <path
-            d="M12 21C12 21 18.5 14.8 18.5 9.8C18.5 6.2 15.6 3.5 12 3.5C8.4 3.5 5.5 6.2 5.5 9.8C5.5 14.8 12 21 12 21Z"
-            fill="currentColor"
-            fillOpacity="0.2"
-            stroke="currentColor"
-            strokeWidth="1.9"
-            strokeLinejoin="round"
-          />
+          <path d="M12 21C12 21 18.5 14.8 18.5 9.8C18.5 6.2 15.6 3.5 12 3.5C8.4 3.5 5.5 6.2 5.5 9.8C5.5 14.8 12 21 12 21Z" fill="currentColor" fillOpacity="0.2" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
           <circle cx="12" cy="9.8" r="2.6" fill="currentColor" />
         </svg>
       );
@@ -1005,14 +817,7 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
     case 'shield':
       return (
         <svg {...common}>
-          <path
-            d="M12 2.8L19.5 5.8V11.8C19.5 16.5 16.3 19.8 12 21.4C7.7 19.8 4.5 16.5 4.5 11.8V5.8L12 2.8Z"
-            fill="currentColor"
-            fillOpacity="0.18"
-            stroke="currentColor"
-            strokeWidth="1.9"
-            strokeLinejoin="round"
-          />
+          <path d="M12 2.8L19.5 5.8V11.8C19.5 16.5 16.3 19.8 12 21.4C7.7 19.8 4.5 16.5 4.5 11.8V5.8L12 2.8Z" fill="currentColor" fillOpacity="0.18" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
           <path d="M8.8 12.2L11 14.4L15.6 9.8" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       );
@@ -1020,13 +825,7 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
     case 'vision':
       return (
         <svg {...common}>
-          <path
-            d="M2.5 12C4.8 7.5 8.2 5.5 12 5.5C15.8 5.5 19.2 7.5 21.5 12C19.2 16.5 15.8 18.5 12 18.5C8.2 18.5 4.8 16.5 2.5 12Z"
-            fill="currentColor"
-            fillOpacity="0.16"
-            stroke="currentColor"
-            strokeWidth="1.9"
-          />
+          <path d="M2.5 12C4.8 7.5 8.2 5.5 12 5.5C15.8 5.5 19.2 7.5 21.5 12C19.2 16.5 15.8 18.5 12 18.5C8.2 18.5 4.8 16.5 2.5 12Z" fill="currentColor" fillOpacity="0.16" stroke="currentColor" strokeWidth="1.9" />
           <circle cx="12" cy="12" r="3" fill="currentColor" />
         </svg>
       );
@@ -1035,11 +834,7 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
       return (
         <svg {...common}>
           <circle cx="12" cy="12" r="3.2" fill="currentColor" fillOpacity="0.2" stroke="currentColor" strokeWidth="1.9" />
-          <path
-            d="M19.4 15A1.7 1.7 0 0 0 19.7 16.9L19.8 17A2 2 0 1 1 17 19.8L16.9 19.7A1.7 1.7 0 0 0 15 19.4A1.7 1.7 0 0 0 14 20.9V21A2 2 0 1 1 10 21V20.9A1.7 1.7 0 0 0 9 19.4A1.7 1.7 0 0 0 7.1 19.7L7 19.8A2 2 0 1 1 4.2 17L4.3 16.9A1.7 1.7 0 0 0 4.6 15A1.7 1.7 0 0 0 3.1 14H3A2 2 0 1 1 3 10H3.1A1.7 1.7 0 0 0 4.6 9A1.7 1.7 0 0 0 4.3 7.1L4.2 7A2 2 0 1 1 7 4.2L7.1 4.3A1.7 1.7 0 0 0 9 4.6H9.1A1.7 1.7 0 0 0 10 3.1V3A2 2 0 1 1 14 3V3.1A1.7 1.7 0 0 0 15 4.6A1.7 1.7 0 0 0 16.9 4.3L17 4.2A2 2 0 1 1 19.8 7L19.7 7.1A1.7 1.7 0 0 0 19.4 9V9.1A1.7 1.7 0 0 0 20.9 10H21A2 2 0 1 1 21 14H20.9A1.7 1.7 0 0 0 19.4 15Z"
-            stroke="currentColor"
-            strokeWidth="1.6"
-          />
+          <path d="M19.4 15A1.7 1.7 0 0 0 19.7 16.9L19.8 17A2 2 0 1 1 17 19.8L16.9 19.7A1.7 1.7 0 0 0 15 19.4A1.7 1.7 0 0 0 14 20.9V21A2 2 0 1 1 10 21V20.9A1.7 1.7 0 0 0 9 19.4A1.7 1.7 0 0 0 7.1 19.7L7 19.8A2 2 0 1 1 4.2 17L4.3 16.9A1.7 1.7 0 0 0 4.6 15A1.7 1.7 0 0 0 3.1 14H3A2 2 0 1 1 3 10H3.1A1.7 1.7 0 0 0 4.6 9A1.7 1.7 0 0 0 4.3 7.1L4.2 7A2 2 0 1 1 7 4.2L7.1 4.3A1.7 1.7 0 0 0 9 4.6H9.1A1.7 1.7 0 0 0 10 3.1V3A2 2 0 1 1 14 3V3.1A1.7 1.7 0 0 0 15 4.6A1.7 1.7 0 0 0 16.9 4.3L17 4.2A2 2 0 1 1 19.8 7L19.7 7.1A1.7 1.7 0 0 0 19.4 9V9.1A1.7 1.7 0 0 0 20.9 10H21A2 2 0 1 1 21 14H20.9A1.7 1.7 0 0 0 19.4 15Z" stroke="currentColor" strokeWidth="1.6" />
         </svg>
       );
 
@@ -1110,21 +905,18 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
         </svg>
       );
 
+    case 'chevronLeft':
+      return (
+        <svg {...common}>
+          <path d="M15 6L9 12L15 18" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+
     case 'whatsapp':
       return (
         <svg {...common}>
-          <path
-            d="M12 3.5C7.3 3.5 3.5 7.3 3.5 12C3.5 13.7 4 15.3 4.8 16.6L3.6 20.6L7.8 19.4C9 20.1 10.5 20.5 12 20.5C16.7 20.5 20.5 16.7 20.5 12C20.5 7.3 16.7 3.5 12 3.5Z"
-            fill="currentColor"
-            fillOpacity="0.18"
-            stroke="currentColor"
-            strokeWidth="1.9"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M9.4 9.2C9.1 9.5 8.8 10.2 9.4 11.4C10 12.6 11.4 14 12.6 14.6C13.8 15.2 14.5 14.9 14.8 14.6L15.4 14C15.6 13.8 15.6 13.4 15.3 13.2L14 12.5C13.7 12.3 13.4 12.4 13.2 12.7L12.8 13.1C12.2 12.8 11.2 11.8 10.9 11.2L11.3 10.8C11.6 10.6 11.7 10.3 11.5 10L10.8 8.7C10.6 8.4 10.2 8.4 10 8.6L9.4 9.2Z"
-            fill="currentColor"
-          />
+          <path d="M12 3.5C7.3 3.5 3.5 7.3 3.5 12C3.5 13.7 4 15.3 4.8 16.6L3.6 20.6L7.8 19.4C9 20.1 10.5 20.5 12 20.5C16.7 20.5 20.5 16.7 20.5 12C20.5 7.3 16.7 3.5 12 3.5Z" fill="currentColor" fillOpacity="0.18" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
+          <path d="M9.4 9.2C9.1 9.5 8.8 10.2 9.4 11.4C10 12.6 11.4 14 12.6 14.6C13.8 15.2 14.5 14.9 14.8 14.6L15.4 14C15.6 13.8 15.6 13.4 15.3 13.2L14 12.5C13.7 12.3 13.4 12.4 13.2 12.7L12.8 13.1C12.2 12.8 11.2 11.8 10.9 11.2L11.3 10.8C11.6 10.6 11.7 10.3 11.5 10L10.8 8.7C10.6 8.4 10.2 8.4 10 8.6L9.4 9.2Z" fill="currentColor" />
         </svg>
       );
 
@@ -1140,28 +932,14 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
     case 'flame':
       return (
         <svg {...common}>
-          <path
-            d="M12.5 3C13.5 6.4 17.5 8.2 17.5 13.2C17.5 16.8 15 19.8 11.8 19.8C8.4 19.8 6.2 17.1 6.2 13.8C6.2 11.2 7.5 9.2 9 7.8C9 9.5 9.8 10.5 10.7 10.8C10.2 8.4 11 5.2 12.5 3Z"
-            fill="currentColor"
-            fillOpacity="0.25"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinejoin="round"
-          />
+          <path d="M12.5 3C13.5 6.4 17.5 8.2 17.5 13.2C17.5 16.8 15 19.8 11.8 19.8C8.4 19.8 6.2 17.1 6.2 13.8C6.2 11.2 7.5 9.2 9 7.8C9 9.5 9.8 10.5 10.7 10.8C10.2 8.4 11 5.2 12.5 3Z" fill="currentColor" fillOpacity="0.25" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
         </svg>
       );
 
     case 'alert':
       return (
         <svg {...common}>
-          <path
-            d="M12 3.5L20.5 18.8C20.9 19.5 20.4 20.3 19.6 20.3H4.4C3.6 20.3 3.1 19.5 3.5 18.8L12 3.5Z"
-            fill="currentColor"
-            fillOpacity="0.18"
-            stroke="currentColor"
-            strokeWidth="1.9"
-            strokeLinejoin="round"
-          />
+          <path d="M12 3.5L20.5 18.8C20.9 19.5 20.4 20.3 19.6 20.3H4.4C3.6 20.3 3.1 19.5 3.5 18.8L12 3.5Z" fill="currentColor" fillOpacity="0.18" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
           <path d="M12 9.5V13.8" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" />
           <circle cx="12" cy="17" r="1.1" fill="currentColor" />
         </svg>
@@ -1175,13 +953,56 @@ export function TTIcon({ name, size = 20, className = '', style = {} }) {
         </svg>
       );
 
+    case 'plus':
+      return (
+        <svg {...common}>
+          <path d="M12 5V19M5 12H19" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+        </svg>
+      );
+
+    case 'trash':
+      return (
+        <svg {...common}>
+          <path d="M4.5 7H19.5M9.5 4H14.5M7 7L7.8 19C7.9 19.8 8.5 20.5 9.3 20.5H14.7C15.5 20.5 16.1 19.8 16.2 19L17 7" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+
+    case 'edit':
+      return (
+        <svg {...common}>
+          <path d="M4 20H8L18.5 9.5C19.3 8.7 19.3 7.3 18.5 6.5L17.5 5.5C16.7 4.7 15.3 4.7 14.5 5.5L4 16V20Z" fill="currentColor" fillOpacity="0.16" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
+        </svg>
+      );
+
+    case 'logout':
+      return (
+        <svg {...common}>
+          <path d="M10 4.5H6C4.9 4.5 4 5.4 4 6.5V17.5C4 18.6 4.9 19.5 6 19.5H10M15 8L19.5 12L15 16M19.5 12H9.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+
+    case 'star':
+      return (
+        <svg {...common}>
+          <path d="M12 3.5L14.6 8.8L20.5 9.6L16.2 13.8L17.2 19.6L12 16.9L6.8 19.6L7.8 13.8L3.5 9.6L9.4 8.8L12 3.5Z" fill="currentColor" fillOpacity="0.22" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+        </svg>
+      );
+
+    case 'info':
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="8.5" fill="currentColor" fillOpacity="0.14" stroke="currentColor" strokeWidth="1.9" />
+          <path d="M12 11V16" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" />
+          <circle cx="12" cy="8" r="1.1" fill="currentColor" />
+        </svg>
+      );
+
     case 'ball':
     default:
       return (
         <svg {...common}>
           <circle cx="12" cy="12" r="8.5" fill="currentColor" fillOpacity="0.18" stroke="currentColor" strokeWidth="1.9" />
-          <path d="M5.8 6.4C8.6 8.8 8.6 15.2 5.8 17.6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-          <path d="M18.2 6.4C15.4 8.8 15.4 15.2 18.2 17.6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+          <path d="M5.8 6.4C8.6 8.8 8.6 15.2 5.8 17.6M18.2 6.4C15.4 8.8 15.4 15.2 18.2 17.6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
         </svg>
       );
   }
