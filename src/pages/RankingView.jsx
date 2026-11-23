@@ -19,8 +19,7 @@ import {
 import { ELO_CONFIG, computeMasterTop8Race } from '../utils/tenisEngine';
 
 /* ==========================================================================
-   PALETAS EDITORIALES SOBRIAS POR DIVISIÓN (SIN CHOQUE VERDE + NARANJA)
-   - Cada rama armoniza sus acentos en Modo Oscuro y Modo Claro sin saturar.
+   PALETAS EDITORIALES SOBRIAS POR DIVISIÓN (MODO OSCURO Y MODO CLARO)
    ========================================================================== */
 const DIVISION_FILTERS = [
   {
@@ -35,11 +34,9 @@ const DIVISION_FILTERS = [
     pillTextLight: '#00DC7D',
     softBgDark: 'rgba(0, 220, 125, 0.12)',
     softBgLight: 'rgba(0, 122, 68, 0.09)',
-    softBorderDark: 'rgba(0, 220, 125, 0.36)',
+    softBorderDark: 'rgba(0, 220, 125, 0.38)',
     softBorderLight: 'rgba(0, 122, 68, 0.28)',
-    glow: 'rgba(0, 220, 125, 0.26)',
-    stageGradDark:
-      'radial-gradient(ellipse 90% 58% at 50% 0%, rgba(0, 220, 125, 0.14) 0%, rgba(28, 7, 50, 0.94) 64%, rgba(16, 4, 30, 0.99) 100%)',
+    glow: 'rgba(0, 220, 125, 0.28)',
     frameBorder: 'rgba(0, 220, 125, 0.55)',
   },
   {
@@ -57,8 +54,6 @@ const DIVISION_FILTERS = [
     softBorderDark: 'rgba(222, 133, 102, 0.44)',
     softBorderLight: 'rgba(168, 72, 38, 0.32)',
     glow: 'rgba(217, 119, 87, 0.3)',
-    stageGradDark:
-      'radial-gradient(ellipse 92% 60% at 50% 0%, rgba(200, 90, 50, 0.24) 0%, rgba(36, 12, 34, 0.94) 62%, rgba(18, 4, 30, 0.99) 100%)',
     frameBorder: 'rgba(222, 133, 102, 0.62)',
   },
   {
@@ -76,8 +71,6 @@ const DIVISION_FILTERS = [
     softBorderDark: 'rgba(234, 116, 174, 0.44)',
     softBorderLight: 'rgba(176, 37, 106, 0.3)',
     glow: 'rgba(223, 90, 156, 0.28)',
-    stageGradDark:
-      'radial-gradient(ellipse 92% 60% at 50% 0%, rgba(219, 39, 119, 0.22) 0%, rgba(38, 9, 46, 0.94) 62%, rgba(18, 4, 30, 0.99) 100%)',
     frameBorder: 'rgba(234, 116, 174, 0.6)',
   },
   {
@@ -95,8 +88,6 @@ const DIVISION_FILTERS = [
     softBorderDark: 'rgba(229, 193, 108, 0.46)',
     softBorderLight: 'rgba(154, 107, 22, 0.34)',
     glow: 'rgba(229, 193, 108, 0.3)',
-    stageGradDark:
-      'radial-gradient(ellipse 92% 60% at 50% 0%, rgba(229, 193, 108, 0.2) 0%, rgba(32, 12, 42, 0.94) 62%, rgba(16, 4, 30, 0.99) 100%)',
     frameBorder: 'rgba(229, 193, 108, 0.62)',
   },
 ];
@@ -111,7 +102,7 @@ const MEDAL_PALETTE = {
     highlight: '#FAF0CA',
     deep: '#A67C23',
     ring: 'linear-gradient(135deg, #FAF0CA 0%, #E5C16C 48%, #9A6B16 100%)',
-    glow: 'rgba(229, 193, 108, 0.3)',
+    glow: 'rgba(229, 193, 108, 0.34)',
   },
   2: {
     key: 'silver',
@@ -121,7 +112,7 @@ const MEDAL_PALETTE = {
     highlight: '#F8FAFC',
     deep: '#64748B',
     ring: 'linear-gradient(135deg, #F8FAFC 0%, #CBD5E1 52%, #64748B 100%)',
-    glow: 'rgba(203, 213, 225, 0.24)',
+    glow: 'rgba(203, 213, 225, 0.26)',
   },
   3: {
     key: 'bronze',
@@ -131,7 +122,7 @@ const MEDAL_PALETTE = {
     highlight: '#F5D8C6',
     deep: '#8C4A2B',
     ring: 'linear-gradient(135deg, #F5D8C6 0%, #C6835E 52%, #7C3D21 100%)',
-    glow: 'rgba(198, 131, 94, 0.24)',
+    glow: 'rgba(198, 131, 94, 0.26)',
   },
 };
 
@@ -150,15 +141,19 @@ function writeStoredRanks(map) {
   try {
     window.localStorage.setItem(RANK_MEMORY_KEY, JSON.stringify(map));
   } catch {
-    // ignore storage quota
+    // ignorar cuota
   }
 }
 
 /* ==========================================================================
-   SUBCOMPONENTE AISLADO: RELOJ SPLIT-FLAP COMPACTO DE CIERRE DE TEMPORADA
+   RELOJ SPLIT-FLAP DE CIERRE DE TEMPORADA (SOPORTA endDate PERSONALIZADO)
    ========================================================================== */
-function getRealSeasonEndMs(seasonNumber, snapshotYear) {
+function getRealSeasonEndMs(seasonNumber, snapshotYear, customEndDate = null) {
   const now = Date.now();
+  if (customEndDate) {
+    const parsed = new Date(`${customEndDate}T23:59:59-05:00`).getTime();
+    if (!Number.isNaN(parsed) && parsed > now) return parsed;
+  }
   const y = Number(snapshotYear) || new Date().getFullYear();
   const map = {
     1: `${y}-03-31T23:59:59-05:00`,
@@ -213,8 +208,11 @@ function MiniFlipUnit({ value, label }) {
   );
 }
 
-function MiniSeasonCountdown({ seasonNumber = 4, year = 2026 }) {
-  const targetMs = useMemo(() => getRealSeasonEndMs(seasonNumber, year), [seasonNumber, year]);
+function MiniSeasonCountdown({ seasonNumber = 4, year = 2026, customEndDate = null }) {
+  const targetMs = useMemo(
+    () => getRealSeasonEndMs(seasonNumber, year, customEndDate),
+    [seasonNumber, year, customEndDate]
+  );
   const [parts, setParts] = useState(() => getCountdownParts(targetMs));
 
   useEffect(() => {
@@ -243,25 +241,15 @@ function MiniSeasonCountdown({ seasonNumber = 4, year = 2026 }) {
 }
 
 /* ==========================================================================
-   SUBCOMPONENTE 1: CORONA DE LAURELES METÁLICOS (ORO CHAMPÁN / PLATA / BRONCE)
+   CORONA DE LAURELES METÁLICOS (ESCALA PROGRESIVA PARA #1, #2 Y #3)
    ========================================================================== */
-function LaurelWreathAvatar({ rank = 1, player, club, size = 62, onClick }) {
+function LaurelWreathAvatar({ rank = 1, player, club, size = 64 }) {
   const medal = MEDAL_PALETTE[rank] || MEDAL_PALETTE[1];
-  const outer = size + 24;
+  const outer = size + 22;
   const gradId = `tt-laurel-${medal.key}-${player?.id || rank}`;
 
   return (
-    <button
-      type="button"
-      className="tt-laurel-avatar-btn"
-      onClick={(e) => {
-        e.stopPropagation();
-        triggerHaptic('light');
-        if (onClick && player) onClick(player);
-      }}
-      aria-label={`Ver ficha de ${player?.name || 'jugador'} (Puesto #${rank})`}
-      style={{ width: outer, height: outer }}
-    >
+    <div className="tt-laurel-wrap" style={{ width: outer, height: outer }}>
       <svg
         width={outer}
         height={outer}
@@ -281,7 +269,7 @@ function LaurelWreathAvatar({ rank = 1, player, club, size = 62, onClick }) {
         <path
           d="M44 89C23 85 11 68 11 49C11 33 19 19 32 12"
           stroke={`url(#${gradId})`}
-          strokeWidth="2.3"
+          strokeWidth="2.4"
           strokeLinecap="round"
         />
         <ellipse cx="14" cy="56" rx="5" ry="2.5" transform="rotate(-32 14 56)" fill={`url(#${gradId})`} />
@@ -295,7 +283,7 @@ function LaurelWreathAvatar({ rank = 1, player, club, size = 62, onClick }) {
         <path
           d="M56 89C77 85 89 68 89 49C89 33 81 19 68 12"
           stroke={`url(#${gradId})`}
-          strokeWidth="2.3"
+          strokeWidth="2.4"
           strokeLinecap="round"
         />
         <ellipse cx="86" cy="56" rx="5" ry="2.5" transform="rotate(32 86 56)" fill={`url(#${gradId})`} />
@@ -327,6 +315,7 @@ function LaurelWreathAvatar({ rank = 1, player, club, size = 62, onClick }) {
           src={player?.avatar}
           alt={player?.name || 'Jugador'}
           initials={player?.name || 'TT'}
+          priority={rank <= 3}
           style={{
             width: '100%',
             height: '100%',
@@ -356,12 +345,153 @@ function LaurelWreathAvatar({ rank = 1, player, club, size = 62, onClick }) {
       >
         #{rank}
       </span>
-    </button>
+    </div>
   );
 }
 
 /* ==========================================================================
-   SUBCOMPONENTE 2: FILA EDITORIAL CON RETRATO VERTICAL + SOPORTE FLIP APPLE
+   TOP 3 HORIZONTAL ESCALONADO (#1 GRANDE → #2 MEDIANO → #3 INTERMEDIO)
+   Conserva Liquid Glass, laureles, animaciones FLIP y acciones rápidas.
+   ========================================================================== */
+function TopThreeHorizontalRow({
+  player,
+  rank,
+  club,
+  isCurrentUser,
+  isLight,
+  moveHighlight = null,
+  registerRowRef,
+  onOpenProfile,
+  onQuickChallenge,
+  onOpenHeadToHead,
+}) {
+  const medal = MEDAL_PALETTE[rank] || MEDAL_PALETTE[1];
+  const cat = getCategoryByPoints(player.points);
+  const wins = Number(player.wins) || 0;
+  const losses = Number(player.losses) || 0;
+  const played = wins + losses;
+  const eff = played > 0 ? Math.round((wins / played) * 100) : 0;
+  const streak = Number(player.streak) || 0;
+  const hasQuorum = played >= ELO_CONFIG.MIN_MATCHES_SEASON_TROPHY;
+
+  const avatarSize = rank === 1 ? 64 : rank === 2 ? 54 : 48;
+  const moveCls =
+    moveHighlight?.dir === 'up'
+      ? 'is-rank-climb'
+      : moveHighlight?.dir === 'down'
+      ? 'is-rank-drop'
+      : '';
+
+  return (
+    <article
+      ref={(el) => registerRowRef(player.id, el)}
+      id={isCurrentUser ? 'tt-my-ranking-row' : undefined}
+      role="button"
+      tabIndex={0}
+      className={`tt-top3-hcard is-tier-${rank} ${isCurrentUser ? 'is-me-halo' : ''} ${moveCls}`}
+      style={{
+        '--medal-color': isLight ? medal.primaryLight : medal.primary,
+        '--medal-glow': medal.glow,
+        borderColor: `${medal.primary}${rank === 1 ? '92' : '64'}`,
+      }}
+      onClick={() => {
+        triggerHaptic('light');
+        if (onOpenProfile) onOpenProfile(player);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          if (onOpenProfile) onOpenProfile(player);
+        }
+      }}
+    >
+      {rank === 1 && <span className="tt-top3-sheen" aria-hidden="true" />}
+
+      {/* Izquierda: Corona de Laureles con escala progresiva */}
+      <div className="tt-top3-left">
+        <LaurelWreathAvatar rank={rank} player={player} club={club} size={avatarSize} />
+      </div>
+
+      {/* Centro: Identidad + Métricas limpias */}
+      <div className="tt-top3-mid">
+        <div className="tt-top3-badge-line">
+          <span className="tt-top3-tier-pill">{medal.label}</span>
+          {moveHighlight && (
+            <span className={`tt-rk-move-pill ${moveHighlight.dir === 'up' ? 'is-up' : 'is-down'}`}>
+              {moveHighlight.dir === 'up' ? `▲ +${moveHighlight.delta}` : `▼ -${moveHighlight.delta}`}
+            </span>
+          )}
+          {player.isVip && <span className="tt-vip-subtle-tag">VIP</span>}
+          {player.isTutelado && <span className="tt-tutela-mini">Tutelada</span>}
+          {isCurrentUser && <span className="tt-me-micro-pill">TÚ</span>}
+        </div>
+
+        <strong className="tt-top3-name">{player.name}</strong>
+
+        <div className="tt-top3-sub">
+          <span className="tt-rk-cat-pill">
+            <i className="tt-rk-cat-dot" style={{ backgroundColor: cat.color }} />
+            {cat.name}
+          </span>
+          <span className="tt-rk-club-chip">{club ? club.shortName : 'Independiente'}</span>
+        </div>
+
+        <div className="tt-top3-meta">
+          <span>
+            {played > 0 ? `${wins}V–${losses}D · ${eff}%` : 'Sin partidos aún'}
+          </span>
+          <span>·</span>
+          <span className={hasQuorum ? 'is-quorum-ok' : ''}>
+            {hasQuorum ? 'Apto premio' : `${played}/${ELO_CONFIG.MIN_MATCHES_SEASON_TROPHY} PJ`}
+          </span>
+          {wins > 0 && streak >= 2 && <span className="tt-streak-clean">+{streak}</span>}
+        </div>
+      </div>
+
+      {/* Derecha: Puntos grandes + Retar / H2H Liquid Glass */}
+      <div className="tt-top3-right">
+        <div className="tt-top3-pts-box">
+          <strong>{Number(player.points || 0).toLocaleString('es-PE')}</strong>
+          <span>PTS</span>
+        </div>
+
+        {!isCurrentUser && (
+          <div className="tt-top3-actions">
+            {onQuickChallenge && (
+              <button
+                type="button"
+                className="tt-top3-reto-btn tt-rk-press"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  triggerHaptic('medium');
+                  onQuickChallenge(player);
+                }}
+              >
+                Retar
+              </button>
+            )}
+            {onOpenHeadToHead && (
+              <button
+                type="button"
+                className="tt-rk-h2h-mini tt-rk-press"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  triggerHaptic('light');
+                  onOpenHeadToHead(player);
+                }}
+              >
+                H2H
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </article>
+  );
+}
+
+/* ==========================================================================
+   FILA ESTÁNDAR (#4 EN ADELANTE) CON RETRATO VERTICAL + SOPORTE FLIP APPLE
    ========================================================================== */
 function RankingPlayerRow({
   player,
@@ -370,7 +500,7 @@ function RankingPlayerRow({
   isCurrentUser,
   showLaurelMini = false,
   divisionTheme,
-  moveHighlight = null, // { dir: 'up' | 'down', delta: number } | null
+  moveHighlight = null,
   registerRowRef,
   onOpenProfile,
   onQuickChallenge,
@@ -413,43 +543,28 @@ function RankingPlayerRow({
         }
       }}
     >
-      {/* 1. Puesto + Tendencia */}
       <div className="tt-rk-rank-col">
-        <span
-          className="tt-rk-rank-num"
-          style={medal ? { color: medal.primary } : undefined}
-        >
+        <span className="tt-rk-rank-num" style={medal ? { color: medal.primary } : undefined}>
           {rank}
         </span>
 
         {moveHighlight ? (
-          <span
-            className={`tt-rk-move-pill ${
-              moveHighlight.dir === 'up' ? 'is-up' : 'is-down'
-            }`}
-          >
-            {moveHighlight.dir === 'up'
-              ? `▲ +${moveHighlight.delta}`
-              : `▼ -${moveHighlight.delta}`}
+          <span className={`tt-rk-move-pill ${moveHighlight.dir === 'up' ? 'is-up' : 'is-down'}`}>
+            {moveHighlight.dir === 'up' ? `▲ +${moveHighlight.delta}` : `▼ -${moveHighlight.delta}`}
           </span>
         ) : (
           <span
-            className={`tt-rk-trend ${
-              trend > 0 ? 'is-up' : trend < 0 ? 'is-down' : 'is-flat'
-            }`}
+            className={`tt-rk-trend ${trend > 0 ? 'is-up' : trend < 0 ? 'is-down' : 'is-flat'}`}
           >
             {trend > 0 ? `▲ ${trend}` : trend < 0 ? `▼ ${Math.abs(trend)}` : '—'}
           </span>
         )}
       </div>
 
-      {/* 2. Retrato Rectangular Vertical Limpio (56x74) */}
       <div className="tt-rk-portrait-wrap">
         <div
           className="tt-rk-portrait-frame"
-          style={{
-            borderColor: medal ? medal.primary : divisionTheme.frameBorder,
-          }}
+          style={{ borderColor: medal ? medal.primary : divisionTheme.frameBorder }}
         >
           <SmartImage
             src={player.fullBodyPhoto || player.avatar}
@@ -467,7 +582,7 @@ function RankingPlayerRow({
         {!isCurrentUser && onQuickChallenge && (
           <button
             type="button"
-            className="tt-rk-quick-reto"
+            className="tt-rk-quick-reto tt-rk-press"
             aria-label={`Desafiar a ${player.name}`}
             title={`Desafiar a ${player.name}`}
             onClick={(e) => {
@@ -481,11 +596,11 @@ function RankingPlayerRow({
         )}
       </div>
 
-      {/* 3. Identidad sobria y legible */}
       <div className="tt-rk-info-col">
         <div className="tt-rk-name-line">
           <strong className="tt-rk-name">{player.name}</strong>
           {player.isVip && <span className="tt-vip-subtle-tag">VIP</span>}
+          {player.isTutelado && <span className="tt-tutela-mini">Tutelada</span>}
           {isCurrentUser && <span className="tt-me-micro-pill">TÚ</span>}
         </div>
 
@@ -522,13 +637,10 @@ function RankingPlayerRow({
             <span className="tt-eff-label">Listo para debutar</span>
           )}
 
-          {wins > 0 && streak >= 2 && (
-            <span className="tt-streak-clean">Racha +{streak}</span>
-          )}
+          {wins > 0 && streak >= 2 && <span className="tt-streak-clean">Racha +{streak}</span>}
         </div>
       </div>
 
-      {/* 4. Puntos equilibrados + H2H sobrio */}
       <div className="tt-rk-points-col">
         <strong className="tt-rk-points-val">
           {Number(player.points || 0).toLocaleString('es-PE')}
@@ -538,7 +650,7 @@ function RankingPlayerRow({
         {!isCurrentUser && onOpenHeadToHead && (
           <button
             type="button"
-            className="tt-rk-h2h-mini"
+            className="tt-rk-h2h-mini tt-rk-press"
             aria-label={`Comparar cara a cara contra ${player.name}`}
             onClick={(e) => {
               e.stopPropagation();
@@ -555,7 +667,7 @@ function RankingPlayerRow({
 }
 
 /* ==========================================================================
-   VISTA PRINCIPAL: RankingView (APPLE FLIP + PALETA LIMPIA CLARO Y OSCURO)
+   VISTA PRINCIPAL: RankingView (TOP 3 HORIZONTAL ESCALONADO + APPLE FLIP)
    ========================================================================== */
 export default function RankingView({
   players = [],
@@ -568,20 +680,13 @@ export default function RankingView({
   onQuickChallenge,
   onGoToTournaments,
 }) {
-  const [activeSubTab, setActiveSubTab] = useState('oficial'); // 'oficial' | 'temporadas' | 'clubes'
+  const [activeSubTab, setActiveSubTab] = useState('oficial');
   const [divisionFilter, setDivisionFilter] = useState('ALL');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [showRewardsGuide, setShowRewardsGuide] = useState(false);
   const [expandedSeasonIds, setExpandedSeasonIds] = useState({});
 
-  /* ------------------------------------------------------------------------
-     MOTOR DE ANIMACIÓN FLIP ESTILO APPLE (SUBIDA VERDE / BAJADA ROJA)
-     - Detecta cambios de puesto al volver de Retos o por actualización en vivo.
-     - Primero muestra brevemente el orden anterior, centra tu tarjeta y luego
-       desliza físicamente tu bloque arriba/abajo moviendo los escalones vecinos.
-     - Al terminar, se apaga el brillo y el bloque queda completamente tranquilo.
-     ------------------------------------------------------------------------ */
   const rowRefs = useRef(new Map());
   const prevRectsRef = useRef(new Map());
   const settleTimerRef = useRef(null);
@@ -589,7 +694,7 @@ export default function RankingView({
   const lastLiveRanksRef = useRef(null);
 
   const [stagedOldOrderIds, setStagedOldOrderIds] = useState(null);
-  const [activeMoves, setActiveMoves] = useState({}); // { [playerId]: { dir: 'up'|'down', delta } }
+  const [activeMoves, setActiveMoves] = useState({});
 
   const registerRowRef = (playerId, el) => {
     if (el) rowRefs.current.set(playerId, el);
@@ -625,12 +730,19 @@ export default function RankingView({
     };
   }, [seasonSnapshots]);
 
-  /* 1. Clasificación Oficial ordenada por puntos reales */
+  const currentSeasonObj = useMemo(
+    () =>
+      safeSnapshots.seasons.find((s) => s.number === safeSnapshots.currentSeason) ||
+      safeSnapshots.seasons[safeSnapshots.seasons.length - 1],
+    [safeSnapshots]
+  );
+
   const rankedPlayers = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
 
     return [...(players || [])]
       .filter((p) => {
+        if (p.isTutorOnly) return false;
         if (divisionFilter === 'Varones' && p.division !== 'Varones') return false;
         if (divisionFilter === 'Damas' && p.division !== 'Damas') return false;
         if (divisionFilter === 'SENIOR_40' && (Number(p.age) || 0) < 40) return false;
@@ -652,13 +764,11 @@ export default function RankingView({
       });
   }, [players, divisionFilter, categoryFilter, searchQuery]);
 
-  // Firma de orden real actual para detectar cambios de puesto
   const currentOrderSignature = useMemo(
     () => rankedPlayers.map((p) => p.id).join(','),
     [rankedPlayers]
   );
 
-  // Detección de cambio de puesto (al montar viniendo de Retos O en tiempo real)
   useEffect(() => {
     if (activeSubTab !== 'oficial' || searchQuery.trim().length > 0 || rankedPlayers.length < 2) {
       return undefined;
@@ -670,12 +780,10 @@ export default function RankingView({
       currentRankMap[p.id] = idx + 1;
     });
 
-    // 1. Primera lectura en esta vista: comparar contra el último ranking guardado en disco
     if (!lastLiveRanksRef.current || lastLiveRanksRef.current.filterKey !== filterKey) {
       const storedAll = readStoredRanks();
       const prevMap = storedAll[filterKey];
 
-      // Actualizar referencia en memoria y disco inmediatamente para no repetir la animación
       lastLiveRanksRef.current = { filterKey, rankMap: currentRankMap };
       writeStoredRanks({ ...storedAll, [filterKey]: currentRankMap });
 
@@ -694,21 +802,18 @@ export default function RankingView({
           }
         });
 
-        // Enfocar especialmente al usuario actual si se movió, o a los jugadores que cambiaron
         const focusId =
           currentUser?.id && detectedMoves[currentUser.id]
             ? currentUser.id
             : Object.keys(detectedMoves)[0] || null;
 
         if (focusId) {
-          // Construir el orden previo para que el ojo vea el origen antes de deslizar
           const oldOrderedIds = [...rankedPlayers]
             .sort((a, b) => (prevMap[a.id] ?? 999) - (prevMap[b.id] ?? 999))
             .map((p) => p.id);
 
           setStagedOldOrderIds(oldOrderedIds);
 
-          // Centrar suavemente en el jugador que se mueve
           window.requestAnimationFrame(() => {
             const targetNode = rowRefs.current.get(focusId);
             if (targetNode) {
@@ -716,7 +821,6 @@ export default function RankingView({
             }
           });
 
-          // Tras 440ms, capturar posiciones exactas (First) y disparar el FLIP al nuevo orden
           window.clearTimeout(stageTimerRef.current);
           stageTimerRef.current = window.setTimeout(() => {
             captureRowRects();
@@ -728,7 +832,6 @@ export default function RankingView({
             setStagedOldOrderIds(null);
             triggerHaptic(detectedMoves[focusId].dir === 'up' ? 'success' : 'warning');
 
-            // Apagar suavemente la iluminación al terminar la transición
             window.clearTimeout(settleTimerRef.current);
             settleTimerRef.current = window.setTimeout(() => {
               setActiveMoves({});
@@ -739,7 +842,6 @@ export default function RankingView({
       return undefined;
     }
 
-    // 2. Actualización en vivo (mientras el usuario ya está mirando el Ranking)
     const prevLiveMap = lastLiveRanksRef.current.rankMap;
     const liveMoves = {};
     rankedPlayers.forEach((p, idx) => {
@@ -767,9 +869,7 @@ export default function RankingView({
       setActiveMoves(focusMove);
 
       const focusId = Object.keys(focusMove)[0];
-      if (focusId) {
-        triggerHaptic(focusMove[focusId].dir === 'up' ? 'success' : 'warning');
-      }
+      if (focusId) triggerHaptic(focusMove[focusId].dir === 'up' ? 'success' : 'warning');
 
       window.clearTimeout(settleTimerRef.current);
       settleTimerRef.current = window.setTimeout(() => {
@@ -778,9 +878,15 @@ export default function RankingView({
     }
 
     return undefined;
-  }, [currentOrderSignature, activeSubTab, divisionFilter, categoryFilter, searchQuery, currentUser?.id]);
+  }, [
+    currentOrderSignature,
+    activeSubTab,
+    divisionFilter,
+    categoryFilter,
+    searchQuery,
+    currentUser?.id,
+  ]);
 
-  // Limpiar timers al desmontar
   useEffect(() => {
     return () => {
       window.clearTimeout(stageTimerRef.current);
@@ -788,7 +894,6 @@ export default function RankingView({
     };
   }, []);
 
-  // Lista visible efectiva (usa brevemente el orden anterior durante los 440ms previos al FLIP)
   const displayedRankedPlayers = useMemo(() => {
     if (!stagedOldOrderIds || stagedOldOrderIds.length === 0) return rankedPlayers;
     const byId = new Map(rankedPlayers.map((p) => [p.id, p]));
@@ -797,15 +902,14 @@ export default function RankingView({
     return [...ordered, ...extras];
   }, [rankedPlayers, stagedOldOrderIds]);
 
-  const showTop3Podium =
-    displayedRankedPlayers.length >= 3 && searchQuery.trim().length === 0;
-  const podiumPlayers = showTop3Podium ? displayedRankedPlayers.slice(0, 3) : [];
-  const listPlayers = showTop3Podium
+  const showTop3Horizontal =
+    displayedRankedPlayers.length >= 1 && searchQuery.trim().length === 0;
+  const top3Players = showTop3Horizontal ? displayedRankedPlayers.slice(0, 3) : [];
+  const listPlayers = showTop3Horizontal
     ? displayedRankedPlayers.slice(3)
     : displayedRankedPlayers;
-  const listStartRank = showTop3Podium ? 4 : 1;
+  const listStartRank = showTop3Horizontal ? 4 : 1;
 
-  // Ejecución FLIP real (Invert & Play) en el mismo frame en que cambia el orden DOM
   useLayoutEffect(() => {
     if (activeSubTab !== 'oficial') return;
     const isLite =
@@ -833,7 +937,6 @@ export default function RankingView({
       });
 
       if (animatedNodes.length > 0) {
-        // Forzar reflow una sola vez para todas las filas
         void document.body.offsetHeight;
 
         animatedNodes.forEach(({ node, isPrimaryMover }) => {
@@ -853,7 +956,6 @@ export default function RankingView({
       }
     }
 
-    // Guardar posiciones actuales para el próximo cambio en vivo
     captureRowRects();
   }, [displayedRankedPlayers, activeSubTab, activeMoves]);
 
@@ -863,7 +965,6 @@ export default function RankingView({
     return idx >= 0 ? idx + 1 : null;
   }, [rankedPlayers, currentUser]);
 
-  /* 2. Carrera Anual de Temporadas -> Master Top 8 */
   const masterTop8Rows = useMemo(() => {
     const engineDiv =
       divisionFilter === 'Varones' || divisionFilter === 'Damas' ? divisionFilter : 'ALL';
@@ -884,11 +985,10 @@ export default function RankingView({
     return rows;
   }, [safeSnapshots, players, divisionFilter, categoryFilter, searchQuery]);
 
-  /* 3. Ranking de Clubes */
   const clubsStandings = useMemo(() => {
     return (clubs || [])
       .map((club) => {
-        const members = (players || []).filter((p) => p.clubId === club.id);
+        const members = (players || []).filter((p) => p.clubId === club.id && !p.isTutorOnly);
         const totalPoints = members.reduce((sum, p) => sum + (Number(p.points) || 0), 0);
         const avgPoints = members.length > 0 ? Math.round(totalPoints / members.length) : 0;
         const totalWins = members.reduce((sum, p) => sum + (Number(p.wins) || 0), 0);
@@ -899,22 +999,13 @@ export default function RankingView({
           (a, b) => (Number(b.points) || 0) - (Number(a.points) || 0)
         )[0];
 
-        return {
-          club,
-          membersCount: members.length,
-          totalPoints,
-          avgPoints,
-          winRate,
-          topPlayer,
-        };
+        return { club, membersCount: members.length, totalPoints, avgPoints, winRate, topPlayer };
       })
       .sort((a, b) => {
         if (b.avgPoints !== a.avgPoints) return b.avgPoints - a.avgPoints;
         return b.totalPoints - a.totalPoints;
       });
   }, [clubs, players]);
-
-  const getPlayerMatchesCount = (p) => (Number(p?.wins) || 0) + (Number(p?.losses) || 0);
 
   const handleResetFilters = () => {
     triggerHaptic('light');
@@ -946,7 +1037,6 @@ export default function RankingView({
     '--rk-soft-bg': isLight ? divisionTheme.softBgLight : divisionTheme.softBgDark,
     '--rk-soft-border': isLight ? divisionTheme.softBorderLight : divisionTheme.softBorderDark,
     '--rk-glow': divisionTheme.glow,
-    '--rk-stage-grad': divisionTheme.stageGradDark,
   };
 
   return (
@@ -955,9 +1045,7 @@ export default function RankingView({
       style={dynamicVars}
       aria-label="Clasificación Oficial TOTAL TENIS"
     >
-      {/* ====================================================================
-          1. BARRA SUPERIOR DIRECTA: CLASIFICACIÓN | TEMPORADAS | CLUBES
-          ==================================================================== */}
+      {/* 1. BARRA SUPERIOR LIQUID GLASS */}
       <div className="tt-rk-subtabs" role="tablist" aria-label="Vistas del Ranking">
         <span
           className="tt-rk-subtab-slider"
@@ -985,9 +1073,7 @@ export default function RankingView({
         ))}
       </div>
 
-      {/* ====================================================================
-          2. BUSCADOR + FILTROS INDEPENDIENTES CON PALETA SOBRIA POR RAMA
-          ==================================================================== */}
+      {/* 2. BUSCADOR + FILTROS INDEPENDIENTES */}
       {activeSubTab !== 'clubes' && (
         <div className="tt-rk-filters-wrap">
           <div className="tt-rk-search-row">
@@ -1003,7 +1089,7 @@ export default function RankingView({
               {searchQuery && (
                 <button
                   type="button"
-                  className="tt-rk-clear-btn"
+                  className="tt-rk-clear-btn tt-rk-press"
                   aria-label="Limpiar búsqueda"
                   onClick={() => setSearchQuery('')}
                 >
@@ -1015,7 +1101,7 @@ export default function RankingView({
             {myRankInCurrentView && activeSubTab === 'oficial' && (
               <button
                 type="button"
-                className="tt-rk-mypos-chip"
+                className="tt-rk-mypos-chip tt-rk-press"
                 onClick={handleJumpToMyRow}
                 title="Ir a mi posición actual"
               >
@@ -1025,7 +1111,6 @@ export default function RankingView({
             )}
           </div>
 
-          {/* Divisiones: General | Varones (Arcilla) | Damas (Orquídea) | +40 Senior (Champán) */}
           <div className="tt-rk-div-row" role="group" aria-label="Filtrar por división">
             {DIVISION_FILTERS.map((div) => {
               const isSelected = divisionFilter === div.id;
@@ -1033,7 +1118,7 @@ export default function RankingView({
                 <button
                   key={div.id}
                   type="button"
-                  className={`tt-rk-div-pill ${isSelected ? 'is-active' : ''}`}
+                  className={`tt-rk-div-pill tt-rk-press ${isSelected ? 'is-active' : ''}`}
                   style={
                     isSelected
                       ? {
@@ -1041,8 +1126,8 @@ export default function RankingView({
                           color: isLight ? div.pillTextLight : div.accentOnFill,
                           borderColor: 'transparent',
                           boxShadow: isLight
-                            ? '0 5px 14px rgba(30, 7, 52, 0.16)'
-                            : `0 6px 16px ${div.glow}`,
+                            ? 'inset 0 1px 0 rgba(255,255,255,0.22), 0 6px 16px rgba(30, 7, 52, 0.18)'
+                            : `inset 0 1px 0 rgba(255,255,255,0.35), 0 8px 18px ${div.glow}`,
                         }
                       : undefined
                   }
@@ -1070,12 +1155,11 @@ export default function RankingView({
             })}
           </div>
 
-          {/* Categorías dentro de la rama */}
           {divisionFilter !== 'SENIOR_40' && (
             <div className="tt-rk-pills-row">
               <button
                 type="button"
-                className={`tt-rk-pill ${categoryFilter === 'ALL' ? 'is-active' : ''}`}
+                className={`tt-rk-pill tt-rk-press ${categoryFilter === 'ALL' ? 'is-active' : ''}`}
                 onClick={() => {
                   triggerHaptic('light');
                   setCategoryFilter('ALL');
@@ -1088,7 +1172,7 @@ export default function RankingView({
                 <button
                   key={cat.id}
                   type="button"
-                  className={`tt-rk-pill ${categoryFilter === cat.id ? 'is-active' : ''}`}
+                  className={`tt-rk-pill tt-rk-press ${categoryFilter === cat.id ? 'is-active' : ''}`}
                   onClick={() => {
                     triggerHaptic('light');
                     setCategoryFilter(cat.id);
@@ -1103,7 +1187,7 @@ export default function RankingView({
       )}
 
       {/* ====================================================================
-          VISTA A: CLASIFICACIÓN + PODIO TOP 3 + ANIMACIÓN FLIP APPLE
+          VISTA A: CLASIFICACIÓN (TOP 3 HORIZONTAL ESCALONADO + #4+ FLIP)
           ==================================================================== */}
       {activeSubTab === 'oficial' && (
         <div
@@ -1122,10 +1206,10 @@ export default function RankingView({
             />
           ) : (
             <>
-              {/* PODIO CEREMONIAL TOP 3 */}
-              {showTop3Podium && (
-                <div className="tt-podium-stage">
-                  <div className="tt-podium-stage-head">
+              {/* TOP 3 HORIZONTAL CON ESCALA PROGRESIVA (#1 GRANDE → #2 → #3) */}
+              {showTop3Horizontal && top3Players.length > 0 && (
+                <div className="tt-top3-stack-wrap">
+                  <div className="tt-top3-stage-head">
                     <span className="tt-podium-kicker">
                       TOP 3 ·{' '}
                       {activeCategoryObj
@@ -1137,94 +1221,27 @@ export default function RankingView({
                     </span>
                   </div>
 
-                  <div className="tt-podium-grid">
-                    {[
-                      { player: podiumPlayers[1], rank: 2, orderCls: 'is-second' },
-                      { player: podiumPlayers[0], rank: 1, orderCls: 'is-first' },
-                      { player: podiumPlayers[2], rank: 3, orderCls: 'is-third' },
-                    ].map(({ player, rank, orderCls }) => {
-                      if (!player) return null;
-                      const medal = MEDAL_PALETTE[rank];
-                      const club = getClubById(clubs, player.clubId);
-                      const cat = getCategoryByPoints(player.points);
-                      const matchesPlayed = getPlayerMatchesCount(player);
-                      const hasQuorum = matchesPlayed >= ELO_CONFIG.MIN_MATCHES_SEASON_TROPHY;
-                      const isMe = Boolean(currentUser && currentUser.id === player.id);
-                      const moveInfo = activeMoves[player.id] || null;
-                      const moveCls =
-                        moveInfo?.dir === 'up'
-                          ? 'is-rank-climb'
-                          : moveInfo?.dir === 'down'
-                          ? 'is-rank-drop'
-                          : '';
-
-                      return (
-                        <article
-                          key={player.id}
-                          ref={(el) => registerRowRef(player.id, el)}
-                          id={isMe ? 'tt-my-ranking-row' : undefined}
-                          className={`tt-podium-card ${orderCls} ${isMe ? 'is-me-halo' : ''} ${moveCls}`}
-                          style={{
-                            borderColor: `${medal.primary}70`,
-                          }}
-                          onClick={() => {
-                            triggerHaptic('light');
-                            if (onOpenPlayerProfile) onOpenPlayerProfile(player);
-                          }}
-                        >
-                          {rank === 1 && <span className="tt-podium-sheen" aria-hidden="true" />}
-
-                          <span
-                            className="tt-podium-tier-tag"
-                            style={{ color: isLight ? medal.primaryLight : medal.primary }}
-                          >
-                            {medal.label}
-                          </span>
-
-                          <LaurelWreathAvatar
-                            rank={rank}
-                            player={player}
-                            club={club}
-                            size={rank === 1 ? 64 : 52}
-                            onClick={onOpenPlayerProfile}
-                          />
-
-                          <strong className="tt-podium-name">{player.name}</strong>
-
-                          <span className="tt-podium-cat">{cat.name}</span>
-
-                          <div className="tt-podium-pts">
-                            <strong>{Number(player.points || 0).toLocaleString('es-PE')}</strong>
-                            <span>PTS</span>
-                          </div>
-
-                          <span className={`tt-quorum-dot ${hasQuorum ? 'is-ok' : 'is-pending'}`}>
-                            {hasQuorum
-                              ? 'Apto premio'
-                              : `${matchesPlayed}/${ELO_CONFIG.MIN_MATCHES_SEASON_TROPHY} PJ`}
-                          </span>
-
-                          {!isMe && onQuickChallenge && (
-                            <button
-                              type="button"
-                              className="tt-podium-reto-btn"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                triggerHaptic('medium');
-                                onQuickChallenge(player);
-                              }}
-                            >
-                              Retar
-                            </button>
-                          )}
-                        </article>
-                      );
-                    })}
+                  <div className="tt-top3-hlist">
+                    {top3Players.map((player, idx) => (
+                      <TopThreeHorizontalRow
+                        key={player.id}
+                        player={player}
+                        rank={idx + 1}
+                        club={getClubById(clubs, player.clubId)}
+                        isCurrentUser={Boolean(currentUser && currentUser.id === player.id)}
+                        isLight={isLight}
+                        moveHighlight={activeMoves[player.id] || null}
+                        registerRowRef={registerRowRef}
+                        onOpenProfile={onOpenPlayerProfile}
+                        onQuickChallenge={onQuickChallenge}
+                        onOpenHeadToHead={onOpenHeadToHead}
+                      />
+                    ))}
                   </div>
                 </div>
               )}
 
-              {/* TABLA DE POSICIONES CON CABECERA ALINEADA Y MOTOR FLIP */}
+              {/* TABLA DEL #4 EN ADELANTE (TAMAÑO ESTÁNDAR + FLIP) */}
               {listPlayers.length > 0 && (
                 <div className="tt-rk-table-shell">
                   <div className="tt-rk-table-head">
@@ -1246,7 +1263,7 @@ export default function RankingView({
                             rank={rank}
                             club={club}
                             isCurrentUser={isMe}
-                            showLaurelMini={!showTop3Podium}
+                            showLaurelMini={!showTop3Horizontal}
                             divisionTheme={divisionTheme}
                             moveHighlight={activeMoves[player.id] || null}
                             registerRowRef={registerRowRef}
@@ -1277,7 +1294,7 @@ export default function RankingView({
       )}
 
       {/* ====================================================================
-          VISTA B: TEMPORADAS (RELOJ SPLIT-FLAP + ACORDEÓN TÁCTIL + MASTER TOP 8)
+          VISTA B: TEMPORADAS + RELOJ SPLIT-FLAP + ACORDEÓN
           ==================================================================== */}
       {activeSubTab === 'temporadas' && (
         <div
@@ -1293,10 +1310,10 @@ export default function RankingView({
               </div>
             </div>
 
-            {/* Reloj Split-Flap compacto en tiempo real */}
             <MiniSeasonCountdown
               seasonNumber={safeSnapshots.currentSeason}
               year={safeSnapshots.year}
+              customEndDate={currentSeasonObj?.endDate || null}
             />
 
             <div className="tt-quarters-strip">
@@ -1321,7 +1338,7 @@ export default function RankingView({
               {onGoToTournaments && (
                 <button
                   type="button"
-                  className="tt-master-gold-cta"
+                  className="tt-master-gold-cta tt-rk-press"
                   onClick={() => {
                     triggerHaptic('medium');
                     onGoToTournaments('master');
@@ -1336,7 +1353,7 @@ export default function RankingView({
 
               <button
                 type="button"
-                className="tt-btn tt-btn-ghost tt-btn-sm"
+                className="tt-btn tt-btn-ghost tt-btn-sm tt-rk-press"
                 onClick={() => {
                   triggerHaptic('light');
                   setShowRewardsGuide((v) => !v);
@@ -1364,9 +1381,7 @@ export default function RankingView({
               </div>
 
               <div className="tt-reward-box is-annual">
-                <span className="tt-reward-kicker is-gold">
-                  {ANNUAL_MASTER_TOP8_REWARDS.badge}
-                </span>
+                <span className="tt-reward-kicker is-gold">{ANNUAL_MASTER_TOP8_REWARDS.badge}</span>
                 <h3>{ANNUAL_MASTER_TOP8_REWARDS.title}</h3>
                 <div className="tt-reward-podium-list">
                   {ANNUAL_MASTER_TOP8_REWARDS.podium.map((p) => (
@@ -1408,11 +1423,7 @@ export default function RankingView({
                         aria-expanded={isOpen}
                         onClick={() => toggleSeasonAccordion(row.player.id)}
                       >
-                        <span
-                          className={`tt-race-rank-pill ${
-                            row.qualifiesMasterTop8 ? 'is-in' : ''
-                          }`}
-                        >
+                        <span className={`tt-race-rank-pill ${row.qualifiesMasterTop8 ? 'is-in' : ''}`}>
                           #{row.raceRank}
                         </span>
 
@@ -1421,12 +1432,7 @@ export default function RankingView({
                             src={row.player.avatar}
                             alt={row.player.name}
                             initials={row.player.name}
-                            style={{
-                              width: '100%',
-                              height: '100%',
-                              objectFit: 'cover',
-                              objectPosition: 'center top',
-                            }}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top' }}
                           />
                         </div>
 
@@ -1462,13 +1468,7 @@ export default function RankingView({
                                 >
                                   <span>T{sIdx + 1}</span>
                                   <strong>{val > 0 ? val.toLocaleString('es-PE') : '—'}</strong>
-                                  <small>
-                                    {sMeta?.locked
-                                      ? 'Terminada'
-                                      : isCurrent
-                                      ? 'En curso'
-                                      : 'Próxima'}
-                                  </small>
+                                  <small>{sMeta?.locked ? 'Terminada' : isCurrent ? 'En curso' : 'Próxima'}</small>
                                 </div>
                               );
                             })}
@@ -1482,7 +1482,7 @@ export default function RankingView({
                             </span>
                             <button
                               type="button"
-                              className="tt-acc-profile-link"
+                              className="tt-acc-profile-link tt-rk-press"
                               onClick={() => {
                                 triggerHaptic('light');
                                 if (onOpenPlayerProfile) onOpenPlayerProfile(row.player);
@@ -1527,18 +1527,12 @@ export default function RankingView({
                 <article
                   key={item.club.id}
                   className="tt-club-rank-card"
-                  style={{
-                    borderColor: medal ? `${medal.primary}68` : undefined,
-                  }}
+                  style={{ borderColor: medal ? `${medal.primary}68` : undefined }}
                 >
                   <div className="tt-club-rank-head">
                     <span
                       className="tt-club-rank-num"
-                      style={
-                        medal
-                          ? { color: isLight ? medal.primaryLight : medal.primary }
-                          : undefined
-                      }
+                      style={medal ? { color: isLight ? medal.primaryLight : medal.primary } : undefined}
                     >
                       #{rank}
                     </span>
@@ -1566,24 +1560,15 @@ export default function RankingView({
                   </div>
 
                   <div className="tt-club-metrics-row">
-                    <div>
-                      <span>Jugadores</span>
-                      <strong>{item.membersCount}</strong>
-                    </div>
-                    <div>
-                      <span>Puntos</span>
-                      <strong>{item.totalPoints.toLocaleString('es-PE')}</strong>
-                    </div>
-                    <div>
-                      <span>Victorias</span>
-                      <strong>{item.winRate}%</strong>
-                    </div>
+                    <div><span>Jugadores</span><strong>{item.membersCount}</strong></div>
+                    <div><span>Puntos</span><strong>{item.totalPoints.toLocaleString('es-PE')}</strong></div>
+                    <div><span>Victorias</span><strong>{item.winRate}%</strong></div>
                   </div>
 
                   {item.topPlayer && (
                     <button
                       type="button"
-                      className="tt-club-top-rep"
+                      className="tt-club-top-rep tt-rk-press"
                       onClick={() => {
                         triggerHaptic('light');
                         if (onOpenPlayerProfile) onOpenPlayerProfile(item.topPlayer);
@@ -1593,14 +1578,7 @@ export default function RankingView({
                         src={item.topPlayer.avatar}
                         alt={item.topPlayer.name}
                         initials={item.topPlayer.name}
-                        style={{
-                          width: 34,
-                          height: 34,
-                          borderRadius: '50%',
-                          objectFit: 'cover',
-                          objectPosition: 'center top',
-                          border: '1.5px solid #00DC7D',
-                        }}
+                        style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', objectPosition: 'center top', border: '1.5px solid #00DC7D' }}
                       />
                       <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
                         <small>Líder de la sede</small>
@@ -1619,69 +1597,36 @@ export default function RankingView({
         </div>
       )}
 
-      {/* ====================================================================
-          ESTILOS FLAGSHIP (APPLE FLIP · LIMPIO EN MODO OSCURO Y MODO CLARO)
-          ==================================================================== */}
       <style>{`
-        .tt-ranking-view {
-          display: flex;
-          flex-direction: column;
-          gap: 13px;
-        }
+        .tt-ranking-view { display: flex; flex-direction: column; gap: 13px; }
+        .tt-rk-press { transition: transform 170ms cubic-bezier(0.22, 1.38, 0.36, 1), box-shadow 200ms ease, border-color 180ms ease !important; }
+        .tt-rk-press:active { transform: scale(0.95) !important; }
 
-        /* 1. SUB-TABS CON SLIDER FÍSICO ELÁSTICO */
+        /* 1. SUB-TABS LIQUID GLASS */
         .tt-rk-subtabs {
-          position: relative;
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          padding: 4px;
-          border-radius: 17px;
-          background: var(--tt-surface-2);
+          position: relative; display: grid; grid-template-columns: repeat(3, 1fr);
+          padding: 4px; border-radius: 18px; background: var(--tt-surface-2);
           border: 1px solid var(--tt-border);
-          box-shadow: var(--tt-card-specular);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+          backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
         }
         .tt-rk-subtab-slider {
-          position: absolute;
-          top: 4px;
-          bottom: 4px;
-          left: 4px;
-          width: calc((100% - 8px) / 3);
-          border-radius: 12px;
-          background: var(--rk-pill-grad);
-          box-shadow: 0 5px 14px var(--rk-glow);
+          position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc((100% - 8px) / 3);
+          border-radius: 13px; background: var(--rk-pill-grad);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.38), 0 6px 16px var(--rk-glow);
           transition: transform 320ms cubic-bezier(0.22, 1.24, 0.36, 1), background 300ms ease;
-          pointer-events: none;
-          z-index: 0;
+          pointer-events: none; z-index: 0;
         }
-        .tt-rk-subtab {
-          position: relative;
-          z-index: 1;
-          min-height: 40px;
-          border-radius: 12px;
-          font-size: 0.79rem;
-          font-weight: 800;
-          color: var(--tt-text-muted);
-          transition: color 220ms ease;
-        }
-        .tt-rk-subtab.is-active {
-          color: var(--rk-accent-on-fill);
-          font-weight: 900;
-        }
+        .tt-rk-subtab { position: relative; z-index: 1; min-height: 41px; border-radius: 13px; font-size: 0.79rem; font-weight: 800; color: var(--tt-text-muted); transition: color 200ms ease; }
+        .tt-rk-subtab.is-active { color: var(--rk-accent-on-fill); font-weight: 900; }
 
-        /* 2. BUSCADOR + FILTROS SOBRIOS */
+        /* 2. BUSCADOR + FILTROS LIQUID GLASS */
         .tt-rk-filters-wrap { display: flex; flex-direction: column; gap: 9px; }
         .tt-rk-search-row { display: flex; align-items: stretch; gap: 8px; }
         .tt-rk-search-bar {
-          flex: 1;
-          display: flex;
-          align-items: center;
-          gap: 9px;
-          min-height: 44px;
-          padding: 0 13px;
-          border-radius: 14px;
-          background: var(--tt-surface);
-          border: 1px solid var(--tt-border);
-          box-shadow: var(--tt-card-specular);
+          flex: 1; display: flex; align-items: center; gap: 9px; min-height: 44px; padding: 0 13px;
+          border-radius: 15px; background: var(--tt-surface); border: 1px solid var(--tt-border);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
           transition: border-color 200ms ease;
         }
         .tt-rk-search-bar:focus-within { border-color: var(--rk-accent); }
@@ -1689,430 +1634,253 @@ export default function RankingView({
         .tt-rk-clear-btn { width: 25px; height: 25px; border-radius: 50%; background: var(--tt-surface-2); color: var(--tt-text-muted); display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
 
         .tt-rk-mypos-chip {
-          padding: 0 12px;
-          border-radius: 14px;
-          background: var(--rk-soft-bg);
-          border: 1px solid var(--rk-soft-border);
-          color: var(--tt-text);
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
+          padding: 0 13px; border-radius: 15px; background: var(--rk-soft-bg);
+          border: 1px solid var(--rk-soft-border); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+          color: var(--tt-text); display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0;
         }
         .tt-rk-mypos-chip small { font-size: 0.5rem; font-weight: 900; letter-spacing: 0.08em; opacity: 0.74; }
         .tt-rk-mypos-chip strong { font-family: var(--tt-font-display); font-size: 1.06rem; line-height: 1; color: var(--rk-accent); }
 
-        .tt-rk-div-row, .tt-rk-pills-row {
-          display: flex;
-          gap: 7px;
-          overflow-x: auto;
-          padding: 1px 1px 3px;
-          scrollbar-width: none;
-        }
+        .tt-rk-div-row, .tt-rk-pills-row { display: flex; gap: 7px; overflow-x: auto; padding: 1px 1px 3px; scrollbar-width: none; }
         .tt-rk-div-row::-webkit-scrollbar, .tt-rk-pills-row::-webkit-scrollbar { display: none; }
         .tt-rk-div-pill {
-          flex-shrink: 0;
-          min-height: 35px;
-          padding: 0 13px;
-          border-radius: 999px;
-          background: var(--tt-surface);
-          border: 1px solid var(--tt-border);
-          color: var(--tt-text-secondary);
-          display: inline-flex;
-          align-items: center;
-          gap: 7px;
-          font-size: 0.75rem;
-          font-weight: 800;
-          transition: transform 200ms cubic-bezier(0.22, 1.35, 0.36, 1), background 280ms ease;
+          flex-shrink: 0; min-height: 36px; padding: 0 13px; border-radius: 999px;
+          background: var(--tt-surface); border: 1px solid var(--tt-border);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09);
+          color: var(--tt-text-secondary); display: inline-flex; align-items: center; gap: 7px; font-size: 0.75rem; font-weight: 800;
         }
-        .tt-rk-div-pill:active { transform: scale(0.95); }
         .tt-rk-div-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-
         .tt-rk-pill {
-          flex-shrink: 0;
-          min-height: 32px;
-          padding: 0 12px;
-          border-radius: 999px;
-          font-size: 0.72rem;
-          font-weight: 700;
-          background: var(--tt-surface-2);
-          border: 1px solid var(--tt-border);
+          flex-shrink: 0; min-height: 33px; padding: 0 12px; border-radius: 999px;
+          font-size: 0.72rem; font-weight: 700; background: var(--tt-surface-2);
+          border: 1px solid var(--tt-border); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
           color: var(--tt-text-muted);
-          transition: all 200ms ease;
         }
         .tt-rk-pill.is-active {
-          background: var(--rk-soft-bg);
-          border-color: var(--rk-soft-border);
-          color: var(--rk-accent);
-          font-weight: 900;
+          background: var(--rk-soft-bg); border-color: var(--rk-soft-border); color: var(--rk-accent); font-weight: 900;
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 4px 12px var(--rk-glow);
         }
 
         .tt-rk-content-stack { display: flex; flex-direction: column; gap: 13px; }
-        .tt-rk-panel-morph { animation: ttRkMorph 340ms cubic-bezier(0.22, 1, 0.36, 1) both; }
-        @keyframes ttRkMorph {
-          from { opacity: 0; transform: translateY(8px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
+        .tt-rk-panel-morph { animation: ttRkMorph 320ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+        @keyframes ttRkMorph { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* 3. PODIO TOP 3 (LIMPIO EN OSCURO Y EDITORIAL EN MODO CLARO) */
-        .tt-podium-stage {
-          border-radius: 23px;
-          padding: 14px 11px 15px;
-          background: var(--rk-stage-grad);
-          border: 1px solid var(--rk-soft-border);
-          box-shadow: var(--tt-card-specular), var(--tt-shadow-sm);
-          color: #FAF9F5;
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-          transition: background 380ms ease, border-color 320ms ease;
-        }
-        .tt-ranking-view.is-light .tt-podium-stage {
-          background: linear-gradient(180deg, #FFFFFF 0%, #F7F4EC 100%);
-          border: 1px solid rgba(30, 7, 52, 0.12);
-          color: #1E0734;
-        }
-        .tt-podium-stage-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        /* ==================================================================
+           3. TOP 3 HORIZONTAL CON ESCALA PROGRESIVA (#1 GRANDE → #2 → #3)
+           ================================================================== */
+        .tt-top3-stack-wrap { display: flex; flex-direction: column; gap: 9px; }
+        .tt-top3-stage-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 4px; }
         .tt-podium-kicker { font-size: 0.64rem; font-weight: 900; letter-spacing: 0.09em; color: var(--rk-accent); }
-        .tt-podium-quorum-note { font-size: 0.65rem; font-weight: 700; opacity: 0.66; }
+        .tt-podium-quorum-note { font-size: 0.65rem; font-weight: 700; color: var(--tt-text-muted); }
 
-        .tt-podium-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end; gap: 8px; }
-        .tt-podium-card {
+        .tt-top3-hlist { display: flex; flex-direction: column; gap: 9px; position: relative; }
+        .tt-top3-hcard {
           position: relative;
           overflow: hidden;
-          border-radius: 18px;
-          padding: 10px 6px 11px;
-          background: rgba(250, 249, 245, 0.055);
-          border: 1.5px solid rgba(250, 249, 245, 0.14);
           display: flex;
-          flex-direction: column;
           align-items: center;
-          text-align: center;
-          gap: 4px;
+          gap: 12px;
+          border-radius: 22px;
+          border: 1.5px solid var(--tt-border);
+          background: var(--tt-surface);
+          backdrop-filter: blur(18px) saturate(145%);
+          -webkit-backdrop-filter: blur(18px) saturate(145%);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), var(--tt-shadow-sm);
           cursor: pointer;
-          transition: transform 240ms cubic-bezier(0.22, 1.25, 0.36, 1), box-shadow 360ms ease, border-color 360ms ease;
+          transition: transform 200ms cubic-bezier(0.22, 1.32, 0.36, 1), box-shadow 360ms ease, border-color 360ms ease, background 360ms ease;
+          will-change: transform;
         }
-        .tt-ranking-view.is-light .tt-podium-card {
-          background: #FFFFFF;
-          box-shadow: 0 6px 18px rgba(30, 7, 52, 0.06);
-        }
-        .tt-podium-card.is-first {
-          padding-top: 14px;
-          padding-bottom: 13px;
-          background: linear-gradient(180deg, rgba(229, 193, 108, 0.14) 0%, rgba(250, 249, 245, 0.05) 100%);
-          transform: translateY(-4px);
-        }
-        .tt-ranking-view.is-light .tt-podium-card.is-first {
-          background: linear-gradient(180deg, #FDF9EC 0%, #FFFFFF 100%);
-          box-shadow: 0 10px 24px rgba(154, 107, 22, 0.12);
-        }
-        .tt-podium-card:active { transform: scale(0.96); }
+        .tt-top3-hcard:active { transform: scale(0.975); }
 
-        .tt-podium-sheen {
-          position: absolute;
-          inset: -40%;
-          background: linear-gradient(115deg, transparent 40%, rgba(250, 240, 202, 0.14) 50%, transparent 60%);
+        /* Escala #1 (Más grande · Oro Champán) */
+        .tt-top3-hcard.is-tier-1 {
+          padding: 15px 14px;
+          border-radius: 24px;
+          background: linear-gradient(135deg, rgba(229, 193, 108, 0.18) 0%, rgba(30, 7, 52, 0.88) 54%, rgba(229, 193, 108, 0.08) 100%);
+          box-shadow: inset 0 1px 0 rgba(250, 240, 202, 0.32), 0 14px 32px rgba(229, 193, 108, 0.18);
+        }
+        .tt-ranking-view.is-light .tt-top3-hcard.is-tier-1 {
+          background: linear-gradient(135deg, #FDF9EC 0%, #FFFFFF 64%, #FAF3DC 100%);
+          box-shadow: inset 0 1px 0 #FFFFFF, 0 12px 28px rgba(154, 107, 22, 0.14);
+        }
+
+        /* Escala #2 (Mediano · Plata Cepillada) */
+        .tt-top3-hcard.is-tier-2 {
+          padding: 13px 14px;
+          border-radius: 21px;
+          background: linear-gradient(135deg, rgba(203, 213, 225, 0.14) 0%, rgba(28, 7, 48, 0.86) 62%, rgba(203, 213, 225, 0.05) 100%);
+          box-shadow: inset 0 1px 0 rgba(248, 250, 252, 0.24), 0 10px 24px rgba(15, 23, 42, 0.22);
+        }
+        .tt-ranking-view.is-light .tt-top3-hcard.is-tier-2 {
+          background: linear-gradient(135deg, #F8FAFC 0%, #FFFFFF 70%, #F1F5F9 100%);
+          box-shadow: inset 0 1px 0 #FFFFFF, 0 8px 20px rgba(71, 85, 105, 0.1);
+        }
+
+        /* Escala #3 (Intermedio · Bronce Noble, un nivel arriba del #4+) */
+        .tt-top3-hcard.is-tier-3 {
+          padding: 11px 14px;
+          border-radius: 19px;
+          background: linear-gradient(135deg, rgba(212, 154, 122, 0.13) 0%, rgba(28, 7, 48, 0.84) 64%, rgba(212, 154, 122, 0.04) 100%);
+          box-shadow: inset 0 1px 0 rgba(245, 216, 198, 0.2), 0 8px 20px rgba(124, 61, 33, 0.16);
+        }
+        .tt-ranking-view.is-light .tt-top3-hcard.is-tier-3 {
+          background: linear-gradient(135deg, #FDF6F2 0%, #FFFFFF 70%, #F9ECE4 100%);
+          box-shadow: inset 0 1px 0 #FFFFFF, 0 6px 18px rgba(154, 74, 40, 0.09);
+        }
+
+        .tt-top3-sheen {
+          position: absolute; inset: -40%;
+          background: linear-gradient(115deg, transparent 42%, rgba(250, 240, 202, 0.15) 50%, transparent 58%);
           transform: translateX(-110%);
-          animation: ttGoldSheen 5.8s ease-in-out infinite;
+          animation: ttGoldSheen 5.6s ease-in-out infinite;
           pointer-events: none;
         }
-        @keyframes ttGoldSheen {
-          0%, 66% { transform: translateX(-110%); }
-          100% { transform: translateX(120%); }
-        }
-        .tt-podium-tier-tag { font-size: 0.58rem; font-weight: 900; letter-spacing: 0.08em; }
-        .tt-laurel-avatar-btn { position: relative; display: inline-flex; align-items: center; justify-content: center; padding: 0; border: none; background: transparent; flex-shrink: 0; }
+        @keyframes ttGoldSheen { 0%, 66% { transform: translateX(-110%); } 100% { transform: translateX(120%); } }
+
+        .tt-top3-left { flex-shrink: 0; position: relative; z-index: 2; }
+        .tt-laurel-wrap { position: relative; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
         .tt-laurel-svg { position: absolute; inset: 0; pointer-events: none; }
         .tt-laurel-ring { border-radius: 50%; padding: 2.5px; position: relative; z-index: 1; }
-        .tt-laurel-club-dot { position: absolute; right: 6px; bottom: 12px; z-index: 3; width: 20px; height: 20px; border-radius: 50%; background: #FFFFFF; border: 1.5px solid #1E0734; overflow: hidden; }
-        .tt-laurel-rank-pill { position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%); z-index: 3; padding: 1px 7px; border-radius: 999px; font-size: 0.62rem; font-weight: 900; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.32); }
+        .tt-laurel-club-dot { position: absolute; right: 4px; bottom: 10px; z-index: 3; width: 20px; height: 20px; border-radius: 50%; background: #FFFFFF; border: 1.5px solid #1E0734; overflow: hidden; }
+        .tt-laurel-rank-pill { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); z-index: 3; padding: 1px 7px; border-radius: 999px; font-size: 0.61rem; font-weight: 900; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.32); }
 
-        .tt-podium-name { font-size: 0.77rem; font-weight: 800; line-height: 1.15; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.2em; }
-        .tt-podium-cat { padding: 2px 7px; border-radius: 999px; background: rgba(250, 249, 245, 0.1); font-size: 0.6rem; font-weight: 800; opacity: 0.85; }
-        .tt-ranking-view.is-light .tt-podium-cat { background: rgba(30, 7, 52, 0.07); color: #371E52; }
-        .tt-podium-pts { display: flex; align-items: baseline; gap: 3px; }
-        .tt-podium-pts strong { font-family: var(--tt-font-display); font-size: 1.06rem; font-weight: 900; color: var(--rk-accent); font-variant-numeric: tabular-nums; }
-        .tt-podium-pts span { font-size: 0.54rem; font-weight: 800; opacity: 0.65; }
-        .tt-quorum-dot { font-size: 0.57rem; font-weight: 800; opacity: 0.72; }
-        .tt-podium-reto-btn {
-          margin-top: 3px;
-          width: 88%;
-          min-height: 27px;
-          border-radius: 999px;
-          background: var(--rk-pill-grad);
-          color: var(--rk-accent-on-fill);
-          font-size: 0.67rem;
-          font-weight: 900;
-          transition: transform 160ms cubic-bezier(0.22, 1.35, 0.36, 1);
+        .tt-top3-mid { flex: 1; min-width: 0; position: relative; z-index: 2; display: flex; flex-direction: column; gap: 4px; }
+        .tt-top3-badge-line { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+        .tt-top3-tier-pill { font-size: 0.6rem; font-weight: 900; letter-spacing: 0.08em; color: var(--medal-color); }
+        .tt-top3-name { font-weight: 900; color: var(--tt-text); line-height: 1.12; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .tt-top3-hcard.is-tier-1 .tt-top3-name { font-size: 1.08rem; }
+        .tt-top3-hcard.is-tier-2 .tt-top3-name { font-size: 0.99rem; }
+        .tt-top3-hcard.is-tier-3 .tt-top3-name { font-size: 0.94rem; }
+
+        .tt-top3-sub { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+        .tt-top3-meta { display: flex; align-items: center; gap: 5px; font-size: 0.67rem; font-weight: 700; color: var(--tt-text-muted); flex-wrap: wrap; }
+        .tt-top3-meta .is-quorum-ok { color: var(--tt-emerald-text); font-weight: 800; }
+
+        .tt-top3-right { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
+        .tt-top3-pts-box { display: flex; flex-direction: column; align-items: flex-end; line-height: 1; }
+        .tt-top3-pts-box strong { font-family: var(--tt-font-display); font-weight: 900; color: var(--rk-accent); font-variant-numeric: tabular-nums; }
+        .tt-top3-hcard.is-tier-1 .tt-top3-pts-box strong { font-size: 1.66rem; color: var(--medal-color); }
+        .tt-top3-hcard.is-tier-2 .tt-top3-pts-box strong { font-size: 1.48rem; }
+        .tt-top3-hcard.is-tier-3 .tt-top3-pts-box strong { font-size: 1.38rem; }
+        .tt-top3-pts-box span { font-size: 0.52rem; font-weight: 900; letter-spacing: 0.08em; color: var(--tt-text-muted); margin-top: 2px; }
+
+        .tt-top3-actions { display: flex; align-items: center; gap: 5px; }
+        .tt-top3-reto-btn {
+          min-height: 28px; padding: 0 11px; border-radius: 999px;
+          background: var(--rk-pill-grad); color: var(--rk-accent-on-fill);
+          font-size: 0.68rem; font-weight: 900;
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 4px 12px var(--rk-glow);
         }
-        .tt-podium-reto-btn:active { transform: scale(0.92); }
 
-        /* 4. TABLA DE POSICIONES CON CABECERA PERFECTAMENTE SEPARADA */
+        /* 4. TABLA DEL #4 EN ADELANTE */
         .tt-rk-table-shell {
-          border-radius: 22px;
-          background: var(--tt-surface);
-          border: 1px solid var(--tt-border);
-          box-shadow: var(--tt-card-specular), var(--tt-shadow-sm);
+          border-radius: 22px; background: var(--tt-surface); border: 1px solid var(--tt-border);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), var(--tt-shadow-sm);
           overflow: hidden;
         }
         .tt-rk-table-head {
-          display: grid;
-          grid-template-columns: 38px 1fr 78px;
-          gap: 12px;
-          padding: 10px 14px;
-          background: var(--tt-surface-2);
-          border-bottom: 1px solid var(--tt-border);
-          font-size: 0.63rem;
-          font-weight: 900;
-          letter-spacing: 0.09em;
-          color: var(--tt-text-muted);
+          display: grid; grid-template-columns: 38px 1fr 78px; gap: 12px; padding: 10px 14px;
+          background: var(--tt-surface-2); border-bottom: 1px solid var(--tt-border);
+          font-size: 0.63rem; font-weight: 900; letter-spacing: 0.09em; color: var(--tt-text-muted);
         }
         .tt-rk-table-head .col-pos { text-align: center; }
         .tt-rk-table-head .col-pts { text-align: right; }
 
         .tt-rk-rows-stack { display: flex; flex-direction: column; position: relative; }
-
         .tt-rk-row {
-          display: grid;
-          grid-template-columns: 38px 58px 1fr auto;
-          align-items: center;
-          gap: 12px;
-          padding: 11px 14px;
-          border-bottom: 1px solid var(--tt-border);
-          cursor: pointer;
-          position: relative;
-          background: var(--tt-surface);
-          transition:
-            background-color 480ms ease,
-            box-shadow 480ms ease,
-            border-color 480ms ease;
+          display: grid; grid-template-columns: 38px 54px 1fr auto; align-items: center; gap: 11px;
+          padding: 10px 14px; border-bottom: 1px solid var(--tt-border); cursor: pointer;
+          position: relative; background: var(--tt-surface);
+          transition: background-color 480ms ease, box-shadow 480ms ease, border-color 480ms ease;
           will-change: transform;
         }
         .tt-rk-row:last-child { border-bottom: none; }
         .tt-rk-row:active { background: var(--tt-surface-2); }
 
         .is-me-halo {
-          background: linear-gradient(
-            90deg,
-            var(--rk-soft-bg) 0%,
-            transparent 76%
-          );
+          background: linear-gradient(90deg, var(--rk-soft-bg) 0%, transparent 76%);
           box-shadow: inset 3px 0 0 var(--rk-accent);
         }
-
-        /* ==================================================================
-           ILUMINACIÓN APPLE FLIP: SUBIDA VERDE ESMERALDA / BAJADA ROJA
-           Activa solo durante la transición (~1.75s), luego descansa limpia.
-           ================================================================== */
         .is-rank-climb {
-          background: linear-gradient(
-            90deg,
-            rgba(0, 220, 125, 0.24) 0%,
-            rgba(0, 220, 125, 0.09) 65%,
-            rgba(0, 220, 125, 0.18) 100%
-          ) !important;
-          box-shadow:
-            inset 4px 0 0 #00DC7D,
-            0 12px 30px rgba(0, 220, 125, 0.28) !important;
+          background: linear-gradient(90deg, rgba(0, 220, 125, 0.24) 0%, rgba(0, 220, 125, 0.09) 65%, rgba(0, 220, 125, 0.18) 100%) !important;
+          box-shadow: inset 4px 0 0 #00DC7D, 0 12px 30px rgba(0, 220, 125, 0.28) !important;
           border-color: rgba(0, 220, 125, 0.65) !important;
         }
         .is-rank-drop {
-          background: linear-gradient(
-            90deg,
-            rgba(239, 68, 68, 0.24) 0%,
-            rgba(239, 68, 68, 0.09) 65%,
-            rgba(239, 68, 68, 0.18) 100%
-          ) !important;
-          box-shadow:
-            inset 4px 0 0 #EF4444,
-            0 12px 30px rgba(239, 68, 68, 0.26) !important;
+          background: linear-gradient(90deg, rgba(239, 68, 68, 0.24) 0%, rgba(239, 68, 68, 0.09) 65%, rgba(239, 68, 68, 0.18) 100%) !important;
+          box-shadow: inset 4px 0 0 #EF4444, 0 12px 30px rgba(239, 68, 68, 0.26) !important;
           border-color: rgba(239, 68, 68, 0.65) !important;
         }
 
-        .tt-rk-move-pill {
-          padding: 2px 5px;
-          border-radius: 999px;
-          font-size: 0.56rem;
-          font-weight: 900;
-          white-space: nowrap;
-        }
+        .tt-rk-move-pill { padding: 2px 5px; border-radius: 999px; font-size: 0.56rem; font-weight: 900; white-space: nowrap; }
         .tt-rk-move-pill.is-up { background: #00DC7D; color: #10021E; }
         .tt-rk-move-pill.is-down { background: #EF4444; color: #FFFFFF; }
 
         .tt-rk-rank-col { display: flex; flex-direction: column; align-items: center; gap: 2px; }
-        .tt-rk-rank-num { font-family: var(--tt-font-display); font-weight: 900; font-size: 1.46rem; line-height: 0.96; color: var(--tt-text); font-variant-numeric: tabular-nums; }
+        .tt-rk-rank-num { font-family: var(--tt-font-display); font-weight: 900; font-size: 1.4rem; line-height: 0.96; color: var(--tt-text); font-variant-numeric: tabular-nums; }
         .tt-rk-trend { font-size: 0.58rem; font-weight: 900; line-height: 1; }
         .tt-rk-trend.is-up { color: var(--tt-emerald-text); }
         .tt-rk-trend.is-down { color: #EF4444; }
         .tt-rk-trend.is-flat { color: var(--tt-text-muted); opacity: 0.5; }
 
-        /* Retrato Rectangular Vertical Sobrio (56x74) */
-        .tt-rk-portrait-wrap { position: relative; width: 56px; height: 74px; flex-shrink: 0; }
-        .tt-rk-portrait-frame {
-          width: 56px;
-          height: 74px;
-          border-radius: 14px;
-          border: 1.5px solid var(--tt-border-medium);
-          overflow: hidden;
-          background: var(--tt-surface-2);
-          transition: border-color 300ms ease;
-        }
+        .tt-rk-portrait-wrap { position: relative; width: 52px; height: 68px; flex-shrink: 0; }
+        .tt-rk-portrait-frame { width: 52px; height: 68px; border-radius: 13px; border: 1.5px solid var(--tt-border-medium); overflow: hidden; background: var(--tt-surface-2); }
         .tt-rk-quick-reto {
-          position: absolute;
-          right: -5px;
-          bottom: -4px;
-          width: 24px;
-          height: 24px;
-          border-radius: 50%;
-          background: #1B0630;
-          border: 1.5px solid var(--rk-accent-vivid);
-          color: var(--rk-accent-vivid);
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          box-shadow: 0 3px 8px rgba(0, 0, 0, 0.32);
+          position: absolute; right: -5px; bottom: -4px; width: 24px; height: 24px; border-radius: 50%;
+          background: #1B0630; border: 1.5px solid var(--rk-accent-vivid); color: var(--rk-accent-vivid);
+          display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 3px 8px rgba(0, 0, 0, 0.32);
         }
-        .tt-ranking-view.is-light .tt-rk-quick-reto {
-          background: #FFFFFF;
-          border-color: var(--rk-accent);
-          color: var(--rk-accent);
-        }
+        .tt-ranking-view.is-light .tt-rk-quick-reto { background: #FFFFFF; border-color: var(--rk-accent); color: var(--rk-accent); }
 
         .tt-rk-info-col { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
         .tt-rk-name-line { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
-        .tt-rk-name { font-size: 0.93rem; font-weight: 800; color: var(--tt-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 172px; }
-        .tt-vip-subtle-tag {
-          padding: 1px 6px;
-          border-radius: 6px;
-          background: rgba(229, 193, 108, 0.16);
-          border: 1px solid rgba(229, 193, 108, 0.45);
-          color: #E5C16C;
-          font-size: 0.58rem;
-          font-weight: 900;
-          letter-spacing: 0.06em;
-        }
-        .tt-ranking-view.is-light .tt-vip-subtle-tag {
-          background: #FBF4E0;
-          border-color: rgba(154, 107, 22, 0.35);
-          color: #8A5D10;
-        }
-        .tt-me-micro-pill {
-          padding: 1px 6px;
-          border-radius: 6px;
-          background: var(--rk-pill-grad);
-          color: var(--rk-accent-on-fill);
-          font-size: 0.56rem;
-          font-weight: 900;
-        }
+        .tt-rk-name { font-size: 0.9rem; font-weight: 800; color: var(--tt-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px; }
+        .tt-vip-subtle-tag { padding: 1px 6px; border-radius: 6px; background: rgba(229, 193, 108, 0.16); border: 1px solid rgba(229, 193, 108, 0.45); color: #E5C16C; font-size: 0.57rem; font-weight: 900; letter-spacing: 0.06em; }
+        .tt-ranking-view.is-light .tt-vip-subtle-tag { background: #FBF4E0; border-color: rgba(154, 107, 22, 0.35); color: #8A5D10; }
+        .tt-tutela-mini { padding: 1px 6px; border-radius: 6px; background: rgba(56, 189, 248, 0.16); border: 1px solid rgba(56, 189, 248, 0.42); color: #7DD3FC; font-size: 0.56rem; font-weight: 900; }
+        .tt-ranking-view.is-light .tt-tutela-mini { background: #E0F2FE; color: #0369A1; }
+        .tt-me-micro-pill { padding: 1px 6px; border-radius: 6px; background: var(--rk-pill-grad); color: var(--rk-accent-on-fill); font-size: 0.56rem; font-weight: 900; }
 
         .tt-rk-sub-line { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
-        .tt-rk-cat-pill {
-          display: inline-flex;
-          align-items: center;
-          gap: 5px;
-          padding: 2px 7px;
-          border-radius: 999px;
-          background: var(--tt-surface-2);
-          font-size: 0.65rem;
-          font-weight: 800;
-          color: var(--tt-text-secondary);
-        }
+        .tt-rk-cat-pill { display: inline-flex; align-items: center; gap: 5px; padding: 2px 7px; border-radius: 999px; background: var(--tt-surface-2); font-size: 0.64rem; font-weight: 800; color: var(--tt-text-secondary); }
         .tt-rk-cat-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-        .tt-rk-club-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 0.71rem; font-weight: 600; color: var(--tt-text-muted); }
+        .tt-rk-club-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 0.7rem; font-weight: 600; color: var(--tt-text-muted); }
 
         .tt-rk-metrics-line { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
-        .tt-eff-label { font-size: 0.68rem; font-weight: 700; color: var(--tt-text-muted); }
+        .tt-eff-label { font-size: 0.67rem; font-weight: 700; color: var(--tt-text-muted); }
         .tt-calib-pill { padding: 2px 7px; border-radius: 999px; background: rgba(56, 189, 248, 0.14); color: #38BDF8; font-size: 0.62rem; font-weight: 800; }
         .tt-ranking-view.is-light .tt-calib-pill { color: #0369A1; }
-        .tt-streak-clean {
-          padding: 2px 7px;
-          border-radius: 999px;
-          background: var(--rk-soft-bg);
-          color: var(--rk-accent);
-          font-size: 0.62rem;
-          font-weight: 800;
-        }
+        .tt-streak-clean { padding: 2px 7px; border-radius: 999px; background: var(--rk-soft-bg); color: var(--rk-accent); font-size: 0.61rem; font-weight: 800; }
 
         .tt-rk-points-col { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
-        .tt-rk-points-val { font-family: var(--tt-font-display); font-size: 1.32rem; font-weight: 900; line-height: 0.98; color: var(--rk-accent); font-variant-numeric: tabular-nums; }
+        .tt-rk-points-val { font-family: var(--tt-font-display); font-size: 1.28rem; font-weight: 900; line-height: 0.98; color: var(--rk-accent); font-variant-numeric: tabular-nums; }
         .tt-rk-points-unit { font-size: 0.54rem; font-weight: 900; letter-spacing: 0.08em; color: var(--tt-text-muted); }
         .tt-rk-h2h-mini {
-          margin-top: 3px;
-          padding: 3px 9px;
-          border-radius: 8px;
-          border: 1px solid var(--tt-border-medium);
-          color: var(--tt-text-secondary);
-          font-size: 0.61rem;
-          font-weight: 800;
+          min-height: 26px; padding: 2px 9px; border-radius: 8px;
+          background: var(--tt-surface-2); border: 1px solid var(--tt-border-medium);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+          color: var(--tt-text-secondary); font-size: 0.61rem; font-weight: 800;
         }
 
-        /* Corte Master Top 8 */
         .tt-master-cutoff-divider { display: flex; align-items: center; gap: 8px; padding: 9px 12px; background: rgba(229, 193, 108, 0.07); border-bottom: 1px solid var(--tt-border); }
         .tt-master-cutoff-divider.is-rounded { border-radius: 13px; border: 1px dashed rgba(229, 193, 108, 0.42); }
         .tt-cutoff-line { flex: 1; height: 1px; border-top: 1px dashed rgba(229, 193, 108, 0.52); }
-        .tt-cutoff-pill {
-          display: inline-flex;
-          align-items: center;
-          gap: 5px;
-          padding: 3px 9px;
-          border-radius: 999px;
-          background: #1E0734;
-          color: #E5C16C;
-          border: 1px solid rgba(229, 193, 108, 0.45);
-          font-size: 0.6rem;
-          font-weight: 900;
-          letter-spacing: 0.06em;
-          white-space: nowrap;
-        }
+        .tt-cutoff-pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px; background: #1E0734; color: #E5C16C; border: 1px solid rgba(229, 193, 108, 0.45); font-size: 0.6rem; font-weight: 900; letter-spacing: 0.06em; white-space: nowrap; }
 
-        /* 5. TEMPORADAS + RELOJ SPLIT-FLAP + ACORDEÓN */
-        .tt-seasons-banner {
-          border-radius: 22px;
-          padding: 15px;
-          background: var(--tt-surface);
-          border: 1px solid var(--tt-border);
-          box-shadow: var(--tt-card-specular), var(--tt-shadow-sm);
-          display: flex;
-          flex-direction: column;
-          gap: 11px;
-        }
+        /* 5. TEMPORADAS + RELOJ SPLIT-FLAP */
+        .tt-seasons-banner { border-radius: 22px; padding: 15px; background: var(--tt-surface); border: 1px solid var(--tt-border); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), var(--tt-shadow-sm); display: flex; flex-direction: column; gap: 11px; }
         .tt-seasons-banner-top { display: flex; align-items: center; gap: 11px; }
         .tt-seasons-kicker { display: block; font-size: 0.61rem; font-weight: 900; letter-spacing: 0.09em; color: #E5C16C; }
         .tt-ranking-view.is-light .tt-seasons-kicker { color: #9A6B16; }
         .tt-seasons-title { margin: 2px 0 0; font-family: var(--tt-font-display); font-size: 1.28rem; font-weight: 900; line-height: 1.06; }
 
-        /* Mini Reloj Split-Flap */
-        .tt-rk-flip-bar {
-          padding: 9px 11px;
-          border-radius: 15px;
-          background: #18042B;
-          color: #FAF9F5;
-          border: 1px solid rgba(250, 249, 245, 0.14);
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 8px;
-          flex-wrap: wrap;
-        }
+        .tt-rk-flip-bar { padding: 9px 11px; border-radius: 15px; background: #18042B; color: #FAF9F5; border: 1px solid rgba(250, 249, 245, 0.14); display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
         .tt-rk-flip-title { display: inline-flex; align-items: center; gap: 6px; font-size: 0.64rem; letter-spacing: 0.08em; }
         .tt-rk-flip-dot { width: 7px; height: 7px; border-radius: 50%; background: #00DC7D; animation: ttLivePulse 1.8s infinite; }
         .tt-rk-flip-group { display: inline-flex; align-items: flex-start; gap: 4px; margin-left: auto; }
         .tt-rk-flip-group em { font-style: normal; font-family: var(--tt-font-display); color: #E5C16C; padding-top: 5px; font-weight: 900; }
         .tt-rk-flip-unit { display: flex; flex-direction: column; align-items: center; gap: 2px; }
-        .tt-rk-flip-card {
-          position: relative;
-          min-width: 34px;
-          height: 32px;
-          padding: 0 4px;
-          border-radius: 7px;
-          background: linear-gradient(180deg, #2D0E4E 0%, #21083B 49%, #140425 51%, #1D0734 100%);
-          border: 1px solid rgba(250, 249, 245, 0.16);
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          animation: ttRkFlip 340ms cubic-bezier(0.22, 1.15, 0.36, 1) both;
-        }
+        .tt-rk-flip-card { position: relative; min-width: 34px; height: 32px; padding: 0 4px; border-radius: 7px; background: linear-gradient(180deg, #2D0E4E 0%, #21083B 49%, #140425 51%, #1D0734 100%); border: 1px solid rgba(250, 249, 245, 0.16); display: inline-flex; align-items: center; justify-content: center; animation: ttRkFlip 340ms cubic-bezier(0.22, 1.15, 0.36, 1) both; }
         @keyframes ttRkFlip { 0% { transform: rotateX(-36deg); opacity: 0.72; } 100% { transform: rotateX(0); opacity: 1; } }
         .tt-rk-flip-card span { font-family: var(--tt-font-display); font-size: 1.12rem; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; }
         .tt-rk-flip-card i { position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: rgba(8, 1, 16, 0.86); }
@@ -2128,35 +1896,17 @@ export default function RankingView({
 
         .tt-seasons-actions-row { display: flex; gap: 8px; flex-wrap: wrap; }
         .tt-master-gold-cta {
-          position: relative;
-          overflow: hidden;
-          flex: 1;
-          min-width: 175px;
-          min-height: 43px;
-          padding: 0 16px;
-          border-radius: 14px;
-          background: linear-gradient(135deg, #F5E1A4 0%, #CCA046 100%);
-          color: #1A1102;
-          font-size: 0.82rem;
-          font-weight: 900;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          box-shadow: 0 8px 20px rgba(204, 160, 70, 0.3);
+          position: relative; overflow: hidden; flex: 1; min-width: 175px; min-height: 43px; padding: 0 16px;
+          border-radius: 14px; background: linear-gradient(135deg, #F5E1A4 0%, #CCA046 100%);
+          color: #1A1102; font-size: 0.82rem; font-weight: 900;
+          display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 8px 20px rgba(204, 160, 70, 0.3);
         }
-        .tt-master-gold-sweep {
-          position: absolute;
-          inset: -20%;
-          background: linear-gradient(110deg, transparent 36%, rgba(255, 255, 255, 0.44) 50%, transparent 64%);
-          transform: translateX(-115%);
-          animation: ttGoldSheen 4.4s ease-in-out infinite;
-          pointer-events: none;
-        }
+        .tt-master-gold-sweep { position: absolute; inset: -20%; background: linear-gradient(110deg, transparent 36%, rgba(255, 255, 255, 0.44) 50%, transparent 64%); transform: translateX(-115%); animation: ttGoldSheen 4.4s ease-in-out infinite; pointer-events: none; }
         .tt-master-arrow { font-size: 1rem; }
 
         .tt-season-acc-list { display: flex; flex-direction: column; gap: 8px; }
-        .tt-acc-card { border-radius: 18px; background: var(--tt-surface); border: 1px solid var(--tt-border); box-shadow: var(--tt-card-specular), var(--tt-shadow-sm); overflow: hidden; }
+        .tt-acc-card { border-radius: 18px; background: var(--tt-surface); border: 1px solid var(--tt-border); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09), var(--tt-shadow-sm); overflow: hidden; }
         .tt-acc-card.is-open { border-color: var(--rk-soft-border); }
         .tt-acc-trigger { width: 100%; padding: 11px 13px; display: flex; align-items: center; gap: 10px; text-align: left; color: var(--tt-text); }
         .tt-race-rank-pill { min-width: 30px; height: 28px; padding: 0 6px; border-radius: 9px; font-family: var(--tt-font-display); font-size: 0.96rem; font-weight: 900; display: inline-flex; align-items: center; justify-content: center; background: var(--tt-surface-2); color: var(--tt-text-muted); flex-shrink: 0; }
@@ -2199,7 +1949,7 @@ export default function RankingView({
         /* 6. CLUBES */
         .tt-clubs-standings-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
         @media (min-width: 720px) { .tt-clubs-standings-grid { grid-template-columns: repeat(2, 1fr); } }
-        .tt-club-rank-card { border-radius: 22px; padding: 14px; background: var(--tt-surface); border: 1.5px solid var(--tt-border); box-shadow: var(--tt-card-specular), var(--tt-shadow-sm); display: flex; flex-direction: column; gap: 11px; }
+        .tt-club-rank-card { border-radius: 22px; padding: 14px; background: var(--tt-surface); border: 1.5px solid var(--tt-border); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), var(--tt-shadow-sm); display: flex; flex-direction: column; gap: 11px; }
         .tt-club-rank-head { display: flex; align-items: center; gap: 10px; }
         .tt-club-rank-num { font-family: var(--tt-font-display); font-size: 1.48rem; font-weight: 900; min-width: 28px; }
         .tt-club-logo-frame { width: 46px; height: 46px; border-radius: 13px; overflow: hidden; background: #FFFFFF; border: 1px solid var(--tt-border); flex-shrink: 0; }
@@ -2216,7 +1966,7 @@ export default function RankingView({
         .tt-club-top-rep strong { display: block; font-size: 0.81rem; }
         .tt-club-rep-pts { font-size: 0.75rem; font-weight: 800; color: var(--tt-emerald-text); white-space: nowrap; }
 
-        html[data-tier='lite'] .tt-podium-sheen,
+        html[data-tier='lite'] .tt-top3-sheen,
         html[data-tier='lite'] .tt-master-gold-sweep { display: none !important; }
       `}</style>
     </section>
