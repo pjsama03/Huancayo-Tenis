@@ -2273,6 +2273,40 @@ export default function App() {
           from { opacity: 0; transform: translate(-50%, -14px); }
           to { opacity: 1; transform: translate(-50%, 0); }
         }
+        /* LIQUID GLASS & FÍSICA ELÁSTICA GLOBAL (RANKING, TORNEOS, RETOS, SEDES) */
+        .tt-btn {
+          position: relative;
+          overflow: hidden;
+          transition:
+            transform 175ms cubic-bezier(0.22, 1.38, 0.36, 1),
+            box-shadow 220ms ease,
+            border-color 200ms ease,
+            filter 180ms ease !important;
+        }
+        .tt-btn:active {
+          transform: scale(0.95) !important;
+        }
+        .tt-btn-primary {
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.45),
+            0 8px 20px rgba(0, 220, 125, 0.28) !important;
+        }
+        .tt-btn-secondary,
+        .tt-btn-ghost {
+          backdrop-filter: blur(14px) saturate(145%);
+          -webkit-backdrop-filter: blur(14px) saturate(145%);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14) !important;
+        }
+        .tt-card,
+        .tt-torneos-view button:not(:disabled) {
+          transition:
+            transform 175ms cubic-bezier(0.22, 1.38, 0.36, 1),
+            box-shadow 220ms ease,
+            border-color 200ms ease;
+        }
+        .tt-torneos-view button:not(:disabled):active {
+          transform: scale(0.95);
+        }
       `}</style>
     </div>
   );
