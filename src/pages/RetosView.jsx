@@ -9,10 +9,23 @@ import {
   triggerHaptic,
 } from '../components/AppIcons';
 import {
+  BALLS_AGREEMENTS,
+  MAX_OFFICIAL_ELO_WINDOW,
+  MatchPosterCard,
+  PlayerAvatarWithClub,
+  QUICK_TIME_SLOTS,
+  RetosCelebrationModal,
+  RetosRescheduleModal,
+  buildLiveScoreFromDirectDraft,
+  computeAdaptiveOfficialRivals,
+  createDirectDraftFromScore,
+  formatDynamicDateAndTime,
+  getTodayDateInputValue,
+} from '../components/RetosParts';
+import {
   CATEGORIES_SCALE,
   INITIAL_CLUBS,
   getCategoryByPoints,
-  getClubById,
 } from '../data/playersAndClubsData';
 import {
   calculateOfficialMatchElo,
@@ -23,602 +36,10 @@ import {
   getPreMatchForecast,
   stepLiveScoreboard,
 } from '../utils/tenisEngine';
-import { buildWhatsappLink } from '../utils/cloudService';
+import { buildWhatsappLink, getEffectiveContactPhone } from '../utils/cloudService';
 
 /* ==========================================================================
-   CONSTANTES Y UTILIDADES DE RETOS (HORA PERÚ + CONVERSOR DE SCORE DIRECTO)
-   ========================================================================== */
-const MAX_OFFICIAL_ELO_WINDOW = 1200;
-
-const QUICK_TIME_SLOTS = [
-  '07:00',
-  '08:30',
-  '10:00',
-  '15:00',
-  '16:30',
-  '18:00',
-  '19:00',
-  '20:00',
-];
-
-const BALLS_AGREEMENTS = [
-  'Lata nueva a medias (50/50)',
-  'Tarro nuevo (lleva retador)',
-  'Pelotas en buen estado',
-];
-
-function getTodayDateInputValue(daysAhead = 0) {
-  const d = new Date();
-  d.setDate(d.getDate() + daysAhead);
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
-}
-
-function formatDynamicDateAndTime(isoString, fallbackDate = '', fallbackTime = '') {
-  if (!isoString) {
-    return {
-      dateText: fallbackDate || 'Por coordinar',
-      timeText: fallbackTime || '--:--',
-    };
-  }
-  const d = new Date(isoString);
-  if (Number.isNaN(d.getTime())) {
-    return {
-      dateText: fallbackDate || 'Por coordinar',
-      timeText: fallbackTime || '--:--',
-    };
-  }
-
-  try {
-    const now = new Date();
-    const fmtKey = (dt) => dt.toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
-    const targetKey = fmtKey(d);
-    const todayKey = fmtKey(now);
-    const tomorrow = new Date(now);
-    tomorrow.setDate(now.getDate() + 1);
-    const tomorrowKey = fmtKey(tomorrow);
-
-    const shortDate = d.toLocaleDateString('es-PE', {
-      timeZone: 'America/Lima',
-      weekday: 'short',
-      day: '2-digit',
-      month: 'short',
-    });
-
-    let dateText = shortDate.charAt(0).toUpperCase() + shortDate.slice(1);
-    if (targetKey === todayKey) {
-      const dm = d.toLocaleDateString('es-PE', {
-        timeZone: 'America/Lima',
-        day: '2-digit',
-        month: 'short',
-      });
-      dateText = `Hoy · ${dm}`;
-    } else if (targetKey === tomorrowKey) {
-      const dm = d.toLocaleDateString('es-PE', {
-        timeZone: 'America/Lima',
-        day: '2-digit',
-        month: 'short',
-      });
-      dateText = `Mañana · ${dm}`;
-    }
-
-    const timeText = d.toLocaleTimeString('es-PE', {
-      timeZone: 'America/Lima',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-    });
-
-    return { dateText, timeText };
-  } catch {
-    return {
-      dateText: fallbackDate || d.toLocaleDateString('es-PE'),
-      timeText:
-        fallbackTime || d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }),
-    };
-  }
-}
-
-function isRegularSetFinished(a, b) {
-  return (
-    (a === 6 && b <= 4) ||
-    (b === 6 && a <= 4) ||
-    (a === 7 && (b === 5 || b === 6)) ||
-    (b === 7 && (a === 5 || a === 6))
-  );
-}
-
-function createDirectDraftFromScore(liveScore) {
-  const s1 = liveScore?.set1 || {};
-  const s2 = liveScore?.set2 || {};
-  const s3 = liveScore?.set3 || {};
-  return {
-    s1a: s1.a > 0 || s1.b > 0 ? String(s1.a) : '',
-    s1b: s1.a > 0 || s1.b > 0 ? String(s1.b) : '',
-    tb1a: s1.tbA > 0 ? String(s1.tbA) : '',
-    tb1b: s1.tbB > 0 ? String(s1.tbB) : '',
-    s2a: s2.a > 0 || s2.b > 0 ? String(s2.a) : '',
-    s2b: s2.a > 0 || s2.b > 0 ? String(s2.b) : '',
-    tb2a: s2.tbA > 0 ? String(s2.tbA) : '',
-    tb2b: s2.tbB > 0 ? String(s2.tbB) : '',
-    s3a: s3.a > 0 || s3.b > 0 ? String(s3.a) : '',
-    s3b: s3.a > 0 || s3.b > 0 ? String(s3.b) : '',
-  };
-}
-
-function buildLiveScoreFromDirectDraft(draft) {
-  const base = createEmptyLiveScore();
-  const s1a = draft.s1a === '' ? 0 : Math.max(0, Math.min(7, Number(draft.s1a) || 0));
-  const s1b = draft.s1b === '' ? 0 : Math.max(0, Math.min(7, Number(draft.s1b) || 0));
-  const s2a = draft.s2a === '' ? 0 : Math.max(0, Math.min(7, Number(draft.s2a) || 0));
-  const s2b = draft.s2b === '' ? 0 : Math.max(0, Math.min(7, Number(draft.s2b) || 0));
-
-  const s1Tb = (s1a === 7 && s1b === 6) || (s1b === 7 && s1a === 6);
-  const s2Tb = (s2a === 7 && s2b === 6) || (s2b === 7 && s2a === 6);
-
-  base.set1 = {
-    ...base.set1,
-    a: s1a,
-    b: s1b,
-    tbA: s1Tb ? (draft.tb1a !== '' ? Math.max(0, Number(draft.tb1a) || 0) : s1a === 7 ? 7 : 5) : 0,
-    tbB: s1Tb ? (draft.tb1b !== '' ? Math.max(0, Number(draft.tb1b) || 0) : s1b === 7 ? 7 : 5) : 0,
-    locked: isRegularSetFinished(s1a, s1b),
-  };
-
-  base.set2 = {
-    ...base.set2,
-    a: s2a,
-    b: s2b,
-    tbA: s2Tb ? (draft.tb2a !== '' ? Math.max(0, Number(draft.tb2a) || 0) : s2a === 7 ? 7 : 5) : 0,
-    tbB: s2Tb ? (draft.tb2b !== '' ? Math.max(0, Number(draft.tb2b) || 0) : s2b === 7 ? 7 : 5) : 0,
-    locked: isRegularSetFinished(s2a, s2b),
-  };
-
-  const w1 = base.set1.locked ? (s1a > s1b ? 'A' : 'B') : null;
-  const w2 = base.set2.locked ? (s2a > s2b ? 'A' : 'B') : null;
-  const needsStb = Boolean(w1 && w2 && w1 !== w2);
-
-  if (needsStb) {
-    const s3a = draft.s3a === '' ? 0 : Math.max(0, Number(draft.s3a) || 0);
-    const s3b = draft.s3b === '' ? 0 : Math.max(0, Number(draft.s3b) || 0);
-    base.set3 = {
-      ...base.set3,
-      a: s3a,
-      b: s3b,
-      locked: (s3a >= 10 || s3b >= 10) && Math.abs(s3a - s3b) >= 2,
-    };
-  }
-
-  return { liveScore: base, s1Tb, s2Tb, needsStb };
-}
-
-/* ==========================================================================
-   SUBCOMPONENTE 1: AVATAR CON ANILLO LIMPIO Y ESCUDO REAL DEL CLUB
-   ========================================================================== */
-function PlayerAvatarWithClub({
-  player,
-  clubs,
-  size = 54,
-  ringColor = '#00DC7D',
-  onClick,
-}) {
-  const club = getClubById(clubs, player?.clubId);
-  const badgeSize = Math.round(size * 0.4);
-
-  return (
-    <button
-      type="button"
-      className="tt-rt-avatar-btn"
-      onClick={(e) => {
-        e.stopPropagation();
-        triggerHaptic('light');
-        if (onClick && player) onClick(player);
-      }}
-      aria-label={`Ver ficha de ${player?.name || 'jugador'}`}
-      style={{
-        position: 'relative',
-        width: size,
-        height: size,
-        padding: 0,
-        border: 'none',
-        background: 'transparent',
-        flexShrink: 0,
-        cursor: onClick ? 'pointer' : 'default',
-      }}
-    >
-      <SmartImage
-        src={player?.avatar}
-        alt={player?.name || 'Jugador'}
-        initials={player?.name || 'TT'}
-        style={{
-          width: size,
-          height: size,
-          borderRadius: '50%',
-          objectFit: 'cover',
-          objectPosition: 'center top',
-          border: `2.5px solid ${ringColor}`,
-          boxShadow: '0 6px 16px rgba(10, 2, 20, 0.28)',
-        }}
-      />
-      {club?.logo && (
-        <span
-          style={{
-            position: 'absolute',
-            right: -2,
-            bottom: -2,
-            width: badgeSize,
-            height: badgeSize,
-            borderRadius: '50%',
-            backgroundColor: '#FFFFFF',
-            border: '2px solid #1E0734',
-            overflow: 'hidden',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.35)',
-          }}
-        >
-          <SmartImage
-            src={club.logo}
-            alt={club.shortName}
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-          />
-        </span>
-      )}
-    </button>
-  );
-}
-
-/* ==========================================================================
-   SUBCOMPONENTE 2: TARJETA PÓSTER VS (LIQUID GLASS + MODO ESPECTADOR)
-   ========================================================================== */
-function MatchPosterCard({
-  challenge,
-  playerA,
-  playerB,
-  judgePlayer,
-  clubs,
-  currentUser,
-  isAdmin,
-  onOpenScoreModal,
-  onAcceptChallenge,
-  onDeclineChallenge,
-  onOpenReschedule,
-  onOpenPlayerProfile,
-  onOpenStories,
-}) {
-  const perms = getMatchPermissions(challenge, currentUser, isAdmin);
-  const { dateText, timeText } = formatDynamicDateAndTime(
-    challenge.scheduledIso,
-    challenge.dateLabel,
-    challenge.timeLabel
-  );
-  const catA = getCategoryByPoints(playerA?.points);
-  const catB = getCategoryByPoints(playerB?.points);
-  const scoreEval = evaluateMatchScore(challenge.liveScore);
-
-  const isLive = challenge.status === 'IN_PLAY';
-  const isPending = challenge.status === 'PENDING';
-  const isProposed = challenge.status === 'SCORE_PROPOSED';
-  const isDisputed = challenge.status === 'DISPUTED';
-  const isFinished = challenge.status === 'FINISHED';
-  const isScheduled = challenge.status === 'SCHEDULED';
-  const isOfficial = challenge.mode !== 'Amistoso';
-
-  const statusMeta = isLive
-    ? { label: 'EN JUEGO AHORA', cls: 'is-live' }
-    : isProposed
-    ? { label: 'POR CONFIRMAR', cls: 'is-pending' }
-    : isDisputed
-    ? { label: 'EN REVISIÓN', cls: 'is-disputed' }
-    : isPending
-    ? { label: 'PENDIENTE DE ACEPTAR', cls: 'is-pending' }
-    : isFinished
-    ? { label: 'TERMINADO', cls: 'is-finished' }
-    : { label: 'PROGRAMADO', cls: 'is-scheduled' };
-
-  const opponent = perms.isPlayerA ? playerB : playerA;
-  const whatsappUrl = opponent
-    ? buildWhatsappLink(
-        opponent.whatsapp,
-        `Hola ${opponent.name}, te escribo desde TOTAL TENIS por nuestro partido en ${challenge.clubName} (${dateText} · ${timeText}).`
-      )
-    : null;
-
-  const canManage = perms.isParticipant || perms.isJudge || isAdmin;
-
-  return (
-    <article className={`tt-match-card ${statusMeta.cls}`}>
-      <div className="tt-match-card-top">
-        <span className={`tt-match-pill ${statusMeta.cls}`}>
-          {isLive && <span className="tt-live-dot-inline" />}
-          {statusMeta.label}
-        </span>
-        <span className="tt-match-mode-tag">
-          {isOfficial ? 'Por puntos' : 'Amistoso'}
-        </span>
-      </div>
-
-      {/* Centro VS */}
-      <div className="tt-match-vs-grid">
-        <div className="tt-match-side">
-          <PlayerAvatarWithClub
-            player={playerA}
-            clubs={clubs}
-            size={56}
-            ringColor="#00DC7D"
-            onClick={onOpenPlayerProfile}
-          />
-          <strong className="tt-match-player-name">{playerA?.name || 'Jugador A'}</strong>
-          <div className="tt-match-player-meta">
-            <span className="tt-cat-dot-inline" style={{ backgroundColor: catA.color }} />
-            <span>{catA.name}</span>
-            <span>·</span>
-            <span>{Number(playerA?.points || 0).toLocaleString('es-PE')} pts</span>
-          </div>
-          {isFinished && challenge.winnerId === playerA?.id && (
-            <span className="tt-winner-chip">GANADOR</span>
-          )}
-        </div>
-
-        <div className="tt-match-center-col">
-          <span className="tt-vs-emblem">VS</span>
-          <span className="tt-match-date-chip">{dateText}</span>
-          <span className="tt-match-time-chip">{timeText}</span>
-        </div>
-
-        <div className="tt-match-side">
-          <PlayerAvatarWithClub
-            player={playerB}
-            clubs={clubs}
-            size={56}
-            ringColor="#E5C16C"
-            onClick={onOpenPlayerProfile}
-          />
-          <strong className="tt-match-player-name">{playerB?.name || 'Jugador B'}</strong>
-          <div className="tt-match-player-meta">
-            <span className="tt-cat-dot-inline" style={{ backgroundColor: catB.color }} />
-            <span>{catB.name}</span>
-            <span>·</span>
-            <span>{Number(playerB?.points || 0).toLocaleString('es-PE')} pts</span>
-          </div>
-          {isFinished && challenge.winnerId === playerB?.id && (
-            <span className="tt-winner-chip">GANADOR</span>
-          )}
-        </div>
-      </div>
-
-      {/* Marcador en Vivo, Por Confirmar o Resultado Final */}
-      {(isLive || isProposed || isDisputed || isFinished) && (
-        <div className="tt-mini-scoreboard">
-          <div className="tt-mini-sb-row">
-            <span className="tt-mini-sb-name">
-              {playerA?.name?.split(' ')[0] || 'A'}
-              {isFinished && challenge.winnerId === playerA?.id && (
-                <TTIcon name="check" size={13} style={{ color: '#00DC7D' }} />
-              )}
-            </span>
-            <div className="tt-mini-sb-sets">
-              <span className="tt-sb-cell">{challenge.liveScore?.set1?.a ?? 0}</span>
-              <span className="tt-sb-cell">{challenge.liveScore?.set2?.a ?? 0}</span>
-              {(scoreEval.needsSuperTieBreak ||
-                (challenge.liveScore?.set3?.a ?? 0) > 0 ||
-                (challenge.liveScore?.set3?.b ?? 0) > 0) && (
-                <span className="tt-sb-cell is-stb">
-                  {challenge.liveScore?.set3?.a ?? 0}
-                </span>
-              )}
-            </div>
-            {isFinished && typeof challenge.eloDeltaA === 'number' && isOfficial && (
-              <span
-                className={`tt-delta-pill ${challenge.eloDeltaA >= 0 ? 'is-pos' : 'is-neg'}`}
-              >
-                {challenge.eloDeltaA >= 0 ? `+${challenge.eloDeltaA}` : challenge.eloDeltaA}
-              </span>
-            )}
-          </div>
-
-          <div className="tt-mini-sb-row">
-            <span className="tt-mini-sb-name">
-              {playerB?.name?.split(' ')[0] || 'B'}
-              {isFinished && challenge.winnerId === playerB?.id && (
-                <TTIcon name="check" size={13} style={{ color: '#00DC7D' }} />
-              )}
-            </span>
-            <div className="tt-mini-sb-sets">
-              <span className="tt-sb-cell">{challenge.liveScore?.set1?.b ?? 0}</span>
-              <span className="tt-sb-cell">{challenge.liveScore?.set2?.b ?? 0}</span>
-              {(scoreEval.needsSuperTieBreak ||
-                (challenge.liveScore?.set3?.a ?? 0) > 0 ||
-                (challenge.liveScore?.set3?.b ?? 0) > 0) && (
-                <span className="tt-sb-cell is-stb">
-                  {challenge.liveScore?.set3?.b ?? 0}
-                </span>
-              )}
-            </div>
-            {isFinished && typeof challenge.eloDeltaB === 'number' && isOfficial && (
-              <span
-                className={`tt-delta-pill ${challenge.eloDeltaB >= 0 ? 'is-pos' : 'is-neg'}`}
-              >
-                {challenge.eloDeltaB >= 0 ? `+${challenge.eloDeltaB}` : challenge.eloDeltaB}
-              </span>
-            )}
-          </div>
-
-          <div className="tt-mini-sb-foot">
-            <span>{challenge.scoreSummary || scoreEval.summary || 'Partido en curso'}</span>
-            <span>
-              {judgePlayer
-                ? `Árbitro: ${judgePlayer.name}`
-                : isProposed
-                ? 'Esperando confirmación del rival'
-                : isDisputed
-                ? 'Observado por revisión'
-                : isLive
-                ? canManage
-                  ? 'Marcador en vivo'
-                  : 'En vivo · Solo lectura'
-                : 'Resultado confirmado'}
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* Sede + Acuerdo de pelotas */}
-      <div className="tt-match-venue-bar">
-        <div className="tt-match-venue-item">
-          <TTIcon name="mapPin" size={15} style={{ color: '#00DC7D' }} />
-          <span>{challenge.clubName || 'Sede por definir'}</span>
-        </div>
-        {challenge.ballsAgreement && (
-          <div className="tt-match-venue-item is-subtle">
-            <TTIcon name="ball" size={14} style={{ color: '#E5C16C' }} />
-            <span>{challenge.ballsAgreement}</span>
-          </div>
-        )}
-      </div>
-
-      {/* Acciones por Rol */}
-      <div className="tt-match-actions">
-        {isPending && perms.isPlayerB && (
-          <>
-            <button
-              type="button"
-              className="tt-btn tt-btn-primary tt-btn-sm tt-glass-press"
-              style={{ flex: 1 }}
-              onClick={() => {
-                triggerHaptic('success');
-                onAcceptChallenge(challenge);
-              }}
-            >
-              Aceptar Desafío
-            </button>
-            <button
-              type="button"
-              className="tt-btn tt-btn-ghost tt-btn-sm tt-glass-press"
-              onClick={() => {
-                triggerHaptic('warning');
-                onDeclineChallenge(challenge);
-              }}
-            >
-              Declinar
-            </button>
-          </>
-        )}
-
-        {isPending && perms.isPlayerA && (
-          <div className="tt-waiting-banner">
-            <TTIcon name="clock" size={15} />
-            <span>Esperando confirmación de {playerB?.name || 'tu rival'}</span>
-          </div>
-        )}
-
-        {isScheduled && (perms.isParticipant || isAdmin) && (
-          <>
-            <button
-              type="button"
-              className="tt-btn tt-btn-primary tt-btn-sm tt-glass-press"
-              style={{ flex: 1 }}
-              onClick={() => {
-                triggerHaptic('medium');
-                onOpenScoreModal(challenge, 'direct');
-              }}
-            >
-              <TTIcon name="scoreboard" size={16} />
-              Subir Resultado
-            </button>
-
-            {perms.canReschedule && (
-              <button
-                type="button"
-                className="tt-btn tt-btn-secondary tt-btn-sm tt-glass-press"
-                onClick={() => {
-                  triggerHaptic('light');
-                  onOpenReschedule(challenge);
-                }}
-              >
-                <TTIcon name="clock" size={15} />
-                {perms.rescheduleMode === 'ORDINARY_ALLOWED' ? 'Cambiar hora' : 'Clima'}
-              </button>
-            )}
-          </>
-        )}
-
-        {isLive && (
-          <button
-            type="button"
-            className={`tt-btn ${
-              perms.canEditScore ? 'tt-btn-primary' : 'tt-btn-secondary'
-            } tt-btn-sm tt-glass-press`}
-            style={{ flex: 1 }}
-            onClick={() => {
-              triggerHaptic('light');
-              onOpenScoreModal(challenge, perms.isJudge ? 'live' : 'direct');
-            }}
-          >
-            <TTIcon name="scoreboard" size={16} />
-            {perms.isJudge
-              ? 'Llevar Marcador (Árbitro)'
-              : perms.canEditScore
-              ? 'Subir / Ver Marcador'
-              : 'Seguir en Vivo'}
-          </button>
-        )}
-
-        {isProposed && perms.isParticipant && (
-          <div className="tt-waiting-banner">
-            <TTIcon name="clock" size={15} />
-            <span>
-              {challenge.proposedBy === currentUser?.id
-                ? 'Resultado enviado · Esperando confirmación del rival'
-                : 'Tu rival subió el marcador · Revisa la ventana de confirmación'}
-            </span>
-          </div>
-        )}
-
-        {isFinished && (perms.isParticipant || isAdmin) && onOpenStories && (
-          <button
-            type="button"
-            className="tt-btn tt-btn-secondary tt-btn-sm tt-glass-press"
-            style={{ flex: 1 }}
-            onClick={() => {
-              triggerHaptic('light');
-              onOpenStories({ challenge, playerA, playerB });
-            }}
-          >
-            <TTIcon name="stories" size={16} />
-            Publicar en Stories
-          </button>
-        )}
-
-        {!canManage && (isScheduled || isPending) && (
-          <div className="tt-spectator-pill">
-            <TTIcon name="vision" size={14} />
-            <span>Modo espectador · Solo lectura</span>
-          </div>
-        )}
-
-        {!isFinished && perms.isParticipant && whatsappUrl && !opponent?.hideWhatsapp && (
-          <a
-            href={whatsappUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="tt-icon-action-btn is-wa tt-glass-press"
-            aria-label={`Coordinar por WhatsApp con ${opponent?.name}`}
-            onClick={() => triggerHaptic('light')}
-          >
-            <TTIcon name="whatsapp" size={18} />
-          </a>
-        )}
-      </div>
-    </article>
-  );
-}
-
-/* ==========================================================================
-   VISTA PRINCIPAL: RetosView (CARRUSEL INSTANTÁNEO + LIQUID GLASS TÁCTIL)
+   VISTA PRINCIPAL: RetosView (CARRUSEL INSTANTÁNEO + ANTI-ESCASEZ + TUTELA)
    ========================================================================== */
 export default function RetosView({
   players = [],
@@ -670,6 +91,23 @@ export default function RetosView({
     });
     return map;
   }, [players]);
+
+  // Motor adaptativo Anti-Escasez (±1,200 normal -> ±1,800 hasta 8 rivales si hay < 6 en tu rango)
+  const adaptiveRadar = useMemo(
+    () => computeAdaptiveOfficialRivals(players, currentUser),
+    [players, currentUser]
+  );
+
+  const isRivalInOfficialRange = useCallback(
+    (rival) => {
+      if (!rival?.id) return false;
+      if (!currentUser) {
+        return Math.abs((Number(rival.points) || 0) - 1500) <= MAX_OFFICIAL_ELO_WINDOW;
+      }
+      return adaptiveRadar.eligibleIds.has(rival.id);
+    },
+    [adaptiveRadar, currentUser]
+  );
 
   const liveChallenges = useMemo(
     () => (challenges || []).filter((c) => c.status === 'IN_PLAY'),
@@ -730,6 +168,7 @@ export default function RetosView({
     const q = rivalSearch.trim().toLowerCase();
 
     return (players || [])
+      .filter((p) => !p.isPaused && !p.isTutorOnly)
       .filter((p) => !currentUser || p.id !== currentUser.id)
       .filter((p) => {
         if (categoryFilter !== 'ALL' && getCategoryByPoints(p.points).id !== categoryFilter) {
@@ -743,15 +182,26 @@ export default function RetosView({
       })
       .map((p) => {
         const gap = Math.abs((Number(p.points) || 0) - myPoints);
-        const inOfficialRange = gap <= MAX_OFFICIAL_ELO_WINDOW;
-        return { player: p, gap, inOfficialRange };
+        const inOfficialRange = isRivalInOfficialRange(p);
+        const viaExpanded = Boolean(
+          adaptiveRadar.expanded && inOfficialRange && gap > MAX_OFFICIAL_ELO_WINDOW
+        );
+        return { player: p, gap, inOfficialRange, viaExpanded };
       })
       .filter((item) => (onlyInRange ? item.inOfficialRange : true))
       .sort((a, b) => {
         if (a.inOfficialRange !== b.inOfficialRange) return a.inOfficialRange ? -1 : 1;
         return a.gap - b.gap;
       });
-  }, [players, currentUser, rivalSearch, categoryFilter, onlyInRange]);
+  }, [
+    players,
+    currentUser,
+    rivalSearch,
+    categoryFilter,
+    onlyInRange,
+    isRivalInOfficialRange,
+    adaptiveRadar.expanded,
+  ]);
 
   const activeScoreboardChallenge = useMemo(
     () => (challenges || []).find((c) => c.id === activeScoreboardId) || null,
@@ -847,8 +297,18 @@ export default function RetosView({
       if (onOpenAuth) onOpenAuth('login');
       return;
     }
-    const gap = Math.abs((Number(rival.points) || 0) - (Number(currentUser.points) || 0));
-    setFormMode(forceFriendly || gap > MAX_OFFICIAL_ELO_WINDOW ? 'Amistoso' : 'Por puntos');
+    if (currentUser.isTutorOnly) {
+      triggerHaptic('warning');
+      if (onNotify) {
+        onNotify(
+          'Tu cuenta está en modo Solo Padre/Tutor. Cambia a la subcuenta de tu hijo en Perfil para lanzar retos.',
+          'info'
+        );
+      }
+      return;
+    }
+    const eligibleOfficial = isRivalInOfficialRange(rival);
+    setFormMode(forceFriendly || !eligibleOfficial ? 'Amistoso' : 'Por puntos');
     setFormClubId(
       currentUser.clubId && currentUser.clubId !== 'independiente'
         ? currentUser.clubId
@@ -901,7 +361,12 @@ export default function RetosView({
     if (onCreateChallenge) onCreateChallenge(newChallenge);
     triggerHaptic('success');
     if (onNotify) {
-      onNotify(`Desafío enviado a ${challengeTarget.name}. Queda pendiente de su aceptación.`, 'success');
+      onNotify(
+        challengeTarget.isTutelado
+          ? `Desafío enviado al padre/madre tutor de ${challengeTarget.name}. Queda pendiente de aceptación.`
+          : `Desafío enviado a ${challengeTarget.name}. Queda pendiente de su aceptación.`,
+        'success'
+      );
     }
     setChallengeTarget(null);
     setSubTab('mis-retos');
@@ -1093,11 +558,12 @@ export default function RetosView({
       });
       triggerHaptic('medium');
       if (onNotify) onNotify(`Reprogramación registrada (${reschedReason}).`, 'info');
-      if (rival && !rival.hideWhatsapp) {
-        const wa = buildWhatsappLink(
-          rival.whatsapp,
-          `Hola ${rival.name}, aviso desde TOTAL TENIS: por "${reschedReason}", propongo reprogramar nuestro partido en ${rescheduleTarget.clubName} para el ${dateText} a las ${timeText}.`
-        );
+      const targetPhone = getEffectiveContactPhone(rival, players);
+      if (rival && targetPhone && (!rival.hideWhatsapp || rival.isTutelado)) {
+        const waMsg = rival.isTutelado
+          ? `Hola ${rival.tutorName || 'Padre/Madre'}, aviso desde TOTAL TENIS: por "${reschedReason}", propongo reprogramar el partido con ${rival.name} en ${rescheduleTarget.clubName} para el ${dateText} a las ${timeText}.`
+          : `Hola ${rival.name}, aviso desde TOTAL TENIS: por "${reschedReason}", propongo reprogramar nuestro partido en ${rescheduleTarget.clubName} para el ${dateText} a las ${timeText}.`;
+        const wa = buildWhatsappLink(targetPhone, waMsg);
         window.open(wa, '_blank', 'noopener,noreferrer');
       }
     }
@@ -1406,6 +872,7 @@ export default function RetosView({
                   playerB={playersMap[ch.playerBId]}
                   judgePlayer={ch.judgeId ? playersMap[ch.judgeId] : null}
                   clubs={clubs}
+                  allPlayers={players}
                   currentUser={currentUser}
                   isAdmin={isAdmin}
                   onOpenScoreModal={openScoreModal}
@@ -1438,6 +905,12 @@ export default function RetosView({
               actionLabel="Iniciar Sesión"
               onAction={() => onOpenAuth && onOpenAuth('login')}
             />
+          ) : currentUser.isTutorOnly ? (
+            <EmptyStateCard
+              theme={theme}
+              title="Cuenta en Modo Solo Padre / Tutor"
+              description="Entra a la pestaña Perfil y toca «Entrar como...» en la ficha de tu hijo/a para ver y confirmar sus partidos."
+            />
           ) : myChallenges.length === 0 ? (
             <EmptyStateCard
               theme={theme}
@@ -1456,6 +929,7 @@ export default function RetosView({
                   playerB={playersMap[ch.playerBId]}
                   judgePlayer={ch.judgeId ? playersMap[ch.judgeId] : null}
                   clubs={clubs}
+                  allPlayers={players}
                   currentUser={currentUser}
                   isAdmin={isAdmin}
                   onOpenScoreModal={openScoreModal}
@@ -1476,10 +950,34 @@ export default function RetosView({
       )}
 
       {/* ====================================================================
-          4C. LANZAR RETO (BUSCADOR DE RIVALES)
+          4C. LANZAR RETO (RADAR CON VENTANA ANTI-ESCASEZ + PROTECCIÓN TUTELA)
           ==================================================================== */}
       {subTab === 'lanzar' && (
         <div key="panel-lanzar" className="tt-retos-panel tt-rt-panel-in">
+          {currentUser?.isTutorOnly && (
+            <div className="tt-tutor-only-card">
+              <TTIcon name="shield" size={18} style={{ color: '#7DD3FC', flexShrink: 0 }} />
+              <div>
+                <strong>Cuenta Solo Padre / Tutor</strong>
+                <p>
+                  Para retar a nombre de tu hijo/a (-18), ve a la pestaña <b>Perfil</b> y toca <b>Entrar como...</b> en su subcuenta tutelada.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {adaptiveRadar.expanded && currentUser && !currentUser.isTutorOnly && (
+            <div className="tt-scarcity-banner">
+              <TTIcon name="shield" size={17} style={{ color: '#00DC7D', flexShrink: 0 }} />
+              <div>
+                <strong>Ventana Anti-Escasez activa (±1,800 pts)</strong>
+                <p>
+                  Como hay menos de 6 rivales en tu rango base (±1,200), ampliamos tus retos oficiales a los 8 rivales más cercanos y tu cuota mensual baja a <b>{adaptiveRadar.monthlyQuota} partidos/mes</b>.
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="tt-radar-controls">
             <div className="tt-search-box">
               <TTIcon name="search" size={17} style={{ opacity: 0.65 }} />
@@ -1501,7 +999,11 @@ export default function RetosView({
                   setOnlyInRange((v) => !v);
                 }}
               >
-                {onlyInRange ? 'Solo en mi rango (±1,200)' : 'Ver todos los niveles'}
+                {onlyInRange
+                  ? adaptiveRadar.expanded
+                    ? 'Mi rango ampliado (±1,800)'
+                    : 'Solo en mi rango (±1,200)'
+                  : 'Ver todos los niveles'}
               </button>
 
               <button
@@ -1545,16 +1047,17 @@ export default function RetosView({
             />
           ) : (
             <div className="tt-rivals-list">
-              {availableRivals.map(({ player, inOfficialRange }) => {
+              {availableRivals.map(({ player, inOfficialRange, viaExpanded }) => {
                 const cat = getCategoryByPoints(player.points);
-                const forecast = currentUser
-                  ? getPreMatchForecast(
-                      currentUser,
-                      player,
-                      challenges,
-                      Math.max(players.length, 130)
-                    )
-                  : null;
+                const forecast =
+                  currentUser && !currentUser.isTutorOnly
+                    ? getPreMatchForecast(
+                        currentUser,
+                        player,
+                        challenges,
+                        Math.max(players.length, 130)
+                      )
+                    : null;
                 const wins = Number(player.wins) || 0;
                 const losses = Number(player.losses) || 0;
                 const total = wins + losses;
@@ -1577,6 +1080,7 @@ export default function RetosView({
                       <div className="tt-rival-name-line">
                         <strong>{player.name}</strong>
                         {player.isVip && <span className="tt-vip-micro-pill">VIP</span>}
+                        {player.isTutelado && <span className="tt-tutela-mini-pill">Tutelada</span>}
                       </div>
 
                       <div className="tt-rival-meta-line">
@@ -1598,10 +1102,13 @@ export default function RetosView({
                           <span className="is-loss">
                             Si pierdes: {forecast.playerA.minLoss} a {forecast.playerA.maxLoss} pts
                           </span>
+                          {viaExpanded && <span className="is-expanded">· Rango ampliado</span>}
                         </div>
                       ) : !inOfficialRange ? (
                         <div className="tt-rival-forecast-line">
-                          <span>Diferencia mayor a 1,200 pts · Disponible como amistoso</span>
+                          <span>
+                            Fuera de tu rango oficial (±{adaptiveRadar.effectiveWindow.toLocaleString('es-PE')} pts) · Disponible como amistoso
+                          </span>
                         </div>
                       ) : null}
                     </div>
@@ -1616,7 +1123,7 @@ export default function RetosView({
                             openCreateChallengeModal(player, false);
                           }}
                         >
-                          Desafiar
+                          {player.isTutelado ? 'Retar (Tutor)' : 'Desafiar'}
                         </button>
                       ) : (
                         <button
@@ -1655,6 +1162,18 @@ export default function RetosView({
       >
         {challengeTarget && (
           <form onSubmit={handleSubmitNewChallenge} className="tt-form-stack">
+            {challengeTarget.isTutelado && (
+              <div className="tt-tutor-only-card">
+                <TTIcon name="shield" size={17} style={{ color: '#7DD3FC', flexShrink: 0 }} />
+                <div>
+                  <strong>Cuenta Juvenil Tutelada (-18)</strong>
+                  <p>
+                    Este reto y toda coordinación por WhatsApp se enviarán directamente al padre/madre verificado ({challengeTarget.tutorName || 'Tutor'}).
+                  </p>
+                </div>
+              </div>
+            )}
+
             {preMatchForecast && formMode === 'Por puntos' && (
               <div className="tt-forecast-box">
                 <div className="tt-forecast-head">
@@ -1683,10 +1202,7 @@ export default function RetosView({
               <label className="tt-field-label">Modalidad del partido</label>
               <div className="tt-toggle-pair">
                 {['Por puntos', 'Amistoso'].map((m) => {
-                  const gap = Math.abs(
-                    (Number(challengeTarget.points) || 0) - (Number(currentUser?.points) || 0)
-                  );
-                  const blocked = m === 'Por puntos' && gap > MAX_OFFICIAL_ELO_WINDOW;
+                  const blocked = m === 'Por puntos' && !isRivalInOfficialRange(challengeTarget);
                   return (
                     <button
                       key={m}
@@ -2297,6 +1813,7 @@ export default function RetosView({
                         {players
                           .filter(
                             (p) =>
+                              !p.isTutorOnly &&
                               p.id !== activeScoreboardChallenge.playerAId &&
                               p.id !== activeScoreboardChallenge.playerBId
                           )
@@ -2666,214 +2183,27 @@ export default function RetosView({
       </ModalPortal>
 
       {/* ====================================================================
-          MODAL 3: REPROGRAMACIÓN Y REGLA 24 HORAS
+          MODALES 3 y 4: REPROGRAMACIÓN 24H + CELEBRACIÓN POST-PARTIDO
           ==================================================================== */}
-      <ModalPortal
-        isOpen={Boolean(rescheduleTarget)}
+      <RetosRescheduleModal
+        rescheduleTarget={rescheduleTarget}
+        currentUser={currentUser}
+        isAdmin={isAdmin}
+        reschedDate={reschedDate}
+        setReschedDate={setReschedDate}
+        reschedTime={reschedTime}
+        setReschedTime={setReschedTime}
+        reschedReason={reschedReason}
+        setReschedReason={setReschedReason}
+        onConfirm={handleConfirmReschedule}
         onClose={() => setRescheduleTarget(null)}
-        title={
-          rescheduleTarget &&
-          getMatchPermissions(rescheduleTarget, currentUser, isAdmin).rescheduleMode ===
-            'ORDINARY_ALLOWED'
-            ? 'Cambiar Fecha y Hora'
-            : 'Suspensión por Clima / Emergencia'
-        }
-        subtitle={rescheduleTarget?.clubName || ''}
-        icon={<IconBadge name="clock" variant="gold" size={38} />}
-      >
-        {rescheduleTarget && (
-          <form onSubmit={handleConfirmReschedule} className="tt-form-stack">
-            {(() => {
-              const p = getMatchPermissions(rescheduleTarget, currentUser, isAdmin);
-              const isOrdinary = p.rescheduleMode === 'ORDINARY_ALLOWED';
-              return (
-                <>
-                  <div className={`tt-rule-callout ${isOrdinary ? 'is-ok' : 'is-warn'}`}>
-                    <TTIcon name={isOrdinary ? 'check' : 'alert'} size={18} />
-                    <div>
-                      <strong>
-                        {isOrdinary
-                          ? 'Cambio de horario habilitado (1 por partido)'
-                          : 'Faltan menos de 24 h o ya usaste tu cambio'}
-                      </strong>
-                      <p style={{ margin: '3px 0 0', fontSize: '0.77rem', opacity: 0.88 }}>
-                        {isOrdinary
-                          ? `Faltan ${p.hoursUntilMatch} horas para el partido. Puedes reprogramar 1 vez sin penalización.`
-                          : 'Solo se permite reprogramar por lluvia o emergencia avisando directo por WhatsApp a tu rival.'}
-                      </p>
-                    </div>
-                  </div>
+      />
 
-                  {!isOrdinary && (
-                    <div className="tt-field-group">
-                      <label className="tt-field-label">Motivo</label>
-                      <div className="tt-balls-stack">
-                        {[
-                          'Lluvia intensa en cancha',
-                          'Cancha inundada',
-                          'Emergencia médica o laboral',
-                        ].map((reason) => (
-                          <button
-                            key={reason}
-                            type="button"
-                            className={`tt-choice-pill tt-glass-press ${
-                              reschedReason === reason ? 'is-selected' : ''
-                            }`}
-                            onClick={() => setReschedReason(reason)}
-                          >
-                            {reason}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="tt-date-time-grid">
-                    <div className="tt-field-group">
-                      <label className="tt-field-label" htmlFor="tt-resched-date">
-                        Nueva fecha
-                      </label>
-                      <input
-                        id="tt-resched-date"
-                        type="date"
-                        className="tt-input"
-                        value={reschedDate}
-                        min={getTodayDateInputValue(0)}
-                        onChange={(e) => setReschedDate(e.target.value)}
-                        required
-                      />
-                    </div>
-                    <div className="tt-field-group">
-                      <label className="tt-field-label" htmlFor="tt-resched-time">
-                        Nueva hora
-                      </label>
-                      <input
-                        id="tt-resched-time"
-                        type="time"
-                        className="tt-input"
-                        value={reschedTime}
-                        onChange={(e) => setReschedTime(e.target.value)}
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="tt-btn tt-btn-primary tt-glass-press"
-                    style={{ width: '100%' }}
-                  >
-                    {isOrdinary
-                      ? 'Confirmar Nuevo Horario'
-                      : 'Reprogramar y Avisar por WhatsApp'}
-                  </button>
-                </>
-              );
-            })()}
-          </form>
-        )}
-      </ModalPortal>
-
-      {/* ====================================================================
-          MODAL 4: CELEBRACIÓN POST-PARTIDO + STORIES
-          ==================================================================== */}
-      <ModalPortal
-        isOpen={Boolean(celebrationPayload)}
+      <RetosCelebrationModal
+        celebrationPayload={celebrationPayload}
+        onOpenStoriesWithMatch={onOpenStoriesWithMatch}
         onClose={() => setCelebrationPayload(null)}
-        title={celebrationPayload?.promoted ? '¡Ascenso de Categoría!' : '¡Resultado Confirmado!'}
-        subtitle="TOTAL TENIS · Circuito Oficial"
-        icon={<IconBadge name="trophy" variant="gold" size={38} />}
-        isTopLayer
-      >
-        {celebrationPayload && (
-          <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
-            <SmartImage
-              src={celebrationPayload.promoted ? ASSETS.gifCelebracion2 : ASSETS.gifCelebracion1}
-              fallbackSrc={ASSETS.trofeoCampeonGira}
-              alt="Celebración de victoria"
-              style={{
-                width: 140,
-                height: 140,
-                borderRadius: 24,
-                objectFit: 'cover',
-                border: '2px solid rgba(0, 220, 125, 0.5)',
-              }}
-            />
-
-            <div>
-              <span className="tt-winner-chip" style={{ marginBottom: 6 }}>
-                GANADOR
-              </span>
-              <h3 className="tt-title-lg" style={{ margin: '4px 0' }}>
-                {celebrationPayload.winnerPlayer?.name}
-              </h3>
-              <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#00B365' }}>
-                {celebrationPayload.eloResult.summary}
-              </div>
-            </div>
-
-            {celebrationPayload.isOfficial && (
-              <div className="tt-elo-preview-deltas" style={{ width: '100%' }}>
-                <div>
-                  <span>{celebrationPayload.playerA?.name}</span>
-                  <strong
-                    style={{
-                      color: celebrationPayload.eloResult.deltaA >= 0 ? '#00B365' : '#EF4444',
-                    }}
-                  >
-                    {celebrationPayload.eloResult.deltaA >= 0
-                      ? `+${celebrationPayload.eloResult.deltaA}`
-                      : celebrationPayload.eloResult.deltaA}{' '}
-                    pts
-                  </strong>
-                </div>
-                <div>
-                  <span>{celebrationPayload.playerB?.name}</span>
-                  <strong
-                    style={{
-                      color: celebrationPayload.eloResult.deltaB >= 0 ? '#00B365' : '#EF4444',
-                    }}
-                  >
-                    {celebrationPayload.eloResult.deltaB >= 0
-                      ? `+${celebrationPayload.eloResult.deltaB}`
-                      : celebrationPayload.eloResult.deltaB}{' '}
-                    pts
-                  </strong>
-                </div>
-              </div>
-            )}
-
-            <div style={{ display: 'flex', gap: 10, width: '100%' }}>
-              {onOpenStoriesWithMatch && (
-                <button
-                  type="button"
-                  className="tt-btn tt-btn-primary tt-glass-press"
-                  style={{ flex: 1 }}
-                  onClick={() => {
-                    const payload = {
-                      challenge: celebrationPayload.challenge,
-                      playerA: celebrationPayload.playerA,
-                      playerB: celebrationPayload.playerB,
-                    };
-                    setCelebrationPayload(null);
-                    onOpenStoriesWithMatch(payload);
-                  }}
-                >
-                  <TTIcon name="stories" size={17} />
-                  Publicar en Stories
-                </button>
-              )}
-              <button
-                type="button"
-                className="tt-btn tt-btn-secondary tt-glass-press"
-                onClick={() => setCelebrationPayload(null)}
-              >
-                Continuar
-              </button>
-            </div>
-          </div>
-        )}
-      </ModalPortal>
+      />
 
       <style>{`
         .tt-retos-view {
@@ -3134,13 +2464,56 @@ export default function RetosView({
           color: #10021E;
         }
 
-        /* 4. FILTROS Y PANELES */
+        /* 4. FILTROS, BANNERS ANTI-ESCASEZ Y TUTELA */
         .tt-retos-panel { display: flex; flex-direction: column; gap: 12px; }
         .tt-rt-panel-in { animation: ttRtFade 280ms cubic-bezier(0.22, 1, 0.36, 1) both; }
         @keyframes ttRtFade {
           from { opacity: 0; transform: translateY(7px); }
           to { opacity: 1; transform: translateY(0); }
         }
+        .tt-scarcity-banner {
+          display: flex;
+          align-items: flex-start;
+          gap: 10px;
+          padding: 11px 13px;
+          border-radius: 16px;
+          background: rgba(0, 220, 125, 0.11);
+          border: 1px solid rgba(0, 220, 125, 0.38);
+          font-size: 0.75rem;
+        }
+        .tt-scarcity-banner strong { display: block; color: var(--tt-emerald-text); font-size: 0.78rem; }
+        .tt-scarcity-banner p { margin: 2px 0 0; color: var(--tt-text-muted); line-height: 1.38; }
+
+        .tt-tutor-only-card {
+          display: flex;
+          align-items: flex-start;
+          gap: 10px;
+          padding: 11px 13px;
+          border-radius: 16px;
+          background: rgba(56, 189, 248, 0.12);
+          border: 1px solid rgba(56, 189, 248, 0.4);
+          font-size: 0.75rem;
+        }
+        .tt-tutor-only-card strong { display: block; font-size: 0.78rem; color: var(--tt-text); }
+        .tt-tutor-only-card p { margin: 2px 0 0; color: var(--tt-text-muted); line-height: 1.38; }
+
+        .tt-tutela-mini-pill {
+          display: inline-block;
+          padding: 1px 6px;
+          border-radius: 6px;
+          background: rgba(56, 189, 248, 0.18);
+          border: 1px solid rgba(125, 211, 252, 0.45);
+          color: #7DD3FC;
+          font-size: 0.56rem;
+          font-weight: 900;
+          letter-spacing: 0.04em;
+        }
+        .tt-retos-view.is-light .tt-tutela-mini-pill {
+          background: #E0F2FE;
+          border-color: #7DD3FC;
+          color: #0369A1;
+        }
+
         .tt-filter-pills-row {
           display: flex;
           gap: 7px;
@@ -3359,344 +2732,4 @@ export default function RetosView({
           flex-shrink: 0;
         }
         .tt-icon-action-btn.is-wa {
-          background: rgba(37, 211, 102, 0.15);
-          color: #16A34A;
-          border: 1px solid rgba(37, 211, 102, 0.35);
-        }
-        .tt-retos-view.is-dark .tt-icon-action-btn.is-wa { color: #4ADE80; }
-        .tt-waiting-banner {
-          flex: 1;
-          display: flex;
-          align-items: center;
-          gap: 7px;
-          padding: 9px 11px;
-          border-radius: 12px;
-          background: rgba(229, 193, 108, 0.12);
-          border: 1px solid rgba(229, 193, 108, 0.3);
-          color: #E5C16C;
-          font-size: 0.74rem;
-          font-weight: 800;
-        }
-        .tt-retos-view.is-light .tt-waiting-banner { color: #8A5D10; background: #FBF4E0; }
-        .tt-spectator-pill {
-          flex: 1;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          gap: 6px;
-          min-height: 36px;
-          border-radius: 11px;
-          background: var(--tt-surface-2);
-          color: var(--tt-text-muted);
-          font-size: 0.72rem;
-          font-weight: 700;
-        }
-
-        /* 6. RADAR DE RIVALES */
-        .tt-radar-controls { display: flex; flex-direction: column; gap: 10px; }
-        .tt-search-box {
-          display: flex;
-          align-items: center;
-          gap: 9px;
-          padding: 0 14px;
-          min-height: 46px;
-          border-radius: 15px;
-          background: var(--tt-surface);
-          border: 1px solid var(--tt-border);
-          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-        }
-        .tt-search-box input {
-          width: 100%;
-          border: none;
-          background: transparent;
-          color: var(--tt-text);
-          font-size: 16px;
-          outline: none;
-        }
-        .tt-rivals-list { display: flex; flex-direction: column; gap: 10px; }
-        .tt-rival-row {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          padding: 12px 13px;
-          border-radius: 18px;
-          background: var(--tt-surface);
-          border: 1px solid var(--tt-border);
-          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-        }
-        .tt-rival-row.is-out-of-range { opacity: 0.75; }
-        .tt-rival-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-        .tt-rival-name-line { display: flex; align-items: center; gap: 6px; font-size: 0.9rem; }
-        .tt-rival-name-line strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .tt-vip-micro-pill {
-          padding: 1px 6px;
-          border-radius: 6px;
-          background: rgba(229, 193, 108, 0.16);
-          border: 1px solid rgba(229, 193, 108, 0.42);
-          color: #E5C16C;
-          font-size: 0.58rem;
-          font-weight: 900;
-        }
-        .tt-retos-view.is-light .tt-vip-micro-pill { background: #FBF4E0; color: #8A5D10; }
-        .tt-rival-meta-line { display: flex; align-items: center; gap: 6px; font-size: 0.72rem; color: var(--tt-text-muted); flex-wrap: wrap; }
-        .tt-cat-mini-pill {
-          display: inline-flex;
-          align-items: center;
-          gap: 4px;
-          padding: 2px 7px;
-          border-radius: 999px;
-          background: var(--tt-surface-2);
-          color: var(--tt-text-secondary);
-          font-weight: 800;
-          font-size: 0.66rem;
-        }
-        .tt-rival-forecast-line { display: flex; align-items: center; gap: 6px; font-size: 0.7rem; color: var(--tt-text-muted); flex-wrap: wrap; }
-        .tt-rival-forecast-line .is-win { color: var(--tt-emerald-text); font-weight: 800; }
-        .tt-rival-forecast-line .is-loss { color: #EF4444; font-weight: 700; }
-        .tt-rival-cta-col { flex-shrink: 0; }
-
-        /* 7. FORMULARIOS EN MODAL */
-        .tt-form-stack { display: flex; flex-direction: column; gap: 14px; }
-        .tt-field-group { display: flex; flex-direction: column; gap: 6px; }
-        .tt-field-label { font-size: 0.74rem; font-weight: 800; color: var(--tt-text-muted); }
-        .tt-forecast-box {
-          border-radius: 16px;
-          padding: 12px;
-          background: linear-gradient(135deg, #1E0734 0%, #140424 100%);
-          color: #FAF9F5;
-          border: 1px solid rgba(0, 220, 125, 0.34);
-        }
-        .tt-forecast-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; font-size: 0.8rem; }
-        .tt-rematch-tag { padding: 3px 8px; border-radius: 999px; background: rgba(229, 193, 108, 0.2); color: #F3DC9B; font-size: 0.66rem; font-weight: 800; }
-        .tt-forecast-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-        .tt-forecast-cell { padding: 9px 10px; border-radius: 12px; background: rgba(250, 249, 245, 0.07); display: flex; flex-direction: column; gap: 2px; }
-        .tt-forecast-cell span { font-size: 0.68rem; opacity: 0.78; }
-        .tt-forecast-cell strong { font-size: 1.15rem; font-weight: 900; }
-        .tt-forecast-cell.is-win strong { color: #00DC7D; }
-        .tt-forecast-cell.is-loss strong { color: #F87171; }
-        .tt-forecast-cell small { font-size: 0.66rem; opacity: 0.74; }
-
-        .tt-toggle-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-        .tt-choice-pill {
-          min-height: 42px;
-          padding: 8px 12px;
-          border-radius: 13px;
-          background: var(--tt-surface-2);
-          border: 1px solid var(--tt-border);
-          color: var(--tt-text);
-          font-size: 0.78rem;
-          font-weight: 700;
-          text-align: center;
-        }
-        .tt-choice-pill.is-selected {
-          background: rgba(0, 220, 125, 0.16);
-          border-color: #00DC7D;
-          color: var(--tt-emerald-text);
-          font-weight: 800;
-        }
-        .tt-retos-view.is-light .tt-choice-pill.is-selected {
-          background: #1E0734;
-          border-color: #1E0734;
-          color: #00DC7D;
-        }
-        .tt-venues-select-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-        .tt-venue-option {
-          min-height: 46px;
-          padding: 8px 10px;
-          border-radius: 13px;
-          background: var(--tt-surface-2);
-          border: 1px solid var(--tt-border);
-          color: var(--tt-text);
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          font-size: 0.77rem;
-          font-weight: 700;
-          text-align: left;
-        }
-        .tt-venue-option.is-custom { grid-column: 1 / -1; justify-content: center; }
-        .tt-venue-option.is-selected { border-color: #00DC7D; background: rgba(0, 220, 125, 0.14); }
-        .tt-date-time-grid { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 10px; }
-        .tt-quick-slots-row { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
-        .tt-slot-chip {
-          flex-shrink: 0;
-          padding: 6px 11px;
-          border-radius: 999px;
-          font-size: 0.74rem;
-          font-weight: 700;
-          background: var(--tt-surface-2);
-          border: 1px solid var(--tt-border);
-          color: var(--tt-text-muted);
-        }
-        .tt-slot-chip.is-selected { background: #00DC7D; border-color: #00DC7D; color: #10021E; font-weight: 900; }
-        .tt-balls-stack { display: flex; flex-direction: column; gap: 7px; }
-
-        /* 8. MODAL MARCADOR DIRECTO + MODO ÁRBITRO */
-        .tt-mc-container { display: flex; flex-direction: column; gap: 13px; }
-        .tt-score-mode-switch {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 5px;
-          padding: 4px;
-          border-radius: 14px;
-          background: var(--tt-surface-2);
-          border: 1px solid var(--tt-border);
-        }
-        .tt-score-mode-switch button {
-          min-height: 38px;
-          border-radius: 10px;
-          font-size: 0.76rem;
-          font-weight: 800;
-          color: var(--tt-text-muted);
-        }
-        .tt-score-mode-switch button.is-active {
-          background: #1E0734;
-          color: #00DC7D;
-        }
-
-        .tt-stadium-board {
-          border-radius: 18px;
-          padding: 13px;
-          background: linear-gradient(135deg, #250942 0%, #140324 100%);
-          color: #FAF9F5;
-          border: 1.5px solid rgba(0, 220, 125, 0.34);
-          display: flex;
-          flex-direction: column;
-          gap: 9px;
-        }
-        .tt-stadium-head { display: flex; justify-content: space-between; font-size: 0.65rem; font-weight: 800; letter-spacing: 0.08em; color: rgba(250, 249, 245, 0.6); }
-        .tt-stadium-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 8px; border-top: 1px solid rgba(250, 249, 245, 0.1); }
-        .tt-stadium-player { display: flex; align-items: center; gap: 9px; min-width: 0; }
-        .tt-stadium-player strong { display: block; font-size: 0.86rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .tt-stadium-player small { font-size: 0.68rem; color: rgba(250, 249, 245, 0.66); }
-        .tt-stadium-cols { display: flex; gap: 7px; flex-shrink: 0; }
-        .tt-stadium-head .tt-stadium-cols span { width: 34px; text-align: center; }
-        .tt-st-num {
-          width: 34px;
-          height: 34px;
-          border-radius: 9px;
-          background: rgba(250, 249, 245, 0.12);
-          font-family: var(--tt-font-display);
-          font-size: 1.15rem;
-          font-weight: 900;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-        }
-        .tt-st-num sup { font-size: 0.6rem; color: #00DC7D; margin-left: 1px; }
-        .tt-st-num.is-stb { background: rgba(229, 193, 108, 0.22); color: #F3DC9B; min-width: 38px; width: auto; padding: 0 6px; }
-
-        .tt-direct-hint { margin: 0; font-size: 0.77rem; color: var(--tt-text-muted); line-height: 1.4; }
-        .tt-direct-set-box {
-          border-radius: 16px;
-          padding: 12px;
-          background: var(--tt-surface-2);
-          border: 1px solid var(--tt-border);
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-        }
-        .tt-direct-set-box.is-stb-card { border-color: rgba(229, 193, 108, 0.5); }
-        .tt-direct-set-head { display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; }
-        .tt-direct-set-head span { font-size: 0.7rem; color: var(--tt-text-muted); }
-        .tt-direct-inputs-row {
-          display: grid;
-          grid-template-columns: 1fr auto 1fr;
-          align-items: end;
-          gap: 10px;
-        }
-        .tt-direct-field { display: flex; flex-direction: column; align-items: center; gap: 5px; }
-        .tt-direct-field span { font-size: 0.74rem; font-weight: 800; color: var(--tt-text-muted); }
-        .tt-direct-num-input {
-          width: 100%;
-          height: 52px;
-          border-radius: 14px;
-          background: var(--tt-surface);
-          border: 1.5px solid var(--tt-border-medium);
-          color: var(--tt-text);
-          text-align: center;
-          font-family: var(--tt-font-display);
-          font-size: 1.65rem;
-          font-weight: 900;
-        }
-        .tt-direct-num-input:focus { outline: none; border-color: #00DC7D; }
-        .tt-direct-dash { font-size: 1.4rem; font-weight: 900; padding-bottom: 12px; color: var(--tt-text-muted); }
-        .tt-direct-tb-row {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          padding-top: 6px;
-          border-top: 1px solid var(--tt-border);
-          font-size: 0.72rem;
-          font-weight: 700;
-          color: var(--tt-text-muted);
-        }
-        .tt-direct-tb-input {
-          width: 48px;
-          height: 36px;
-          border-radius: 10px;
-          background: var(--tt-surface);
-          border: 1px solid var(--tt-border-medium);
-          color: var(--tt-text);
-          text-align: center;
-          font-weight: 900;
-        }
-        .tt-direct-validation-note {
-          padding: 11px 13px;
-          border-radius: 13px;
-          background: var(--tt-surface-2);
-          border: 1px dashed var(--tt-border-medium);
-          color: var(--tt-text-muted);
-          font-size: 0.76rem;
-          font-weight: 700;
-          text-align: center;
-        }
-
-        .tt-mc-controls-wrap { display: flex; flex-direction: column; gap: 11px; }
-        .tt-set-control-card {
-          border-radius: 16px;
-          padding: 12px;
-          background: var(--tt-surface-2);
-          border: 1px solid var(--tt-border);
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-        }
-        .tt-set-control-card.is-stb-card { border-color: rgba(229, 193, 108, 0.45); }
-        .tt-set-control-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 0.8rem; }
-        .tt-unlock-btn { padding: 4px 10px; border-radius: 999px; background: rgba(229, 193, 108, 0.16); color: #E5C16C; font-size: 0.7rem; font-weight: 800; }
-        .tt-retos-view.is-light .tt-unlock-btn { color: #8A5D10; }
-        .tt-tb-panel { display: flex; flex-direction: column; gap: 10px; }
-        .tt-tb-banner { text-align: center; padding: 6px 10px; border-radius: 10px; background: rgba(0, 220, 125, 0.15); color: var(--tt-emerald-text); font-size: 0.68rem; font-weight: 900; }
-        .tt-dual-stepper { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .tt-stepper-side { display: flex; flex-direction: column; gap: 6px; }
-        .tt-stepper-name { font-size: 0.76rem; font-weight: 800; color: var(--tt-text-muted); text-align: center; }
-        .tt-stepper-btns { display: flex; gap: 6px; }
-        .tt-step-minus { width: 40px; height: 44px; border-radius: 12px; background: var(--tt-surface); border: 1px solid var(--tt-border); color: var(--tt-text); font-size: 1.2rem; font-weight: 800; }
-        .tt-step-plus { flex: 1; height: 44px; border-radius: 12px; background: linear-gradient(135deg, #00DC7D 0%, #00B365 100%); color: #10021E; font-size: 0.82rem; font-weight: 900; }
-        .tt-step-plus.is-champagne { background: linear-gradient(135deg, #F5E1A4 0%, #CCA046 100%); color: #1A1102; }
-
-        .tt-judge-assign-box { display: flex; flex-direction: column; gap: 6px; }
-        .tt-elo-preview-card {
-          border-radius: 16px;
-          padding: 13px;
-          background: rgba(0, 220, 125, 0.1);
-          border: 1.5px solid rgba(0, 220, 125, 0.45);
-        }
-        .tt-elo-preview-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 10px; }
-        .tt-elo-preview-head span { font-size: 0.72rem; color: var(--tt-text-muted); }
-        .tt-elo-preview-deltas { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-        .tt-elo-preview-deltas > div { padding: 8px 10px; border-radius: 11px; background: var(--tt-surface); display: flex; flex-direction: column; gap: 2px; font-size: 0.76rem; }
-        .tt-mc-secondary-bar { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding-top: 2px; }
-        .tt-text-action { font-size: 0.75rem; font-weight: 700; color: var(--tt-text-muted); text-decoration: underline; }
-        .tt-text-action.is-danger { color: #EF4444; }
-        .tt-wo-box { padding: 11px; border-radius: 13px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.32); }
-        .tt-spectator-note { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 14px; background: var(--tt-surface-2); font-size: 0.8rem; color: var(--tt-text-muted); }
-        .tt-rule-callout { display: flex; gap: 10px; padding: 12px; border-radius: 14px; font-size: 0.82rem; }
-        .tt-rule-callout.is-ok { background: rgba(0, 220, 125, 0.14); border: 1px solid rgba(0, 220, 125, 0.4); }
-        .tt-rule-callout.is-warn { background: rgba(229, 193, 108, 0.14); border: 1px solid rgba(229, 193, 108, 0.42); }
-      `}</style>
-    </section>
-  );
-}
+          background: rgba(37, 211, 102,
