@@ -40,6 +40,11 @@ export const AUTH_ONBOARDING_EDITABLE_CONFIG = {
     '7101': { id: 'coach-rodrigo', name: 'Rodrigo Quispe', role: 'COACH' },
     '7202': { id: 'coach-romina', name: 'Romina Cutipa', role: 'COACH' },
     '7303': { id: 'coach-carlos', name: 'Carlos Mendoza', role: 'COACH' },
+    '7404': { id: 'coach-diego', name: 'Diego Salazar', role: 'COACH' },
+    '8101': { id: 'club-country', clubId: 'club-country', name: 'Country Club Los Huancas', role: 'CLUB' },
+    '8202': { id: 'club-romina', clubId: 'club-romina', name: 'Academia Romina Cutipa', role: 'CLUB' },
+    '8303': { id: 'club-tauro', clubId: 'club-tauro', name: 'Club Tauro Tenis', role: 'CLUB' },
+    '8404': { id: 'club-inkas', clubId: 'club-inkas', name: 'Club Los Inkas', role: 'CLUB' },
   },
 };
 
