@@ -180,6 +180,93 @@ function getRealSeasonTargetMs(seasonNumber, snapshotYear, customEndDate = null)
   }
   return target;
 }
+
+function computeRemainingParts(targetMs) {
+  const diffSec = Math.max(0, Math.floor((targetMs - Date.now()) / 1000));
+  const days = Math.floor(diffSec / 86400);
+  const hours = Math.floor((diffSec % 86400) / 3600);
+  const minutes = Math.floor((diffSec % 3600) / 60);
+  const seconds = diffSec % 60;
+  return {
+    days: String(days).padStart(2, '0'),
+    hours: String(hours).padStart(2, '0'),
+    minutes: String(minutes).padStart(2, '0'),
+    seconds: String(seconds).padStart(2, '0'),
+  };
+}
+
+function FlipUnit({ value, label }) {
+  const prevRef = useRef(value);
+  const [tickKey, setTickKey] = useState(0);
+
+  useEffect(() => {
+    if (prevRef.current !== value) {
+      prevRef.current = value;
+      setTickKey((k) => k + 1);
+    }
+  }, [value]);
+
+  return (
+    <div className="tt-flip-unit">
+      <div className="tt-flip-card" key={tickKey}>
+        <span className="tt-flip-num">{value}</span>
+        <span className="tt-flip-hinge" aria-hidden="true" />
+      </div>
+      <span className="tt-flip-lbl">{label}</span>
+    </div>
+  );
+}
+
+function SeasonFlipCountdown({ seasonNumber = 4, year = 2026, customEndDate = null }) {
+  const targetMs = useMemo(
+    () => getRealSeasonTargetMs(seasonNumber, year, customEndDate),
+    [seasonNumber, year, customEndDate]
+  );
+  const [parts, setParts] = useState(() => computeRemainingParts(targetMs));
+
+  useEffect(() => {
+    setParts(computeRemainingParts(targetMs));
+    const timer = window.setInterval(() => {
+      setParts(computeRemainingParts(targetMs));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [targetMs]);
+
+  return (
+    <div className="tt-flip-strip" aria-label={`Tiempo restante de la Temporada ${seasonNumber}`}>
+      <div className="tt-flip-meta">
+        <span className="tt-flip-dot" />
+        <strong>CIERRE TEMPORADA {seasonNumber}</strong>
+      </div>
+
+      <div className="tt-flip-clock">
+        <FlipUnit value={parts.days} label="DÍAS" />
+        <span className="tt-flip-sep">:</span>
+        <FlipUnit value={parts.hours} label="HRS" />
+        <span className="tt-flip-sep">:</span>
+        <FlipUnit value={parts.minutes} label="MIN" />
+        <span className="tt-flip-sep">:</span>
+        <FlipUnit value={parts.seconds} label="SEG" />
+      </div>
+    </div>
+  );
+}
+  let target = new Date(quarterEndIsoMap[seasonNumber] || quarterEndIsoMap[4]).getTime();
+
+  if (Number.isNaN(target) || target <= now) {
+    const d = new Date();
+    const curY = d.getFullYear();
+    const curQ = Math.floor(d.getMonth() / 3) + 1;
+    const endMap = {
+      1: `${curY}-03-31T23:59:59-05:00`,
+      2: `${curY}-06-30T23:59:59-05:00`,
+      3: `${curY}-09-30T23:59:59-05:00`,
+      4: `${curY}-12-31T23:59:59-05:00`,
+    };
+    target = new Date(endMap[curQ]).getTime();
+  }
+  return target;
+}
   let target = new Date(quarterEndIsoMap[seasonNumber] || quarterEndIsoMap[4]).getTime();
 
   // Si la fecha configurada ya pasó, calcula automáticamente el fin del trimestre calendario real actual
