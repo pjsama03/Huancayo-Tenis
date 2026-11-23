@@ -2732,4 +2732,346 @@ export default function RetosView({
           flex-shrink: 0;
         }
         .tt-icon-action-btn.is-wa {
-          background: rgba(37, 211, 102,
+          background: rgba(37, 211, 102, 0.15);
+          color: #16A34A;
+          border: 1px solid rgba(37, 211, 102, 0.35);
+        }
+        .tt-retos-view.is-dark .tt-icon-action-btn.is-wa { color: #4ADE80; }
+        .tt-waiting-banner {
+          flex: 1;
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          padding: 9px 11px;
+          border-radius: 12px;
+          background: rgba(229, 193, 108, 0.12);
+          border: 1px solid rgba(229, 193, 108, 0.3);
+          color: #E5C16C;
+          font-size: 0.74rem;
+          font-weight: 800;
+        }
+        .tt-retos-view.is-light .tt-waiting-banner { color: #8A5D10; background: #FBF4E0; }
+        .tt-spectator-pill {
+          flex: 1;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          min-height: 36px;
+          border-radius: 11px;
+          background: var(--tt-surface-2);
+          color: var(--tt-text-muted);
+          font-size: 0.72rem;
+          font-weight: 700;
+        }
+
+        /* 6. RADAR DE RIVALES */
+        .tt-radar-controls { display: flex; flex-direction: column; gap: 10px; }
+        .tt-search-box {
+          display: flex;
+          align-items: center;
+          gap: 9px;
+          padding: 0 14px;
+          min-height: 46px;
+          border-radius: 15px;
+          background: var(--tt-surface);
+          border: 1px solid var(--tt-border);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        }
+        .tt-search-box input {
+          width: 100%;
+          border: none;
+          background: transparent;
+          color: var(--tt-text);
+          font-size: 16px;
+          outline: none;
+        }
+        .tt-rivals-list { display: flex; flex-direction: column; gap: 10px; }
+        .tt-rival-row {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 12px 13px;
+          border-radius: 18px;
+          background: var(--tt-surface);
+          border: 1px solid var(--tt-border);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        }
+        .tt-rival-row.is-out-of-range { opacity: 0.75; }
+        .tt-rival-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+        .tt-rival-name-line { display: flex; align-items: center; gap: 6px; font-size: 0.9rem; flex-wrap: wrap; }
+        .tt-rival-name-line strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .tt-vip-micro-pill {
+          padding: 1px 6px;
+          border-radius: 6px;
+          background: rgba(229, 193, 108, 0.16);
+          border: 1px solid rgba(229, 193, 108, 0.42);
+          color: #E5C16C;
+          font-size: 0.58rem;
+          font-weight: 900;
+        }
+        .tt-retos-view.is-light .tt-vip-micro-pill { background: #FBF4E0; color: #8A5D10; }
+        .tt-rival-meta-line { display: flex; align-items: center; gap: 6px; font-size: 0.72rem; color: var(--tt-text-muted); flex-wrap: wrap; }
+        .tt-cat-mini-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          padding: 2px 7px;
+          border-radius: 999px;
+          background: var(--tt-surface-2);
+          color: var(--tt-text-secondary);
+          font-weight: 800;
+          font-size: 0.66rem;
+        }
+        .tt-rival-forecast-line { display: flex; align-items: center; gap: 6px; font-size: 0.7rem; color: var(--tt-text-muted); flex-wrap: wrap; }
+        .tt-rival-forecast-line .is-win { color: var(--tt-emerald-text); font-weight: 800; }
+        .tt-rival-forecast-line .is-loss { color: #EF4444; font-weight: 700; }
+        .tt-rival-forecast-line .is-expanded { color: #7DD3FC; font-weight: 800; }
+        .tt-rival-cta-col { flex-shrink: 0; }
+
+        /* 7. FORMULARIOS EN MODAL */
+        .tt-form-stack { display: flex; flex-direction: column; gap: 14px; }
+        .tt-field-group { display: flex; flex-direction: column; gap: 6px; }
+        .tt-field-label { font-size: 0.74rem; font-weight: 800; color: var(--tt-text-muted); }
+        .tt-forecast-box {
+          border-radius: 16px;
+          padding: 12px;
+          background: linear-gradient(135deg, #1E0734 0%, #140424 100%);
+          color: #FAF9F5;
+          border: 1px solid rgba(0, 220, 125, 0.34);
+        }
+        .tt-forecast-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; font-size: 0.8rem; }
+        .tt-rematch-tag { padding: 3px 8px; border-radius: 999px; background: rgba(229, 193, 108, 0.2); color: #F3DC9B; font-size: 0.66rem; font-weight: 800; }
+        .tt-forecast-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .tt-forecast-cell { padding: 9px 10px; border-radius: 12px; background: rgba(250, 249, 245, 0.07); display: flex; flex-direction: column; gap: 2px; }
+        .tt-forecast-cell span { font-size: 0.68rem; opacity: 0.78; }
+        .tt-forecast-cell strong { font-size: 1.15rem; font-weight: 900; }
+        .tt-forecast-cell.is-win strong { color: #00DC7D; }
+        .tt-forecast-cell.is-loss strong { color: #F87171; }
+        .tt-forecast-cell small { font-size: 0.66rem; opacity: 0.74; }
+
+        .tt-toggle-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .tt-choice-pill {
+          min-height: 42px;
+          padding: 8px 12px;
+          border-radius: 13px;
+          background: var(--tt-surface-2);
+          border: 1px solid var(--tt-border);
+          color: var(--tt-text);
+          font-size: 0.78rem;
+          font-weight: 700;
+          text-align: center;
+        }
+        .tt-choice-pill:disabled { opacity: 0.45; cursor: not-allowed; }
+        .tt-choice-pill.is-selected {
+          background: rgba(0, 220, 125, 0.16);
+          border-color: #00DC7D;
+          color: var(--tt-emerald-text);
+          font-weight: 800;
+        }
+        .tt-retos-view.is-light .tt-choice-pill.is-selected {
+          background: #1E0734;
+          border-color: #1E0734;
+          color: #00DC7D;
+        }
+        .tt-venues-select-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .tt-venue-option {
+          min-height: 46px;
+          padding: 8px 10px;
+          border-radius: 13px;
+          background: var(--tt-surface-2);
+          border: 1px solid var(--tt-border);
+          color: var(--tt-text);
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 0.77rem;
+          font-weight: 700;
+          text-align: left;
+        }
+        .tt-venue-option.is-custom { grid-column: 1 / -1; justify-content: center; }
+        .tt-venue-option.is-selected { border-color: #00DC7D; background: rgba(0, 220, 125, 0.14); }
+        .tt-date-time-grid { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 10px; }
+        .tt-quick-slots-row { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+        .tt-slot-chip {
+          flex-shrink: 0;
+          padding: 6px 11px;
+          border-radius: 999px;
+          font-size: 0.74rem;
+          font-weight: 700;
+          background: var(--tt-surface-2);
+          border: 1px solid var(--tt-border);
+          color: var(--tt-text-muted);
+        }
+        .tt-slot-chip.is-selected { background: #00DC7D; border-color: #00DC7D; color: #10021E; font-weight: 900; }
+        .tt-balls-stack { display: flex; flex-direction: column; gap: 7px; }
+
+        /* 8. MODAL MARCADOR DIRECTO + MODO ÁRBITRO */
+        .tt-mc-container { display: flex; flex-direction: column; gap: 13px; }
+        .tt-score-mode-switch {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 5px;
+          padding: 4px;
+          border-radius: 14px;
+          background: var(--tt-surface-2);
+          border: 1px solid var(--tt-border);
+        }
+        .tt-score-mode-switch button {
+          min-height: 38px;
+          border-radius: 10px;
+          font-size: 0.76rem;
+          font-weight: 800;
+          color: var(--tt-text-muted);
+        }
+        .tt-score-mode-switch button.is-active {
+          background: #1E0734;
+          color: #00DC7D;
+        }
+
+        .tt-stadium-board {
+          border-radius: 18px;
+          padding: 13px;
+          background: linear-gradient(135deg, #250942 0%, #140324 100%);
+          color: #FAF9F5;
+          border: 1.5px solid rgba(0, 220, 125, 0.34);
+          display: flex;
+          flex-direction: column;
+          gap: 9px;
+        }
+        .tt-stadium-head { display: flex; justify-content: space-between; font-size: 0.65rem; font-weight: 800; letter-spacing: 0.08em; color: rgba(250, 249, 245, 0.6); }
+        .tt-stadium-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 8px; border-top: 1px solid rgba(250, 249, 245, 0.1); }
+        .tt-stadium-player { display: flex; align-items: center; gap: 9px; min-width: 0; }
+        .tt-stadium-player strong { display: block; font-size: 0.86rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .tt-stadium-player small { font-size: 0.68rem; color: rgba(250, 249, 245, 0.66); }
+        .tt-stadium-cols { display: flex; gap: 7px; flex-shrink: 0; }
+        .tt-stadium-head .tt-stadium-cols span { width: 34px; text-align: center; }
+        .tt-st-num {
+          width: 34px;
+          height: 34px;
+          border-radius: 9px;
+          background: rgba(250, 249, 245, 0.12);
+          font-family: var(--tt-font-display);
+          font-size: 1.15rem;
+          font-weight: 900;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .tt-st-num sup { font-size: 0.6rem; color: #00DC7D; margin-left: 1px; }
+        .tt-st-num.is-stb { background: rgba(229, 193, 108, 0.22); color: #F3DC9B; min-width: 38px; width: auto; padding: 0 6px; }
+
+        .tt-direct-hint { margin: 0; font-size: 0.77rem; color: var(--tt-text-muted); line-height: 1.4; }
+        .tt-direct-set-box {
+          border-radius: 16px;
+          padding: 12px;
+          background: var(--tt-surface-2);
+          border: 1px solid var(--tt-border);
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+        .tt-direct-set-box.is-stb-card { border-color: rgba(229, 193, 108, 0.5); }
+        .tt-direct-set-head { display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; }
+        .tt-direct-set-head span { font-size: 0.7rem; color: var(--tt-text-muted); }
+        .tt-direct-inputs-row {
+          display: grid;
+          grid-template-columns: 1fr auto 1fr;
+          align-items: end;
+          gap: 10px;
+        }
+        .tt-direct-field { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+        .tt-direct-field span { font-size: 0.74rem; font-weight: 800; color: var(--tt-text-muted); }
+        .tt-direct-num-input {
+          width: 100%;
+          height: 52px;
+          border-radius: 14px;
+          background: var(--tt-surface);
+          border: 1.5px solid var(--tt-border-medium);
+          color: var(--tt-text);
+          text-align: center;
+          font-family: var(--tt-font-display);
+          font-size: 1.65rem;
+          font-weight: 900;
+        }
+        .tt-direct-num-input:focus { outline: none; border-color: #00DC7D; }
+        .tt-direct-dash { font-size: 1.4rem; font-weight: 900; padding-bottom: 12px; color: var(--tt-text-muted); }
+        .tt-direct-tb-row {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          padding-top: 6px;
+          border-top: 1px solid var(--tt-border);
+          font-size: 0.72rem;
+          font-weight: 700;
+          color: var(--tt-text-muted);
+        }
+        .tt-direct-tb-input {
+          width: 48px;
+          height: 36px;
+          border-radius: 10px;
+          background: var(--tt-surface);
+          border: 1px solid var(--tt-border-medium);
+          color: var(--tt-text);
+          text-align: center;
+          font-weight: 900;
+        }
+        .tt-direct-validation-note {
+          padding: 11px 13px;
+          border-radius: 13px;
+          background: var(--tt-surface-2);
+          border: 1px dashed var(--tt-border-medium);
+          color: var(--tt-text-muted);
+          font-size: 0.76rem;
+          font-weight: 700;
+          text-align: center;
+        }
+
+        .tt-mc-controls-wrap { display: flex; flex-direction: column; gap: 11px; }
+        .tt-set-control-card {
+          border-radius: 16px;
+          padding: 12px;
+          background: var(--tt-surface-2);
+          border: 1px solid var(--tt-border);
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+        .tt-set-control-card.is-stb-card { border-color: rgba(229, 193, 108, 0.45); }
+        .tt-set-control-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 0.8rem; }
+        .tt-unlock-btn { padding: 4px 10px; border-radius: 999px; background: rgba(229, 193, 108, 0.16); color: #E5C16C; font-size: 0.7rem; font-weight: 800; }
+        .tt-retos-view.is-light .tt-unlock-btn { color: #8A5D10; }
+        .tt-tb-panel { display: flex; flex-direction: column; gap: 10px; }
+        .tt-tb-banner { text-align: center; padding: 6px 10px; border-radius: 10px; background: rgba(0, 220, 125, 0.15); color: var(--tt-emerald-text); font-size: 0.68rem; font-weight: 900; }
+        .tt-dual-stepper { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .tt-stepper-side { display: flex; flex-direction: column; gap: 6px; }
+        .tt-stepper-name { font-size: 0.76rem; font-weight: 800; color: var(--tt-text-muted); text-align: center; }
+        .tt-stepper-btns { display: flex; gap: 6px; }
+        .tt-step-minus { width: 40px; height: 44px; border-radius: 12px; background: var(--tt-surface); border: 1px solid var(--tt-border); color: var(--tt-text); font-size: 1.2rem; font-weight: 800; }
+        .tt-step-plus { flex: 1; height: 44px; border-radius: 12px; background: linear-gradient(135deg, #00DC7D 0%, #00B365 100%); color: #10021E; font-size: 0.82rem; font-weight: 900; }
+        .tt-step-plus.is-champagne { background: linear-gradient(135deg, #F5E1A4 0%, #CCA046 100%); color: #1A1102; }
+
+        .tt-judge-assign-box { display: flex; flex-direction: column; gap: 6px; }
+        .tt-elo-preview-card {
+          border-radius: 16px;
+          padding: 13px;
+          background: rgba(0, 220, 125, 0.1);
+          border: 1.5px solid rgba(0, 220, 125, 0.45);
+        }
+        .tt-elo-preview-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 10px; }
+        .tt-elo-preview-head span { font-size: 0.72rem; color: var(--tt-text-muted); }
+        .tt-elo-preview-deltas { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .tt-elo-preview-deltas > div { padding: 8px 10px; border-radius: 11px; background: var(--tt-surface); display: flex; flex-direction: column; gap: 2px; font-size: 0.76rem; }
+        .tt-mc-secondary-bar { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding-top: 2px; }
+        .tt-text-action { font-size: 0.75rem; font-weight: 700; color: var(--tt-text-muted); text-decoration: underline; }
+        .tt-text-action.is-danger { color: #EF4444; }
+        .tt-wo-box { padding: 11px; border-radius: 13px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.32); }
+        .tt-spectator-note { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 14px; background: var(--tt-surface-2); font-size: 0.8rem; color: var(--tt-text-muted); }
+        .tt-rule-callout { display: flex; gap: 10px; padding: 12px; border-radius: 14px; font-size: 0.82rem; }
+        .tt-rule-callout.is-ok { background: rgba(0, 220, 125, 0.14); border: 1px solid rgba(0, 220, 125, 0.4); }
+        .tt-rule-callout.is-warn { background: rgba(229, 193, 108, 0.14); border: 1px solid rgba(229, 193, 108, 0.42); }
+      `}</style>
+    </section>
+  );
+}
