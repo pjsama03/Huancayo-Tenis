@@ -17,9 +17,11 @@ import {
   RetosCelebrationModal,
   RetosRescheduleModal,
   buildLiveScoreFromDirectDraft,
+  calculateMatchVictoryGems,
   computeAdaptiveOfficialRivals,
   createDirectDraftFromScore,
   formatDynamicDateAndTime,
+  getMatchVictoryGemsRange,
   getTodayDateInputValue,
 } from '../components/RetosParts';
 import {
@@ -39,7 +41,8 @@ import {
 import { buildWhatsappLink, getEffectiveContactPhone } from '../utils/cloudService';
 
 /* ==========================================================================
-   VISTA PRINCIPAL: RetosView (CARRUSEL INSTANTÁNEO + ANTI-ESCASEZ + TUTELA)
+   VISTA PRINCIPAL: RetosView
+   (CARRUSEL INSTANTÁNEO + RETO EN 1 TOQUE + GEMAS HASTA 6-0, 6-0 + TUTELA)
    ========================================================================== */
 export default function RetosView({
   players = [],
@@ -48,6 +51,8 @@ export default function RetosView({
   currentUser = null,
   isAdmin = false,
   theme = 'dark',
+  quickChallengeRival = null,
+  onConsumeQuickChallenge,
   onCreateChallenge,
   onUpdateChallenge,
   onFinalizeMatch,
@@ -289,37 +294,52 @@ export default function RetosView({
   }, [heroSlides.length, challengeTarget, activeScoreboardId, rescheduleTarget, celebrationPayload]);
 
   /* ------------------------------------------------------------------------
-     ACCIONES DE NEGOCIO
+     ACCIONES DE NEGOCIO (INCLUYE RETO DIRECTO EN 1 TOQUE DESDE RANKING/H2H)
      ------------------------------------------------------------------------ */
-  const openCreateChallengeModal = (rival, forceFriendly = false) => {
-    if (!currentUser) {
-      if (onNotify) onNotify('Inicia sesión para pactar un desafío.', 'info');
-      if (onOpenAuth) onOpenAuth('login');
-      return;
-    }
-    if (currentUser.isTutorOnly) {
-      triggerHaptic('warning');
-      if (onNotify) {
-        onNotify(
-          'Tu cuenta está en modo Solo Padre/Tutor. Cambia a la subcuenta de tu hijo en Perfil para lanzar retos.',
-          'info'
-        );
+  const openCreateChallengeModal = useCallback(
+    (rival, forceFriendly = false) => {
+      if (!rival) return;
+      if (!currentUser) {
+        if (onNotify) onNotify('Inicia sesión para pactar un desafío.', 'info');
+        if (onOpenAuth) onOpenAuth('login');
+        return;
       }
-      return;
-    }
-    const eligibleOfficial = isRivalInOfficialRange(rival);
-    setFormMode(forceFriendly || !eligibleOfficial ? 'Amistoso' : 'Por puntos');
-    setFormClubId(
-      currentUser.clubId && currentUser.clubId !== 'independiente'
-        ? currentUser.clubId
-        : clubs?.[0]?.id || 'club-country'
-    );
-    setFormCustomVenue('');
-    setFormDate(getTodayDateInputValue(1));
-    setFormTime('18:00');
-    setFormBalls(BALLS_AGREEMENTS[0]);
-    setChallengeTarget(rival);
-  };
+      if (currentUser.isTutorOnly) {
+        triggerHaptic('warning');
+        if (onNotify) {
+          onNotify(
+            'Tu cuenta está en modo Solo Padre/Tutor. Cambia a la subcuenta de tu hijo en Perfil para lanzar retos.',
+            'info'
+          );
+        }
+        return;
+      }
+      if (rival.id === currentUser.id) {
+        if (onNotify) onNotify('No puedes enviarte un desafío a ti mismo.', 'info');
+        return;
+      }
+      const eligibleOfficial = isRivalInOfficialRange(rival);
+      setFormMode(forceFriendly || !eligibleOfficial ? 'Amistoso' : 'Por puntos');
+      setFormClubId(
+        currentUser.clubId && currentUser.clubId !== 'independiente'
+          ? currentUser.clubId
+          : clubs?.[0]?.id || 'club-country'
+      );
+      setFormCustomVenue('');
+      setFormDate(getTodayDateInputValue(1));
+      setFormTime('18:00');
+      setFormBalls(BALLS_AGREEMENTS[0]);
+      setChallengeTarget(rival);
+    },
+    [currentUser, isRivalInOfficialRange, clubs, onNotify, onOpenAuth]
+  );
+
+  // Disparo instantáneo del modal "Pactar Nuevo Desafío" al llegar desde Ranking, Perfil o H2H
+  useEffect(() => {
+    if (!quickChallengeRival?.id) return;
+    openCreateChallengeModal(quickChallengeRival, false);
+    if (onConsumeQuickChallenge) onConsumeQuickChallenge();
+  }, [quickChallengeRival, openCreateChallengeModal, onConsumeQuickChallenge]);
 
   const handleSubmitNewChallenge = (e) => {
     e.preventDefault();
@@ -507,6 +527,10 @@ export default function RetosView({
     if (closesImmediately) {
       const winnerPlayer = eloResult.winnerSide === 'A' ? pA : pB;
       const promoted = eloResult.winnerSide === 'A' ? eloResult.promotedA : eloResult.promotedB;
+      const victoryGems = isOfficial
+        ? calculateMatchVictoryGems(finalScoreObj, Boolean(winnerPlayer?.isVip), isWalkover)
+        : null;
+
       setCelebrationPayload({
         challenge: {
           ...activeScoreboardChallenge,
@@ -520,6 +544,7 @@ export default function RetosView({
         playerB: pB,
         winnerPlayer,
         eloResult,
+        victoryGems,
         promoted,
         isOfficial,
       });
@@ -572,7 +597,7 @@ export default function RetosView({
   };
 
   /* ------------------------------------------------------------------------
-     CÁLCULOS EN VIVO PARA LOS MODALES
+     CÁLCULOS EN VIVO PARA LOS MODALES (ELO + GEMAS HASTA 6-0, 6-0)
      ------------------------------------------------------------------------ */
   const preMatchForecast = useMemo(() => {
     if (!currentUser || !challengeTarget) return null;
@@ -616,6 +641,13 @@ export default function RetosView({
           })
         : null;
 
+    const winnerPreviewObj =
+      scoreEval.winnerSide === 'A' ? pA : scoreEval.winnerSide === 'B' ? pB : null;
+    const previewVictoryGems =
+      scoreEval.finished && activeScoreboardChallenge.mode !== 'Amistoso' && winnerPreviewObj
+        ? calculateMatchVictoryGems(effectiveScore, Boolean(winnerPreviewObj.isVip), false)
+        : null;
+
     return {
       pA,
       pB,
@@ -625,6 +657,8 @@ export default function RetosView({
       effectiveScore,
       scoreEval,
       previewElo,
+      previewVictoryGems,
+      winnerPreviewObj,
     };
   }, [
     activeScoreboardChallenge,
@@ -638,6 +672,11 @@ export default function RetosView({
   ]);
 
   const subTabIdx = subTab === 'cartelera' ? 0 : subTab === 'mis-retos' ? 1 : 2;
+
+  const victoryGemsRange = useMemo(
+    () => getMatchVictoryGemsRange(Boolean(currentUser?.isVip)),
+    [currentUser?.isVip]
+  );
 
   return (
     <section
@@ -1096,11 +1135,15 @@ export default function RetosView({
                       {forecast && inOfficialRange ? (
                         <div className="tt-rival-forecast-line">
                           <span className="is-win">
-                            Si ganas: +{forecast.playerA.minWin} a +{forecast.playerA.maxWin} pts
+                            +{forecast.playerA.minWin} a +{forecast.playerA.maxWin} pts
+                          </span>
+                          <span>·</span>
+                          <span className="is-gems">
+                            +{victoryGemsRange.min} a +{victoryGemsRange.max} 💎
                           </span>
                           <span>·</span>
                           <span className="is-loss">
-                            Si pierdes: {forecast.playerA.minLoss} a {forecast.playerA.maxLoss} pts
+                            {forecast.playerA.minLoss} a {forecast.playerA.maxLoss} pts
                           </span>
                           {viaExpanded && <span className="is-expanded">· Rango ampliado</span>}
                         </div>
@@ -1147,7 +1190,7 @@ export default function RetosView({
       )}
 
       {/* ====================================================================
-          MODAL 1: PACTAR NUEVO DESAFÍO
+          MODAL 1: PACTAR NUEVO DESAFÍO (ELO + DESGLOSE DE GEMAS HASTA 6-0, 6-0)
           ==================================================================== */}
       <ModalPortal
         isOpen={Boolean(challengeTarget)}
@@ -1177,9 +1220,10 @@ export default function RetosView({
             {preMatchForecast && formMode === 'Por puntos' && (
               <div className="tt-forecast-box">
                 <div className="tt-forecast-head">
-                  <strong>Puntos en juego</strong>
+                  <strong>Puntos y Gemas en juego</strong>
                   <span className="tt-rematch-tag">{preMatchForecast.rematch.label}</span>
                 </div>
+
                 <div className="tt-forecast-grid">
                   <div className="tt-forecast-cell is-win">
                     <span>Si ganas (hasta)</span>
@@ -1194,6 +1238,38 @@ export default function RetosView({
                     <strong>{preMatchForecast.playerA.maxLoss} pts</strong>
                     <small>En 3 sets: {preMatchForecast.playerA.minLoss} pts</small>
                   </div>
+                </div>
+
+                <div className="tt-gems-forecast-strip">
+                  <div className="tt-gems-forecast-top">
+                    <span>
+                      Gemas por victoria {currentUser?.isVip ? '· Socio VIP (×2.5)' : '· Plan Estándar'}
+                    </span>
+                    <strong>
+                      +{victoryGemsRange.min} a +{victoryGemsRange.max} 💎
+                    </strong>
+                  </div>
+
+                  <div className="tt-gems-tiers-row">
+                    <span>
+                      <b>3 sets:</b> +{currentUser?.isVip ? 10 : 4} 💎
+                    </span>
+                    <span>
+                      <b>2 sets:</b> +{currentUser?.isVip ? 15 : 6} 💎
+                    </span>
+                    <span>
+                      <b>≤4 games:</b> +{currentUser?.isVip ? 20 : 8} 💎
+                    </span>
+                    <span className="is-max">
+                      <b>6-0, 6-0:</b> +{victoryGemsRange.max} 💎
+                    </span>
+                  </div>
+
+                  {!currentUser?.isVip && (
+                    <small className="tt-gems-vip-upsell">
+                      Máximo posible con <b>6-0, 6-0</b>: <b>+{victoryGemsRange.standardMax} 💎</b> (Socio VIP gana hasta <b>+{victoryGemsRange.vipMax} 💎</b>).
+                    </small>
+                  )}
                 </div>
               </div>
             )}
@@ -1690,7 +1766,7 @@ export default function RetosView({
                       <span>
                         {activeScoreboardChallenge.mode === 'Amistoso'
                           ? 'Partido amistoso (sin cambio de puntos)'
-                          : 'Se enviará a tu rival para confirmar los puntos'}
+                          : 'Se enviará a tu rival para confirmar puntos y Gemas'}
                       </span>
                     </div>
 
@@ -1722,6 +1798,16 @@ export default function RetosView({
                             pts
                           </strong>
                         </div>
+                      </div>
+                    )}
+
+                    {activeSbData.previewVictoryGems?.awarded > 0 && (
+                      <div className="tt-gems-preview-pill">
+                        <span>
+                          Gemas para {activeSbData.winnerPreviewObj?.name?.split(' ')[0]} ·{' '}
+                          {activeSbData.previewVictoryGems.tierLabel}
+                        </span>
+                        <strong>+{activeSbData.previewVictoryGems.awarded} 💎</strong>
                       </div>
                     )}
 
@@ -2133,6 +2219,17 @@ export default function RetosView({
                       <div className="tt-elo-preview-head">
                         <strong>Marcador completo: {activeSbData.scoreEval.summary}</strong>
                       </div>
+
+                      {activeSbData.previewVictoryGems?.awarded > 0 && (
+                        <div className="tt-gems-preview-pill" style={{ marginBottom: 10 }}>
+                          <span>
+                            Gemas para {activeSbData.winnerPreviewObj?.name?.split(' ')[0]} ·{' '}
+                            {activeSbData.previewVictoryGems.tierLabel}
+                          </span>
+                          <strong>+{activeSbData.previewVictoryGems.awarded} 💎</strong>
+                        </div>
+                      )}
+
                       {activeSbData.perms.canConfirmOfficial ? (
                         <button
                           type="button"
@@ -2226,7 +2323,9 @@ export default function RetosView({
         .tt-rt-avatar-btn {
           transition: transform 180ms cubic-bezier(0.22, 1.35, 0.36, 1);
         }
-        .tt-rt-avatar-btn:active { transform: scale(0.93); }
+        .tt-rt-avatar-btn:active {
+          transform: scale(0.93);
+        }
 
         /* 1. HERO COMPACTO CON 3 CAPAS PRECARGADAS (CROSSFADE SIN ESPERAS) */
         .tt-hero-stage {
@@ -2343,8 +2442,16 @@ export default function RetosView({
           background-color: #00DC7D;
           flex-shrink: 0;
         }
-        .tt-hero-controls { display: flex; align-items: center; gap: 8px; }
-        .tt-hero-dots { display: flex; align-items: center; gap: 5px; }
+        .tt-hero-controls {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .tt-hero-dots {
+          display: flex;
+          align-items: center;
+          gap: 5px;
+        }
         .tt-hero-dot {
           width: 7px;
           height: 7px;
@@ -2352,8 +2459,14 @@ export default function RetosView({
           background: rgba(250, 249, 245, 0.38);
           transition: width 240ms cubic-bezier(0.22, 1.25, 0.36, 1), background-color 200ms ease;
         }
-        .tt-hero-dot.is-active { width: 22px; background: #00DC7D; }
-        .tt-hero-arrows { display: flex; gap: 5px; }
+        .tt-hero-dot.is-active {
+          width: 22px;
+          background: #00DC7D;
+        }
+        .tt-hero-arrows {
+          display: flex;
+          gap: 5px;
+        }
         .tt-circle-nav-btn {
           width: 29px;
           height: 29px;
@@ -2386,7 +2499,11 @@ export default function RetosView({
           box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 12px 26px rgba(0, 220, 125, 0.14);
           color: #FAF9F5;
         }
-        .tt-incoming-alert-head { display: flex; align-items: center; gap: 11px; }
+        .tt-incoming-alert-head {
+          display: flex;
+          align-items: center;
+          gap: 11px;
+        }
         .tt-incoming-kicker {
           display: block;
           font-size: 0.63rem;
@@ -2465,8 +2582,14 @@ export default function RetosView({
         }
 
         /* 4. FILTROS, BANNERS ANTI-ESCASEZ Y TUTELA */
-        .tt-retos-panel { display: flex; flex-direction: column; gap: 12px; }
-        .tt-rt-panel-in { animation: ttRtFade 280ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+        .tt-retos-panel {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+        .tt-rt-panel-in {
+          animation: ttRtFade 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
         @keyframes ttRtFade {
           from { opacity: 0; transform: translateY(7px); }
           to { opacity: 1; transform: translateY(0); }
@@ -2481,8 +2604,16 @@ export default function RetosView({
           border: 1px solid rgba(0, 220, 125, 0.38);
           font-size: 0.75rem;
         }
-        .tt-scarcity-banner strong { display: block; color: var(--tt-emerald-text); font-size: 0.78rem; }
-        .tt-scarcity-banner p { margin: 2px 0 0; color: var(--tt-text-muted); line-height: 1.38; }
+        .tt-scarcity-banner strong {
+          display: block;
+          color: var(--tt-emerald-text);
+          font-size: 0.78rem;
+        }
+        .tt-scarcity-banner p {
+          margin: 2px 0 0;
+          color: var(--tt-text-muted);
+          line-height: 1.38;
+        }
 
         .tt-tutor-only-card {
           display: flex;
@@ -2494,8 +2625,16 @@ export default function RetosView({
           border: 1px solid rgba(56, 189, 248, 0.4);
           font-size: 0.75rem;
         }
-        .tt-tutor-only-card strong { display: block; font-size: 0.78rem; color: var(--tt-text); }
-        .tt-tutor-only-card p { margin: 2px 0 0; color: var(--tt-text-muted); line-height: 1.38; }
+        .tt-tutor-only-card strong {
+          display: block;
+          font-size: 0.78rem;
+          color: var(--tt-text);
+        }
+        .tt-tutor-only-card p {
+          margin: 2px 0 0;
+          color: var(--tt-text-muted);
+          line-height: 1.38;
+        }
 
         .tt-tutela-mini-pill {
           display: inline-block;
@@ -2521,7 +2660,9 @@ export default function RetosView({
           padding-bottom: 2px;
           scrollbar-width: none;
         }
-        .tt-filter-pills-row::-webkit-scrollbar { display: none; }
+        .tt-filter-pills-row::-webkit-scrollbar {
+          display: none;
+        }
         .tt-filter-chip {
           flex-shrink: 0;
           min-height: 34px;
@@ -2548,9 +2689,15 @@ export default function RetosView({
         }
 
         /* 5. TARJETAS PÓSTER VS (LIQUID GLASS + CHAMPÁN SOBRIO) */
-        .tt-matches-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+        .tt-matches-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 12px;
+        }
         @media (min-width: 760px) {
-          .tt-matches-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+          .tt-matches-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
         }
         .tt-match-card {
           border-radius: 22px;
@@ -2584,16 +2731,51 @@ export default function RetosView({
           font-weight: 900;
           letter-spacing: 0.06em;
         }
-        .tt-match-pill.is-live { background: rgba(0, 220, 125, 0.16); color: #00DC7D; border: 1px solid rgba(0, 220, 125, 0.35); }
-        .tt-retos-view.is-light .tt-match-pill.is-live { background: #1E0734; color: #00DC7D; border-color: transparent; }
-        .tt-match-pill.is-scheduled { background: rgba(147, 197, 253, 0.15); color: #93C5FD; }
-        .tt-retos-view.is-light .tt-match-pill.is-scheduled { background: rgba(30, 7, 52, 0.08); color: #1E0734; }
-        .tt-match-pill.is-pending { background: rgba(229, 193, 108, 0.14); color: #E5C16C; border: 1px solid rgba(229, 193, 108, 0.34); }
-        .tt-retos-view.is-light .tt-match-pill.is-pending { background: #FBF4E0; color: #8A5D10; border-color: rgba(154, 107, 22, 0.28); }
-        .tt-match-pill.is-disputed { background: rgba(239, 68, 68, 0.16); color: #F87171; }
-        .tt-retos-view.is-light .tt-match-pill.is-disputed { background: #FEE2E2; color: #B91C1C; }
-        .tt-match-pill.is-finished { background: var(--tt-surface-2); color: var(--tt-text-muted); }
-        .tt-match-mode-tag { font-size: 0.7rem; font-weight: 700; color: var(--tt-text-muted); }
+        .tt-match-pill.is-live {
+          background: rgba(0, 220, 125, 0.16);
+          color: #00DC7D;
+          border: 1px solid rgba(0, 220, 125, 0.35);
+        }
+        .tt-retos-view.is-light .tt-match-pill.is-live {
+          background: #1E0734;
+          color: #00DC7D;
+          border-color: transparent;
+        }
+        .tt-match-pill.is-scheduled {
+          background: rgba(147, 197, 253, 0.15);
+          color: #93C5FD;
+        }
+        .tt-retos-view.is-light .tt-match-pill.is-scheduled {
+          background: rgba(30, 7, 52, 0.08);
+          color: #1E0734;
+        }
+        .tt-match-pill.is-pending {
+          background: rgba(229, 193, 108, 0.14);
+          color: #E5C16C;
+          border: 1px solid rgba(229, 193, 108, 0.34);
+        }
+        .tt-retos-view.is-light .tt-match-pill.is-pending {
+          background: #FBF4E0;
+          color: #8A5D10;
+          border-color: rgba(154, 107, 22, 0.28);
+        }
+        .tt-match-pill.is-disputed {
+          background: rgba(239, 68, 68, 0.16);
+          color: #F87171;
+        }
+        .tt-retos-view.is-light .tt-match-pill.is-disputed {
+          background: #FEE2E2;
+          color: #B91C1C;
+        }
+        .tt-match-pill.is-finished {
+          background: var(--tt-surface-2);
+          color: var(--tt-text-muted);
+        }
+        .tt-match-mode-tag {
+          font-size: 0.7rem;
+          font-weight: 700;
+          color: var(--tt-text-muted);
+        }
 
         .tt-match-vs-grid {
           display: grid;
@@ -2645,7 +2827,10 @@ export default function RetosView({
           font-weight: 900;
           letter-spacing: 0.08em;
         }
-        .tt-retos-view.is-light .tt-winner-chip { background: #007A44; color: #FFFFFF; }
+        .tt-retos-view.is-light .tt-winner-chip {
+          background: #007A44;
+          color: #FFFFFF;
+        }
         .tt-match-center-col {
           display: flex;
           flex-direction: column;
@@ -2661,9 +2846,21 @@ export default function RetosView({
           color: #E5C16C;
           line-height: 1;
         }
-        .tt-retos-view.is-light .tt-vs-emblem { color: #9A6B16; }
-        .tt-match-date-chip { font-size: 0.69rem; font-weight: 800; color: var(--tt-text); white-space: nowrap; }
-        .tt-match-time-chip { font-size: 0.68rem; font-weight: 700; color: var(--tt-text-muted); white-space: nowrap; }
+        .tt-retos-view.is-light .tt-vs-emblem {
+          color: #9A6B16;
+        }
+        .tt-match-date-chip {
+          font-size: 0.69rem;
+          font-weight: 800;
+          color: var(--tt-text);
+          white-space: nowrap;
+        }
+        .tt-match-time-chip {
+          font-size: 0.68rem;
+          font-weight: 700;
+          color: var(--tt-text-muted);
+          white-space: nowrap;
+        }
 
         .tt-mini-scoreboard {
           border-radius: 14px;
@@ -2675,9 +2872,25 @@ export default function RetosView({
           flex-direction: column;
           gap: 6px;
         }
-        .tt-mini-sb-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-        .tt-mini-sb-name { display: inline-flex; align-items: center; gap: 5px; font-size: 0.8rem; font-weight: 800; min-width: 76px; }
-        .tt-mini-sb-sets { display: flex; gap: 6px; margin-left: auto; }
+        .tt-mini-sb-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+        }
+        .tt-mini-sb-name {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          font-size: 0.8rem;
+          font-weight: 800;
+          min-width: 76px;
+        }
+        .tt-mini-sb-sets {
+          display: flex;
+          gap: 6px;
+          margin-left: auto;
+        }
         .tt-sb-cell {
           width: 26px;
           height: 24px;
@@ -2696,9 +2909,18 @@ export default function RetosView({
           width: auto;
           padding: 0 6px;
         }
-        .tt-delta-pill { min-width: 40px; text-align: right; font-size: 0.75rem; font-weight: 900; }
-        .tt-delta-pill.is-pos { color: #00DC7D; }
-        .tt-delta-pill.is-neg { color: #F87171; }
+        .tt-delta-pill {
+          min-width: 40px;
+          text-align: right;
+          font-size: 0.75rem;
+          font-weight: 900;
+        }
+        .tt-delta-pill.is-pos {
+          color: #00DC7D;
+        }
+        .tt-delta-pill.is-neg {
+          color: #F87171;
+        }
         .tt-mini-sb-foot {
           margin-top: 2px;
           padding-top: 6px;
@@ -2718,10 +2940,30 @@ export default function RetosView({
           border-radius: 13px;
           background: var(--tt-surface-2);
         }
-        .tt-match-venue-item { display: flex; align-items: center; gap: 7px; font-size: 0.75rem; font-weight: 700; color: var(--tt-text); }
-        .tt-match-venue-item.is-subtle { font-size: 0.71rem; font-weight: 600; color: var(--tt-text-muted); }
-        .tt-match-actions { display: flex; align-items: center; gap: 8px; }
-        .tt-btn-sm { min-height: 40px !important; padding: 0 13px !important; font-size: 0.77rem !important; border-radius: 12px !important; }
+        .tt-match-venue-item {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          font-size: 0.75rem;
+          font-weight: 700;
+          color: var(--tt-text);
+        }
+        .tt-match-venue-item.is-subtle {
+          font-size: 0.71rem;
+          font-weight: 600;
+          color: var(--tt-text-muted);
+        }
+        .tt-match-actions {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .tt-btn-sm {
+          min-height: 40px !important;
+          padding: 0 13px !important;
+          font-size: 0.77rem !important;
+          border-radius: 12px !important;
+        }
         .tt-icon-action-btn {
           width: 40px;
           height: 40px;
@@ -2736,7 +2978,9 @@ export default function RetosView({
           color: #16A34A;
           border: 1px solid rgba(37, 211, 102, 0.35);
         }
-        .tt-retos-view.is-dark .tt-icon-action-btn.is-wa { color: #4ADE80; }
+        .tt-retos-view.is-dark .tt-icon-action-btn.is-wa {
+          color: #4ADE80;
+        }
         .tt-waiting-banner {
           flex: 1;
           display: flex;
@@ -2750,7 +2994,10 @@ export default function RetosView({
           font-size: 0.74rem;
           font-weight: 800;
         }
-        .tt-retos-view.is-light .tt-waiting-banner { color: #8A5D10; background: #FBF4E0; }
+        .tt-retos-view.is-light .tt-waiting-banner {
+          color: #8A5D10;
+          background: #FBF4E0;
+        }
         .tt-spectator-pill {
           flex: 1;
           display: inline-flex;
@@ -2766,7 +3013,11 @@ export default function RetosView({
         }
 
         /* 6. RADAR DE RIVALES */
-        .tt-radar-controls { display: flex; flex-direction: column; gap: 10px; }
+        .tt-radar-controls {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
         .tt-search-box {
           display: flex;
           align-items: center;
@@ -2786,7 +3037,11 @@ export default function RetosView({
           font-size: 16px;
           outline: none;
         }
-        .tt-rivals-list { display: flex; flex-direction: column; gap: 10px; }
+        .tt-rivals-list {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
         .tt-rival-row {
           display: flex;
           align-items: center;
@@ -2797,10 +3052,28 @@ export default function RetosView({
           border: 1px solid var(--tt-border);
           box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
         }
-        .tt-rival-row.is-out-of-range { opacity: 0.75; }
-        .tt-rival-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-        .tt-rival-name-line { display: flex; align-items: center; gap: 6px; font-size: 0.9rem; flex-wrap: wrap; }
-        .tt-rival-name-line strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .tt-rival-row.is-out-of-range {
+          opacity: 0.75;
+        }
+        .tt-rival-info {
+          flex: 1;
+          min-width: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 3px;
+        }
+        .tt-rival-name-line {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 0.9rem;
+          flex-wrap: wrap;
+        }
+        .tt-rival-name-line strong {
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
         .tt-vip-micro-pill {
           padding: 1px 6px;
           border-radius: 6px;
@@ -2810,8 +3083,18 @@ export default function RetosView({
           font-size: 0.58rem;
           font-weight: 900;
         }
-        .tt-retos-view.is-light .tt-vip-micro-pill { background: #FBF4E0; color: #8A5D10; }
-        .tt-rival-meta-line { display: flex; align-items: center; gap: 6px; font-size: 0.72rem; color: var(--tt-text-muted); flex-wrap: wrap; }
+        .tt-retos-view.is-light .tt-vip-micro-pill {
+          background: #FBF4E0;
+          color: #8A5D10;
+        }
+        .tt-rival-meta-line {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 0.72rem;
+          color: var(--tt-text-muted);
+          flex-wrap: wrap;
+        }
         .tt-cat-mini-pill {
           display: inline-flex;
           align-items: center;
@@ -2823,34 +3106,196 @@ export default function RetosView({
           font-weight: 800;
           font-size: 0.66rem;
         }
-        .tt-rival-forecast-line { display: flex; align-items: center; gap: 6px; font-size: 0.7rem; color: var(--tt-text-muted); flex-wrap: wrap; }
-        .tt-rival-forecast-line .is-win { color: var(--tt-emerald-text); font-weight: 800; }
-        .tt-rival-forecast-line .is-loss { color: #EF4444; font-weight: 700; }
-        .tt-rival-forecast-line .is-expanded { color: #7DD3FC; font-weight: 800; }
-        .tt-rival-cta-col { flex-shrink: 0; }
+        .tt-rival-forecast-line {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 0.7rem;
+          color: var(--tt-text-muted);
+          flex-wrap: wrap;
+        }
+        .tt-rival-forecast-line .is-win {
+          color: var(--tt-emerald-text);
+          font-weight: 800;
+        }
+        .tt-rival-forecast-line .is-gems {
+          color: #E5C16C;
+          font-weight: 900;
+        }
+        .tt-retos-view.is-light .tt-rival-forecast-line .is-gems {
+          color: #9A6B16;
+        }
+        .tt-rival-forecast-line .is-loss {
+          color: #EF4444;
+          font-weight: 700;
+        }
+        .tt-rival-forecast-line .is-expanded {
+          color: #7DD3FC;
+          font-weight: 800;
+        }
+        .tt-rival-cta-col {
+          flex-shrink: 0;
+        }
 
-        /* 7. FORMULARIOS EN MODAL */
-        .tt-form-stack { display: flex; flex-direction: column; gap: 14px; }
-        .tt-field-group { display: flex; flex-direction: column; gap: 6px; }
-        .tt-field-label { font-size: 0.74rem; font-weight: 800; color: var(--tt-text-muted); }
+        /* 7. FORMULARIOS EN MODAL + BLOQUE DE GEMAS HASTA 6-0, 6-0 */
+        .tt-form-stack {
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+        }
+        .tt-field-group {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+        .tt-field-label {
+          font-size: 0.74rem;
+          font-weight: 800;
+          color: var(--tt-text-muted);
+        }
         .tt-forecast-box {
           border-radius: 16px;
           padding: 12px;
           background: linear-gradient(135deg, #1E0734 0%, #140424 100%);
           color: #FAF9F5;
           border: 1px solid rgba(0, 220, 125, 0.34);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
         }
-        .tt-forecast-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; font-size: 0.8rem; }
-        .tt-rematch-tag { padding: 3px 8px; border-radius: 999px; background: rgba(229, 193, 108, 0.2); color: #F3DC9B; font-size: 0.66rem; font-weight: 800; }
-        .tt-forecast-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-        .tt-forecast-cell { padding: 9px 10px; border-radius: 12px; background: rgba(250, 249, 245, 0.07); display: flex; flex-direction: column; gap: 2px; }
-        .tt-forecast-cell span { font-size: 0.68rem; opacity: 0.78; }
-        .tt-forecast-cell strong { font-size: 1.15rem; font-weight: 900; }
-        .tt-forecast-cell.is-win strong { color: #00DC7D; }
-        .tt-forecast-cell.is-loss strong { color: #F87171; }
-        .tt-forecast-cell small { font-size: 0.66rem; opacity: 0.74; }
+        .tt-forecast-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          margin-bottom: 10px;
+          font-size: 0.8rem;
+        }
+        .tt-rematch-tag {
+          padding: 3px 8px;
+          border-radius: 999px;
+          background: rgba(229, 193, 108, 0.2);
+          color: #F3DC9B;
+          font-size: 0.66rem;
+          font-weight: 800;
+        }
+        .tt-forecast-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 8px;
+        }
+        .tt-forecast-cell {
+          padding: 9px 10px;
+          border-radius: 12px;
+          background: rgba(250, 249, 245, 0.07);
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+        .tt-forecast-cell span {
+          font-size: 0.68rem;
+          opacity: 0.78;
+        }
+        .tt-forecast-cell strong {
+          font-size: 1.15rem;
+          font-weight: 900;
+        }
+        .tt-forecast-cell.is-win strong {
+          color: #00DC7D;
+        }
+        .tt-forecast-cell.is-loss strong {
+          color: #F87171;
+        }
+        .tt-forecast-cell small {
+          font-size: 0.66rem;
+          opacity: 0.74;
+        }
 
-        .tt-toggle-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .tt-gems-forecast-strip {
+          margin-top: 10px;
+          padding: 10px 11px;
+          border-radius: 13px;
+          background: linear-gradient(135deg, rgba(0, 220, 125, 0.14) 0%, rgba(229, 193, 108, 0.1) 100%);
+          border: 1px solid rgba(0, 220, 125, 0.36);
+          display: flex;
+          flex-direction: column;
+          gap: 7px;
+        }
+        .tt-gems-forecast-top {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          font-size: 0.74rem;
+        }
+        .tt-gems-forecast-top span {
+          color: rgba(250, 249, 245, 0.88);
+          font-weight: 700;
+        }
+        .tt-gems-forecast-top strong {
+          color: #00DC7D;
+          font-size: 0.84rem;
+          font-weight: 900;
+          white-space: nowrap;
+        }
+        .tt-gems-tiers-row {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 5px;
+        }
+        @media (min-width: 480px) {
+          .tt-gems-tiers-row {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+          }
+        }
+        .tt-gems-tiers-row span {
+          padding: 5px 7px;
+          border-radius: 9px;
+          background: rgba(16, 3, 29, 0.56);
+          border: 1px solid rgba(250, 249, 245, 0.1);
+          font-size: 0.64rem;
+          color: rgba(250, 249, 245, 0.86);
+          text-align: center;
+          white-space: nowrap;
+        }
+        .tt-gems-tiers-row span.is-max {
+          background: rgba(229, 193, 108, 0.18);
+          border-color: rgba(229, 193, 108, 0.45);
+          color: #F5E1A4;
+        }
+        .tt-gems-vip-upsell {
+          font-size: 0.66rem;
+          line-height: 1.35;
+          color: rgba(250, 249, 245, 0.78);
+        }
+        .tt-gems-vip-upsell b {
+          color: #F5E1A4;
+        }
+
+        .tt-gems-preview-pill {
+          margin-top: 9px;
+          padding: 9px 12px;
+          border-radius: 12px;
+          background: linear-gradient(135deg, rgba(0, 220, 125, 0.14) 0%, rgba(229, 193, 108, 0.1) 100%);
+          border: 1px solid rgba(0, 220, 125, 0.4);
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          font-size: 0.75rem;
+          color: var(--tt-text);
+          text-align: left;
+        }
+        .tt-gems-preview-pill strong {
+          color: var(--tt-emerald-text);
+          font-size: 0.86rem;
+          font-weight: 900;
+          white-space: nowrap;
+        }
+
+        .tt-toggle-pair {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 8px;
+        }
         .tt-choice-pill {
           min-height: 42px;
           padding: 8px 12px;
@@ -2862,7 +3307,10 @@ export default function RetosView({
           font-weight: 700;
           text-align: center;
         }
-        .tt-choice-pill:disabled { opacity: 0.45; cursor: not-allowed; }
+        .tt-choice-pill:disabled {
+          opacity: 0.45;
+          cursor: not-allowed;
+        }
         .tt-choice-pill.is-selected {
           background: rgba(0, 220, 125, 0.16);
           border-color: #00DC7D;
@@ -2874,7 +3322,11 @@ export default function RetosView({
           border-color: #1E0734;
           color: #00DC7D;
         }
-        .tt-venues-select-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .tt-venues-select-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 8px;
+        }
         .tt-venue-option {
           min-height: 46px;
           padding: 8px 10px;
@@ -2889,10 +3341,25 @@ export default function RetosView({
           font-weight: 700;
           text-align: left;
         }
-        .tt-venue-option.is-custom { grid-column: 1 / -1; justify-content: center; }
-        .tt-venue-option.is-selected { border-color: #00DC7D; background: rgba(0, 220, 125, 0.14); }
-        .tt-date-time-grid { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 10px; }
-        .tt-quick-slots-row { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+        .tt-venue-option.is-custom {
+          grid-column: 1 / -1;
+          justify-content: center;
+        }
+        .tt-venue-option.is-selected {
+          border-color: #00DC7D;
+          background: rgba(0, 220, 125, 0.14);
+        }
+        .tt-date-time-grid {
+          display: grid;
+          grid-template-columns: 1.15fr 0.85fr;
+          gap: 10px;
+        }
+        .tt-quick-slots-row {
+          display: flex;
+          gap: 6px;
+          overflow-x: auto;
+          padding-bottom: 2px;
+        }
         .tt-slot-chip {
           flex-shrink: 0;
           padding: 6px 11px;
@@ -2903,11 +3370,24 @@ export default function RetosView({
           border: 1px solid var(--tt-border);
           color: var(--tt-text-muted);
         }
-        .tt-slot-chip.is-selected { background: #00DC7D; border-color: #00DC7D; color: #10021E; font-weight: 900; }
-        .tt-balls-stack { display: flex; flex-direction: column; gap: 7px; }
+        .tt-slot-chip.is-selected {
+          background: #00DC7D;
+          border-color: #00DC7D;
+          color: #10021E;
+          font-weight: 900;
+        }
+        .tt-balls-stack {
+          display: flex;
+          flex-direction: column;
+          gap: 7px;
+        }
 
         /* 8. MODAL MARCADOR DIRECTO + MODO ÁRBITRO */
-        .tt-mc-container { display: flex; flex-direction: column; gap: 13px; }
+        .tt-mc-container {
+          display: flex;
+          flex-direction: column;
+          gap: 13px;
+        }
         .tt-score-mode-switch {
           display: grid;
           grid-template-columns: 1fr 1fr;
@@ -2939,13 +3419,48 @@ export default function RetosView({
           flex-direction: column;
           gap: 9px;
         }
-        .tt-stadium-head { display: flex; justify-content: space-between; font-size: 0.65rem; font-weight: 800; letter-spacing: 0.08em; color: rgba(250, 249, 245, 0.6); }
-        .tt-stadium-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 8px; border-top: 1px solid rgba(250, 249, 245, 0.1); }
-        .tt-stadium-player { display: flex; align-items: center; gap: 9px; min-width: 0; }
-        .tt-stadium-player strong { display: block; font-size: 0.86rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .tt-stadium-player small { font-size: 0.68rem; color: rgba(250, 249, 245, 0.66); }
-        .tt-stadium-cols { display: flex; gap: 7px; flex-shrink: 0; }
-        .tt-stadium-head .tt-stadium-cols span { width: 34px; text-align: center; }
+        .tt-stadium-head {
+          display: flex;
+          justify-content: space-between;
+          font-size: 0.65rem;
+          font-weight: 800;
+          letter-spacing: 0.08em;
+          color: rgba(250, 249, 245, 0.6);
+        }
+        .tt-stadium-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          padding-top: 8px;
+          border-top: 1px solid rgba(250, 249, 245, 0.1);
+        }
+        .tt-stadium-player {
+          display: flex;
+          align-items: center;
+          gap: 9px;
+          min-width: 0;
+        }
+        .tt-stadium-player strong {
+          display: block;
+          font-size: 0.86rem;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .tt-stadium-player small {
+          font-size: 0.68rem;
+          color: rgba(250, 249, 245, 0.66);
+        }
+        .tt-stadium-cols {
+          display: flex;
+          gap: 7px;
+          flex-shrink: 0;
+        }
+        .tt-stadium-head .tt-stadium-cols span {
+          width: 34px;
+          text-align: center;
+        }
         .tt-st-num {
           width: 34px;
           height: 34px;
@@ -2958,10 +3473,25 @@ export default function RetosView({
           align-items: center;
           justify-content: center;
         }
-        .tt-st-num sup { font-size: 0.6rem; color: #00DC7D; margin-left: 1px; }
-        .tt-st-num.is-stb { background: rgba(229, 193, 108, 0.22); color: #F3DC9B; min-width: 38px; width: auto; padding: 0 6px; }
+        .tt-st-num sup {
+          font-size: 0.6rem;
+          color: #00DC7D;
+          margin-left: 1px;
+        }
+        .tt-st-num.is-stb {
+          background: rgba(229, 193, 108, 0.22);
+          color: #F3DC9B;
+          min-width: 38px;
+          width: auto;
+          padding: 0 6px;
+        }
 
-        .tt-direct-hint { margin: 0; font-size: 0.77rem; color: var(--tt-text-muted); line-height: 1.4; }
+        .tt-direct-hint {
+          margin: 0;
+          font-size: 0.77rem;
+          color: var(--tt-text-muted);
+          line-height: 1.4;
+        }
         .tt-direct-set-box {
           border-radius: 16px;
           padding: 12px;
@@ -2971,17 +3501,36 @@ export default function RetosView({
           flex-direction: column;
           gap: 10px;
         }
-        .tt-direct-set-box.is-stb-card { border-color: rgba(229, 193, 108, 0.5); }
-        .tt-direct-set-head { display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; }
-        .tt-direct-set-head span { font-size: 0.7rem; color: var(--tt-text-muted); }
+        .tt-direct-set-box.is-stb-card {
+          border-color: rgba(229, 193, 108, 0.5);
+        }
+        .tt-direct-set-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          font-size: 0.8rem;
+        }
+        .tt-direct-set-head span {
+          font-size: 0.7rem;
+          color: var(--tt-text-muted);
+        }
         .tt-direct-inputs-row {
           display: grid;
           grid-template-columns: 1fr auto 1fr;
           align-items: end;
           gap: 10px;
         }
-        .tt-direct-field { display: flex; flex-direction: column; align-items: center; gap: 5px; }
-        .tt-direct-field span { font-size: 0.74rem; font-weight: 800; color: var(--tt-text-muted); }
+        .tt-direct-field {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 5px;
+        }
+        .tt-direct-field span {
+          font-size: 0.74rem;
+          font-weight: 800;
+          color: var(--tt-text-muted);
+        }
         .tt-direct-num-input {
           width: 100%;
           height: 52px;
@@ -2994,8 +3543,16 @@ export default function RetosView({
           font-size: 1.65rem;
           font-weight: 900;
         }
-        .tt-direct-num-input:focus { outline: none; border-color: #00DC7D; }
-        .tt-direct-dash { font-size: 1.4rem; font-weight: 900; padding-bottom: 12px; color: var(--tt-text-muted); }
+        .tt-direct-num-input:focus {
+          outline: none;
+          border-color: #00DC7D;
+        }
+        .tt-direct-dash {
+          font-size: 1.4rem;
+          font-weight: 900;
+          padding-bottom: 12px;
+          color: var(--tt-text-muted);
+        }
         .tt-direct-tb-row {
           display: flex;
           align-items: center;
@@ -3028,7 +3585,11 @@ export default function RetosView({
           text-align: center;
         }
 
-        .tt-mc-controls-wrap { display: flex; flex-direction: column; gap: 11px; }
+        .tt-mc-controls-wrap {
+          display: flex;
+          flex-direction: column;
+          gap: 11px;
+        }
         .tt-set-control-card {
           border-radius: 16px;
           padding: 12px;
@@ -3038,40 +3599,169 @@ export default function RetosView({
           flex-direction: column;
           gap: 10px;
         }
-        .tt-set-control-card.is-stb-card { border-color: rgba(229, 193, 108, 0.45); }
-        .tt-set-control-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 0.8rem; }
-        .tt-unlock-btn { padding: 4px 10px; border-radius: 999px; background: rgba(229, 193, 108, 0.16); color: #E5C16C; font-size: 0.7rem; font-weight: 800; }
-        .tt-retos-view.is-light .tt-unlock-btn { color: #8A5D10; }
-        .tt-tb-panel { display: flex; flex-direction: column; gap: 10px; }
-        .tt-tb-banner { text-align: center; padding: 6px 10px; border-radius: 10px; background: rgba(0, 220, 125, 0.15); color: var(--tt-emerald-text); font-size: 0.68rem; font-weight: 900; }
-        .tt-dual-stepper { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .tt-stepper-side { display: flex; flex-direction: column; gap: 6px; }
-        .tt-stepper-name { font-size: 0.76rem; font-weight: 800; color: var(--tt-text-muted); text-align: center; }
-        .tt-stepper-btns { display: flex; gap: 6px; }
-        .tt-step-minus { width: 40px; height: 44px; border-radius: 12px; background: var(--tt-surface); border: 1px solid var(--tt-border); color: var(--tt-text); font-size: 1.2rem; font-weight: 800; }
-        .tt-step-plus { flex: 1; height: 44px; border-radius: 12px; background: linear-gradient(135deg, #00DC7D 0%, #00B365 100%); color: #10021E; font-size: 0.82rem; font-weight: 900; }
-        .tt-step-plus.is-champagne { background: linear-gradient(135deg, #F5E1A4 0%, #CCA046 100%); color: #1A1102; }
+        .tt-set-control-card.is-stb-card {
+          border-color: rgba(229, 193, 108, 0.45);
+        }
+        .tt-set-control-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          font-size: 0.8rem;
+        }
+        .tt-unlock-btn {
+          padding: 4px 10px;
+          border-radius: 999px;
+          background: rgba(229, 193, 108, 0.16);
+          color: #E5C16C;
+          font-size: 0.7rem;
+          font-weight: 800;
+        }
+        .tt-retos-view.is-light .tt-unlock-btn {
+          color: #8A5D10;
+        }
+        .tt-tb-panel {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+        .tt-tb-banner {
+          text-align: center;
+          padding: 6px 10px;
+          border-radius: 10px;
+          background: rgba(0, 220, 125, 0.15);
+          color: var(--tt-emerald-text);
+          font-size: 0.68rem;
+          font-weight: 900;
+        }
+        .tt-dual-stepper {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 10px;
+        }
+        .tt-stepper-side {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+        .tt-stepper-name {
+          font-size: 0.76rem;
+          font-weight: 800;
+          color: var(--tt-text-muted);
+          text-align: center;
+        }
+        .tt-stepper-btns {
+          display: flex;
+          gap: 6px;
+        }
+        .tt-step-minus {
+          width: 40px;
+          height: 44px;
+          border-radius: 12px;
+          background: var(--tt-surface);
+          border: 1px solid var(--tt-border);
+          color: var(--tt-text);
+          font-size: 1.2rem;
+          font-weight: 800;
+        }
+        .tt-step-plus {
+          flex: 1;
+          height: 44px;
+          border-radius: 12px;
+          background: linear-gradient(135deg, #00DC7D 0%, #00B365 100%);
+          color: #10021E;
+          font-size: 0.82rem;
+          font-weight: 900;
+        }
+        .tt-step-plus.is-champagne {
+          background: linear-gradient(135deg, #F5E1A4 0%, #CCA046 100%);
+          color: #1A1102;
+        }
 
-        .tt-judge-assign-box { display: flex; flex-direction: column; gap: 6px; }
+        .tt-judge-assign-box {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
         .tt-elo-preview-card {
           border-radius: 16px;
           padding: 13px;
           background: rgba(0, 220, 125, 0.1);
           border: 1.5px solid rgba(0, 220, 125, 0.45);
         }
-        .tt-elo-preview-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 10px; }
-        .tt-elo-preview-head span { font-size: 0.72rem; color: var(--tt-text-muted); }
-        .tt-elo-preview-deltas { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-        .tt-elo-preview-deltas > div { padding: 8px 10px; border-radius: 11px; background: var(--tt-surface); display: flex; flex-direction: column; gap: 2px; font-size: 0.76rem; }
-        .tt-mc-secondary-bar { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding-top: 2px; }
-        .tt-text-action { font-size: 0.75rem; font-weight: 700; color: var(--tt-text-muted); text-decoration: underline; }
-        .tt-text-action.is-danger { color: #EF4444; }
-        .tt-wo-box { padding: 11px; border-radius: 13px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.32); }
-        .tt-spectator-note { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 14px; background: var(--tt-surface-2); font-size: 0.8rem; color: var(--tt-text-muted); }
-        .tt-rule-callout { display: flex; gap: 10px; padding: 12px; border-radius: 14px; font-size: 0.82rem; }
-        .tt-rule-callout.is-ok { background: rgba(0, 220, 125, 0.14); border: 1px solid rgba(0, 220, 125, 0.4); }
-        .tt-rule-callout.is-warn { background: rgba(229, 193, 108, 0.14); border: 1px solid rgba(229, 193, 108, 0.42); }
+        .tt-elo-preview-head {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+          margin-bottom: 10px;
+        }
+        .tt-elo-preview-head span {
+          font-size: 0.72rem;
+          color: var(--tt-text-muted);
+        }
+        .tt-elo-preview-deltas {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 8px;
+        }
+        .tt-elo-preview-deltas > div {
+          padding: 8px 10px;
+          border-radius: 11px;
+          background: var(--tt-surface);
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+          font-size: 0.76rem;
+        }
+        .tt-mc-secondary-bar {
+          display: flex;
+          justify-content: space-between;
+          gap: 8px;
+          flex-wrap: wrap;
+          padding-top: 2px;
+        }
+        .tt-text-action {
+          font-size: 0.75rem;
+          font-weight: 700;
+          color: var(--tt-text-muted);
+          text-decoration: underline;
+        }
+        .tt-text-action.is-danger {
+          color: #EF4444;
+        }
+        .tt-wo-box {
+          padding: 11px;
+          border-radius: 13px;
+          background: rgba(239, 68, 68, 0.1);
+          border: 1px solid rgba(239, 68, 68, 0.32);
+        }
+        .tt-spectator-note {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 12px;
+          border-radius: 14px;
+          background: var(--tt-surface-2);
+          font-size: 0.8rem;
+          color: var(--tt-text-muted);
+        }
+        .tt-rule-callout {
+          display: flex;
+          gap: 10px;
+          padding: 12px;
+          border-radius: 14px;
+          font-size: 0.82rem;
+        }
+        .tt-rule-callout.is-ok {
+          background: rgba(0, 220, 125, 0.14);
+          border: 1px solid rgba(0, 220, 125, 0.4);
+        }
+        .tt-rule-callout.is-warn {
+          background: rgba(229, 193, 108, 0.14);
+          border: 1px solid rgba(229, 193, 108, 0.42);
+        }
       `}</style>
     </section>
   );
 }
+
