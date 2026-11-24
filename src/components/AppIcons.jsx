@@ -311,6 +311,7 @@ export function ModalPortal({
 }) {
   const bodyRef = useRef(null);
   const onCloseRef = useRef(onClose);
+  const backdropDownRef = useRef(false);
 
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -361,8 +362,13 @@ export function ModalPortal({
       role="dialog"
       aria-modal="true"
       aria-label={typeof title === 'string' ? title : 'Ventana TOTAL TENIS'}
+      onMouseDown={(e) => {
+        backdropDownRef.current = e.target === e.currentTarget;
+      }}
       onClick={(e) => {
-        if (e.target === e.currentTarget && onCloseRef.current) {
+        const startedOutside = backdropDownRef.current;
+        backdropDownRef.current = false;
+        if (startedOutside && e.target === e.currentTarget && onCloseRef.current) {
           triggerHaptic('light');
           onCloseRef.current();
         }
