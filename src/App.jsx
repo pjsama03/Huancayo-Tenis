@@ -51,6 +51,7 @@ import {
   TTIcon,
   triggerHaptic,
 } from './components/AppIcons';
+import { calculateMatchVictoryGems } from './components/RetosParts';
 import SplashScreen from './components/SplashScreen';
 import HeaderAndDrawer from './components/HeaderAndDrawer';
 import BottomDock from './components/BottomDock';
@@ -82,6 +83,7 @@ export const APP_RUNTIME_CONFIG = {
   themeStorageKey: 'tt_theme_pref_v2',
   firstVisitKey: 'tt_visited_before_v2',
   rankMemoryKey: 'tt_rk_seen_ranks_v2',
+  sessionStorageKey: 'tt_active_session_v2',
   defaultTab: 'retos',
   toastDurationMs: 3800,
   tickerMessages: [
@@ -95,6 +97,49 @@ export const APP_RUNTIME_CONFIG = {
 const MONTHS_ES_SHORT = [
   'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic',
 ];
+
+/* ==========================================================================
+   PERSISTENCIA LOCAL DE SESIÓN ACTIVA (PERFILES RÁPIDOS, SANDBOX Y TUTELA)
+   ========================================================================== */
+function readSavedLocalSession() {
+  try {
+    const raw = window.localStorage.getItem(APP_RUNTIME_CONFIG.sessionStorageKey);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !parsed.userId) return null;
+    return {
+      userId: String(parsed.userId),
+      tutorParentId: parsed.tutorParentId ? String(parsed.tutorParentId) : null,
+      isAdmin: Boolean(parsed.isAdmin),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeSavedLocalSession({ userId, tutorParentId = null, isAdmin = false }) {
+  try {
+    if (!userId) return;
+    window.localStorage.setItem(
+      APP_RUNTIME_CONFIG.sessionStorageKey,
+      JSON.stringify({
+        userId: String(userId),
+        tutorParentId: tutorParentId ? String(tutorParentId) : null,
+        isAdmin: Boolean(isAdmin),
+      })
+    );
+  } catch {
+    // continuar si el navegador bloquea storage
+  }
+}
+
+function clearSavedLocalSession() {
+  try {
+    window.localStorage.removeItem(APP_RUNTIME_CONFIG.sessionStorageKey);
+  } catch {
+    // continuar
+  }
+}
 
 /* ==========================================================================
    CINTA SUPERIOR AISLADA (NO RE-RENDERIZA App NI RESETEA SCROLL DE MODALES)
@@ -318,7 +363,8 @@ function snapshotPreMatchRankMap(playersList) {
 }
 
 /* ==========================================================================
-   COMPONENTE RAÍZ MAESTRO: App (SUPABASE REALTIME + AUTÓNOMO 00:00 + TUTELA)
+   COMPONENTE RAÍZ MAESTRO: App
+   (SUPABASE REALTIME + SESIÓN PERSISTENTE + RETO 1 TOQUE + GEMAS 6-0, 6-0)
    ========================================================================== */
 export default function App() {
   const scrollContainerRef = useRef(null);
@@ -338,6 +384,8 @@ export default function App() {
     };
   }, []);
 
+  const initialSavedSession = useMemo(() => readSavedLocalSession(), []);
+
   const [players, setPlayers] = useState(defaultSeeds.players);
   const [clubs, setClubs] = useState(defaultSeeds.clubs);
   const [coaches, setCoaches] = useState(defaultSeeds.coaches);
@@ -345,8 +393,8 @@ export default function App() {
   const [tournaments, setTournaments] = useState(defaultSeeds.tournaments);
   const [products, setProducts] = useState(defaultSeeds.products);
   const [seasonSnapshots, setSeasonSnapshots] = useState(defaultSeeds.seasonSnapshots);
-  const [currentUserId, setCurrentUserId] = useState(null);
-  const [tutorParentId, setTutorParentId] = useState(null);
+  const [currentUserId, setCurrentUserId] = useState(() => initialSavedSession?.userId || null);
+  const [tutorParentId, setTutorParentId] = useState(() => initialSavedSession?.tutorParentId || null);
   const [gemLedger, setGemLedger] = useState([]);
   const [complaints, setComplaints] = useState([]);
   const [notices, setNotices] = useState([]);
@@ -373,8 +421,9 @@ export default function App() {
   });
   const [activeTab, setActiveTab] = useState(APP_RUNTIME_CONFIG.defaultTab);
   const [torneosInitialSubTab, setTorneosInitialSubTab] = useState('gira');
+  const [quickChallengeRival, setQuickChallengeRival] = useState(null);
 
-  const [isAdminSession, setIsAdminSession] = useState(false);
+  const [isAdminSession, setIsAdminSession] = useState(() => Boolean(initialSavedSession?.isAdmin));
   const [activePartner, setActivePartner] = useState(null);
 
   // Control centralizado de Modales
@@ -398,6 +447,17 @@ export default function App() {
   useEffect(() => {
     playersRef.current = players;
   }, [players]);
+
+  // Persistir sesión activa en disco para sobrevivir cierres de app (Elías, rápido, sandbox, tutela)
+  useEffect(() => {
+    if (currentUserId) {
+      writeSavedLocalSession({
+        userId: currentUserId,
+        tutorParentId,
+        isAdmin: isAdminSession,
+      });
+    }
+  }, [currentUserId, tutorParentId, isAdminSession]);
 
   const showToast = useCallback((message, type = 'info') => {
     if (!message) return;
@@ -446,7 +506,7 @@ export default function App() {
   }, []);
 
   /* ------------------------------------------------------------------------
-     2. SINCRONIZACIÓN INICIAL SUPABASE + SESIÓN REAL + REALTIME
+     2. SINCRONIZACIÓN INICIAL SUPABASE + SESIÓN REAL/PERSISTENTE + REALTIME
      ------------------------------------------------------------------------ */
   const resolveSessionPlayer = useCallback((session, list) => {
     if (!session?.user) return null;
@@ -493,12 +553,40 @@ export default function App() {
           if (cloudData.sponsorsConfig) setSponsorsConfig(cloudData.sponsorsConfig);
         }
 
+        const saved = readSavedLocalSession();
         const matched = resolveSessionPlayer(session, loadedPlayers);
+
         if (matched) {
-          setCurrentUserId(matched.id);
+          // Si un padre con sesión real estaba gestionando a su hijo tutelado, conservar ese subperfil
+          const savedChild =
+            saved?.userId && saved.userId !== matched.id
+              ? loadedPlayers.find(
+                  (p) => p.id === saved.userId && p.isTutelado && p.tutorId === matched.id
+                )
+              : null;
+          const activeProfile = savedChild || matched;
+          setCurrentUserId(activeProfile.id);
           setTutorParentId(matched.isTutelado ? matched.tutorId : matched.id);
-          setIsAdminSession(Boolean(matched.isAdmin));
+          setIsAdminSession(Boolean(matched.isAdmin || saved?.isAdmin));
           linkOneSignalUser(matched.id);
+        } else if (saved?.userId) {
+          // Restaurar perfil guardado localmente (ej. Elías, acceso rápido o modo pruebas)
+          const savedPlayer = loadedPlayers.find((p) => p.id === saved.userId);
+          if (savedPlayer) {
+            setCurrentUserId(savedPlayer.id);
+            setTutorParentId(
+              savedPlayer.isTutelado ? savedPlayer.tutorId : saved.tutorParentId || savedPlayer.id
+            );
+            setIsAdminSession(Boolean(savedPlayer.isAdmin || saved.isAdmin));
+            linkOneSignalUser(
+              savedPlayer.isTutelado && savedPlayer.tutorId ? savedPlayer.tutorId : savedPlayer.id
+            );
+          } else {
+            clearSavedLocalSession();
+            setCurrentUserId(null);
+            setTutorParentId(null);
+            setIsAdminSession(false);
+          }
         }
       } catch (err) {
         console.error('[TOTAL TENIS] Error en carga inicial cloud:', err);
@@ -509,17 +597,28 @@ export default function App() {
 
     const unsubscribeAuth = onCloudAuthStateChange((event, session) => {
       if (!mounted) return;
-      if (event === 'SIGNED_OUT' || !session?.user) {
+      // Solo limpiar cuando ocurre un cierre de sesión real (jamás en INITIAL_SESSION sin JWT)
+      if (event === 'SIGNED_OUT') {
+        clearSavedLocalSession();
         setCurrentUserId(null);
         setTutorParentId(null);
         setIsAdminSession(false);
         return;
       }
+      if (!session?.user) return;
       const matched = resolveSessionPlayer(session, playersRef.current);
       if (matched) {
-        setCurrentUserId(matched.id);
+        const saved = readSavedLocalSession();
+        const savedChild =
+          saved?.userId && saved.userId !== matched.id
+            ? playersRef.current.find(
+                (p) => p.id === saved.userId && p.isTutelado && p.tutorId === matched.id
+              )
+            : null;
+        const activeProfile = savedChild || matched;
+        setCurrentUserId(activeProfile.id);
         setTutorParentId(matched.isTutelado ? matched.tutorId : matched.id);
-        setIsAdminSession(Boolean(matched.isAdmin));
+        setIsAdminSession(Boolean(matched.isAdmin || saved?.isAdmin));
         linkOneSignalUser(matched.id);
       }
     });
@@ -622,7 +721,6 @@ export default function App() {
 
   /* ------------------------------------------------------------------------
      3. CIERRE AUTÓNOMO 00:00 (HORA PERÚ) + RESET AL PISO DE CATEGORÍA (300+)
-     Funciona de forma independiente sin depender de que el Admin abra la app.
      ------------------------------------------------------------------------ */
   useEffect(() => {
     if (!cloudSynced || !seasonSnapshots?.autoAdvance) return undefined;
@@ -660,7 +758,8 @@ export default function App() {
     const timer = window.setInterval(checkAndCloseIfMidnightPassed, 60000);
     return () => window.clearInterval(timer);
   }, [cloudSynced, seasonSnapshots]);
-  /* ------------------------------------------------------------------------
+
+/* ------------------------------------------------------------------------
      4. DERIVADOS DE ESTADO, TUTELA FAMILIAR Y DETECCIÓN MULTIUSUARIO
      ------------------------------------------------------------------------ */
   const currentUser = useMemo(
@@ -741,6 +840,27 @@ export default function App() {
     }
   }, []);
 
+  // Centra suavemente al jugador en su fila del Ranking (o Podio Top 3) acompañando el FLIP
+  const focusMyPositionInRanking = useCallback((newRank) => {
+    const scrollToTarget = () => {
+      if (typeof document === 'undefined') return;
+      if (newRank && newRank <= 3) {
+        const podium = document.querySelector('.tt-podium-stage');
+        if (podium && typeof podium.scrollIntoView === 'function') {
+          podium.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          return;
+        }
+      }
+      const myRow = document.getElementById('tt-my-ranking-row');
+      if (myRow && typeof myRow.scrollIntoView === 'function') {
+        myRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    };
+
+    window.setTimeout(scrollToTarget, 220);
+    window.setTimeout(scrollToTarget, 1520);
+  }, []);
+
   const handleSelectTab = useCallback(
     (tabId) => {
       setActiveTab(tabId);
@@ -757,6 +877,10 @@ export default function App() {
     },
     [scrollMainToTop]
   );
+
+  const handleConsumeQuickChallenge = useCallback(() => {
+    setQuickChallengeRival(null);
+  }, []);
 
   const handleFinishSplash = useCallback(() => {
     setShowSplash(false);
@@ -835,12 +959,12 @@ export default function App() {
   }, []);
 
   /* ------------------------------------------------------------------------
-     6. ACCIONES CONECTADAS A SUPABASE + STORAGE + PUSH (CON TUTOR) + FLIP
+     6. ACCIONES CONECTADAS A SUPABASE + STORAGE + GEMAS 6-0, 6-0 + FLIP
      ------------------------------------------------------------------------ */
   const appendGemLedger = useCallback(
     async (entry, targetPlayerId = currentUserId) => {
       const localEntry = {
-        id: `lg-${Date.now()}`,
+        id: `lg-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
         date: entry.date || formatPeruDate(new Date(), false) || 'Hoy',
         ...entry,
       };
@@ -976,7 +1100,7 @@ export default function App() {
     [challenges, currentUser?.id, effectiveIsAdmin, showToast]
   );
 
-  /* Confirmación definitiva de puntos + salto automático al Ranking FLIP si cambió tu puesto */
+  /* Confirmación definitiva de puntos + Gemas por victoria (hasta 6-0, 6-0) + Auto-scroll al Ranking */
   const applyOfficialMatchResult = useCallback(
     async ({
       challenge,
@@ -987,6 +1111,7 @@ export default function App() {
       newPointsA,
       newPointsB,
       liveScore,
+      isWalkover = false,
       autoJumpToRanking = true,
     }) => {
       if (!challenge?.id) return;
@@ -997,10 +1122,13 @@ export default function App() {
         const preRankMap = snapshotPreMatchRankMap(playersRef.current);
 
         const winnerId = winnerSide === 'A' ? challenge.playerAId : challenge.playerBId;
+        const effectiveScore = liveScore || challenge.liveScore || {};
+        const isOfficial = challenge.mode !== 'Amistoso';
+
         const finishedChallenge = {
           ...challenge,
           status: 'FINISHED',
-          liveScore: liveScore || challenge.liveScore || {},
+          liveScore: effectiveScore,
           winnerId,
           scoreSummary: summary || challenge.scoreSummary || '',
           eloDeltaA: Number(deltaA) || 0,
@@ -1011,7 +1139,12 @@ export default function App() {
         const playerA = playersRef.current.find((p) => p.id === challenge.playerAId);
         const playerB = playersRef.current.find((p) => p.id === challenge.playerBId);
 
-        const buildUpdatedPlayer = (p, isA) => {
+        const getCatRankIndex = (pts) => {
+          const cat = PlayersData.getCategoryByPoints(pts);
+          return (PlayersData.CATEGORIES_SCALE || []).findIndex((c) => c.id === cat?.id);
+        };
+
+        const buildUpdatedPlayer = (p, opponent, isA) => {
           if (!p) return null;
           const won = p.id === winnerId;
           const computedPoints = isA
@@ -1027,8 +1160,57 @@ export default function App() {
             Engine.ELO_CONFIG?.CALIBRATION_MATCHES || 5,
             (Number(p.calibrationPlayed) || 0) + 1
           );
-          let bonusGems = 0;
-          if (won && nextStreak >= 3) bonusGems = p.isVip ? 13 : 5;
+
+          const ledgerItems = [];
+          let totalAwardedGems = 0;
+
+          if (isOfficial && won) {
+            // 1. Gemas por victoria oficial en cancha (hasta +10 Estándar / +25 VIP con 6-0, 6-0)
+            const matchGems = calculateMatchVictoryGems(
+              effectiveScore,
+              Boolean(p.isVip),
+              Boolean(isWalkover)
+            );
+            if (matchGems.awarded > 0) {
+              totalAwardedGems += matchGems.awarded;
+              ledgerItems.push({
+                type: 'credit',
+                amount: matchGems.awarded,
+                title: matchGems.isDoubleBagel
+                  ? 'Victoria perfecta 6-0, 6-0'
+                  : 'Victoria oficial en cancha',
+                detail: `${matchGems.tierLabel} · ${finishedChallenge.scoreSummary}`,
+              });
+            }
+
+            // 2. Bono Mata Gigantes (victoria ante rival de categoría superior)
+            if (!isWalkover && opponent) {
+              const myCatIdx = getCatRankIndex(p.points);
+              const oppCatIdx = getCatRankIndex(opponent.points);
+              if (myCatIdx >= 0 && oppCatIdx > myCatIdx) {
+                const giantBonus = p.isVip ? 25 : 10;
+                totalAwardedGems += giantBonus;
+                ledgerItems.push({
+                  type: 'credit',
+                  amount: giantBonus,
+                  title: 'Bono Mata Gigantes',
+                  detail: `Victoria ante categoría superior (${finishedChallenge.scoreSummary})`,
+                });
+              }
+            }
+
+            // 3. Bono por racha de 3+ victorias seguidas
+            if (!isWalkover && nextStreak >= 3) {
+              const streakBonus = p.isVip ? 13 : 5;
+              totalAwardedGems += streakBonus;
+              ledgerItems.push({
+                type: 'credit',
+                amount: streakBonus,
+                title: `Bono por racha (${nextStreak} seguidas)`,
+                detail: `Marcador ${finishedChallenge.scoreSummary}`,
+              });
+            }
+          }
 
           return {
             updated: {
@@ -1039,14 +1221,16 @@ export default function App() {
               streak: nextStreak,
               calibrationPlayed: nextCalib,
               rankTrend: won ? Math.max(1, (Number(p.rankTrend) || 0) + 1) : -1,
-              gems: (Number(p.gems) || 0) + bonusGems,
+              gems: (Number(p.gems) || 0) + totalAwardedGems,
+              weeklyGemsEarned: (Number(p.weeklyGemsEarned) || 0) + totalAwardedGems,
             },
-            bonusGems,
+            totalAwardedGems,
+            ledgerItems,
           };
         };
 
-        const resA = buildUpdatedPlayer(playerA, true);
-        const resB = buildUpdatedPlayer(playerB, false);
+        const resA = buildUpdatedPlayer(playerA, playerB, true);
+        const resB = buildUpdatedPlayer(playerB, playerA, false);
 
         const nextPlayersList = playersRef.current
           .map((p) => {
@@ -1067,28 +1251,23 @@ export default function App() {
           resB ? upsertCloudPlayer(resB.updated) : Promise.resolve(),
         ]);
 
-        if (resA?.bonusGems > 0) {
-          appendGemLedger(
-            {
-              type: 'credit',
-              amount: resA.bonusGems,
-              title: 'Bono por racha ganadora',
-              detail: `Marcador ${finishedChallenge.scoreSummary}`,
-            },
-            resA.updated.id
-          );
+        if (resA?.ledgerItems?.length) {
+          for (const entry of resA.ledgerItems) {
+            await appendGemLedger(entry, resA.updated.id);
+          }
         }
-        if (resB?.bonusGems > 0) {
-          appendGemLedger(
-            {
-              type: 'credit',
-              amount: resB.bonusGems,
-              title: 'Bono por racha ganadora',
-              detail: `Marcador ${finishedChallenge.scoreSummary}`,
-            },
-            resB.updated.id
-          );
+        if (resB?.ledgerItems?.length) {
+          for (const entry of resB.ledgerItems) {
+            await appendGemLedger(entry, resB.updated.id);
+          }
         }
+
+        const winnerGems =
+          resA && resA.updated.id === winnerId
+            ? resA.totalAwardedGems
+            : resB && resB.updated.id === winnerId
+              ? resB.totalAwardedGems
+              : 0;
 
         sendPushNotification({
           targetPlayerIds: resolvePushRecipients(
@@ -1096,16 +1275,19 @@ export default function App() {
             playersRef.current
           ),
           title: 'Marcador oficial confirmado',
-          message: `Resultado final ${finishedChallenge.scoreSummary}. Tu puntaje en el ranking ya se actualizó.`,
+          message: `Resultado final ${finishedChallenge.scoreSummary}${
+            winnerGems > 0 ? ` (+${winnerGems} 💎 para el ganador)` : ''
+          }. Tu ranking ya se actualizó.`,
           path: '/',
         });
 
         setDismissedScoreIds((prev) => prev.filter((id) => id !== challenge.id));
         setBusyActionId(null);
 
+        // Salto automático directo a tu posición en el Ranking + centrado FLIP
         if (
           autoJumpToRanking &&
-          challenge.mode !== 'Amistoso' &&
+          isOfficial &&
           currentUserId &&
           (challenge.playerAId === currentUserId || challenge.playerBId === currentUserId)
         ) {
@@ -1113,18 +1295,27 @@ export default function App() {
           const oldRank = preRankMap[currentUserId];
           const newRankIdx = postOrdered.findIndex((p) => p.id === currentUserId);
           const newRank = newRankIdx >= 0 ? newRankIdx + 1 : null;
+          const myRes =
+            resA && resA.updated.id === currentUserId
+              ? resA
+              : resB && resB.updated.id === currentUserId
+                ? resB
+                : null;
+          const gemsSuffix =
+            myRes && myRes.totalAwardedGems > 0 ? ` y sumaste +${myRes.totalAwardedGems} 💎` : '';
 
-          if (oldRank && newRank && oldRank !== newRank) {
-            window.setTimeout(() => {
-              setActiveTab('ranking');
-              showToast(
-                newRank < oldRank
-                  ? `¡Subiste al puesto #${newRank} en el Ranking!`
-                  : `Tu posición cambió al puesto #${newRank} en el Ranking.`,
-                newRank < oldRank ? 'success' : 'info'
-              );
-            }, 320);
-          }
+          window.setTimeout(() => {
+            setActiveTab('ranking');
+            focusMyPositionInRanking(newRank);
+
+            if (oldRank && newRank && newRank < oldRank) {
+              showToast(`¡Subiste al puesto #${newRank}${gemsSuffix}!`, 'success');
+            } else if (oldRank && newRank && newRank > oldRank) {
+              showToast(`Tu posición actualizó al puesto #${newRank} en el Ranking.`, 'info');
+            } else if (newRank) {
+              showToast(`Mantienes el puesto #${newRank} en el Ranking${gemsSuffix}.`, 'success');
+            }
+          }, 260);
         }
       });
 
@@ -1132,12 +1323,12 @@ export default function App() {
         showToast('Ya estamos procesando este marcador, espera un segundo...', 'info');
       }
     },
-    [appendGemLedger, currentUserId, showToast]
+    [appendGemLedger, currentUserId, focusMyPositionInRanking, showToast]
   );
 
   /* Doble confirmación de marcador */
   const handleFinalizeMatch = useCallback(
-    async ({ challenge, eloResult, liveScore }) => {
+    async ({ challenge, eloResult, liveScore, isWalkover = false }) => {
       if (!challenge || !eloResult?.ok) return;
 
       const isParticipant =
@@ -1165,9 +1356,9 @@ export default function App() {
           newPointsA: eloResult.newPointsA,
           newPointsB: eloResult.newPointsB,
           liveScore,
+          isWalkover: Boolean(isWalkover),
           autoJumpToRanking: true,
         });
-        showToast('Marcador confirmado y puntos actualizados en vivo.', 'success');
         return;
       }
 
@@ -1189,6 +1380,7 @@ export default function App() {
               winnerSide: eloResult.winnerSide,
               newPointsA: eloResult.newPointsA,
               newPointsB: eloResult.newPointsB,
+              isWalkover: Boolean(isWalkover),
             },
           },
         };
@@ -1208,7 +1400,7 @@ export default function App() {
         });
 
         showToast(
-          'Marcador enviado a tu rival. Cuando lo confirme (o tras 24h) se actualizarán los puntos.',
+          'Marcador enviado a tu rival. Cuando lo confirme (o tras 24h) se actualizarán puntos y Gemas.',
           'success'
         );
       });
@@ -1231,12 +1423,12 @@ export default function App() {
         newPointsA: meta.newPointsA,
         newPointsB: meta.newPointsB,
         liveScore: ch.liveScore,
+        isWalkover: Boolean(meta.isWalkover),
         autoJumpToRanking: true,
       });
       triggerHaptic('success');
-      showToast('¡Marcador confirmado oficialmente! El ranking ya se actualizó.', 'success');
     },
-    [applyOfficialMatchResult, showToast]
+    [applyOfficialMatchResult]
   );
 
   const handleDisputeProposedScore = useCallback(
@@ -1270,20 +1462,34 @@ export default function App() {
     [currentUser, showToast]
   );
 
+  /* Reto directo en 1 toque desde Ranking, Ficha de Rival o Cara a Cara (H2H) */
   const handleQuickChallengeFromAnywhere = useCallback(
     (rival) => {
+      if (!rival?.id) return;
       if (!currentUser) {
         showToast('Inicia sesión para desafiar a este jugador.', 'info');
         openAuthSheet('login');
         return;
       }
+      if (currentUser.isTutorOnly) {
+        triggerHaptic('warning');
+        showToast(
+          'Tu cuenta está en modo Solo Padre/Tutor. Cambia a la subcuenta de tu hijo en Perfil para lanzar retos.',
+          'info'
+        );
+        return;
+      }
+      if (rival.id === currentUser.id) {
+        showToast('No puedes enviarte un desafío a ti mismo.', 'info');
+        return;
+      }
+
+      triggerHaptic('medium');
       setInspectPlayerId(null);
+      setH2hModal({ open: false, playerA: null, playerB: null });
+      setQuickChallengeRival(rival);
       setActiveTab('retos');
       scrollMainToTop();
-      showToast(
-        `Toca "Lanzar Reto" para pactar horario y sede con ${rival?.name || 'tu rival'}.`,
-        'info'
-      );
     },
     [currentUser, openAuthSheet, scrollMainToTop, showToast]
   );
@@ -1558,11 +1764,13 @@ export default function App() {
 
   const handleLogout = useCallback(async () => {
     triggerHaptic('medium');
+    clearSavedLocalSession();
     await signOutCloudAccount();
     setCurrentUserId(null);
     setTutorParentId(null);
     setIsAdminSession(false);
     setActivePartner(null);
+    setQuickChallengeRival(null);
     setGemLedger([]);
     setDismissedIncomingIds([]);
     setDismissedScoreIds([]);
@@ -1583,7 +1791,8 @@ export default function App() {
   const scoreWinner = scoreConfirmChallenge
     ? players.find((p) => p.id === scoreConfirmChallenge.winnerId)
     : null;
-  const popupChallengerPhone = getEffectiveContactPhone(popupChallenger, players);
+
+const popupChallengerPhone = getEffectiveContactPhone(popupChallenger, players);
   const popupWaText = popupChallenger?.isTutelado
     ? `Hola ${popupChallenger.tutorName || 'Padre/Madre'}, recibí el reto de ${popupChallenger.name} en TOTAL TENIS para ${popupChallenge?.clubName || ''} (${popupChallenge?.dateLabel || ''} ${popupChallenge?.timeLabel || ''}). ¿Coordinamos otra hora o sede?`
     : `Hola ${popupChallenger?.name || ''}, recibí tu reto en TOTAL TENIS para ${popupChallenge?.clubName || ''} (${popupChallenge?.dateLabel || ''} ${popupChallenge?.timeLabel || ''}). ¿Coordinamos otra hora o sede?`;
@@ -1651,6 +1860,8 @@ export default function App() {
                 isAdmin={effectiveIsAdmin}
                 theme={theme}
                 sunlightMode={sunlightMode}
+                quickChallengeRival={quickChallengeRival}
+                onConsumeQuickChallenge={handleConsumeQuickChallenge}
                 onCreateChallenge={handleCreateChallenge}
                 onUpdateChallenge={handleUpdateChallenge}
                 onFinalizeMatch={handleFinalizeMatch}
@@ -2180,7 +2391,10 @@ export default function App() {
         onAdminUpdatePlayer={handleUpdatePlayer}
         onAdminDeletePlayer={async (pid) => {
           setPlayers((prev) => prev.filter((p) => p.id !== pid));
-          if (currentUserId === pid) setCurrentUserId(null);
+          if (currentUserId === pid) {
+            clearSavedLocalSession();
+            setCurrentUserId(null);
+          }
           try {
             await deleteCloudPlayer(pid);
           } catch (err) {
