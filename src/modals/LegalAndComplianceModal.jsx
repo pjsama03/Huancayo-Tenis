@@ -29,7 +29,7 @@ export const LEGAL_EDITABLE_CONFIG = {
   customBookIconSrc: '/assets/icon-libro-reclamaciones.png',
   lastUpdated: 'Noviembre 2026',
 
-  /* 5 CLÁUSULAS OBLIGATORIAS DE TÉRMINOS Y CONDICIONES */
+ /* 6 CLÁUSULAS OBLIGATORIAS DE TÉRMINOS Y CONDICIONES */
   termsClauses: [
     {
       number: '01',
@@ -40,62 +40,74 @@ export const LEGAL_EDITABLE_CONFIG = {
     },
     {
       number: '02',
-      title: 'Exención de Responsabilidad Física (Deslinde)',
-      icon: 'alert',
-      summary: 'Participación voluntaria bajo propia responsabilidad y riesgo físico.',
-      body: 'El usuario declara encontrarse apto físicamente para la práctica del tenis y participa en los partidos, retos, entrenamientos y torneos bajo su propia responsabilidad y riesgo físico. TOTAL TENIS y sus administradores quedan exentos de toda responsabilidad civil, médica o penal por lesiones, accidentes, golpes de calor, daños materiales o altercados ocurridos antes, durante o después de los encuentros.',
+      title: 'Titularidad (+18), Menores Tutelados (-18) y Emancipación',
+      icon: 'users',
+      summary: 'Acceso directo para mayores de edad y protección integral del menor.',
+      body: 'El registro directo como titular es exclusivo para mayores de 18 años. Los menores de edad participan únicamente mediante una Subcuenta Tutelada creada y administrada bajo declaración de patria potestad o tutela por su padre, madre o apoderado verificado. Al cumplir 18 años, el titular adulto puede emitir un código único de emancipación para que el jugador asuma su cuenta propia conservando el 100 % de sus puntos, categoría e historial.',
     },
     {
       number: '03',
-      title: 'Política Estricta de No Reembolso',
-      icon: 'clock',
-      summary: 'Pagos finales por inscripciones, membresías VIP y servicios.',
-      body: 'Los pagos realizados por concepto de inscripciones a torneos, membresías Socio VIP o servicios publicados en la plataforma se efectúan como pago directo de servicio y son finales. No proceden reembolsos si el usuario cancela su participación con menos de 24 horas de anticipación, no se presenta al partido (walkover) o es descalificado por incumplimiento del reglamento.',
+      title: 'Exención de Responsabilidad Física (Deslinde)',
+      icon: 'alert',
+      summary: 'Participación voluntaria bajo propia responsabilidad y riesgo físico.',
+      body: 'El usuario (o su padre, madre o tutor legal en el caso de cuentas tuteladas) declara que el participante se encuentra apto físicamente para la práctica del tenis y participa en los partidos, retos, entrenamientos y torneos bajo su propia responsabilidad y riesgo físico. TOTAL TENIS y sus administradores quedan exentos de toda responsabilidad civil, médica o penal por lesiones, accidentes, golpes de calor, daños materiales o altercados ocurridos antes, durante o después de los encuentros.',
     },
     {
       number: '04',
+      title: 'Pagos Directos, No Reembolso y Naturaleza de las Gemas',
+      icon: 'clock',
+      summary: 'Ventas directas finales y puntos de fidelidad sin valor monetario.',
+      body: 'Los pagos realizados por concepto de inscripciones a torneos, membresías Socio VIP o servicios publicados en la plataforma se efectúan como pago directo de servicio y son finales. No proceden reembolsos si el usuario cancela su participación con menos de 24 horas de anticipación, no se presenta al partido (walkover) o es descalificado por incumplimiento del reglamento. Las Gemas son puntos de fidelidad deportiva sin valor monetario, sin equivalencia en soles y no canjeables por dinero en efectivo.',
+    },
+    {
+      number: '05',
       title: 'Derecho de Admisión, Sanciones y Baneo',
       icon: 'crown',
       summary: 'Protección de la integridad deportiva y juego limpio.',
       body: 'El Comité Administrador de TOTAL TENIS se reserva el derecho de suspender temporal o definitivamente cualquier cuenta, sin derecho a reembolso ni indemnización, ante casos comprobados de suplantación de identidad, falsificación o arreglo de marcadores, agresión verbal o física, acoso o conducta antideportiva dentro o fuera de cancha.',
     },
     {
-      number: '05',
-      title: 'Reglas del Ranking y Modificaciones',
+      number: '06',
+      title: 'Reglas del Ranking, Temporadas 00:00 y Reset al Piso',
       icon: 'chart',
-      summary: 'Administración técnica orientada a la equidad competitiva.',
-      body: 'El sistema de puntaje oficial, las categorías, los cierres de temporada y el formato del Master Top 8 son administrados por la plataforma. TOTAL TENIS podrá ajustar parámetros técnicos, horarios y lineamientos reglamentarios cuando sea necesario para preservar la equidad deportiva de toda la comunidad.',
+      summary: 'Equidad competitiva, cierres automáticos y carrera al Master Top 8.',
+      body: 'El puntaje oficial, la ventana dinámica anti-escasez, la actividad mensual y los cierres automáticos de temporada a las 00:00 (hora Perú) —donde se guarda la foto anual para el Master Top 8 y cada jugador inicia la nueva temporada en el piso de su categoría— son administrados por la plataforma para preservar la equidad deportiva de toda la comunidad.',
     },
   ],
 
-  /* 4 CLÁUSULAS OBLIGATORIAS DE POLÍTICA DE PRIVACIDAD (LEY N° 29733 — PERÚ) */
+  /* 5 CLÁUSULAS OBLIGATORIAS DE POLÍTICA DE PRIVACIDAD (LEY N° 29733 — PERÚ) */
   privacyClauses: [
     {
       number: '01',
       title: 'Datos Personales Recopilados',
       icon: 'users',
-      body: 'Para el funcionamiento del circuito recopilamos únicamente los datos que proporcionas al registrarte y competir: nombre completo, número de celular (WhatsApp), correo electrónico, fotografía de perfil, club o sede de procedencia, edad (+18 años) y estadísticas deportivas de tus partidos.',
+      body: 'Para el funcionamiento del circuito recopilamos únicamente los datos que proporcionas al registrarte y competir: nombre completo, número de celular (WhatsApp), correo electrónico, fotografía de perfil, club o sede de procedencia, edad (+18 años para titulares) y estadísticas deportivas de tus partidos.',
     },
     {
       number: '02',
+      title: 'Protección Especial de Menores Tutelados (-18)',
+      icon: 'shield',
+      body: 'En subcuentas juveniles tuteladas no solicitamos ni almacenamos correo electrónico, contraseña ni teléfono personal del menor. Toda coordinación de retos, avisos y contacto por WhatsApp se enruta exclusivamente hacia el número verificado del padre, madre o apoderado legal.',
+    },
+    {
+      number: '03',
       title: 'Finalidad del Tratamiento',
       icon: 'shield',
       body: 'Tus datos personales se utilizan exclusivamente para operar el ranking deportivo oficial, permitir la coordinación de partidos entre rivales autorizados, validar pagos directos de torneos o membresías y enviarte comunicaciones oficiales vinculadas al circuito TOTAL TENIS.',
     },
     {
-      number: '03',
+      number: '04',
       title: 'Privacidad de tu Teléfono (WhatsApp)',
       icon: 'whatsapp',
       body: 'Tienes control directo sobre tu número de contacto. Desde los Ajustes de tu perfil puedes elegir en cualquier momento si tu número de WhatsApp es visible para la comunidad o si queda restringido únicamente a rivales con los que tengas un reto oficialmente aceptado.',
     },
     {
-      number: '04',
+      number: '05',
       title: 'Derechos ARCO (Acceso, Rectificación, Cancelación y Oposición)',
       icon: 'check',
-      body: 'Conforme a la Ley N° 29733 de Protección de Datos Personales del Perú, puedes ejercer en cualquier momento tus Derechos ARCO solicitando el acceso, actualización, rectificación o eliminación definitiva de tus datos personales de la base de datos de TOTAL TENIS a través de nuestros canales oficiales de soporte.',
+      body: 'Conforme a la Ley N° 29733 de Protección de Datos Personales del Perú, puedes ejercer en cualquier momento tus Derechos ARCO solicitando el acceso, actualización, rectificación o eliminación definitiva de tus datos personales (o los de tu menor tutelado) de la base de datos de TOTAL TENIS a través de nuestros canales oficiales de soporte.',
     },
   ],
-};
 
 const COMPLAINTS_STORAGE_KEY = 'tt_indecopi_complaints_v1';
 
@@ -261,8 +273,8 @@ function downloadComplaintReceiptText(record) {
     `   Incidente       : ${record.detail}`,
     record.consumerRequest ? `   Pedido          : ${record.consumerRequest}` : null,
     '------------------------------------------------------------',
-    `Plazo legal de respuesta: hasta ${LEGAL_EDITABLE_CONFIG.responseDeadlineDays} días hábiles`,
-    '(Conforme al Código de Protección y Defensa del Consumidor - Indecopi).',
+   `Plazo legal de respuesta: hasta ${LEGAL_EDITABLE_CONFIG.responseDeadlineDays} días hábiles improrrogables`,
+    '(Ley N° 29571, Ley N° 31435 y Ley N° 32495 - Indecopi Perú).',
     '============================================================',
   ]
     .filter(Boolean)
@@ -751,8 +763,8 @@ export default function LegalAndComplianceModal({
                 </div>
 
                 <p className="tt-lg-legal-note">
-                  La formulación del reclamo no impide acudir a otras vías de solución de controversias ni es requisito previo para interponer una denuncia ante Indecopi. Daremos respuesta formal en un plazo máximo de{' '}
-                  <strong>{LEGAL_EDITABLE_CONFIG.responseDeadlineDays} días hábiles</strong>.
+                  La formulación del reclamo no impide acudir a otras vías de solución de controversias ni es requisito previo para interponer una denuncia ante Indecopi. Daremos respuesta formal por escrito en un plazo máximo de{' '}
+                  <strong>{LEGAL_EDITABLE_CONFIG.responseDeadlineDays} días hábiles improrrogables</strong> (Ley N° 31435 y Ley N° 32495).
                 </p>
 
                 <button
