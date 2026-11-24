@@ -229,6 +229,85 @@ export function computeAdaptiveOfficialRivals(players = [], currentUser = null) 
 }
 
 /* ==========================================================================
+   MOTOR DE GEMAS POR VICTORIA EN CANCHA (ESCALADO HASTA 6-0, 6-0 · VIP ×2.5)
+   - Walkover: 0 💎 (anti-farmeo)
+   - Peleada (3 sets / STB o ≥9 games cedidos): +4 💎 Estándar | +10 💎 VIP
+   - Sólida (2 sets, 5–8 games cedidos):        +6 💎 Estándar | +15 💎 VIP
+   - Contundente (2 sets, 1–4 games cedidos):   +8 💎 Estándar | +20 💎 VIP
+   - Máximo Doble Bicicleta (6-0, 6-0):        +10 💎 Estándar | +25 💎 VIP
+   ========================================================================== */
+export function getMatchVictoryGemsRange(isVip = false) {
+  return isVip
+    ? { min: 10, max: 25, standardMax: 10, vipMax: 25 }
+    : { min: 4, max: 10, standardMax: 10, vipMax: 25 };
+}
+
+export function calculateMatchVictoryGems(liveScore, isVip = false, isWalkover = false) {
+  if (isWalkover) {
+    return {
+      standard: 0,
+      vip: 0,
+      awarded: 0,
+      tierLabel: 'Walkover (sin bono en cancha)',
+      isDoubleBagel: false,
+    };
+  }
+
+  const ev = evaluateMatchScore(liveScore);
+  if (!ev?.finished || !ev?.winnerSide) {
+    return {
+      standard: 0,
+      vip: 0,
+      awarded: 0,
+      tierLabel: 'Pendiente de cierre',
+      isDoubleBagel: false,
+    };
+  }
+
+  const s1 = liveScore?.set1 || {};
+  const s2 = liveScore?.set2 || {};
+  const s3 = liveScore?.set3 || {};
+  const wentTo3Sets = Boolean(
+    ev.needsSuperTieBreak || (Number(s3.a) || 0) > 0 || (Number(s3.b) || 0) > 0
+  );
+
+  const gamesConceded =
+    ev.winnerSide === 'A'
+      ? (Number(s1.b) || 0) + (Number(s2.b) || 0)
+      : (Number(s1.a) || 0) + (Number(s2.a) || 0);
+
+  let standard = 4;
+  let tierLabel = 'Victoria peleada (3 sets)';
+  let isDoubleBagel = false;
+
+  if (!wentTo3Sets) {
+    if (gamesConceded === 0) {
+      standard = 10;
+      tierLabel = 'Dominio total 6-0, 6-0 (Máximo)';
+      isDoubleBagel = true;
+    } else if (gamesConceded <= 4) {
+      standard = 8;
+      tierLabel = 'Victoria contundente';
+    } else if (gamesConceded <= 8) {
+      standard = 6;
+      tierLabel = 'Victoria sólida en 2 sets';
+    } else {
+      standard = 4;
+      tierLabel = 'Victoria peleada en 2 sets';
+    }
+  }
+
+  const vip = Math.round(standard * 2.5);
+  return {
+    standard,
+    vip,
+    awarded: isVip ? vip : standard,
+    tierLabel,
+    isDoubleBagel,
+  };
+}
+
+/* ==========================================================================
    SUBCOMPONENTE 1: AVATAR CON ANILLO LIMPIO Y ESCUDO REAL DEL CLUB
    ========================================================================== */
 export function PlayerAvatarWithClub({
@@ -790,7 +869,7 @@ export function RetosRescheduleModal({
 }
 
 /* ==========================================================================
-   MODAL 4 EXTRAÍDO: CELEBRACIÓN POST-PARTIDO + STORIES
+   MODAL 4 EXTRAÍDO: CELEBRACIÓN POST-PARTIDO + GEMAS GANADAS + STORIES
    ========================================================================== */
 export function RetosCelebrationModal({
   celebrationPayload,
@@ -869,6 +948,18 @@ export function RetosCelebrationModal({
                   pts
                 </strong>
               </div>
+            </div>
+          )}
+
+          {celebrationPayload.isOfficial && celebrationPayload.victoryGems?.awarded > 0 && (
+            <div
+              className="tt-gems-preview-pill"
+              style={{ width: '100%', justifyContent: 'space-between' }}
+            >
+              <span>
+                Bono por victoria ({celebrationPayload.victoryGems.tierLabel})
+              </span>
+              <strong>+{celebrationPayload.victoryGems.awarded} 💎</strong>
             </div>
           )}
 
