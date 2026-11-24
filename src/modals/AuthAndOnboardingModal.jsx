@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   ASSETS,
@@ -172,8 +172,18 @@ export default function AuthAndOnboardingModal({
   const [pendingRegisteredData, setPendingRegisteredData] = useState(null);
   const [verifyTargetEmail, setVerifyTargetEmail] = useState('');
 
+  // Blindaje anti-reinicio y anti-cierre accidental por arrastre del mouse en PC
+  const wasOpenRef = useRef(false);
+  const overlayDownOnSelfRef = useRef(false);
+
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      wasOpenRef.current = false;
+      return;
+    }
+    if (wasOpenRef.current) return;
+    wasOpenRef.current = true;
+
     if (initialMode === 'partner') {
       setAccountKind('partner');
       setViewMode('login');
@@ -748,8 +758,20 @@ export default function AuthAndOnboardingModal({
       role="dialog"
       aria-modal="true"
       aria-label="Portal de Acceso TOTAL TENIS"
+      onMouseDown={(e) => {
+        overlayDownOnSelfRef.current = e.target === e.currentTarget;
+      }}
       onClick={(e) => {
-        if (e.target === e.currentTarget && !isSubmitting && onClose) {
+        const startedOutside = overlayDownOnSelfRef.current;
+        overlayDownOnSelfRef.current = false;
+        // En Registro / Tarjetas / Emancipación / Recuperación solo cierra con X o Volver para no perder datos
+        if (
+          startedOutside &&
+          e.target === e.currentTarget &&
+          viewMode === 'login' &&
+          !isSubmitting &&
+          onClose
+        ) {
           triggerHaptic('light');
           onClose();
         }
@@ -1357,25 +1379,33 @@ export default function AuthAndOnboardingModal({
                           setRegLegalAccepted(e.target.checked);
                         }}
                       />
-                      <span>
-                        Declaro ser mayor de 18 años y acepto los{' '}
-                        <button
-                          type="button"
-                          className="tt-legal-inline-link"
-                          onClick={() => setInlineLegalDoc('terms')}
-                        >
-                          Términos y Condiciones
-                        </button>{' '}
-                        y la{' '}
-                        <button
-                          type="button"
-                          className="tt-legal-inline-link"
-                          onClick={() => setInlineLegalDoc('privacy')}
-                        >
-                          Política de Privacidad (Ley N° 29733)
-                        </button>{' '}
-                        de TOTAL TENIS.
-                      </span>
+                     <span>
+              Declaro ser mayor de 18 años y acepto los{' '}
+              <button
+                type="button"
+                className="tt-legal-inline-link"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setInlineLegalDoc('terms');
+                }}
+              >
+                Términos y Condiciones
+              </button>{' '}
+              y la{' '}
+              <button
+                type="button"
+                className="tt-legal-inline-link"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setInlineLegalDoc('privacy');
+                }}
+              >
+                Política de Privacidad (Ley N° 29733)
+              </button>{' '}
+              de TOTAL TENIS.
+            </span>
                     </label>
 
                     <button
