@@ -47,9 +47,10 @@ export const PROSHOP_EDITABLE_CONFIG = {
 };
 
 /* ==========================================================================
-   METADATOS EXTENDIDOS SIN CAMBIAR SQL (VARIANTES, CÓDIGO PROMO, MARCA)
+   METADATOS EXTENDIDOS SIN CAMBIAR SQL
+   (VARIANTES, CÓDIGO PROMO, MARCA Y CASHBACK EN GEMAS PARA MARCAS ALIADAS)
    Se guardan de forma invisible dentro de `description` en Supabase y el
-   cliente solo ve el texto limpio y los botones táctiles de selección.
+   jugador solo ve el texto limpio, los botones 3D y sus Gemas de recompensa.
    ========================================================================== */
 const META_REGEX = /\n?<!--tt_meta:([\s\S]*?)-->$/;
 
@@ -86,8 +87,14 @@ function parseProductMeta(raw) {
       ? Number(raw.priceVip)
       : null;
 
-  // Solo el Almacén Propio permite canje de Gemas
+  // Solo Almacén Propio permite canje directo con Gemas
   const gemsCost = channel === 'OWN_STOCK' ? Math.max(0, Number(raw?.gemsCost) || 0) : 0;
+
+  // Solo Marcas Aliadas entregan Cashback en Gemas al validar compra con enlace/código
+  const cashbackGems =
+    channel === 'SPONSOR'
+      ? Math.max(0, Number(meta.cashbackGems ?? raw?.cashbackGems) || 0)
+      : 0;
 
   return {
     id: raw?.id || `prod-${Date.now()}`,
@@ -102,6 +109,7 @@ function parseProductMeta(raw) {
     oldPriceSoles,
     vipPriceSoles,
     gemsCost,
+    cashbackGems,
     externalUrl: raw?.externalUrl || '',
     promoCode: meta.promoCode || raw?.promoCode || '',
     variantLabel: meta.variantLabel || raw?.variantLabel || 'Opción disponible',
@@ -130,6 +138,7 @@ function serializeProductDescription(cleanDescription, meta) {
   const payload = {};
   if (meta.brand) payload.brand = meta.brand;
   if (meta.promoCode) payload.promoCode = meta.promoCode;
+  if (Number(meta.cashbackGems) > 0) payload.cashbackGems = Math.round(Number(meta.cashbackGems));
   if (meta.variantLabel) payload.variantLabel = meta.variantLabel;
   if (Array.isArray(meta.variants) && meta.variants.length > 0) payload.variants = meta.variants;
   if (meta.isStringingService) payload.isStringingService = true;
@@ -157,11 +166,10 @@ function appendUtmToExternalUrl(url = '', productId = '') {
 }
 
 /* ==========================================================================
-   MOSTRADOR DEMO INICIAL (3 CARRILES HÍBRIDOS LISTOS PARA PRESENTAR A MARCAS)
-   Se reemplaza automáticamente en cuanto cargan o editas tus productos en Supabase.
+   MOSTRADOR DEMO INICIAL (3 CARRILES HÍBRIDOS + CASHBACK EN MARCAS ALIADAS)
    ========================================================================== */
 export const DEFAULT_HYBRID_CATALOG = [
-  // CARRIL 1: MARCAS OFICIALES / TIENDAS ALIADAS (LINK EXACTO AL PRODUCTO · SIN GEMAS)
+  // CARRIL 1: MARCAS OFICIALES / TIENDAS ALIADAS (ENLACE + CÓDIGO + CASHBACK 💎)
   {
     id: 'sp-wilson-blade',
     channel: 'SPONSOR',
@@ -176,6 +184,7 @@ export const DEFAULT_HYBRID_CATALOG = [
     oldPriceSoles: 1099,
     vipPriceSoles: null,
     gemsCost: 0,
+    cashbackGems: 35,
     externalUrl: 'https://www.wilson.com/en-us/product/blade-98-16x19-v9-frm-wr14980',
     promoCode: 'TOTALTENIS10',
     variantLabel: 'Grips disponibles en tienda',
@@ -202,8 +211,9 @@ export const DEFAULT_HYBRID_CATALOG = [
     oldPriceSoles: null,
     vipPriceSoles: null,
     gemsCost: 0,
+    cashbackGems: 40,
     externalUrl: 'https://www.babolat.com/us/pure-aero-98-unstrung/101499.html',
-    promoCode: '',
+    promoCode: 'TOTALTENIS',
     variantLabel: 'Grips en tienda oficial',
     variants: ['L2 (4 1/4)', 'L3 (4 3/8)'],
     badgeText: 'DESTACADO PRO',
@@ -231,6 +241,7 @@ export const DEFAULT_HYBRID_CATALOG = [
     oldPriceSoles: null,
     vipPriceSoles: 45,
     gemsCost: 900,
+    cashbackGems: 0,
     variantLabel: 'Servicio en taller',
     variants: [],
     badgeText: 'TALLER OFICIAL',
@@ -255,6 +266,7 @@ export const DEFAULT_HYBRID_CATALOG = [
     oldPriceSoles: null,
     vipPriceSoles: 42,
     gemsCost: 750,
+    cashbackGems: 0,
     variantLabel: 'Edición disponible',
     variants: ['Arcilla Extra Duty', 'All Court Pro', 'Altura Oficial'],
     badgeText: 'EN STOCK',
@@ -279,6 +291,7 @@ export const DEFAULT_HYBRID_CATALOG = [
     oldPriceSoles: null,
     vipPriceSoles: 12,
     gemsCost: 220,
+    cashbackGems: 0,
     variantLabel: 'Color en stock',
     variants: ['Blanco Pro', 'Negro Mate', 'Verde Esmeralda'],
     badgeText: 'CANJE RÁPIDO',
@@ -303,6 +316,7 @@ export const DEFAULT_HYBRID_CATALOG = [
     oldPriceSoles: null,
     vipPriceSoles: 20,
     gemsCost: 360,
+    cashbackGems: 0,
     variantLabel: 'Color disponible',
     variants: ['Púrpura Noche', 'Blanco Editorial', 'Negro'],
     badgeText: 'PACK 2 EN 1',
@@ -329,6 +343,7 @@ export const DEFAULT_HYBRID_CATALOG = [
     oldPriceSoles: null,
     vipPriceSoles: 50,
     gemsCost: 0,
+    cashbackGems: 0,
     coachId: 'coach-romina',
     coachWhatsapp: '51964201001',
     variantLabel: 'Enfoque de sesión',
@@ -344,9 +359,27 @@ export const DEFAULT_HYBRID_CATALOG = [
 ];
 
 /* ==========================================================================
-   MISIONES LIMPIAS DE GEMAS (ALINEADAS AL ANTI-FARMEO +3 💎 · CERO SOLES)
+   MISIONES LIMPIAS DE GEMAS (VICTORIA HASTA 6-0, 6-0 + CASHBACK · CERO SOLES)
    ========================================================================== */
 const GEM_MISSIONS = [
+  {
+    id: 'm-victory',
+    icon: 'challenge',
+    variant: 'emerald',
+    title: 'Victoria oficial en cancha (hasta 6-0, 6-0)',
+    standard: '+4 a +10 💎',
+    vip: '+10 a +25 💎 (×2.5)',
+    note: 'Escala según dominio: 3 sets (+4), 2 sets (+6), ≤4 games (+8), doble 6-0 (+10)',
+  },
+  {
+    id: 'm-cashback',
+    icon: 'shop',
+    variant: 'gold',
+    title: 'Cashback en Marcas Aliadas (Pro Shop)',
+    standard: '+💎 por compra',
+    vip: '+💎 por compra',
+    note: 'Compra usando nuestro enlace/código oficial y reclama tus Gemas de recompensa',
+  },
   {
     id: 'm-streak',
     icon: 'trophy',
@@ -354,16 +387,16 @@ const GEM_MISSIONS = [
     title: 'Racha de 3+ victorias seguidas',
     standard: '+5 💎',
     vip: '+13 💎 (×2.5)',
-    note: 'En partidos oficiales confirmados',
+    note: 'Bono adicional en partidos oficiales confirmados',
   },
   {
     id: 'm-giant',
-    icon: 'challenge',
+    icon: 'crown',
     variant: 'emerald',
     title: 'Victoria ante categoría superior',
     standard: '+10 💎',
     vip: '+25 💎 (×2.5)',
-    note: 'Premio al mérito deportivo',
+    note: 'Bono Mata Gigantes al mérito deportivo',
   },
   {
     id: 'm-weather',
@@ -376,7 +409,7 @@ const GEM_MISSIONS = [
   },
   {
     id: 'm-tourney',
-    icon: 'crown',
+    icon: 'trophy',
     variant: 'gold',
     title: 'Podio en Torneos Oficiales',
     standard: '+120 a +300 💎',
@@ -387,8 +420,8 @@ const GEM_MISSIONS = [
 
 const CHANNEL_FILTERS = [
   { id: 'ALL', label: 'Todo' },
-  { id: 'OWN_STOCK', label: 'En Stock · Gemas' },
-  { id: 'SPONSOR', label: 'Marcas Oficiales' },
+  { id: 'SPONSOR', label: 'Marcas · Cashback 💎' },
+  { id: 'OWN_STOCK', label: 'En Stock · Canje' },
   { id: 'COACH', label: 'Coaches' },
 ];
 
@@ -403,6 +436,7 @@ const EMPTY_ADMIN_FORM = {
   oldPriceSoles: '',
   vipPriceSoles: '',
   gemsCost: '',
+  cashbackGems: '',
   externalUrl: '',
   promoCode: '',
   variantLabel: 'Opción / Talla',
@@ -413,7 +447,8 @@ const EMPTY_ADMIN_FORM = {
 };
 
 /* ==========================================================================
-   COMPONENTE PRINCIPAL: ProShopAndGemsModal (3 CARRILES + GESTOR ADMIN)
+   COMPONENTE PRINCIPAL: ProShopAndGemsModal
+   (3 CARRILES 3D TÁCTILES + CASHBACK EN GEMAS + GESTOR ADMIN + MODO CLARO)
    ========================================================================== */
 export default function ProShopAndGemsModal({
   isOpen = false,
@@ -432,6 +467,7 @@ export default function ProShopAndGemsModal({
   onNotify,
 }) {
   const adminPhotoRef = useRef(null);
+  const cashbackReceiptRef = useRef(null);
 
   const canManageStore = Boolean(isAdmin || currentUser?.isAdmin);
   const [activeMode, setActiveMode] = useState(initialMode === 'vault' ? 'vault' : 'shop');
@@ -452,6 +488,13 @@ export default function ProShopAndGemsModal({
   const [pickupClubId, setPickupClubId] = useState(clubs?.[0]?.id || 'club-country');
   const [copiedCodeId, setCopiedCodeId] = useState(null);
 
+  // Flujo Cashback en Gemas (Reclamo de compra en Marca Aliada)
+  const [showCashbackClaim, setShowCashbackClaim] = useState(false);
+  const [cashbackOrderRef, setCashbackOrderRef] = useState('');
+  const [cashbackReceiptUrl, setCashbackReceiptUrl] = useState('');
+  const [isUploadingReceipt, setIsUploadingReceipt] = useState(false);
+  const [submittedCashbackIds, setSubmittedCashbackIds] = useState({});
+
   // Sub-pantalla Gestor Rápido de Tienda (Solo Admin)
   const [showAdminManager, setShowAdminManager] = useState(false);
   const [adminForm, setAdminForm] = useState(EMPTY_ADMIN_FORM);
@@ -469,6 +512,7 @@ export default function ProShopAndGemsModal({
     setActiveMode(initialMode === 'vault' ? 'vault' : 'shop');
     setSelectedProductId(null);
     setShowAdminManager(false);
+    setShowCashbackClaim(false);
   }, [isOpen, initialMode]);
 
   useEffect(() => {
@@ -548,13 +592,16 @@ export default function ProShopAndGemsModal({
   }, [cloudLedger, gemLedger, localSessionLedger, isVip]);
 
   /* ------------------------------------------------------------------------
-     ACCIONES DE COMPRA, LINK EXTERNO CON RASTREO Y CANJE DE GEMAS
+     ACCIONES DE COMPRA, LINK EXTERNO, CASHBACK EN GEMAS Y CANJE
      ------------------------------------------------------------------------ */
   const openProductDetail = (item) => {
     triggerHaptic('light');
     setSelectedProductId(item.id);
     setSelectedVariant(item.variants?.[0] || '');
     setPurchaseMethod('direct');
+    setShowCashbackClaim(false);
+    setCashbackOrderRef('');
+    setCashbackReceiptUrl('');
     setStringId(PROSHOP_EDITABLE_CONFIG.stringingOptions.strings[0].id);
     setTensionLbs(PROSHOP_EDITABLE_CONFIG.stringingOptions.defaultLbs);
     setPickupClubId(
@@ -589,6 +636,88 @@ export default function ProShopAndGemsModal({
       window.open(targetUrl, '_blank', 'noopener,noreferrer');
     } else if (onNotify) {
       onNotify('Este artículo aún no tiene enlace externo configurado.', 'info');
+    }
+  };
+
+  const handleUploadCashbackReceipt = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingReceipt(true);
+    try {
+      const url = await uploadCompressedMedia(
+        file,
+        'cashback',
+        `${currentUser?.id || 'guest'}-${selectedProduct?.id || 'item'}`
+      );
+      if (url) {
+        setCashbackReceiptUrl(url);
+        triggerHaptic('success');
+        if (onNotify) onNotify('Comprobante adjuntado correctamente.', 'success');
+      }
+    } catch {
+      triggerHaptic('warning');
+      if (onNotify) {
+        onNotify('No se pudo subir la captura. Puedes enviarla directo al abrir WhatsApp.', 'info');
+      }
+    } finally {
+      setIsUploadingReceipt(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleSubmitCashbackClaim = (e) => {
+    e.preventDefault();
+    if (!selectedProduct) return;
+
+    if (!currentUser) {
+      if (onNotify) onNotify('Inicia sesión para reclamar tus Gemas de Cashback.', 'info');
+      if (onOpenAuth) onOpenAuth('login');
+      return;
+    }
+
+    const cleanOrderRef = cashbackOrderRef.trim();
+    if (cleanOrderRef.length < 3 && !cashbackReceiptUrl) {
+      triggerHaptic('warning');
+      if (onNotify) {
+        onNotify('Ingresa tu número de pedido/boleta o adjunta una captura de compra.', 'warning');
+      }
+      return;
+    }
+
+    const rewardGems = Number(selectedProduct.cashbackGems) || 0;
+    const claimCode = `CB-${String(Date.now()).slice(-6)}`;
+
+    const waLines = [
+      'Hola Comité TOTAL TENIS, quiero reclamar mi Cashback en Gemas por compra en Marca Aliada:',
+      `• Ticket de reclamo: ${claimCode}`,
+      `• Jugador: ${currentUser.name} (${currentUser.credentialId || currentUser.id})`,
+      `• Marca / Producto: ${selectedProduct.brand} — ${selectedProduct.name}`,
+      selectedVariant ? `• Variante: ${selectedVariant}` : '',
+      selectedProduct.promoCode ? `• Código utilizado: ${selectedProduct.promoCode}` : '',
+      cleanOrderRef ? `• Nº Pedido / Boleta: ${cleanOrderRef}` : '',
+      cashbackReceiptUrl ? `• Captura de comprobante: ${cashbackReceiptUrl}` : '• Adjunto captura de compra aquí en el chat.',
+      rewardGems > 0
+        ? `• Recompensa publicada: +${rewardGems.toLocaleString('es-PE')} Gemas`
+        : '• Recompensa: Según compra verificada',
+    ].filter(Boolean);
+
+    window.open(
+      buildWhatsappLink(APP_CONFIG.supportWhatsApp, waLines.join('\n')),
+      '_blank',
+      'noopener,noreferrer'
+    );
+
+    setSubmittedCashbackIds((prev) => ({ ...prev, [selectedProduct.id]: claimCode }));
+    setShowCashbackClaim(false);
+    setCashbackOrderRef('');
+    setCashbackReceiptUrl('');
+
+    triggerHaptic('success');
+    if (onNotify) {
+      onNotify(
+        `Solicitud ${claimCode} enviada. Al verificar la compra acreditaremos tus Gemas en tu Bóveda.`,
+        'success'
+      );
     }
   };
 
@@ -714,7 +843,7 @@ export default function ProShopAndGemsModal({
   };
 
   /* ------------------------------------------------------------------------
-     GESTOR ADMIN INTEGRADO (SUBIR STOCK/SPONSORS SIN TOCAR CÓDIGO JAMÁS)
+     GESTOR ADMIN INTEGRADO (SUBIR STOCK/SPONSORS + CASHBACK SIN TOCAR CÓDIGO)
      ------------------------------------------------------------------------ */
   const openAdminForNew = () => {
     triggerHaptic('light');
@@ -735,6 +864,7 @@ export default function ProShopAndGemsModal({
       oldPriceSoles: item.oldPriceSoles || '',
       vipPriceSoles: item.vipPriceSoles ?? '',
       gemsCost: item.gemsCost || '',
+      cashbackGems: item.cashbackGems || '',
       externalUrl: item.externalUrl || '',
       promoCode: item.promoCode || '',
       variantLabel: item.variantLabel || 'Opción / Talla',
@@ -780,6 +910,8 @@ export default function ProShopAndGemsModal({
       const serializedDesc = serializeProductDescription(adminForm.description, {
         brand: adminForm.brand.trim() || 'TOTAL TENIS',
         promoCode: adminForm.channel === 'SPONSOR' ? adminForm.promoCode.trim().toUpperCase() : '',
+        cashbackGems:
+          adminForm.channel === 'SPONSOR' ? Math.max(0, Number(adminForm.cashbackGems) || 0) : 0,
         variantLabel: adminForm.variantLabel.trim() || 'Opción disponible',
         variants,
       });
@@ -798,6 +930,8 @@ export default function ProShopAndGemsModal({
             ? Number(adminForm.vipPriceSoles)
             : null,
         gemsCost: adminForm.channel === 'OWN_STOCK' ? Number(adminForm.gemsCost) || 0 : 0,
+        cashbackGems:
+          adminForm.channel === 'SPONSOR' ? Math.max(0, Number(adminForm.cashbackGems) || 0) : 0,
         externalUrl: adminForm.channel === 'SPONSOR' ? adminForm.externalUrl.trim() : '',
         coachWhatsapp: adminForm.channel === 'COACH' ? adminForm.coachWhatsapp.trim() : '',
         badgeText: adminForm.badgeText.trim().toUpperCase(),
@@ -849,89 +983,140 @@ export default function ProShopAndGemsModal({
     if (onNotify) onNotify('Producto retirado del catálogo.', 'info');
   };
 
-  /* ------------------------------------------------------------------------
-     SUBCOMPONENTE INTERNO: TARJETA LIMPIA DE PRODUCTO
+/* ------------------------------------------------------------------------
+     RENDER DE TARJETA DE PRODUCTO 3D TÁCTIL (3 CARRILES + BADGE CASHBACK 💎)
      ------------------------------------------------------------------------ */
-  const renderProductCard = (item, idx) => {
+  const renderProductCard = (item) => {
     const isSponsor = item.channel === 'SPONSOR';
     const isOwn = item.channel === 'OWN_STOCK';
+    const isCoach = item.channel === 'COACH';
+    const hasVipPrice = !isSponsor && item.vipPriceSoles !== null && item.vipPriceSoles < item.priceSoles;
 
     return (
       <article
         key={item.id}
-        className={`tt-prod-card is-ch-${item.channel.toLowerCase()}`}
-        style={{ '--ps-delay': `${Math.min(idx, 8) * 40}ms` }}
+        className={`tt-ps-card ${isSponsor ? 'is-sponsor' : isOwn ? 'is-own' : 'is-coach'}`}
         onClick={() => openProductDetail(item)}
       >
-        <div className="tt-prod-media">
+        <div className="tt-ps-card-media">
           <SmartImage
             src={item.imageUrl}
             fallbackSrc={item.fallbackImage || ASSETS.logo}
             alt={item.name}
-            className="tt-prod-img"
+            className="tt-ps-card-img"
           />
-          {item.badgeText && <span className="tt-prod-tag">{item.badgeText}</span>}
-          {isOwn && item.inStock && <span className="tt-prod-stock-dot">En Stock</span>}
+
+          {item.badgeText && (
+            <span className={`tt-ps-card-badge ${isSponsor ? 'is-gold' : isOwn ? 'is-emerald' : 'is-sky'}`}>
+              {item.badgeText}
+            </span>
+          )}
+
+          {isSponsor && item.cashbackGems > 0 && (
+            <span className="tt-ps-cashback-pill">
+              +{item.cashbackGems} 💎 Cashback
+            </span>
+          )}
+
+          {canManageStore && (
+            <button
+              type="button"
+              className="tt-ps-admin-edit-fab"
+              aria-label={`Editar ${item.name}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                openAdminForEdit(item);
+              }}
+            >
+              ✎
+            </button>
+          )}
         </div>
 
-        <div className="tt-prod-body">
-          <span className="tt-prod-brand">{item.brand}</span>
-          <h3 className="tt-prod-name">{item.name}</h3>
+        <div className="tt-ps-card-body">
+          <span className="tt-ps-card-brand">{item.brand}</span>
+          <h4 className="tt-ps-card-title">{item.name}</h4>
 
-          <div className="tt-prod-price-block">
-            <div className="tt-prod-price-row">
-              {item.oldPriceSoles && item.oldPriceSoles > item.priceSoles && (
-                <span className="tt-prod-strike">S/ {item.oldPriceSoles}</span>
-              )}
-              <strong className="tt-prod-price">
-                S/ {item.vipPriceSoles && isVip ? item.vipPriceSoles : item.priceSoles}
-              </strong>
-              {!isSponsor && item.vipPriceSoles && item.vipPriceSoles < item.priceSoles && (
-                <span className="tt-prod-vip-chip">VIP S/ {item.vipPriceSoles}</span>
+          <div className="tt-ps-price-stack">
+            <div className="tt-ps-price-line">
+              {item.priceSoles > 0 ? (
+                <>
+                  <strong>S/ {isVip && hasVipPrice ? item.vipPriceSoles : item.priceSoles}</strong>
+                  {item.oldPriceSoles && item.oldPriceSoles > item.priceSoles && (
+                    <span className="tt-ps-old-price">S/ {item.oldPriceSoles}</span>
+                  )}
+                  {hasVipPrice && !isVip && (
+                    <span className="tt-ps-vip-tag">VIP S/ {item.vipPriceSoles}</span>
+                  )}
+                </>
+              ) : (
+                <strong>A consultar</strong>
               )}
             </div>
 
             {isOwn && item.gemsCost > 0 && (
-              <span className="tt-prod-gems-line">
-                Canjeable con <strong>{item.gemsCost.toLocaleString('es-PE')} 💎</strong>
-              </span>
+              <div className="tt-ps-gems-cost-line">
+                <span>O canje directo:</span>
+                <strong>{item.gemsCost.toLocaleString('es-PE')} 💎</strong>
+              </div>
             )}
+
             {isSponsor && item.promoCode && (
-              <span className="tt-prod-code-hint">Código: {item.promoCode}</span>
+              <button
+                type="button"
+                className="tt-ps-code-chip"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCopyText(item.promoCode, 'Código', item.id);
+                }}
+              >
+                <span>Código: <b>{item.promoCode}</b></span>
+                <small>{copiedCodeId === item.id ? 'Copiado ✓' : 'Copiar'}</small>
+              </button>
             )}
           </div>
 
-          <div className="tt-prod-foot">
-            <span className="tt-prod-cta-label">
-              {isSponsor ? 'Ver en tienda ↗' : isOwn ? 'Ver tallas / Canjear ›' : 'Ver sesión ›'}
-            </span>
-          </div>
+          <button
+            type="button"
+            className={`tt-ps-3d-btn ${isSponsor ? 'is-gold' : isCoach ? 'is-sky' : 'is-emerald'}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              openProductDetail(item);
+            }}
+          >
+            {isSponsor
+              ? item.cashbackGems > 0
+                ? `Comprar y ganar +${item.cashbackGems} 💎`
+                : 'Ver en tienda oficial'
+              : isOwn
+              ? item.gemsCost > 0
+                ? 'Ver · Canjear / Comprar'
+                : 'Ver en stock'
+              : 'Reservar sesión'}
+          </button>
         </div>
       </article>
     );
   };
 
+  /* ------------------------------------------------------------------------
+     MODAL PRINCIPAL
+     ------------------------------------------------------------------------ */
   const modalTitle = showAdminManager
-    ? 'Gestionar Tienda Pro Shop'
+    ? 'Gestor de Pro Shop (Admin)'
     : selectedProduct
     ? selectedProduct.name
     : activeMode === 'vault'
-    ? 'Mi Bóveda de Gemas'
-    : 'Pro Shop Oficial';
+    ? 'Tu Bóveda de Gemas'
+    : 'Pro Shop TOTAL TENIS';
 
   const modalSubtitle = showAdminManager
-    ? 'Sube stock propio o productos de marcas aliadas en segundos'
+    ? 'Stock propio, Marcas Aliadas con Cashback y Vitrina de Coaches'
     : selectedProduct
-    ? `${selectedProduct.brand} · ${
-        selectedProduct.channel === 'SPONSOR'
-          ? 'Tienda Oficial Aliada'
-          : selectedProduct.channel === 'OWN_STOCK'
-          ? 'En Stock · Almacén TOTAL TENIS'
-          : 'Vitrina de Entrenadores'
-      }`
+    ? selectedProduct.brand
     : activeMode === 'vault'
-    ? `Saldo disponible: ${myGems.toLocaleString('es-PE')} 💎`
-    : 'Equipamiento de marcas aliadas, stock propio y entrenadores';
+    ? 'Gana Gemas compitiendo o comprando en marcas aliadas'
+    : 'Equipamiento oficial, taller de encordado y beneficios';
 
   return (
     <ModalPortal
@@ -939,39 +1124,27 @@ export default function ProShopAndGemsModal({
       onClose={onClose}
       title={modalTitle}
       subtitle={modalSubtitle}
-      icon={
-        <IconBadge
-          name={showAdminManager ? 'settings' : activeMode === 'vault' && !selectedProduct ? 'gem' : 'shop'}
-          variant={activeMode === 'vault' && !selectedProduct ? 'purple' : 'emerald'}
-          size={38}
-        />
-      }
+      icon={<IconBadge name={activeMode === 'vault' ? 'gem' : 'shop'} variant="emerald" size={38} />}
       isWide
-      isTopLayer
     >
       <div className={`tt-ps-root ${theme === 'light' ? 'is-light' : 'is-dark'}`}>
         {/* ==================================================================
-            CONMUTADOR SUPERIOR (PRO SHOP | BÓVEDA) + ACCESO ADMIN DISCRETO
+            BARRA SUPERIOR 3D: CAMBIO PRO SHOP / BÓVEDA + SALDO + ADMIN
             ================================================================== */}
         {!selectedProduct && !showAdminManager && (
-          <div className="tt-ps-top-row">
-            <div className="tt-ps-mode-bar" role="tablist" style={{ flex: 1 }}>
-              <span
-                className="tt-ps-mode-slider"
-                aria-hidden="true"
-                style={{ transform: `translateX(${activeMode === 'shop' ? '0%' : '100%'})` }}
-              />
+          <div className="tt-ps-top-bar">
+            <div className="tt-ps-mode-switch" role="tablist" aria-label="Modo Tienda o Bóveda">
               <button
                 type="button"
                 role="tab"
                 aria-selected={activeMode === 'shop'}
-                className={`tt-ps-mode-btn ${activeMode === 'shop' ? 'is-active' : ''}`}
+                className={`tt-ps-3d-tab ${activeMode === 'shop' ? 'is-active' : ''}`}
                 onClick={() => {
                   triggerHaptic('light');
                   setActiveMode('shop');
                 }}
               >
-                <TTIcon name="shop" size={15} />
+                <TTIcon name="shop" size={16} />
                 <span>Pro Shop</span>
               </button>
 
@@ -979,1106 +1152,2035 @@ export default function ProShopAndGemsModal({
                 type="button"
                 role="tab"
                 aria-selected={activeMode === 'vault'}
-                className={`tt-ps-mode-btn ${activeMode === 'vault' ? 'is-active' : ''}`}
+                className={`tt-ps-3d-tab ${activeMode === 'vault' ? 'is-active' : ''}`}
                 onClick={() => {
                   triggerHaptic('light');
                   setActiveMode('vault');
                 }}
               >
-                <TTIcon name="gem" size={15} />
-                <span>Bóveda ({myGems.toLocaleString('es-PE')})</span>
+                <TTIcon name="gem" size={16} />
+                <span>Bóveda</span>
+                <span className="tt-ps-gem-counter">{myGems.toLocaleString('es-PE')} 💎</span>
               </button>
             </div>
 
             {canManageStore && (
               <button
                 type="button"
-                className="tt-ps-admin-btn"
+                className="tt-ps-3d-btn is-dark-pill"
                 onClick={openAdminForNew}
-                title="Gestionar catálogo de la tienda"
               >
-                <TTIcon name="settings" size={16} />
-                <span>Gestionar</span>
+                + Gestionar Catálogo
               </button>
             )}
           </div>
         )}
 
         {/* ==================================================================
-            VISTA ADMIN: GESTOR RÁPIDO DE TIENDA (SIN TOCAR CÓDIGO NUNCA MÁS)
+            SUB-VISTA A: GESTOR ADMIN (CON CAMPO CASHBACK EN GEMAS)
             ================================================================== */}
-        {showAdminManager && canManageStore && (
-          <div className="tt-ps-stack tt-ps-enter">
+        {showAdminManager && (
+          <div className="tt-ps-admin-wrap">
             <button
               type="button"
-              className="tt-detail-back-btn"
-              onClick={() => setShowAdminManager(false)}
+              className="tt-ps-back-3d"
+              onClick={() => {
+                triggerHaptic('light');
+                setShowAdminManager(false);
+                setAdminForm(EMPTY_ADMIN_FORM);
+              }}
             >
-              ‹ Volver a la tienda
+              ← Volver al Pro Shop
             </button>
 
-            <form onSubmit={handleSaveAdminProduct} className="tt-admin-form-card">
-              <span className="tt-ps-kicker">
-                {adminForm.id ? 'EDITAR ARTÍCULO' : 'SUBIR NUEVO ARTÍCULO AL MOSTRADOR'}
-              </span>
-
-              {/* Selector de Carril */}
-              <div className="tt-admin-channel-row">
-                {[
-                  { id: 'OWN_STOCK', label: 'En Stock (Gemas)' },
-                  { id: 'SPONSOR', label: 'Marca Aliada (Link)' },
-                  { id: 'COACH', label: 'Vitrina Coach' },
-                ].map((ch) => (
-                  <button
-                    key={ch.id}
-                    type="button"
-                    className={`tt-adm-ch-btn ${adminForm.channel === ch.id ? 'is-on' : ''}`}
-                    onClick={() => setAdminForm((p) => ({ ...p, channel: ch.id }))}
-                  >
-                    {ch.label}
-                  </button>
-                ))}
+            <form onSubmit={handleSaveAdminProduct} className="tt-ps-admin-form">
+              <div className="tt-ps-admin-section-title">
+                <strong>{adminForm.id ? 'Editar artículo publicado' : 'Publicar nuevo artículo'}</strong>
+                <span>Se guarda en tiempo real en Supabase</span>
               </div>
 
-              {/* Foto directa desde celular o URL */}
-              <div className="tt-adm-photo-row">
-                <div className="tt-adm-thumb">
-                  <SmartImage
-                    src={adminForm.imageUrl}
-                    fallbackSrc={ASSETS.logo}
-                    alt="Vista previa"
-                    style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+              <div className="tt-ps-field">
+                <label>Carril / Tipo de publicación</label>
+                <div className="tt-ps-channel-pills">
+                  {[
+                    { id: 'OWN_STOCK', label: 'Stock Propio (Canje 💎)' },
+                    { id: 'SPONSOR', label: 'Marca Aliada (Cashback 💎)' },
+                    { id: 'COACH', label: 'Vitrina Coach' },
+                  ].map((ch) => (
+                    <button
+                      key={ch.id}
+                      type="button"
+                      className={`tt-ps-3d-chip ${adminForm.channel === ch.id ? 'is-active' : ''}`}
+                      onClick={() => {
+                        triggerHaptic('light');
+                        setAdminForm((prev) => ({ ...prev, channel: ch.id }));
+                      }}
+                    >
+                      {ch.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="tt-ps-admin-grid-2">
+                <div className="tt-ps-field">
+                  <label>Nombre del artículo *</label>
+                  <input
+                    type="text"
+                    className="tt-input"
+                    required
+                    value={adminForm.name}
+                    onChange={(e) => setAdminForm((p) => ({ ...p, name: e.target.value }))}
+                    placeholder="Ej. Wilson Blade 98 v9"
                   />
                 </div>
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div className="tt-ps-field">
+                  <label>Marca / Autor</label>
                   <input
-                    ref={adminPhotoRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleUploadProductPhoto}
-                    style={{ display: 'none' }}
+                    type="text"
+                    className="tt-input"
+                    value={adminForm.brand}
+                    onChange={(e) => setAdminForm((p) => ({ ...p, brand: e.target.value }))}
+                    placeholder="Ej. Wilson · Tienda Oficial"
                   />
-                  <button
-                    type="button"
-                    disabled={isUploadingImg}
-                    className="tt-btn tt-btn-ghost tt-btn-sm"
-                    onClick={() => adminPhotoRef.current?.click()}
-                  >
-                    <TTIcon name="camera" size={15} />
-                    {isUploadingImg ? 'Subiendo foto...' : 'Tomar / Subir foto'}
-                  </button>
+                </div>
+              </div>
+
+              <div className="tt-ps-field">
+                <label>Descripción clara para el jugador</label>
+                <textarea
+                  rows={2}
+                  className="tt-input"
+                  value={adminForm.description}
+                  onChange={(e) => setAdminForm((p) => ({ ...p, description: e.target.value }))}
+                  placeholder="Detalles clave de uso, entrega o garantía..."
+                />
+              </div>
+
+              <div className="tt-ps-admin-grid-2">
+                <div className="tt-ps-field">
+                  <label>Foto del producto</label>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input
+                      ref={adminPhotoRef}
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={handleUploadProductPhoto}
+                    />
+                    <button
+                      type="button"
+                      className="tt-ps-3d-btn is-dark-pill"
+                      style={{ flex: 1 }}
+                      disabled={isUploadingImg}
+                      onClick={() => adminPhotoRef.current?.click()}
+                    >
+                      {isUploadingImg ? 'Subiendo...' : 'Subir foto'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="tt-ps-field">
+                  <label>O pega URL de imagen</label>
                   <input
-                    type="url"
-                    className="tt-ps-input"
+                    type="text"
+                    className="tt-input"
                     value={adminForm.imageUrl}
                     onChange={(e) => setAdminForm((p) => ({ ...p, imageUrl: e.target.value }))}
-                    placeholder="O pega URL directa de la imagen"
+                    placeholder="https://..."
                   />
                 </div>
               </div>
 
-              <div className="tt-adm-grid-2">
-                <input
-                  type="text"
-                  className="tt-ps-input"
-                  value={adminForm.name}
-                  onChange={(e) => setAdminForm((p) => ({ ...p, name: e.target.value }))}
-                  placeholder="Nombre del producto *"
-                  required
-                />
-                <input
-                  type="text"
-                  className="tt-ps-input"
-                  value={adminForm.brand}
-                  onChange={(e) => setAdminForm((p) => ({ ...p, brand: e.target.value }))}
-                  placeholder="Marca o tienda (ej. Wilson)"
-                />
-              </div>
-
-              <div className="tt-adm-grid-3">
-                <input
-                  type="number"
-                  className="tt-ps-input"
-                  value={adminForm.priceSoles}
-                  onChange={(e) => setAdminForm((p) => ({ ...p, priceSoles: e.target.value }))}
-                  placeholder="Precio S/"
-                />
-                {adminForm.channel !== 'SPONSOR' ? (
+              <div className="tt-ps-admin-grid-3">
+                <div className="tt-ps-field">
+                  <label>Precio Regular (S/)</label>
                   <input
                     type="number"
-                    className="tt-ps-input"
-                    value={adminForm.vipPriceSoles}
-                    onChange={(e) => setAdminForm((p) => ({ ...p, vipPriceSoles: e.target.value }))}
-                    placeholder="Precio VIP S/"
+                    min={0}
+                    className="tt-input"
+                    value={adminForm.priceSoles}
+                    onChange={(e) => setAdminForm((p) => ({ ...p, priceSoles: e.target.value }))}
+                    placeholder="0"
                   />
-                ) : (
+                </div>
+                <div className="tt-ps-field">
+                  <label>Precio Antes (S/)</label>
                   <input
                     type="number"
-                    className="tt-ps-input"
+                    min={0}
+                    className="tt-input"
                     value={adminForm.oldPriceSoles}
                     onChange={(e) => setAdminForm((p) => ({ ...p, oldPriceSoles: e.target.value }))}
-                    placeholder="Antes S/ (opc.)"
+                    placeholder="Opcional"
                   />
-                )}
-                {adminForm.channel === 'OWN_STOCK' ? (
-                  <input
-                    type="number"
-                    className="tt-ps-input"
-                    value={adminForm.gemsCost}
-                    onChange={(e) => setAdminForm((p) => ({ ...p, gemsCost: e.target.value }))}
-                    placeholder="Canje 💎"
-                  />
+                </div>
+                {adminForm.channel !== 'SPONSOR' ? (
+                  <div className="tt-ps-field">
+                    <label>Precio Socio VIP (S/)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      className="tt-input"
+                      value={adminForm.vipPriceSoles}
+                      onChange={(e) =>
+                        setAdminForm((p) => ({ ...p, vipPriceSoles: e.target.value }))
+                      }
+                      placeholder="Opcional"
+                    />
+                  </div>
                 ) : (
-                  <input
-                    type="text"
-                    className="tt-ps-input"
-                    value={adminForm.badgeText}
-                    onChange={(e) => setAdminForm((p) => ({ ...p, badgeText: e.target.value }))}
-                    placeholder="Etiqueta (ej. PRO)"
-                  />
+                  <div className="tt-ps-field">
+                    <label>Cashback en Gemas (💎)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      className="tt-input"
+                      value={adminForm.cashbackGems}
+                      onChange={(e) =>
+                        setAdminForm((p) => ({ ...p, cashbackGems: e.target.value }))
+                      }
+                      placeholder="Ej. 35"
+                    />
+                  </div>
                 )}
               </div>
 
+              {adminForm.channel === 'OWN_STOCK' && (
+                <div className="tt-ps-field">
+                  <label>Costo de canje directo en Gemas (💎)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    className="tt-input"
+                    value={adminForm.gemsCost}
+                    onChange={(e) => setAdminForm((p) => ({ ...p, gemsCost: e.target.value }))}
+                    placeholder="Ej. 220 (0 si no se canjea con Gemas)"
+                  />
+                </div>
+              )}
+
               {adminForm.channel === 'SPONSOR' && (
-                <div className="tt-adm-grid-2">
-                  <input
-                    type="url"
-                    className="tt-ps-input"
-                    value={adminForm.externalUrl}
-                    onChange={(e) => setAdminForm((p) => ({ ...p, externalUrl: e.target.value }))}
-                    placeholder="Link exacto al producto (https://...)"
-                  />
-                  <input
-                    type="text"
-                    className="tt-ps-input"
-                    value={adminForm.promoCode}
-                    onChange={(e) => setAdminForm((p) => ({ ...p, promoCode: e.target.value }))}
-                    placeholder="Código dcto (ej. TOTALTENIS10)"
-                  />
+                <div className="tt-ps-admin-sponsor-box">
+                  <div className="tt-ps-admin-grid-2">
+                    <div className="tt-ps-field">
+                      <label>Enlace oficial de afiliado / marca *</label>
+                      <input
+                        type="url"
+                        className="tt-input"
+                        value={adminForm.externalUrl}
+                        onChange={(e) =>
+                          setAdminForm((p) => ({ ...p, externalUrl: e.target.value }))
+                        }
+                        placeholder="https://www.wilson.com/..."
+                      />
+                    </div>
+                    <div className="tt-ps-field">
+                      <label>Código de descuento / afiliado</label>
+                      <input
+                        type="text"
+                        className="tt-input"
+                        value={adminForm.promoCode}
+                        onChange={(e) =>
+                          setAdminForm((p) => ({ ...p, promoCode: e.target.value.toUpperCase() }))
+                        }
+                        placeholder="Ej. TOTALTENIS10"
+                      />
+                    </div>
+                  </div>
+                  <small className="tt-ps-admin-note">
+                    Calcula internamente cuántas Gemas otorgar según tu comisión de afiliado. Al jugador solo se le muestra la recompensa en 💎 (nunca equivalencia en soles).
+                  </small>
                 </div>
               )}
 
               {adminForm.channel === 'COACH' && (
-                <input
-                  type="tel"
-                  className="tt-ps-input"
-                  value={adminForm.coachWhatsapp}
-                  onChange={(e) => setAdminForm((p) => ({ ...p, coachWhatsapp: e.target.value }))}
-                  placeholder="WhatsApp del Coach (9 dígitos)"
-                />
+                <div className="tt-ps-field">
+                  <label>WhatsApp del Coach (con 51)</label>
+                  <input
+                    type="tel"
+                    className="tt-input"
+                    value={adminForm.coachWhatsapp}
+                    onChange={(e) =>
+                      setAdminForm((p) => ({ ...p, coachWhatsapp: e.target.value }))
+                    }
+                    placeholder="51964201001"
+                  />
+                </div>
               )}
 
-              <div className="tt-adm-grid-2">
-                <input
-                  type="text"
-                  className="tt-ps-input"
-                  value={adminForm.variantLabel}
-                  onChange={(e) => setAdminForm((p) => ({ ...p, variantLabel: e.target.value }))}
-                  placeholder="Título variante (ej. Tamaño de grip)"
-                />
-                <input
-                  type="text"
-                  className="tt-ps-input"
-                  value={adminForm.variantsCsv}
-                  onChange={(e) => setAdminForm((p) => ({ ...p, variantsCsv: e.target.value }))}
-                  placeholder="Opciones: L2 (4 1/4), L3 (4 3/8)"
-                />
+              <div className="tt-ps-admin-grid-3">
+                <div className="tt-ps-field">
+                  <label>Etiqueta (Badge)</label>
+                  <input
+                    type="text"
+                    className="tt-input"
+                    value={adminForm.badgeText}
+                    onChange={(e) => setAdminForm((p) => ({ ...p, badgeText: e.target.value }))}
+                    placeholder="MARCA ALIADA / EN STOCK"
+                  />
+                </div>
+                <div className="tt-ps-field">
+                  <label>Título de opciones</label>
+                  <input
+                    type="text"
+                    className="tt-input"
+                    value={adminForm.variantLabel}
+                    onChange={(e) => setAdminForm((p) => ({ ...p, variantLabel: e.target.value }))}
+                    placeholder="Grip / Color / Talla"
+                  />
+                </div>
+                <div className="tt-ps-field">
+                  <label>Opciones (separadas por coma)</label>
+                  <input
+                    type="text"
+                    className="tt-input"
+                    value={adminForm.variantsCsv}
+                    onChange={(e) => setAdminForm((p) => ({ ...p, variantsCsv: e.target.value }))}
+                    placeholder="L2, L3, L4"
+                  />
+                </div>
               </div>
 
-              <textarea
-                rows={2}
-                className="tt-ps-input"
-                value={adminForm.description}
-                onChange={(e) => setAdminForm((p) => ({ ...p, description: e.target.value }))}
-                placeholder="Descripción breve y clara del producto..."
-              />
-
-              <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ display: 'flex', gap: 10 }}>
                 {adminForm.id && (
                   <button
                     type="button"
-                    className="tt-btn tt-btn-ghost tt-btn-sm"
+                    className="tt-ps-3d-btn is-dark-pill"
                     onClick={() => setAdminForm(EMPTY_ADMIN_FORM)}
                   >
-                    Nuevo
+                    Cancelar edición
                   </button>
                 )}
                 <button
                   type="submit"
-                  disabled={isSavingProduct}
-                  className="tt-btn tt-btn-primary tt-btn-sm"
+                  className="tt-ps-3d-btn is-emerald"
                   style={{ flex: 1 }}
+                  disabled={isSavingProduct}
                 >
                   {isSavingProduct
-                    ? 'Guardando en la nube...'
+                    ? 'Guardando en Supabase...'
                     : adminForm.id
-                    ? 'Actualizar Producto'
-                    : 'Publicar en Tienda'}
+                    ? 'Guardar cambios'
+                    : 'Publicar en Pro Shop'}
                 </button>
               </div>
             </form>
 
-            {/* Listado Admin con clics de sponsors en vivo */}
-            <div>
-              <span className="tt-ps-kicker">CATÁLOGO ACTIVO ({localProducts.length})</span>
-              <div className="tt-adm-list">
-                {localProducts.map((item) => (
-                  <div key={item.id} className="tt-adm-row">
-                    <div className="tt-adm-row-img">
-                      <SmartImage
-                        src={item.imageUrl}
-                        fallbackSrc={item.fallbackImage || ASSETS.logo}
-                        alt={item.name}
-                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                      />
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <strong>{item.name}</strong>
-                      <small>
-                        {item.channel === 'SPONSOR'
-                          ? `Marca · ${item.clicksCount || 0} clics`
-                          : item.channel === 'OWN_STOCK'
-                          ? `En Stock · S/ ${item.priceSoles}${item.gemsCost ? ` · ${item.gemsCost} 💎` : ''}`
-                          : `Coach · S/ ${item.priceSoles}`}
-                      </small>
-                    </div>
-                    <button
-                      type="button"
-                      className="tt-adm-edit-btn"
-                      onClick={() => openAdminForEdit(item)}
-                    >
-                      Editar
-                    </button>
-                    <button
-                      type="button"
-                      className="tt-adm-del-btn"
-                      onClick={() => handleDeleteAdminProduct(item.id)}
-                    >
-                      ✕
-                    </button>
+            <div className="tt-ps-admin-list">
+              <h5>Artículos activos ({localProducts.length})</h5>
+              {localProducts.map((p) => (
+                <div key={p.id} className="tt-ps-admin-item">
+                  <SmartImage
+                    src={p.imageUrl}
+                    fallbackSrc={ASSETS.logo}
+                    alt={p.name}
+                    style={{ width: 44, height: 44, borderRadius: 10, objectFit: 'cover' }}
+                  />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <strong>{p.name}</strong>
+                    <small>
+                      {p.channel === 'SPONSOR'
+                        ? `Marca Aliada · +${p.cashbackGems || 0} 💎 Cashback · ${p.clicksCount} clics`
+                        : p.channel === 'OWN_STOCK'
+                        ? `Stock Propio · S/ ${p.priceSoles}${p.gemsCost > 0 ? ` · ${p.gemsCost} 💎` : ''}`
+                        : `Coach · S/ ${p.priceSoles}`}
+                    </small>
                   </div>
-                ))}
-              </div>
+                  <button
+                    type="button"
+                    className="tt-ps-3d-chip"
+                    onClick={() => openAdminForEdit(p)}
+                  >
+                    Editar
+                  </button>
+                  <button
+                    type="button"
+                    className="tt-ps-3d-chip is-danger"
+                    onClick={() => handleDeleteAdminProduct(p.id)}
+                  >
+                    Eliminar
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
         )}
 
         {/* ==================================================================
-            VISTA 1: BÓVEDA DE GEMAS (SIN EQUIVALENCIA EN SOLES — PUNTO 9)
-            ================================================================== */}
-        {!selectedProduct && !showAdminManager && activeMode === 'vault' && (
-          <div key="ps-vault" className="tt-ps-stack tt-ps-enter">
-            <div className="tt-vault-hero-card">
-              <div className="tt-vh-top">
-                <div>
-                  <span className="tt-vh-kicker">SALDO DISPONIBLE</span>
-                  <div className="tt-vh-balance">
-                    <TTIcon name="gem" size={28} style={{ color: '#00DC7D' }} />
-                    <strong>{myGems.toLocaleString('es-PE')}</strong>
-                    <span>GEMAS</span>
-                  </div>
-                </div>
-                <span className={`tt-vh-plan-pill ${isVip ? 'is-vip' : ''}`}>
-                  {isVip ? 'SOCIO VIP · ×2.5' : 'ESTÁNDAR'}
-                </span>
-              </div>
-
-              <div className="tt-vh-cap-box">
-                <div className="tt-vh-cap-head">
-                  <span>Avance semanal en cancha</span>
-                  <strong>
-                    {weeklyEarned} / {weeklyCap} 💎
-                  </strong>
-                </div>
-                <div className="tt-vh-cap-track">
-                  <div className="tt-vh-cap-fill" style={{ width: `${weeklyPct}%` }} />
-                </div>
-              </div>
-
-              <div className="tt-vh-actions">
-                <button
-                  type="button"
-                  className="tt-btn tt-btn-primary tt-btn-sm"
-                  style={{ flex: 1 }}
-                  onClick={() => {
-                    triggerHaptic('light');
-                    setChannelFilter('OWN_STOCK');
-                    setActiveMode('shop');
-                  }}
-                >
-                  Canjear en Almacén
-                </button>
-
-                {!isVip && onOpenVipCard && (
-                  <button
-                    type="button"
-                    className="tt-btn tt-btn-secondary tt-btn-sm"
-                    onClick={() => {
-                      triggerHaptic('medium');
-                      if (onClose) onClose();
-                      onOpenVipCard();
-                    }}
-                  >
-                    +200 💎/mes VIP
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <div>
-              <span className="tt-ps-kicker">CÓMO GANAR GEMAS</span>
-              <div className="tt-missions-grid">
-                {GEM_MISSIONS.map((m) => (
-                  <div key={m.id} className="tt-mission-tile">
-                    <IconBadge name={m.icon} variant={m.variant} size={34} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <strong>{m.title}</strong>
-                      <small>{m.note}</small>
-                      <div className="tt-mission-rates">
-                        <span>Estándar: {m.standard}</span>
-                        <span className="is-vip">VIP: {m.vip}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <span className="tt-ps-kicker">HISTORIAL DE MOVIMIENTOS</span>
-              <div className="tt-ledger-list">
-                {effectiveLedger.map((entry) => (
-                  <div key={entry.id} className="tt-ledger-row">
-                    <div className={`tt-ledger-dot ${entry.type === 'debit' ? 'is-out' : 'is-in'}`}>
-                      {entry.type === 'debit' ? '−' : '+'}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <strong>{entry.title}</strong>
-                      <small>
-                        {entry.date} · {entry.detail}
-                      </small>
-                    </div>
-                    <strong className={`tt-ledger-amt ${entry.type === 'debit' ? 'is-out' : 'is-in'}`}>
-                      {entry.type === 'debit' ? `-${entry.amount}` : `+${entry.amount}`} 💎
-                    </strong>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ==================================================================
-            VISTA 2: PRO SHOP HÍBRIDO EN 3 CARRILES (MOSTRADOR LIMPIO)
-            ================================================================== */}
-        {!selectedProduct && !showAdminManager && activeMode === 'shop' && (
-          <div key="ps-shop" className="tt-ps-stack tt-ps-enter">
-            {/* Buscador + Filtros de Carril */}
-            <div className="tt-shop-controls">
-              <div className="tt-shop-search">
-                <TTIcon name="search" size={16} style={{ opacity: 0.65, flexShrink: 0 }} />
-                <input
-                  type="search"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Buscar raquetas, pelotas, encordado..."
-                  aria-label="Buscar en Pro Shop"
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    className="tt-shop-clear"
-                    onClick={() => setSearchQuery('')}
-                  >
-                    <TTIcon name="close" size={13} />
-                  </button>
-                )}
-              </div>
-
-              <div className="tt-shop-cats-row">
-                {CHANNEL_FILTERS.map((f) => (
-                  <button
-                    key={f.id}
-                    type="button"
-                    className={`tt-shop-cat-pill ${channelFilter === f.id ? 'is-active' : ''}`}
-                    onClick={() => {
-                      triggerHaptic('light');
-                      setChannelFilter(f.id);
-                    }}
-                  >
-                    {f.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {filteredProducts.length === 0 ? (
-              <EmptyStateCard
-                theme={theme}
-                title="Sin resultados en esta sección"
-                description="Prueba con otro término o revisa todo el escaparate disponible."
-                actionLabel="Ver todo"
-                onAction={() => {
-                  setSearchQuery('');
-                  setChannelFilter('ALL');
-                }}
-              />
-            ) : (
-              <div className="tt-lanes-stack">
-                {/* CARRIL 1: MARCAS OFICIALES & TIENDAS ALIADAS */}
-                {lanes.sponsors.length > 0 && (
-                  <section className="tt-lane-block">
-                    <div className="tt-lane-head">
-                      <div>
-                        <span className="tt-ps-kicker">TIENDAS OFICIALES · COMPRA DIRECTA</span>
-                        <h3>Marcas Aliadas</h3>
-                      </div>
-                      <span className="tt-lane-tag">Enlace directo</span>
-                    </div>
-                    <div className="tt-shop-grid">
-                      {lanes.sponsors.map((item, idx) => renderProductCard(item, idx))}
-                    </div>
-                  </section>
-                )}
-
-                {/* CARRIL 2: EN STOCK · ALMACÉN TOTAL TENIS (ÚNICO CON GEMAS) */}
-                {lanes.own.length > 0 && (
-                  <section className="tt-lane-block">
-                    <div className="tt-lane-head">
-                      <div>
-                        <span className="tt-ps-kicker">ENTREGA EN SEDE · CANJE DE GEMAS</span>
-                        <h3>En Stock · Almacén & Taller</h3>
-                      </div>
-                      <span className="tt-lane-tag is-emerald">Acepta 💎</span>
-                    </div>
-                    <div className="tt-shop-grid">
-                      {lanes.own.map((item, idx) => renderProductCard(item, idx))}
-                    </div>
-                  </section>
-                )}
-
-                {/* CARRIL 3: VITRINA DE COACHES */}
-                {lanes.coaches.length > 0 && (
-                  <section className="tt-lane-block">
-                    <div className="tt-lane-head">
-                      <div>
-                        <span className="tt-ps-kicker">PROGRAMAS Y SERVICIOS EN CANCHA</span>
-                        <h3>Vitrina de Entrenadores</h3>
-                      </div>
-                    </div>
-                    <div className="tt-shop-grid">
-                      {lanes.coaches.map((item, idx) => renderProductCard(item, idx))}
-                    </div>
-                  </section>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ==================================================================
-            VISTA 3: SUB-PANTALLA DE PRODUCTO (VARIANTES, GRIP, EDICIÓN Y PAGO)
+            SUB-VISTA B: FICHA DETALLADA + RECLAMO CASHBACK EN GEMAS
             ================================================================== */}
         {selectedProduct && !showAdminManager && detailPricing && (
-          <div key={selectedProduct.id} className="tt-ps-stack tt-ps-enter">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-              <button
-                type="button"
-                className="tt-detail-back-btn"
-                onClick={() => {
-                  triggerHaptic('light');
-                  setSelectedProductId(null);
-                }}
-              >
-                ‹ Volver al Pro Shop
-              </button>
+          <div className="tt-ps-detail-wrap">
+            <button
+              type="button"
+              className="tt-ps-back-3d"
+              onClick={() => {
+                triggerHaptic('light');
+                setSelectedProductId(null);
+              }}
+            >
+              ← Volver al catálogo
+            </button>
 
-              {canManageStore && (
-                <button
-                  type="button"
-                  className="tt-detail-back-btn"
-                  onClick={() => openAdminForEdit(selectedProduct)}
-                >
-                  Editar artículo
-                </button>
+            <div className="tt-ps-detail-hero">
+              <SmartImage
+                src={selectedProduct.imageUrl}
+                fallbackSrc={selectedProduct.fallbackImage || ASSETS.logo}
+                alt={selectedProduct.name}
+                className="tt-ps-detail-img"
+              />
+              {selectedProduct.channel === 'SPONSOR' && selectedProduct.cashbackGems > 0 && (
+                <div className="tt-ps-detail-cashback-float">
+                  Recompensa por compra: <strong>+{selectedProduct.cashbackGems} 💎</strong>
+                </div>
               )}
             </div>
 
-            <div className="tt-detail-hero">
-              <div className="tt-detail-media">
-                <SmartImage
-                  src={selectedProduct.imageUrl}
-                  fallbackSrc={selectedProduct.fallbackImage || ASSETS.logo}
-                  alt={selectedProduct.name}
-                  className="tt-detail-img"
-                />
-              </div>
-
-              <div className="tt-detail-summary">
-                <span className="tt-ps-kicker">{selectedProduct.brand}</span>
-                <h3>{selectedProduct.name}</h3>
-                {selectedProduct.description && (
-                  <p className="tt-detail-desc">{selectedProduct.description}</p>
-                )}
-
-                {/* Comparador limpio según carril */}
-                <div className="tt-detail-compare-grid">
-                  <div>
-                    <span>Precio</span>
-                    <strong>S/ {detailPricing.regularPrice}</strong>
-                  </div>
-                  {selectedProduct.channel !== 'SPONSOR' && (
-                    <div className="is-vip">
-                      <span>Socio VIP</span>
-                      <strong>S/ {detailPricing.vipPrice}</strong>
-                    </div>
+            <div className="tt-ps-detail-info">
+              <div className="tt-ps-detail-head">
+                <div>
+                  <span className="tt-ps-card-brand">{selectedProduct.brand}</span>
+                  <h3>{selectedProduct.name}</h3>
+                </div>
+                <div className="tt-ps-detail-price-col">
+                  {detailPricing.regularPrice > 0 && (
+                    <strong>S/ {detailPricing.effectiveCash}</strong>
                   )}
-                  {selectedProduct.channel === 'OWN_STOCK' && selectedProduct.gemsCost > 0 && (
-                    <div className="is-gems">
-                      <span>Canje</span>
-                      <strong>{selectedProduct.gemsCost.toLocaleString('es-PE')} 💎</strong>
-                    </div>
+                  {selectedProduct.oldPriceSoles && (
+                    <span className="tt-ps-old-price">S/ {selectedProduct.oldPriceSoles}</span>
                   )}
                 </div>
               </div>
-            </div>
 
-            {/* Selector interactivo de variantes (Grip, Edición, Color) */}
-            {selectedProduct.variants.length > 0 && (
-              <div className="tt-detail-box">
-                <span className="tt-ps-kicker">{selectedProduct.variantLabel}</span>
-                <div className="tt-variants-row">
-                  {selectedProduct.variants.map((v) => (
-                    <button
-                      key={v}
-                      type="button"
-                      className={`tt-var-pill ${selectedVariant === v ? 'is-on' : ''}`}
-                      onClick={() => {
-                        triggerHaptic('light');
-                        setSelectedVariant(v);
-                      }}
-                    >
-                      {v}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+              {selectedProduct.description && (
+                <p className="tt-ps-detail-desc">{selectedProduct.description}</p>
+              )}
 
-            {/* Configurador del Taller de Encordado */}
-            {selectedProduct.isStringingService && (
-              <div className="tt-detail-box">
-                <span className="tt-ps-kicker">CONFIGURA TU ENCORDADO</span>
-                <div className="tt-str-options">
-                  {PROSHOP_EDITABLE_CONFIG.stringingOptions.strings.map((st) => (
-                    <button
-                      key={st.id}
-                      type="button"
-                      className={`tt-str-pill ${stringId === st.id ? 'is-on' : ''}`}
-                      onClick={() => {
-                        triggerHaptic('light');
-                        setStringId(st.id);
-                      }}
-                    >
-                      <span>{st.name}</span>
-                      {st.extraSoles !== 0 && (
-                        <strong>
-                          {st.extraSoles > 0
-                            ? `+S/ ${st.extraSoles}`
-                            : `-S/ ${Math.abs(st.extraSoles)}`}
-                        </strong>
-                      )}
-                    </button>
-                  ))}
-                </div>
-
-                <div style={{ marginTop: 8 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem' }}>
-                    <span>Tensión deseada</span>
-                    <strong style={{ color: '#00DC7D' }}>{tensionLbs} lbs</strong>
-                  </div>
-                  <input
-                    type="range"
-                    min={PROSHOP_EDITABLE_CONFIG.stringingOptions.minLbs}
-                    max={PROSHOP_EDITABLE_CONFIG.stringingOptions.maxLbs}
-                    step="1"
-                    value={tensionLbs}
-                    style={{ width: '100%', accentColor: '#00DC7D', marginTop: 6 }}
-                    onChange={(e) => setTensionLbs(Number(e.target.value))}
-                  />
-                  <small className="tt-muted" style={{ display: 'block', fontSize: '0.7rem', marginTop: 4 }}>
-                    {PROSHOP_EDITABLE_CONFIG.stringingOptions.altitudeTip}
-                  </small>
-                </div>
-              </div>
-            )}
-
-            {/* Especificaciones técnicas */}
-            {selectedProduct.specs.length > 0 && (
-              <div className="tt-detail-box">
-                <span className="tt-ps-kicker">ESPECIFICACIONES</span>
-                <div className="tt-specs-grid">
+              {selectedProduct.specs?.length > 0 && (
+                <div className="tt-ps-specs-grid">
                   {selectedProduct.specs.map((sp, i) => (
-                    <div key={i} className="tt-spec-row">
+                    <div key={`${sp.label}-${i}`} className="tt-ps-spec-box">
                       <span>{sp.label}</span>
                       <strong>{sp.value}</strong>
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* FLUJO SEGÚN CARRIL */}
-            {selectedProduct.channel === 'SPONSOR' ? (
-              <div className="tt-sponsor-cta-box">
-                {selectedProduct.promoCode && (
-                  <div className="tt-promo-code-bar">
-                    <div>
-                      <small>CÓDIGO DE BENEFICIO EN TIENDA</small>
-                      <strong>{selectedProduct.promoCode}</strong>
-                    </div>
-                    <button
-                      type="button"
-                      className="tt-ps-copy-btn"
-                      onClick={() =>
-                        handleCopyText(selectedProduct.promoCode, 'Código', selectedProduct.id)
-                      }
-                    >
-                      {copiedCodeId === selectedProduct.id ? '✓ Copiado' : 'Copiar código'}
-                    </button>
-                  </div>
-                )}
-
-                <button
-                  type="button"
-                  className="tt-btn tt-btn-primary"
-                  style={{ width: '100%' }}
-                  onClick={() => handleOpenSponsorLink(selectedProduct)}
-                >
-                  Ir a tienda oficial ({selectedProduct.brand}) ↗
-                </button>
-              </div>
-            ) : (
-              <>
-                {/* Modalidades para Stock Propio (Pago directo o Canje con Gemas) */}
-                {selectedProduct.channel === 'OWN_STOCK' && (
-                  <div className="tt-detail-methods">
-                    <span className="tt-ps-kicker">
-                      FORMA DE ADQUISICIÓN (TU SALDO: {myGems.toLocaleString('es-PE')} 💎)
-                    </span>
-
-                    <button
-                      type="button"
-                      className={`tt-method-tile ${purchaseMethod === 'direct' ? 'is-on' : ''}`}
-                      onClick={() => {
-                        triggerHaptic('light');
-                        setPurchaseMethod('direct');
-                      }}
-                    >
-                      <div>
-                        <strong>{isVip ? 'Pago Directo · Tarifa Socio VIP' : 'Pago Directo (Yape / Plin)'}</strong>
-                        <small>Conservas todas tus Gemas acumuladas</small>
-                      </div>
-                      <strong className="tt-method-val">S/ {detailPricing.effectiveCash}</strong>
-                    </button>
-
-                    {selectedProduct.gemsCost > 0 && (
+              {/* Selector de variante (grip / color / enfoque) */}
+              {selectedProduct.variants?.length > 0 && (
+                <div className="tt-ps-field">
+                  <label>{selectedProduct.variantLabel || 'Opción disponible'}</label>
+                  <div className="tt-ps-variants-row">
+                    {selectedProduct.variants.map((v) => (
                       <button
+                        key={v}
                         type="button"
-                        className={`tt-method-tile ${purchaseMethod === 'full_gems' ? 'is-on' : ''} ${
-                          !detailPricing.canRedeemGems ? 'is-low' : ''
-                        }`}
+                        className={`tt-ps-3d-chip ${selectedVariant === v ? 'is-active' : ''}`}
                         onClick={() => {
                           triggerHaptic('light');
-                          setPurchaseMethod('full_gems');
+                          setSelectedVariant(v);
                         }}
                       >
-                        <div>
-                          <strong>Canjear con Gemas</strong>
-                          <small>
-                            {detailPricing.canRedeemGems
-                              ? '¡Tienes saldo suficiente para canjear ahora!'
-                              : `Te faltan ${(selectedProduct.gemsCost - myGems).toLocaleString('es-PE')} 💎`}
-                          </small>
-                        </div>
-                        <strong className="tt-method-val is-emerald">
-                          {selectedProduct.gemsCost.toLocaleString('es-PE')} 💎
-                        </strong>
+                        {v}
                       </button>
-                    )}
+                    ))}
+                  </div>
+                </div>
+              )}
 
-                    {/* Sede de entrega */}
-                    <div className="tt-detail-box" style={{ padding: 11 }}>
-                      <label htmlFor="tt-ps-pickup" className="tt-ps-kicker" style={{ marginBottom: 5 }}>
-                        SEDE DE ENTREGA O RECOJO
-                      </label>
-                      <select
-                        id="tt-ps-pickup"
-                        className="tt-ps-input"
-                        value={pickupClubId}
-                        onChange={(e) => setPickupClubId(e.target.value)}
-                      >
-                        {(clubs || INITIAL_CLUBS).map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.name}
-                          </option>
-                        ))}
-                        <option value="coordinar">Coordinar entrega directa</option>
-                      </select>
+              {/* === FLUJO 1: MARCA ALIADA + CASHBACK EN GEMAS === */}
+              {selectedProduct.channel === 'SPONSOR' && (
+                <div className="tt-ps-sponsor-panel">
+                  <div className="tt-ps-cashback-box">
+                    <div className="tt-ps-cashback-box-head">
+                      <IconBadge name="gem" variant="gold" size={34} />
+                      <div>
+                        <strong>
+                          {selectedProduct.cashbackGems > 0
+                            ? `Gana +${selectedProduct.cashbackGems} 💎 al comprar aquí`
+                            : 'Beneficio exclusivo comunidad TOTAL TENIS'}
+                        </strong>
+                        <p>
+                          Entra con nuestro enlace oficial{selectedProduct.promoCode ? ` y aplica el código ${selectedProduct.promoCode}` : ''}. Al terminar tu compra, presiona «Ya compré» y acreditamos tus Gemas en tu Bóveda.
+                        </p>
+                      </div>
                     </div>
 
-                    {purchaseMethod !== 'full_gems' && (
-                      <div className="tt-ps-pay-bar">
+                    {selectedProduct.promoCode && (
+                      <div className="tt-ps-code-banner">
                         <div>
-                          <small>Yape / Plin ({PROSHOP_EDITABLE_CONFIG.payment.holder})</small>
-                          <strong>{PROSHOP_EDITABLE_CONFIG.payment.yapePlin}</strong>
+                          <span>CÓDIGO DE AFILIADO</span>
+                          <strong>{selectedProduct.promoCode}</strong>
                         </div>
                         <button
                           type="button"
-                          className="tt-ps-copy-btn"
+                          className="tt-ps-3d-btn is-gold"
+                          style={{ minHeight: 38, padding: '0 14px' }}
                           onClick={() =>
-                            handleCopyText(PROSHOP_EDITABLE_CONFIG.payment.yapePlin, 'Yape / Plin')
+                            handleCopyText(selectedProduct.promoCode, 'Código', selectedProduct.id)
                           }
                         >
-                          Copiar
+                          {copiedCodeId === selectedProduct.id ? 'Copiado ✓' : 'Copiar código'}
                         </button>
                       </div>
                     )}
                   </div>
-                )}
 
+                  <div className="tt-ps-sponsor-actions">
+                    <button
+                      type="button"
+                      className="tt-ps-3d-btn is-emerald"
+                      onClick={() => handleOpenSponsorLink(selectedProduct)}
+                    >
+                      Ir a la tienda oficial de {selectedProduct.brand} ↗
+                    </button>
+
+                    <button
+                      type="button"
+                      className="tt-ps-3d-btn is-gold"
+                      onClick={() => {
+                        triggerHaptic('medium');
+                        setShowCashbackClaim((v) => !v);
+                      }}
+                    >
+                      {showCashbackClaim
+                        ? 'Ocultar formulario de reclamo'
+                        : selectedProduct.cashbackGems > 0
+                        ? `Ya compré · Reclamar mis +${selectedProduct.cashbackGems} 💎`
+                        : 'Ya compré · Registrar mi compra'}
+                    </button>
+                  </div>
+
+                  {submittedCashbackIds[selectedProduct.id] && (
+                    <div className="tt-ps-claim-done-banner">
+                      <TTIcon name="check" size={16} />
+                      <span>
+                        Ticket <b>{submittedCashbackIds[selectedProduct.id]}</b> enviado al Comité. Apenas confirmemos la boleta verás tus Gemas acreditadas en tu Bóveda.
+                      </span>
+                    </div>
+                  )}
+
+                  {showCashbackClaim && (
+                    <form onSubmit={handleSubmitCashbackClaim} className="tt-ps-claim-form">
+                      <div className="tt-ps-claim-head">
+                        <strong>Valida tu compra y recibe tus Gemas</strong>
+                        <small>Paso rápido · El Comité verifica tu pedido en minutos</small>
+                      </div>
+
+                      <div className="tt-ps-field">
+                        <label htmlFor="tt-cb-order">Nº de pedido, boleta o correo de compra</label>
+                        <input
+                          id="tt-cb-order"
+                          type="text"
+                          className="tt-input"
+                          value={cashbackOrderRef}
+                          onChange={(e) => setCashbackOrderRef(e.target.value)}
+                          placeholder="Ej. Pedido #W-89412 o boleta F001-234"
+                        />
+                      </div>
+
+                      <div className="tt-ps-field">
+                        <label>Captura de boleta o confirmación (opcional aquí)</label>
+                        <input
+                          ref={cashbackReceiptRef}
+                          type="file"
+                          accept="image/*"
+                          style={{ display: 'none' }}
+                          onChange={handleUploadCashbackReceipt}
+                        />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <button
+                            type="button"
+                            className="tt-ps-3d-btn is-dark-pill"
+                            style={{ flex: 1 }}
+                            disabled={isUploadingReceipt}
+                            onClick={() => cashbackReceiptRef.current?.click()}
+                          >
+                            {isUploadingReceipt
+                              ? 'Subiendo captura...'
+                              : cashbackReceiptUrl
+                              ? 'Captura lista ✓ (cambiar)'
+                              : 'Adjuntar foto de boleta'}
+                          </button>
+                          {cashbackReceiptUrl && (
+                            <SmartImage
+                              src={cashbackReceiptUrl}
+                              alt="Comprobante"
+                              style={{ width: 44, height: 44, borderRadius: 10, objectFit: 'cover' }}
+                            />
+                          )}
+                        </div>
+                      </div>
+
+                      <button type="submit" className="tt-ps-3d-btn is-emerald">
+                        Enviar comprobante y reclamar{' '}
+                        {selectedProduct.cashbackGems > 0
+                          ? `+${selectedProduct.cashbackGems} 💎`
+                          : 'recompensa'}
+                      </button>
+                    </form>
+                  )}
+                </div>
+              )}
+
+              {/* === FLUJO 2: STOCK PROPIO (CANJE CON GEMAS O PAGO) Y COACHES === */}
+              {selectedProduct.channel !== 'SPONSOR' && (
+                <div className="tt-ps-order-panel">
+                  {selectedProduct.isStringingService && (
+                    <div className="tt-ps-string-box">
+                      <div className="tt-ps-field">
+                        <label>Tipo de cuerda</label>
+                        <div className="tt-ps-string-list">
+                          {PROSHOP_EDITABLE_CONFIG.stringingOptions.strings.map((st) => (
+                            <button
+                              key={st.id}
+                              type="button"
+                              className={`tt-ps-3d-chip ${stringId === st.id ? 'is-active' : ''}`}
+                              style={{ textAlign: 'left', justifyContent: 'space-between' }}
+                              onClick={() => {
+                                triggerHaptic('light');
+                                setStringId(st.id);
+                              }}
+                            >
+                              <span>{st.name}</span>
+                              {st.extraSoles !== 0 && (
+                                <b>{st.extraSoles > 0 ? `+S/ ${st.extraSoles}` : `S/ ${st.extraSoles}`}</b>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="tt-ps-field">
+                        <label>Tensión recomendada: <b>{tensionLbs} lbs</b></label>
+                        <input
+                          type="range"
+                          min={PROSHOP_EDITABLE_CONFIG.stringingOptions.minLbs}
+                          max={PROSHOP_EDITABLE_CONFIG.stringingOptions.maxLbs}
+                          value={tensionLbs}
+                          onChange={(e) => setTensionLbs(Number(e.target.value))}
+                          style={{ width: '100%', accentColor: '#00DC7D' }}
+                        />
+                        <small className="tt-ps-altitude-tip">
+                          {PROSHOP_EDITABLE_CONFIG.stringingOptions.altitudeTip}
+                        </small>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedProduct.channel === 'OWN_STOCK' && selectedProduct.gemsCost > 0 && (
+                    <div className="tt-ps-field">
+                      <label>¿Cómo prefieres obtenerlo?</label>
+                      <div className="tt-ps-pay-toggle">
+                        <button
+                          type="button"
+                          className={`tt-ps-3d-chip ${purchaseMethod === 'direct' ? 'is-active' : ''}`}
+                          onClick={() => {
+                            triggerHaptic('light');
+                            setPurchaseMethod('direct');
+                          }}
+                        >
+                          Pago directo · S/ {detailPricing.effectiveCash}
+                        </button>
+                        <button
+                          type="button"
+                          className={`tt-ps-3d-chip ${purchaseMethod === 'full_gems' ? 'is-active' : ''}`}
+                          onClick={() => {
+                            triggerHaptic('light');
+                            setPurchaseMethod('full_gems');
+                          }}
+                        >
+                          Canje · {selectedProduct.gemsCost.toLocaleString('es-PE')} 💎
+                        </button>
+                      </div>
+                      {purchaseMethod === 'full_gems' && !detailPricing.canRedeemGems && (
+                        <small className="tt-ps-warn-inline">
+                          Tienes {myGems.toLocaleString('es-PE')} 💎. Te faltan{' '}
+                          {(selectedProduct.gemsCost - myGems).toLocaleString('es-PE')} 💎 para este canje.
+                        </small>
+                      )}
+                    </div>
+                  )}
+
+                  {selectedProduct.channel === 'OWN_STOCK' && (
+                    <div className="tt-ps-field">
+                      <label htmlFor="tt-ps-pickup">Sede de entrega</label>
+                      <select
+                        id="tt-ps-pickup"
+                        className="tt-input"
+                        value={pickupClubId}
+                        onChange={(e) => setPickupClubId(e.target.value)}
+                      >
+                        {(clubs || []).map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {purchaseMethod === 'direct' && selectedProduct.channel === 'OWN_STOCK' && (
+                    <div className="tt-ps-payment-card">
+                      <div>
+                        <span>Yape / Plin Oficial</span>
+                        <strong>{PROSHOP_EDITABLE_CONFIG.payment.yapePlin}</strong>
+                        <small>{PROSHOP_EDITABLE_CONFIG.payment.holder}</small>
+                      </div>
+                      <button
+                        type="button"
+                        className="tt-ps-3d-chip"
+                        onClick={() =>
+                          handleCopyText(PROSHOP_EDITABLE_CONFIG.payment.yapePlin, 'Número Yape/Plin')
+                        }
+                      >
+                        Copiar
+                      </button>
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    className="tt-ps-3d-btn is-emerald"
+                    onClick={handleConfirmOwnOrCoachOrder}
+                  >
+                    <TTIcon name="whatsapp" size={18} />
+                    {purchaseMethod === 'full_gems' && selectedProduct.channel === 'OWN_STOCK'
+                      ? `Canjear por ${selectedProduct.gemsCost.toLocaleString('es-PE')} 💎 y coordinar entrega`
+                      : selectedProduct.channel === 'COACH'
+                      ? `Reservar con ${selectedProduct.brand} (S/ ${detailPricing.effectiveCash})`
+                      : `Confirmar pedido por WhatsApp (S/ ${detailPricing.effectiveCash})`}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ==================================================================
+            SUB-VISTA C: BÓVEDA DE GEMAS (VICTORIA HASTA 6-0, 6-0 + CASHBACK)
+            ================================================================== */}
+        {activeMode === 'vault' && !selectedProduct && !showAdminManager && (
+          <div className="tt-ps-vault-wrap">
+            <div className="tt-ps-vault-hero">
+              <div className="tt-ps-vault-balance">
+                <span>TU SALDO DISPONIBLE</span>
+                <strong>{myGems.toLocaleString('es-PE')} 💎</strong>
+                <small>
+                  Puntos de fidelidad sin valor monetario · Canjeables en Stock Propio y Fondos de Perfil
+                </small>
+              </div>
+
+              <div className="tt-ps-vault-cap">
+                <div className="tt-ps-vault-cap-head">
+                  <span>Progreso semanal en cancha</span>
+                  <strong>
+                    {weeklyEarned} / {weeklyCap} 💎 {isVip ? '(VIP ×2.5)' : ''}
+                  </strong>
+                </div>
+                <div className="tt-ps-vault-bar">
+                  <div className="tt-ps-vault-bar-fill" style={{ width: `${weeklyPct}%` }} />
+                </div>
+              </div>
+
+              {!isVip && onOpenVipCard && (
                 <button
                   type="button"
-                  className="tt-btn tt-btn-primary"
-                  style={{ width: '100%' }}
-                  onClick={handleConfirmOwnOrCoachOrder}
+                  className="tt-ps-3d-btn is-gold"
+                  onClick={() => {
+                    triggerHaptic('light');
+                    onClose?.();
+                    onOpenVipCard();
+                  }}
                 >
-                  <TTIcon name="whatsapp" size={18} />
-                  {selectedProduct.channel === 'COACH'
-                    ? 'Coordinar con Coach por WhatsApp'
-                    : purchaseMethod === 'full_gems'
-                    ? 'Confirmar Canje con Gemas'
-                    : 'Confirmar Pedido por WhatsApp'}
+                  Activar Socio VIP · Multiplica tus Gemas ×2.5
                 </button>
-              </>
+              )}
+            </div>
+
+            <div className="tt-ps-section-block">
+              <div className="tt-ps-section-head">
+                <h4>Cómo ganar Gemas</h4>
+                <span>Cancha + Cashback</span>
+              </div>
+
+              <div className="tt-ps-missions-list">
+                {GEM_MISSIONS.map((m) => (
+                  <div key={m.id} className="tt-ps-mission-card">
+                    <IconBadge name={m.icon} variant={m.variant} size={36} />
+                    <div className="tt-ps-mission-copy">
+                      <strong>{m.title}</strong>
+                      <p>{m.note}</p>
+                    </div>
+                    <div className="tt-ps-mission-reward">
+                      <strong>{isVip ? m.vip : m.standard}</strong>
+                      {!isVip && m.vip !== m.standard && <small>VIP: {m.vip}</small>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="tt-ps-section-block">
+              <div className="tt-ps-section-head">
+                <h4>Últimos movimientos</h4>
+                <span>{effectiveLedger.length} registros</span>
+              </div>
+
+              <div className="tt-ps-ledger-list">
+                {effectiveLedger.map((item) => {
+                  const isDebit = item.type === 'debit';
+                  return (
+                    <div key={item.id} className="tt-ps-ledger-row">
+                      <div style={{ minWidth: 0 }}>
+                        <strong>{item.title}</strong>
+                        <small>
+                          {item.detail ? `${item.detail} · ` : ''}
+                          {item.date || 'Reciente'}
+                        </small>
+                      </div>
+                      <span className={`tt-ps-ledger-amt ${isDebit ? 'is-debit' : 'is-credit'}`}>
+                        {isDebit ? `-${item.amount}` : `+${item.amount}`} 💎
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ==================================================================
+            SUB-VISTA D: CATÁLOGO PRO SHOP (3 CARRILES CON BOTONES 3D)
+            ================================================================== */}
+        {activeMode === 'shop' && !selectedProduct && !showAdminManager && (
+          <div className="tt-ps-catalog-wrap">
+            <div className="tt-ps-search-row">
+              <TTIcon name="search" size={17} style={{ opacity: 0.65 }} />
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Buscar raquetas, pelotas, encordado o marcas..."
+                aria-label="Buscar en Pro Shop"
+              />
+            </div>
+
+            <div className="tt-ps-filters-row">
+              {CHANNEL_FILTERS.map((f) => (
+                <button
+                  key={f.id}
+                  type="button"
+                  className={`tt-ps-3d-chip ${channelFilter === f.id ? 'is-active' : ''}`}
+                  onClick={() => {
+                    triggerHaptic('light');
+                    setChannelFilter(f.id);
+                  }}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            {filteredProducts.length === 0 ? (
+              <EmptyStateCard
+                theme={theme}
+                title="No encontramos ese artículo"
+                description="Prueba con otro filtro o limpia el buscador para ver todo el Pro Shop."
+                actionLabel="Ver todo"
+                onAction={() => {
+                  setChannelFilter('ALL');
+                  setSearchQuery('');
+                }}
+              />
+            ) : (
+              <div className="tt-ps-lanes-stack">
+                {lanes.sponsors.length > 0 && (
+                  <section className="tt-ps-lane">
+                    <div className="tt-ps-lane-head">
+                      <div>
+                        <h4>Marcas Aliadas · Cashback en Gemas 💎</h4>
+                        <p>Compra con nuestro enlace/código y te devolvemos Gemas en tu Bóveda.</p>
+                      </div>
+                    </div>
+                    <div className="tt-ps-grid">{lanes.sponsors.map(renderProductCard)}</div>
+                  </section>
+                )}
+
+                {lanes.own.length > 0 && (
+                  <section className="tt-ps-lane">
+                    <div className="tt-ps-lane-head">
+                      <div>
+                        <h4>Almacén y Taller TOTAL TENIS</h4>
+                        <p>Entrega inmediata en sede · Único carril canjeable con tus Gemas.</p>
+                      </div>
+                    </div>
+                    <div className="tt-ps-grid">{lanes.own.map(renderProductCard)}</div>
+                  </section>
+                )}
+
+                {lanes.coaches.length > 0 && (
+                  <section className="tt-ps-lane">
+                    <div className="tt-ps-lane-head">
+                      <div>
+                        <h4>Vitrina de Coaches Oficiales</h4>
+                        <p>Evaluaciones técnicas y packs directos con entrenadores del circuito.</p>
+                      </div>
+                    </div>
+                    <div className="tt-ps-grid">{lanes.coaches.map(renderProductCard)}</div>
+                  </section>
+                )}
+              </div>
             )}
           </div>
         )}
       </div>
 
       <style>{`
-        .tt-ps-root,
-        .tt-ps-stack { display: flex; flex-direction: column; gap: 14px; }
-        .tt-ps-enter { animation: ttPsIn 300ms cubic-bezier(0.22, 1, 0.36, 1) both; }
-        @keyframes ttPsIn {
-          from { opacity: 0; transform: translateY(9px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .tt-ps-kicker {
-          display: block;
-          font-size: 0.62rem;
-          font-weight: 900;
-          letter-spacing: 0.09em;
-          color: var(--tt-emerald-text);
-          margin-bottom: 6px;
+        .tt-ps-root {
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+          color: var(--tt-text);
         }
 
-        .tt-ps-top-row { display: flex; align-items: stretch; gap: 8px; }
-        .tt-ps-mode-bar {
+        /* ==================================================================
+           SISTEMA 3D TÁCTIL + LIQUID GLASS (OSCURO Y CLARO CON CONTRASTE REAL)
+           ================================================================== */
+        .tt-ps-3d-btn {
           position: relative;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          min-height: 44px;
+          padding: 0 16px;
+          border-radius: 14px;
+          font-size: 0.8rem;
+          font-weight: 900;
+          letter-spacing: 0.01em;
+          cursor: pointer;
+          border: 1px solid transparent;
+          transition:
+            transform 120ms cubic-bezier(0.22, 1.35, 0.36, 1),
+            box-shadow 120ms ease,
+            filter 160ms ease;
+        }
+        .tt-ps-3d-btn:disabled {
+          opacity: 0.55;
+          cursor: not-allowed;
+        }
+        .tt-ps-3d-btn:active:not(:disabled) {
+          transform: translateY(3px) scale(0.985);
+        }
+
+        .tt-ps-3d-btn.is-emerald {
+          background: linear-gradient(180deg, #1EF093 0%, #00C96F 55%, #00A95C 100%);
+          color: #0D0219;
+          border-color: rgba(152, 255, 207, 0.65);
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.65),
+            0 4px 0 #007540,
+            0 10px 20px rgba(0, 220, 125, 0.28);
+        }
+        .tt-ps-3d-btn.is-emerald:active:not(:disabled) {
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.45),
+            0 1px 0 #007540,
+            0 4px 10px rgba(0, 220, 125, 0.22);
+        }
+
+        .tt-ps-3d-btn.is-gold {
+          background: linear-gradient(180deg, #F9E7B2 0%, #E5C16C 55%, #C99B3B 100%);
+          color: #1A1002;
+          border-color: rgba(255, 245, 210, 0.72);
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.72),
+            0 4px 0 #8A6114,
+            0 10px 20px rgba(229, 193, 108, 0.28);
+        }
+        .tt-ps-3d-btn.is-gold:active:not(:disabled) {
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.5),
+            0 1px 0 #8A6114,
+            0 4px 10px rgba(229, 193, 108, 0.22);
+        }
+
+        .tt-ps-3d-btn.is-sky {
+          background: linear-gradient(180deg, #60D5FF 0%, #24B0EE 58%, #0F8AC6 100%);
+          color: #061A29;
+          border-color: rgba(186, 236, 255, 0.7);
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.62),
+            0 4px 0 #075B87,
+            0 10px 20px rgba(56, 189, 248, 0.26);
+        }
+        .tt-ps-3d-btn.is-sky:active:not(:disabled) {
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.45),
+            0 1px 0 #075B87,
+            0 4px 10px rgba(56, 189, 248, 0.2);
+        }
+
+        .tt-ps-3d-btn.is-dark-pill {
+          background: linear-gradient(180deg, #35155A 0%, #240B41 100%);
+          color: #FAF9F5;
+          border-color: rgba(255, 255, 255, 0.18);
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.22),
+            0 4px 0 #120322,
+            0 8px 16px rgba(0, 0, 0, 0.34);
+        }
+        .tt-ps-3d-btn.is-dark-pill:active:not(:disabled) {
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.16),
+            0 1px 0 #120322,
+            0 3px 8px rgba(0, 0, 0, 0.28);
+        }
+        .tt-ps-root.is-light .tt-ps-3d-btn.is-dark-pill {
+          background: linear-gradient(180deg, #FFFFFF 0%, #EEEAF6 100%);
+          color: #1E0734;
+          border-color: rgba(30, 7, 52, 0.2);
+          box-shadow:
+            inset 0 1px 0 #FFFFFF,
+            0 4px 0 #C9BEDE,
+            0 8px 16px rgba(30, 7, 52, 0.12);
+        }
+        .tt-ps-root.is-light .tt-ps-3d-btn.is-dark-pill:active:not(:disabled) {
+          box-shadow:
+            inset 0 1px 0 #FFFFFF,
+            0 1px 0 #C9BEDE,
+            0 3px 8px rgba(30, 7, 52, 0.1);
+        }
+
+        /* BOTÓN VOLVER 3D */
+        .tt-ps-back-3d {
+          align-self: flex-start;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          min-height: 36px;
+          padding: 0 14px;
+          border-radius: 12px;
+          background: linear-gradient(180deg, #321355 0%, #220A3D 100%);
+          border: 1px solid rgba(255, 255, 255, 0.18);
+          color: #FAF9F5;
+          font-size: 0.76rem;
+          font-weight: 800;
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.22),
+            0 3px 0 #110320;
+          transition: transform 110ms ease, box-shadow 110ms ease;
+        }
+        .tt-ps-back-3d:active {
+          transform: translateY(2px);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 1px 0 #110320;
+        }
+        .tt-ps-root.is-light .tt-ps-back-3d {
+          background: linear-gradient(180deg, #FFFFFF 0%, #EFEBF6 100%);
+          border-color: rgba(30, 7, 52, 0.18);
+          color: #1E0734;
+          box-shadow: inset 0 1px 0 #FFFFFF, 0 3px 0 #C8BEDC;
+        }
+
+        /* BARRA SUPERIOR CON TABS 3D REALES (PRO SHOP | BÓVEDA) */
+        .tt-ps-top-bar {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+        .tt-ps-mode-switch {
           display: grid;
           grid-template-columns: 1fr 1fr;
-          padding: 4px;
-          border-radius: 16px;
-          background: var(--tt-surface-2);
-          border: 1px solid var(--tt-border);
+          gap: 8px;
+          padding: 6px;
+          border-radius: 18px;
+          background: rgba(14, 3, 26, 0.72);
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.45);
         }
-        .tt-ps-mode-slider {
-          position: absolute;
-          top: 4px;
-          bottom: 4px;
-          left: 4px;
-          width: calc((100% - 8px) / 2);
-          border-radius: 12px;
-          background: linear-gradient(135deg, #00DC7D 0%, #00B365 100%);
-          transition: transform 300ms cubic-bezier(0.22, 1.24, 0.36, 1);
-          pointer-events: none;
-          z-index: 0;
+        .tt-ps-root.is-light .tt-ps-mode-switch {
+          background: #E8E2F2;
+          border-color: rgba(30, 7, 52, 0.14);
+          box-shadow: inset 0 2px 5px rgba(30, 7, 52, 0.12);
         }
-        .tt-ps-root.is-light .tt-ps-mode-slider { background: #1E0734; }
-        .tt-ps-mode-btn {
-          position: relative;
-          z-index: 1;
-          min-height: 39px;
+        .tt-ps-3d-tab {
+          min-height: 44px;
+          padding: 0 12px;
+          border-radius: 13px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 7px;
+          font-size: 0.8rem;
+          font-weight: 800;
+          background: linear-gradient(180deg, #2D114D 0%, #1E0838 100%);
+          color: rgba(250, 249, 245, 0.82);
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.14),
+            0 3px 0 #10021E;
+          transition: transform 110ms ease, box-shadow 110ms ease, background 180ms ease;
+        }
+        .tt-ps-3d-tab:active {
+          transform: translateY(2px);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 1px 0 #10021E;
+        }
+        .tt-ps-3d-tab.is-active {
+          background: linear-gradient(180deg, #1CF092 0%, #00C86E 55%, #00A95C 100%);
+          color: #0D0219;
+          font-weight: 900;
+          border-color: rgba(164, 255, 214, 0.72);
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.65),
+            0 4px 0 #007540,
+            0 8px 18px rgba(0, 220, 125, 0.3);
+        }
+        .tt-ps-root.is-light .tt-ps-3d-tab {
+          background: linear-gradient(180deg, #FFFFFF 0%, #F1EDF8 100%);
+          color: #361C54;
+          border-color: rgba(30, 7, 52, 0.14);
+          box-shadow: inset 0 1px 0 #FFFFFF, 0 3px 0 #CFC5E2;
+        }
+        .tt-ps-root.is-light .tt-ps-3d-tab.is-active {
+          background: linear-gradient(180deg, #331059 0%, #1E0734 100%);
+          color: #00DC7D;
+          border-color: #1E0734;
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.24),
+            0 4px 0 #0E021A,
+            0 8px 16px rgba(30, 7, 52, 0.24);
+        }
+        .tt-ps-gem-counter {
+          padding: 2px 8px;
+          border-radius: 999px;
+          background: rgba(16, 2, 30, 0.28);
+          font-size: 0.7rem;
+          font-weight: 900;
+          white-space: nowrap;
+        }
+        .tt-ps-root.is-light .tt-ps-3d-tab:not(.is-active) .tt-ps-gem-counter {
+          background: rgba(30, 7, 52, 0.1);
+          color: #1E0734;
+        }
+        .tt-ps-root.is-light .tt-ps-3d-tab.is-active .tt-ps-gem-counter {
+          background: rgba(0, 220, 125, 0.18);
+          color: #00DC7D;
+        }
+
+        /* CHIPS / FILTROS 3D CON RELIEVE FÍSICO */
+        .tt-ps-3d-chip {
+          flex-shrink: 0;
+          min-height: 36px;
+          padding: 6px 13px;
           border-radius: 12px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
           gap: 6px;
+          font-size: 0.74rem;
+          font-weight: 800;
+          background: linear-gradient(180deg, #311254 0%, #21093C 100%);
+          color: #EDE8F5;
+          border: 1px solid rgba(255, 255, 255, 0.16);
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.18),
+            0 3px 0 #10021E;
+          transition: transform 110ms ease, box-shadow 110ms ease, background 160ms ease;
+        }
+        .tt-ps-3d-chip:active {
+          transform: translateY(2px);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 1px 0 #10021E;
+        }
+        .tt-ps-3d-chip.is-active {
+          background: linear-gradient(180deg, #1CF092 0%, #00C96F 60%, #00A85B 100%);
+          color: #0E021A;
+          border-color: rgba(164, 255, 214, 0.72);
+          font-weight: 900;
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.62),
+            0 3px 0 #007540,
+            0 6px 14px rgba(0, 220, 125, 0.28);
+        }
+        .tt-ps-3d-chip.is-danger {
+          background: linear-gradient(180deg, #F87171 0%, #DC2626 100%);
+          color: #FFFFFF;
+          border-color: rgba(254, 202, 202, 0.55);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 3px 0 #991B1B;
+        }
+        .tt-ps-root.is-light .tt-ps-3d-chip {
+          background: linear-gradient(180deg, #FFFFFF 0%, #EFEBF7 100%);
+          color: #1E0734;
+          border-color: rgba(30, 7, 52, 0.18);
+          box-shadow: inset 0 1px 0 #FFFFFF, 0 3px 0 #C7BDDC;
+        }
+        .tt-ps-root.is-light .tt-ps-3d-chip.is-active {
+          background: linear-gradient(180deg, #321057 0%, #1E0734 100%);
+          color: #00DC7D;
+          border-color: #1E0734;
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.24),
+            0 3px 0 #0D0218,
+            0 6px 14px rgba(30, 7, 52, 0.22);
+        }
+
+        /* ==================================================================
+           CATÁLOGO 3 CARRILES + TARJETAS CON PROFUNDIDAD Y BRILLO
+           ================================================================== */
+        .tt-ps-catalog-wrap {
+          display: flex;
+          flex-direction: column;
+          gap: 13px;
+        }
+        .tt-ps-search-row {
+          display: flex;
+          align-items: center;
+          gap: 9px;
+          min-height: 46px;
+          padding: 0 14px;
+          border-radius: 15px;
+          background: var(--tt-surface-2);
+          border: 1.5px solid var(--tt-border);
+          box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.12);
+        }
+        .tt-ps-root.is-light .tt-ps-search-row {
+          background: #FFFFFF;
+          border-color: rgba(30, 7, 52, 0.18);
+          color: #1E0734;
+        }
+        .tt-ps-search-row input {
+          width: 100%;
+          border: none;
+          background: transparent;
+          color: inherit;
+          font-size: 16px;
+          outline: none;
+        }
+        .tt-ps-filters-row {
+          display: flex;
+          gap: 8px;
+          overflow-x: auto;
+          padding: 2px 1px 6px;
+          scrollbar-width: none;
+        }
+        .tt-ps-filters-row::-webkit-scrollbar {
+          display: none;
+        }
+
+        .tt-ps-lanes-stack {
+          display: flex;
+          flex-direction: column;
+          gap: 18px;
+        }
+        .tt-ps-lane {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+        .tt-ps-lane-head h4 {
+          margin: 0;
+          font-size: 0.96rem;
+          font-weight: 900;
+          color: var(--tt-text);
+        }
+        .tt-ps-lane-head p {
+          margin: 2px 0 0;
+          font-size: 0.74rem;
+          color: var(--tt-text-muted);
+        }
+        .tt-ps-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 12px;
+        }
+        @media (min-width: 560px) {
+          .tt-ps-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+        }
+
+        .tt-ps-card {
+          border-radius: 20px;
+          overflow: hidden;
+          background: linear-gradient(180deg, rgba(42, 16, 72, 0.94) 0%, rgba(24, 7, 44, 0.98) 100%);
+          border: 1.5px solid rgba(255, 255, 255, 0.14);
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.18),
+            0 5px 0 rgba(10, 2, 20, 0.78),
+            0 12px 24px rgba(0, 0, 0, 0.28);
+          display: flex;
+          flex-direction: column;
+          cursor: pointer;
+          transition: transform 150ms cubic-bezier(0.22, 1.35, 0.36, 1), border-color 180ms ease;
+        }
+        .tt-ps-card:active {
+          transform: translateY(2px) scale(0.99);
+        }
+        .tt-ps-card.is-sponsor {
+          border-color: rgba(229, 193, 108, 0.48);
+        }
+        .tt-ps-card.is-own {
+          border-color: rgba(0, 220, 125, 0.42);
+        }
+        .tt-ps-card.is-coach {
+          border-color: rgba(56, 189, 248, 0.42);
+        }
+        .tt-ps-root.is-light .tt-ps-card {
+          background: linear-gradient(180deg, #FFFFFF 0%, #F7F4FC 100%);
+          border-color: rgba(30, 7, 52, 0.16);
+          box-shadow:
+            inset 0 1px 0 #FFFFFF,
+            0 5px 0 #D6CEE6,
+            0 12px 22px rgba(30, 7, 52, 0.1);
+        }
+        .tt-ps-root.is-light .tt-ps-card.is-sponsor {
+          border-color: rgba(180, 126, 22, 0.42);
+        }
+        .tt-ps-root.is-light .tt-ps-card.is-own {
+          border-color: rgba(0, 150, 84, 0.36);
+        }
+
+        .tt-ps-card-media {
+          position: relative;
+          height: 148px;
+          background: radial-gradient(circle at 50% 35%, rgba(0, 220, 125, 0.14), rgba(16, 3, 29, 0.92));
+          overflow: hidden;
+        }
+        .tt-ps-root.is-light .tt-ps-card-media {
+          background: radial-gradient(circle at 50% 35%, #EFEAF9, #E1D9F0);
+        }
+        .tt-ps-card-img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+        .tt-ps-card-badge {
+          position: absolute;
+          top: 9px;
+          left: 9px;
+          padding: 4px 9px;
+          border-radius: 999px;
+          font-size: 0.6rem;
+          font-weight: 900;
+          letter-spacing: 0.06em;
+          box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
+        }
+        .tt-ps-card-badge.is-gold {
+          background: linear-gradient(180deg, #F8E5AC 0%, #D4A442 100%);
+          color: #1A1002;
+        }
+        .tt-ps-card-badge.is-emerald {
+          background: linear-gradient(180deg, #1EF093 0%, #00B966 100%);
+          color: #0D0219;
+        }
+        .tt-ps-card-badge.is-sky {
+          background: linear-gradient(180deg, #68D8FF 0%, #0EA5E9 100%);
+          color: #051A2A;
+        }
+
+        .tt-ps-cashback-pill {
+          position: absolute;
+          left: 9px;
+          bottom: 9px;
+          padding: 5px 10px;
+          border-radius: 999px;
+          background: rgba(20, 4, 36, 0.92);
+          border: 1.5px solid #E5C16C;
+          color: #F7E2A6;
+          font-size: 0.68rem;
+          font-weight: 900;
+          box-shadow: 0 6px 14px rgba(0, 0, 0, 0.45);
+        }
+
+        .tt-ps-admin-edit-fab {
+          position: absolute;
+          top: 9px;
+          right: 9px;
+          width: 32px;
+          height: 32px;
+          border-radius: 10px;
+          background: rgba(18, 4, 32, 0.88);
+          border: 1px solid rgba(255, 255, 255, 0.3);
+          color: #FAF9F5;
+          font-size: 0.85rem;
+          font-weight: 900;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .tt-ps-card-body {
+          padding: 12px 13px 14px;
+          display: flex;
+          flex-direction: column;
+          gap: 7px;
+          flex: 1;
+        }
+        .tt-ps-card-brand {
+          font-size: 0.65rem;
+          font-weight: 900;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          color: #00DC7D;
+        }
+        .tt-ps-root.is-light .tt-ps-card-brand {
+          color: #007A44;
+        }
+        .tt-ps-card-title {
+          margin: 0;
+          font-size: 0.92rem;
+          font-weight: 900;
+          line-height: 1.24;
+          color: var(--tt-text);
+        }
+        .tt-ps-price-stack {
+          display: flex;
+          flex-direction: column;
+          gap: 5px;
+          margin-bottom: 4px;
+        }
+        .tt-ps-price-line {
+          display: flex;
+          align-items: baseline;
+          gap: 7px;
+          flex-wrap: wrap;
+        }
+        .tt-ps-price-line strong {
+          font-size: 1.08rem;
+          font-weight: 900;
+          color: var(--tt-text);
+        }
+        .tt-ps-old-price {
+          font-size: 0.74rem;
+          text-decoration: line-through;
+          color: var(--tt-text-muted);
+        }
+        .tt-ps-vip-tag {
+          padding: 2px 7px;
+          border-radius: 7px;
+          background: rgba(229, 193, 108, 0.18);
+          border: 1px solid rgba(229, 193, 108, 0.45);
+          color: #F3DC9B;
+          font-size: 0.66rem;
+          font-weight: 900;
+        }
+        .tt-ps-root.is-light .tt-ps-vip-tag {
+          background: #FBF1D4;
+          border-color: rgba(154, 107, 22, 0.35);
+          color: #82560B;
+        }
+        .tt-ps-gems-cost-line {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 5px 9px;
+          border-radius: 10px;
+          background: rgba(0, 220, 125, 0.12);
+          border: 1px solid rgba(0, 220, 125, 0.32);
+          font-size: 0.7rem;
+          color: var(--tt-text);
+        }
+        .tt-ps-gems-cost-line strong {
+          color: #00DC7D;
+          font-weight: 900;
+        }
+        .tt-ps-root.is-light .tt-ps-gems-cost-line {
+          background: #E7F9F0;
+          border-color: rgba(0, 140, 78, 0.3);
+          color: #163327;
+        }
+        .tt-ps-root.is-light .tt-ps-gems-cost-line strong {
+          color: #007A44;
+        }
+
+        .tt-ps-code-chip {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          padding: 6px 9px;
+          border-radius: 10px;
+          background: rgba(229, 193, 108, 0.14);
+          border: 1px dashed rgba(229, 193, 108, 0.52);
+          color: #F6E2A8;
+          font-size: 0.7rem;
+        }
+        .tt-ps-code-chip small {
+          font-weight: 900;
+          color: #00DC7D;
+        }
+        .tt-ps-root.is-light .tt-ps-code-chip {
+          background: #FDF6E2;
+          border-color: rgba(154, 107, 22, 0.45);
+          color: #6B4506;
+        }
+        .tt-ps-root.is-light .tt-ps-code-chip small {
+          color: #007A44;
+        }
+        .tt-ps-card .tt-ps-3d-btn {
+          margin-top: auto;
+          width: 100%;
+          min-height: 40px;
+          font-size: 0.76rem;
+        }
+
+        /* ==================================================================
+           FICHA DETALLADA + PANEL CASHBACK EN GEMAS + FORMULARIO RECLAMO
+           ================================================================== */
+        .tt-ps-detail-wrap {
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+        }
+        .tt-ps-detail-hero {
+          position: relative;
+          height: 205px;
+          border-radius: 20px;
+          overflow: hidden;
+          border: 1.5px solid var(--tt-border);
+          background: #17042A;
+        }
+        .tt-ps-detail-img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+        .tt-ps-detail-cashback-float {
+          position: absolute;
+          left: 12px;
+          bottom: 12px;
+          padding: 7px 12px;
+          border-radius: 12px;
+          background: rgba(18, 4, 34, 0.92);
+          border: 1.5px solid #E5C16C;
+          color: #FAF9F5;
+          font-size: 0.76rem;
+          box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
+        }
+        .tt-ps-detail-cashback-float strong {
+          color: #F6E2A8;
+          font-weight: 900;
+        }
+
+        .tt-ps-detail-info {
+          display: flex;
+          flex-direction: column;
+          gap: 13px;
+        }
+        .tt-ps-detail-head {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 10px;
+        }
+        .tt-ps-detail-head h3 {
+          margin: 3px 0 0;
+          font-size: 1.12rem;
+          font-weight: 900;
+          color: var(--tt-text);
+        }
+        .tt-ps-detail-price-col {
+          text-align: right;
+          flex-shrink: 0;
+        }
+        .tt-ps-detail-price-col strong {
+          display: block;
+          font-size: 1.25rem;
+          font-weight: 900;
+          color: var(--tt-text);
+        }
+        .tt-ps-detail-desc {
+          margin: 0;
+          font-size: 0.82rem;
+          line-height: 1.48;
+          color: var(--tt-text-muted);
+        }
+        .tt-ps-specs-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 8px;
+        }
+        .tt-ps-spec-box {
+          padding: 10px 11px;
+          border-radius: 13px;
+          background: var(--tt-surface-2);
+          border: 1px solid var(--tt-border);
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+        .tt-ps-root.is-light .tt-ps-spec-box {
+          background: #F4F1FA;
+          border-color: rgba(30, 7, 52, 0.14);
+        }
+        .tt-ps-spec-box span {
+          font-size: 0.67rem;
+          color: var(--tt-text-muted);
+          font-weight: 700;
+        }
+        .tt-ps-spec-box strong {
           font-size: 0.77rem;
+          color: var(--tt-text);
+        }
+
+        .tt-ps-field {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+        .tt-ps-field label {
+          font-size: 0.75rem;
           font-weight: 800;
           color: var(--tt-text-muted);
         }
-        .tt-ps-mode-btn.is-active { color: #10021E; font-weight: 900; }
-        .tt-ps-root.is-light .tt-ps-mode-btn.is-active { color: #00DC7D; }
-
-        .tt-ps-admin-btn {
-          padding: 0 12px;
-          border-radius: 15px;
-          background: var(--tt-surface-2);
-          border: 1px solid var(--tt-border-medium);
-          color: var(--tt-text);
-          display: inline-flex;
-          align-items: center;
-          gap: 5px;
-          font-size: 0.72rem;
-          font-weight: 800;
-          flex-shrink: 0;
+        .tt-ps-variants-row {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
         }
 
-        /* BÓVEDA (CERO SOLES) */
-        .tt-vault-hero-card {
-          border-radius: 22px;
-          padding: 16px;
-          background: linear-gradient(135deg, #24093F 0%, #130322 100%);
+        .tt-ps-sponsor-panel {
+          display: flex;
+          flex-direction: column;
+          gap: 11px;
+        }
+        .tt-ps-cashback-box {
+          padding: 13px;
+          border-radius: 17px;
+          background: linear-gradient(135deg, #270B46 0%, #16042A 100%);
+          border: 1.5px solid rgba(229, 193, 108, 0.55);
           color: #FAF9F5;
-          border: 1px solid rgba(0, 220, 125, 0.34);
+          display: flex;
+          flex-direction: column;
+          gap: 11px;
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 10px 22px rgba(0, 0, 0, 0.25);
+        }
+        .tt-ps-cashback-box-head {
+          display: flex;
+          align-items: flex-start;
+          gap: 10px;
+        }
+        .tt-ps-cashback-box-head strong {
+          display: block;
+          font-size: 0.9rem;
+          color: #F8E5AC;
+        }
+        .tt-ps-cashback-box-head p {
+          margin: 3px 0 0;
+          font-size: 0.75rem;
+          line-height: 1.42;
+          color: rgba(250, 249, 245, 0.85);
+        }
+        .tt-ps-code-banner {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          padding: 9px 11px;
+          border-radius: 13px;
+          background: rgba(255, 255, 255, 0.08);
+          border: 1px dashed rgba(229, 193, 108, 0.55);
+        }
+        .tt-ps-code-banner span {
+          display: block;
+          font-size: 0.6rem;
+          font-weight: 800;
+          letter-spacing: 0.08em;
+          color: rgba(250, 249, 245, 0.7);
+        }
+        .tt-ps-code-banner strong {
+          font-size: 0.96rem;
+          letter-spacing: 0.06em;
+          color: #FFFFFF;
+        }
+
+        .tt-ps-sponsor-actions {
+          display: flex;
+          flex-direction: column;
+          gap: 9px;
+        }
+        .tt-ps-claim-done-banner {
+          display: flex;
+          align-items: flex-start;
+          gap: 9px;
+          padding: 11px 12px;
+          border-radius: 14px;
+          background: rgba(0, 220, 125, 0.14);
+          border: 1.5px solid rgba(0, 220, 125, 0.45);
+          font-size: 0.76rem;
+          line-height: 1.4;
+          color: var(--tt-text);
+        }
+        .tt-ps-claim-form {
+          padding: 13px;
+          border-radius: 16px;
+          background: var(--tt-surface-2);
+          border: 1.5px solid rgba(0, 220, 125, 0.4);
+          display: flex;
+          flex-direction: column;
+          gap: 11px;
+        }
+        .tt-ps-root.is-light .tt-ps-claim-form {
+          background: #F6F3FC;
+          border-color: rgba(0, 150, 84, 0.35);
+        }
+        .tt-ps-claim-head strong {
+          display: block;
+          font-size: 0.86rem;
+          color: var(--tt-text);
+        }
+        .tt-ps-claim-head small {
+          font-size: 0.72rem;
+          color: var(--tt-text-muted);
+        }
+
+        .tt-ps-order-panel {
           display: flex;
           flex-direction: column;
           gap: 12px;
         }
-        .tt-vh-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
-        .tt-vh-kicker { display: block; font-size: 0.6rem; font-weight: 900; letter-spacing: 0.09em; color: #7CF5C0; margin-bottom: 4px; }
-        .tt-vh-balance { display: flex; align-items: baseline; gap: 8px; }
-        .tt-vh-balance strong { font-family: var(--tt-font-display); font-size: 2.35rem; line-height: 0.95; font-variant-numeric: tabular-nums; }
-        .tt-vh-balance span { font-size: 0.72rem; font-weight: 900; letter-spacing: 0.08em; color: #00DC7D; }
-        .tt-vh-plan-pill { padding: 5px 10px; border-radius: 999px; background: rgba(250, 249, 245, 0.14); font-size: 0.62rem; font-weight: 900; }
-        .tt-vh-plan-pill.is-vip { background: linear-gradient(135deg, #F3DC9B 0%, #C89F45 100%); color: #1A0D00; }
-        .tt-vh-cap-box { padding: 10px 12px; border-radius: 14px; background: rgba(250, 249, 245, 0.06); display: flex; flex-direction: column; gap: 6px; }
-        .tt-vh-cap-head { display: flex; justify-content: space-between; font-size: 0.72rem; }
-        .tt-vh-cap-track { height: 7px; border-radius: 999px; background: rgba(250, 249, 245, 0.14); overflow: hidden; }
-        .tt-vh-cap-fill { height: 100%; border-radius: 999px; background: #00DC7D; }
-        .tt-vh-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-
-        .tt-missions-grid { display: grid; grid-template-columns: 1fr; gap: 8px; }
-        @media (min-width: 600px) {
-          .tt-missions-grid { grid-template-columns: 1fr 1fr; }
-        }
-        .tt-mission-tile { display: flex; align-items: flex-start; gap: 10px; padding: 11px; border-radius: 15px; background: var(--tt-surface-2); border: 1px solid var(--tt-border); }
-        .tt-mission-tile strong { display: block; font-size: 0.8rem; }
-        .tt-mission-tile small { display: block; font-size: 0.7rem; color: var(--tt-text-muted); margin-top: 2px; }
-        .tt-mission-rates { margin-top: 5px; display: flex; gap: 8px; flex-wrap: wrap; font-size: 0.68rem; font-weight: 800; }
-        .tt-mission-rates .is-vip { color: #E5C16C; }
-        .tt-ps-root.is-light .tt-mission-rates .is-vip { color: #9A6B16; }
-
-        .tt-ledger-list { display: flex; flex-direction: column; gap: 7px; }
-        .tt-ledger-row { display: flex; align-items: center; gap: 10px; padding: 10px 11px; border-radius: 14px; background: var(--tt-surface-2); border: 1px solid var(--tt-border); }
-        .tt-ledger-dot { width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-weight: 900; flex-shrink: 0; }
-        .tt-ledger-dot.is-in { background: rgba(0, 220, 125, 0.16); color: #00DC7D; }
-        .tt-ledger-dot.is-out { background: rgba(248, 113, 113, 0.16); color: #F87171; }
-        .tt-ledger-row strong { display: block; font-size: 0.8rem; }
-        .tt-ledger-row small { display: block; font-size: 0.68rem; color: var(--tt-text-muted); }
-        .tt-ledger-amt { font-size: 0.82rem; white-space: nowrap; }
-        .tt-ledger-amt.is-in { color: var(--tt-emerald-text); }
-        .tt-ledger-amt.is-out { color: #F87171; }
-
-        /* PRO SHOP 3 CARRILES */
-        .tt-shop-controls { display: flex; flex-direction: column; gap: 9px; }
-        .tt-shop-search { display: flex; align-items: center; gap: 9px; min-height: 44px; padding: 0 13px; border-radius: 14px; background: var(--tt-surface-2); border: 1px solid var(--tt-border); }
-        .tt-shop-search input { width: 100%; border: none; background: transparent; color: var(--tt-text); font-size: 16px; outline: none; }
-        .tt-shop-clear { width: 24px; height: 24px; border-radius: 50%; background: var(--tt-surface); color: var(--tt-text-muted); display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .tt-shop-cats-row { display: flex; gap: 7px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
-        .tt-shop-cats-row::-webkit-scrollbar { display: none; }
-        .tt-shop-cat-pill {
-          flex-shrink: 0;
-          min-height: 34px;
-          padding: 0 13px;
-          border-radius: 999px;
-          background: var(--tt-surface-2);
-          border: 1px solid var(--tt-border);
-          color: var(--tt-text-muted);
-          font-size: 0.74rem;
-          font-weight: 800;
-          white-space: nowrap;
-        }
-        .tt-shop-cat-pill.is-active { background: #1E0734; border-color: #00DC7D; color: #00DC7D; }
-
-        .tt-lanes-stack { display: flex; flex-direction: column; gap: 18px; }
-        .tt-lane-block { display: flex; flex-direction: column; gap: 10px; }
-        .tt-lane-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; }
-        .tt-lane-head h3 { margin: 0; font-family: var(--tt-font-display); font-size: 1.24rem; line-height: 1.04; }
-        .tt-lane-tag {
-          padding: 3px 9px;
-          border-radius: 999px;
-          background: var(--tt-surface-2);
-          border: 1px solid var(--tt-border);
-          color: var(--tt-text-muted);
-          font-size: 0.64rem;
-          font-weight: 800;
-        }
-        .tt-lane-tag.is-emerald {
-          background: rgba(0, 220, 125, 0.14);
-          border-color: rgba(0, 220, 125, 0.42);
-          color: var(--tt-emerald-text);
-        }
-
-        .tt-shop-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-        @media (min-width: 700px) {
-          .tt-shop-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-        }
-        .tt-prod-card {
-          border-radius: 18px;
-          overflow: hidden;
+        .tt-ps-string-box {
+          padding: 12px;
+          border-radius: 15px;
           background: var(--tt-surface-2);
           border: 1px solid var(--tt-border);
           display: flex;
           flex-direction: column;
-          cursor: pointer;
-          transition: transform 180ms cubic-bezier(0.22, 1.25, 0.36, 1), border-color 180ms ease;
-          animation: ttPsIn 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
-          animation-delay: var(--ps-delay, 0ms);
+          gap: 11px;
         }
-        .tt-prod-card:active { transform: scale(0.97); border-color: #00DC7D; }
-        .tt-prod-media {
-          position: relative;
-          aspect-ratio: 4 / 3;
-          background: #FFFFFF;
+        .tt-ps-string-list {
           display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 10px;
-          overflow: hidden;
+          flex-direction: column;
+          gap: 7px;
         }
-        .tt-prod-img { width: 100%; height: 100%; object-fit: contain; }
-        .tt-prod-tag {
-          position: absolute;
-          left: 7px;
-          top: 7px;
-          padding: 3px 7px;
-          border-radius: 7px;
-          background: rgba(24, 6, 43, 0.88);
-          color: #FAF9F5;
-          font-size: 0.54rem;
-          font-weight: 900;
-          letter-spacing: 0.05em;
+        .tt-ps-altitude-tip {
+          font-size: 0.71rem;
+          color: var(--tt-text-muted);
+          line-height: 1.38;
         }
-        .tt-prod-stock-dot {
-          position: absolute;
-          right: 7px;
-          bottom: 7px;
-          padding: 2px 7px;
-          border-radius: 999px;
-          background: #00DC7D;
-          color: #10021E;
-          font-size: 0.56rem;
-          font-weight: 900;
+        .tt-ps-pay-toggle {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 8px;
         }
-        .tt-prod-body { padding: 10px; display: flex; flex-direction: column; gap: 5px; flex: 1; }
-        .tt-prod-brand { font-size: 0.62rem; font-weight: 800; color: var(--tt-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .tt-prod-name { margin: 0; font-size: 0.8rem; font-weight: 800; line-height: 1.22; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.4em; }
-        .tt-prod-price-block { display: flex; flex-direction: column; gap: 3px; margin-top: 2px; }
-        .tt-prod-price-row { display: flex; align-items: baseline; gap: 5px; flex-wrap: wrap; }
-        .tt-prod-strike { font-size: 0.68rem; text-decoration: line-through; color: var(--tt-text-muted); }
-        .tt-prod-price { font-family: var(--tt-font-display); font-size: 1.16rem; line-height: 1; color: var(--tt-text); }
-        .tt-prod-vip-chip { padding: 2px 6px; border-radius: 6px; background: rgba(229, 193, 108, 0.16); color: #E5C16C; font-size: 0.58rem; font-weight: 900; }
-        .tt-ps-root.is-light .tt-prod-vip-chip { color: #8A5D10; }
-        .tt-prod-gems-line { font-size: 0.66rem; color: var(--tt-emerald-text); font-weight: 700; }
-        .tt-prod-code-hint { font-size: 0.64rem; font-weight: 800; color: var(--tt-text-muted); }
-        .tt-prod-foot { margin-top: auto; padding-top: 6px; border-top: 1px solid var(--tt-border); font-size: 0.66rem; font-weight: 800; color: var(--tt-emerald-text); }
-
-        /* SUB-PANTALLA DETALLE DE PRODUCTO */
-        .tt-detail-back-btn { padding: 6px 12px; border-radius: 999px; background: var(--tt-surface-2); border: 1px solid var(--tt-border); color: var(--tt-text); font-size: 0.74rem; font-weight: 800; }
-        .tt-detail-hero { display: grid; grid-template-columns: 1fr; gap: 12px; }
-        @media (min-width: 600px) {
-          .tt-detail-hero { grid-template-columns: 0.9fr 1.1fr; align-items: center; }
+        .tt-ps-warn-inline {
+          font-size: 0.72rem;
+          font-weight: 800;
+          color: #F59E0B;
         }
-        .tt-detail-media { background: #FFFFFF; border-radius: 18px; padding: 14px; aspect-ratio: 4 / 3; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-        .tt-detail-img { width: 100%; height: 100%; object-fit: contain; }
-        .tt-detail-summary { display: flex; flex-direction: column; gap: 6px; }
-        .tt-detail-summary h3 { margin: 0; font-family: var(--tt-font-display); font-size: 1.42rem; line-height: 1.06; }
-        .tt-detail-desc { margin: 0; font-size: 0.78rem; line-height: 1.44; color: var(--tt-text-muted); }
-
-        .tt-detail-compare-grid { margin-top: 4px; display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 7px; text-align: center; }
-        .tt-detail-compare-grid > div { padding: 9px 6px; border-radius: 12px; background: var(--tt-surface-2); border: 1px solid var(--tt-border); }
-        .tt-detail-compare-grid span { display: block; font-size: 0.62rem; color: var(--tt-text-muted); }
-        .tt-detail-compare-grid strong { font-size: 0.9rem; font-weight: 900; }
-        .tt-detail-compare-grid .is-vip strong { color: #E5C16C; }
-        .tt-ps-root.is-light .tt-detail-compare-grid .is-vip strong { color: #8A5D10; }
-        .tt-detail-compare-grid .is-gems strong { color: var(--tt-emerald-text); }
-
-        .tt-detail-box { padding: 13px; border-radius: 16px; background: var(--tt-surface-2); border: 1px solid var(--tt-border); display: flex; flex-direction: column; gap: 8px; }
-        .tt-variants-row { display: flex; flex-wrap: wrap; gap: 7px; }
-        .tt-var-pill { min-height: 36px; padding: 0 12px; border-radius: 11px; background: var(--tt-surface); border: 1.5px solid var(--tt-border); color: var(--tt-text); font-size: 0.75rem; font-weight: 800; }
-        .tt-var-pill.is-on { border-color: #00DC7D; background: rgba(0, 220, 125, 0.14); color: var(--tt-emerald-text); }
-
-        .tt-str-options { display: flex; flex-direction: column; gap: 6px; }
-        .tt-str-pill { width: 100%; padding: 9px 11px; border-radius: 12px; background: var(--tt-surface); border: 1.5px solid var(--tt-border); color: var(--tt-text); display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 0.76rem; font-weight: 700; text-align: left; }
-        .tt-str-pill.is-on { border-color: #00DC7D; background: rgba(0, 220, 125, 0.12); }
-
-        .tt-specs-grid { display: grid; grid-template-columns: 1fr; gap: 7px; }
-        @media (min-width: 560px) {
-          .tt-specs-grid { grid-template-columns: 1fr 1fr; }
+        .tt-ps-root.is-light .tt-ps-warn-inline {
+          color: #B45309;
         }
-        .tt-spec-row { padding: 8px 10px; border-radius: 11px; background: var(--tt-surface); }
-        .tt-spec-row span { display: block; font-size: 0.64rem; color: var(--tt-text-muted); }
-        .tt-spec-row strong { font-size: 0.77rem; }
-
-        .tt-sponsor-cta-box, .tt-detail-methods { display: flex; flex-direction: column; gap: 9px; }
-        .tt-promo-code-bar, .tt-ps-pay-bar {
+        .tt-ps-payment-card {
           display: flex;
           align-items: center;
           justify-content: space-between;
           gap: 10px;
           padding: 11px 13px;
           border-radius: 14px;
-          background: #1A0530;
-          color: #FAF9F5;
-          border: 1px solid rgba(0, 220, 125, 0.38);
+          background: var(--tt-surface-2);
+          border: 1px solid var(--tt-border);
         }
-        .tt-promo-code-bar small, .tt-ps-pay-bar small { display: block; font-size: 0.6rem; opacity: 0.76; letter-spacing: 0.06em; }
-        .tt-promo-code-bar strong, .tt-ps-pay-bar strong { font-size: 0.96rem; color: #00DC7D; letter-spacing: 0.05em; }
-        .tt-ps-copy-btn { padding: 6px 12px; border-radius: 999px; background: #00DC7D; color: #10021E; font-size: 0.72rem; font-weight: 900; }
+        .tt-ps-payment-card span {
+          display: block;
+          font-size: 0.67rem;
+          font-weight: 800;
+          color: var(--tt-text-muted);
+        }
+        .tt-ps-payment-card strong {
+          display: block;
+          font-size: 0.96rem;
+          color: var(--tt-text);
+        }
+        .tt-ps-payment-card small {
+          font-size: 0.69rem;
+          color: var(--tt-text-muted);
+        }
 
-        .tt-method-tile {
-          width: 100%;
+        /* ==================================================================
+           BÓVEDA DE GEMAS
+           ================================================================== */
+        .tt-ps-vault-wrap {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+        .tt-ps-vault-hero {
+          padding: 16px;
+          border-radius: 20px;
+          background: linear-gradient(145deg, #2A0C4B 0%, #150327 100%);
+          border: 1.5px solid rgba(0, 220, 125, 0.42);
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.18),
+            0 5px 0 rgba(9, 2, 18, 0.8),
+            0 12px 24px rgba(0, 0, 0, 0.3);
+          color: #FAF9F5;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+        .tt-ps-vault-balance span {
+          display: block;
+          font-size: 0.66rem;
+          font-weight: 900;
+          letter-spacing: 0.09em;
+          color: #00DC7D;
+        }
+        .tt-ps-vault-balance strong {
+          display: block;
+          font-family: var(--tt-font-display);
+          font-size: 2rem;
+          font-weight: 900;
+          line-height: 1.08;
+          margin: 3px 0;
+          color: #FAF9F5;
+        }
+        .tt-ps-vault-balance small {
+          font-size: 0.72rem;
+          color: rgba(250, 249, 245, 0.76);
+        }
+        .tt-ps-vault-cap {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+        .tt-ps-vault-cap-head {
+          display: flex;
+          justify-content: space-between;
+          font-size: 0.74rem;
+          color: rgba(250, 249, 245, 0.88);
+        }
+        .tt-ps-vault-bar {
+          height: 9px;
+          border-radius: 999px;
+          background: rgba(255, 255, 255, 0.14);
+          overflow: hidden;
+        }
+        .tt-ps-vault-bar-fill {
+          height: 100%;
+          border-radius: 999px;
+          background: linear-gradient(90deg, #00DC7D 0%, #E5C16C 100%);
+        }
+
+        .tt-ps-section-block {
+          display: flex;
+          flex-direction: column;
+          gap: 9px;
+        }
+        .tt-ps-section-head {
+          display: flex;
+          align-items: baseline;
+          justify-content: space-between;
+          gap: 8px;
+        }
+        .tt-ps-section-head h4 {
+          margin: 0;
+          font-size: 0.92rem;
+          font-weight: 900;
+          color: var(--tt-text);
+        }
+        .tt-ps-section-head span {
+          font-size: 0.71rem;
+          font-weight: 700;
+          color: var(--tt-text-muted);
+        }
+        .tt-ps-missions-list {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+        .tt-ps-mission-card {
+          display: flex;
+          align-items: center;
+          gap: 10px;
           padding: 11px 12px;
           border-radius: 15px;
           background: var(--tt-surface-2);
-          border: 1.5px solid var(--tt-border);
+          border: 1px solid var(--tt-border);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 3px 0 rgba(0, 0, 0, 0.16);
+        }
+        .tt-ps-root.is-light .tt-ps-mission-card {
+          background: #FFFFFF;
+          border-color: rgba(30, 7, 52, 0.14);
+          box-shadow: inset 0 1px 0 #FFFFFF, 0 3px 0 #DAD2EA;
+        }
+        .tt-ps-mission-copy {
+          flex: 1;
+          min-width: 0;
+        }
+        .tt-ps-mission-copy strong {
+          display: block;
+          font-size: 0.8rem;
           color: var(--tt-text);
+        }
+        .tt-ps-mission-copy p {
+          margin: 2px 0 0;
+          font-size: 0.7rem;
+          line-height: 1.35;
+          color: var(--tt-text-muted);
+        }
+        .tt-ps-mission-reward {
+          text-align: right;
+          flex-shrink: 0;
+        }
+        .tt-ps-mission-reward strong {
+          display: block;
+          font-size: 0.78rem;
+          font-weight: 900;
+          color: var(--tt-emerald-text);
+        }
+        .tt-ps-mission-reward small {
+          display: block;
+          font-size: 0.64rem;
+          color: #E5C16C;
+          font-weight: 800;
+        }
+        .tt-ps-root.is-light .tt-ps-mission-reward small {
+          color: #8A5D10;
+        }
+
+        .tt-ps-ledger-list {
+          display: flex;
+          flex-direction: column;
+          gap: 7px;
+        }
+        .tt-ps-ledger-row {
           display: flex;
           align-items: center;
           justify-content: space-between;
           gap: 10px;
-          text-align: left;
+          padding: 10px 12px;
+          border-radius: 13px;
+          background: var(--tt-surface-2);
+          border: 1px solid var(--tt-border);
         }
-        .tt-method-tile.is-on { border-color: #00DC7D; background: rgba(0, 220, 125, 0.12); }
-        .tt-method-tile.is-low { opacity: 0.68; }
-        .tt-method-tile strong { display: block; font-size: 0.8rem; }
-        .tt-method-tile small { display: block; font-size: 0.7rem; color: var(--tt-text-muted); margin-top: 2px; }
-        .tt-method-val { font-family: var(--tt-font-display); font-size: 1.15rem; white-space: nowrap; }
-        .tt-method-val.is-emerald { color: var(--tt-emerald-text); }
+        .tt-ps-root.is-light .tt-ps-ledger-row {
+          background: #FFFFFF;
+          border-color: rgba(30, 7, 52, 0.12);
+        }
+        .tt-ps-ledger-row strong {
+          display: block;
+          font-size: 0.79rem;
+          color: var(--tt-text);
+        }
+        .tt-ps-ledger-row small {
+          display: block;
+          font-size: 0.69rem;
+          color: var(--tt-text-muted);
+        }
+        .tt-ps-ledger-amt {
+          font-size: 0.82rem;
+          font-weight: 900;
+          white-space: nowrap;
+        }
+        .tt-ps-ledger-amt.is-credit {
+          color: var(--tt-emerald-text);
+        }
+        .tt-ps-ledger-amt.is-debit {
+          color: #EF4444;
+        }
 
-        /* GESTOR ADMIN INTEGRADO */
-        .tt-admin-form-card { padding: 14px; border-radius: 18px; background: var(--tt-surface-2); border: 1px solid var(--tt-border); display: flex; flex-direction: column; gap: 10px; }
-        .tt-admin-channel-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-        .tt-adm-ch-btn { min-height: 36px; border-radius: 10px; background: var(--tt-surface); border: 1.5px solid var(--tt-border); color: var(--tt-text-muted); font-size: 0.7rem; font-weight: 800; }
-        .tt-adm-ch-btn.is-on { border-color: #00DC7D; background: rgba(0, 220, 125, 0.14); color: var(--tt-emerald-text); }
-        .tt-adm-photo-row { display: flex; gap: 10px; align-items: center; }
-        .tt-adm-thumb { width: 70px; height: 70px; border-radius: 14px; background: #FFFFFF; padding: 6px; flex-shrink: 0; overflow: hidden; }
-        .tt-adm-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-        .tt-adm-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-        .tt-ps-input { width: 100%; min-height: 42px; padding: 8px 12px; border-radius: 12px; background: var(--tt-surface); border: 1px solid var(--tt-border-medium); color: var(--tt-text); font-size: 16px; font-family: inherit; }
-
-        .tt-adm-list { display: flex; flex-direction: column; gap: 7px; }
-        .tt-adm-row { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 14px; background: var(--tt-surface-2); border: 1px solid var(--tt-border); }
-        .tt-adm-row-img { width: 42px; height: 42px; border-radius: 10px; background: #FFFFFF; padding: 4px; flex-shrink: 0; }
-        .tt-adm-row strong { display: block; font-size: 0.82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .tt-adm-row small { display: block; font-size: 0.69rem; color: var(--tt-text-muted); }
-        .tt-adm-edit-btn { padding: 5px 10px; border-radius: 999px; background: var(--tt-surface); border: 1px solid var(--tt-border); color: var(--tt-text); font-size: 0.7rem; font-weight: 800; }
-        .tt-adm-del-btn { width: 28px; height: 28px; border-radius: 50%; background: var(--tt-danger-soft); color: #F87171; font-size: 0.74rem; }
-
-        html[data-tier='lite'] .tt-prod-card { animation: none !important; }
+        /* ==================================================================
+           GESTOR ADMIN DEL PRO SHOP
+           ================================================================== */
+        .tt-ps-admin-wrap {
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+        }
+        .tt-ps-admin-form {
+          padding: 14px;
+          border-radius: 18px;
+          background: var(--tt-surface-2);
+          border: 1.5px solid var(--tt-border);
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+        .tt-ps-root.is-light .tt-ps-admin-form {
+          background: #F6F3FC;
+          border-color: rgba(30, 7, 52, 0.16);
+        }
+        .tt-ps-admin-section-title strong {
+          display: block;
+          font-size: 0.9rem;
+          color: var(--tt-text);
+        }
+        .tt-ps-admin-section-title span {
+          font-size: 0.72rem;
+          color: var(--tt-text-muted);
+        }
+        .tt-ps-channel-pills {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 7px;
+        }
+        .tt-ps-admin-grid-2 {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 10px;
+        }
+        .tt-ps-admin-grid-3 {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 10px;
+        }
+        @media (min-width: 560px) {
+          .tt-ps-admin-grid-2 {
+            grid-template-columns: 1fr 1fr;
+          }
+          .tt-ps-admin-grid-3 {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+          }
+        }
+        .tt-ps-admin-sponsor-box {
+          padding: 11px;
+          border-radius: 14px;
+          background: rgba(229, 193, 108, 0.1);
+          border: 1px solid rgba(229, 193, 108, 0.42);
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+        .tt-ps-admin-note {
+          font-size: 0.7rem;
+          line-height: 1.38;
+          color: var(--tt-text-muted);
+        }
+        .tt-ps-admin-list {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+        .tt-ps-admin-list h5 {
+          margin: 0;
+          font-size: 0.85rem;
+          color: var(--tt-text);
+        }
+        .tt-ps-admin-item {
+          display: flex;
+          align-items: center;
+          gap: 9px;
+          padding: 9px 10px;
+          border-radius: 14px;
+          background: var(--tt-surface-2);
+          border: 1px solid var(--tt-border);
+        }
+        .tt-ps-admin-item strong {
+          display: block;
+          font-size: 0.8rem;
+          color: var(--tt-text);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .tt-ps-admin-item small {
+          display: block;
+          font-size: 0.69rem;
+          color: var(--tt-text-muted);
+        }
       `}</style>
     </ModalPortal>
   );
