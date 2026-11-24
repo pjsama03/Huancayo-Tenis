@@ -108,7 +108,7 @@ export const LEGAL_EDITABLE_CONFIG = {
       body: 'Conforme a la Ley N° 29733 de Protección de Datos Personales del Perú, puedes ejercer en cualquier momento tus Derechos ARCO solicitando el acceso, actualización, rectificación o eliminación definitiva de tus datos personales (o los de tu menor tutelado) de la base de datos de TOTAL TENIS a través de nuestros canales oficiales de soporte.',
     },
   ],
-
+};
 const COMPLAINTS_STORAGE_KEY = 'tt_indecopi_complaints_v1';
 
 /* ==========================================================================
