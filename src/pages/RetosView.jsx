@@ -42,7 +42,7 @@ import { buildWhatsappLink, getEffectiveContactPhone } from '../utils/cloudServi
 
 /* ==========================================================================
    VISTA PRINCIPAL: RetosView
-   (CARRUSEL INSTANTÁNEO + RETO EN 1 TOQUE + GEMAS HASTA 6-0, 6-0 + TUTELA)
+   (ACABADO 3D TÁCTIL + LIQUID GLASS + RETO EN 1 TOQUE + GEMAS HASTA 6-0, 6-0)
    ========================================================================== */
 export default function RetosView({
   players = [],
@@ -62,6 +62,9 @@ export default function RetosView({
   onGoToTournaments,
   onNotify,
 }) {
+  const isLight = theme === 'light';
+  const modeClass = isLight ? 'is-light' : 'is-dark';
+
   const [subTab, setSubTab] = useState('cartelera'); // 'cartelera' | 'mis-retos' | 'lanzar'
   const [heroSlideIdx, setHeroSlideIdx] = useState(0);
 
@@ -671,20 +674,23 @@ export default function RetosView({
     players.length,
   ]);
 
-  const subTabIdx = subTab === 'cartelera' ? 0 : subTab === 'mis-retos' ? 1 : 2;
-
   const victoryGemsRange = useMemo(
     () => getMatchVictoryGemsRange(Boolean(currentUser?.isVip)),
     [currentUser?.isVip]
   );
 
-  return (
+  const activeMyChallengesCount = useMemo(
+    () => myChallenges.filter((c) => c.status !== 'FINISHED').length,
+    [myChallenges]
+  );
+
+return (
     <section
-      className={`tt-retos-view ${theme === 'light' ? 'is-light' : 'is-dark'}`}
+      className={`tt-retos-view ${modeClass}`}
       aria-label="Retos y Cartelera Oficial TOTAL TENIS"
     >
       {/* ====================================================================
-          1. CARRUSEL HERO INSTANTÁNEO (3 FOTOS MONTADAS CON PRELOAD + CROSSFADE)
+          1. CARRUSEL HERO 3D INSTANTÁNEO (3 FOTOS PRECARGADAS + CROSSFADE)
           ==================================================================== */}
       <div className="tt-hero-stage">
         {heroSlides.map((slide, idx) => (
@@ -713,7 +719,7 @@ export default function RetosView({
           <div className="tt-hero-footer-row">
             <button
               type="button"
-              className="tt-hero-cta-pill tt-glass-press"
+              className="tt-hero-cta-3d"
               onClick={activeSlide.onCta}
             >
               <span className="tt-cta-emerald-dot" />
@@ -739,7 +745,7 @@ export default function RetosView({
                 <button
                   type="button"
                   aria-label="Anterior"
-                  className="tt-circle-nav-btn tt-glass-press"
+                  className="tt-circle-nav-btn"
                   onClick={() => {
                     triggerHaptic('light');
                     setHeroSlideIdx((prev) => (prev - 1 + heroSlides.length) % heroSlides.length);
@@ -750,7 +756,7 @@ export default function RetosView({
                 <button
                   type="button"
                   aria-label="Siguiente"
-                  className="tt-circle-nav-btn tt-glass-press"
+                  className="tt-circle-nav-btn"
                   onClick={() => {
                     triggerHaptic('light');
                     setHeroSlideIdx((prev) => (prev + 1) % heroSlides.length);
@@ -765,27 +771,27 @@ export default function RetosView({
       </div>
 
       {/* ====================================================================
-          2. ALERTA PRIORITARIA DE RETOS ENTRANTES PENDIENTES
+          2. ALERTA PRIORITARIA 3D DE RETOS ENTRANTES PENDIENTES
           ==================================================================== */}
       {incomingPending.length > 0 && (
         <div className="tt-incoming-alert">
           <div className="tt-incoming-alert-head">
-            <IconBadge name="challenge" variant="emerald" size={38} />
+            <IconBadge name="challenge" variant="emerald" size={40} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <span className="tt-incoming-kicker">
                 TIENES {incomingPending.length}{' '}
                 {incomingPending.length === 1 ? 'DESAFÍO PENDIENTE' : 'DESAFÍOS PENDIENTES'}
               </span>
-              <strong style={{ display: 'block', fontSize: '0.94rem' }}>
+              <strong style={{ display: 'block', fontSize: '0.95rem', color: '#FAF9F5' }}>
                 {playersMap[incomingPending[0].playerAId]?.name || 'Un jugador'} te retó en{' '}
                 {incomingPending[0].clubName}
               </strong>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+          <div style={{ display: 'flex', gap: 9, marginTop: 11 }}>
             <button
               type="button"
-              className="tt-btn tt-btn-primary tt-btn-sm tt-glass-press"
+              className="tt-btn tt-btn-primary tt-btn-sm"
               style={{ flex: 1 }}
               onClick={() => {
                 triggerHaptic('success');
@@ -796,7 +802,7 @@ export default function RetosView({
             </button>
             <button
               type="button"
-              className="tt-btn tt-btn-secondary tt-btn-sm tt-glass-press"
+              className="tt-rt-hero-ghost-btn"
               onClick={() => {
                 triggerHaptic('light');
                 setSubTab('mis-retos');
@@ -809,20 +815,14 @@ export default function RetosView({
       )}
 
       {/* ====================================================================
-          3. SELECTOR DE 3 SUB-VISTAS CON SLIDER ELÁSTICO LIQUID GLASS
+          3. DOCK 3D TÁCTIL DE 3 SUB-VISTAS (CARTELERA | TUS DESAFÍOS | LANZAR RETO)
           ==================================================================== */}
-      <div className="tt-subtabs-bar" role="tablist" aria-label="Secciones de Retos">
-        <span
-          className="tt-subtab-slider"
-          aria-hidden="true"
-          style={{ transform: `translateX(${subTabIdx * 100}%)` }}
-        />
-
+      <div className="tt-rt-3d-dock" role="tablist" aria-label="Secciones de Retos">
         <button
           type="button"
           role="tab"
           aria-selected={subTab === 'cartelera'}
-          className={`tt-subtab-btn ${subTab === 'cartelera' ? 'is-active' : ''}`}
+          className={`tt-rt-3d-tab ${subTab === 'cartelera' ? 'is-active' : ''}`}
           onClick={() => {
             triggerHaptic('light');
             setSubTab('cartelera');
@@ -838,17 +838,15 @@ export default function RetosView({
           type="button"
           role="tab"
           aria-selected={subTab === 'mis-retos'}
-          className={`tt-subtab-btn ${subTab === 'mis-retos' ? 'is-active' : ''}`}
+          className={`tt-rt-3d-tab ${subTab === 'mis-retos' ? 'is-active' : ''}`}
           onClick={() => {
             triggerHaptic('light');
             setSubTab('mis-retos');
           }}
         >
           <span>Tus Desafíos</span>
-          {myChallenges.filter((c) => c.status !== 'FINISHED').length > 0 && (
-            <span className="tt-subtab-chip">
-              {myChallenges.filter((c) => c.status !== 'FINISHED').length}
-            </span>
+          {activeMyChallengesCount > 0 && (
+            <span className="tt-subtab-chip">{activeMyChallengesCount}</span>
           )}
         </button>
 
@@ -856,7 +854,7 @@ export default function RetosView({
           type="button"
           role="tab"
           aria-selected={subTab === 'lanzar'}
-          className={`tt-subtab-btn is-cta ${subTab === 'lanzar' ? 'is-active' : ''}`}
+          className={`tt-rt-3d-tab is-cta ${subTab === 'lanzar' ? 'is-active' : ''}`}
           onClick={() => {
             triggerHaptic('light');
             setSubTab('lanzar');
@@ -868,7 +866,7 @@ export default function RetosView({
       </div>
 
       {/* ====================================================================
-          4A. CARTELERA PÚBLICA
+          4A. CARTELERA PÚBLICA (FILTROS 3D + TARJETAS PÓSTER VS CON RELIEVE)
           ==================================================================== */}
       {subTab === 'cartelera' && (
         <div key="panel-cartelera" className="tt-retos-panel tt-rt-panel-in">
@@ -882,13 +880,14 @@ export default function RetosView({
               <button
                 key={f.id}
                 type="button"
-                className={`tt-filter-chip tt-glass-press ${boardFilter === f.id ? 'is-active' : ''}`}
+                className={`tt-rt-3d-chip ${boardFilter === f.id ? 'is-active' : ''}`}
                 onClick={() => {
                   triggerHaptic('light');
                   setBoardFilter(f.id);
                 }}
               >
-                {f.label}
+                {f.id === 'IN_PLAY' && <span className="tt-chip-live-dot" aria-hidden="true" />}
+                <span>{f.label}</span>
               </button>
             ))}
           </div>
@@ -989,17 +988,18 @@ export default function RetosView({
       )}
 
       {/* ====================================================================
-          4C. LANZAR RETO (RADAR CON VENTANA ANTI-ESCASEZ + PROTECCIÓN TUTELA)
+          4C. LANZAR RETO (RADAR 3D CON ANTI-ESCASEZ + PROTECCIÓN TUTELA)
           ==================================================================== */}
       {subTab === 'lanzar' && (
         <div key="panel-lanzar" className="tt-retos-panel tt-rt-panel-in">
           {currentUser?.isTutorOnly && (
             <div className="tt-tutor-only-card">
-              <TTIcon name="shield" size={18} style={{ color: '#7DD3FC', flexShrink: 0 }} />
+              <TTIcon name="shield" size={18} style={{ color: 'var(--tt-sky-text, #7DD3FC)', flexShrink: 0 }} />
               <div>
                 <strong>Cuenta Solo Padre / Tutor</strong>
                 <p>
-                  Para retar a nombre de tu hijo/a (-18), ve a la pestaña <b>Perfil</b> y toca <b>Entrar como...</b> en su subcuenta tutelada.
+                  Para retar a nombre de tu hijo/a (-18), ve a la pestaña <b>Perfil</b> y toca{' '}
+                  <b>Entrar como...</b> en su subcuenta tutelada.
                 </p>
               </div>
             </div>
@@ -1007,11 +1007,13 @@ export default function RetosView({
 
           {adaptiveRadar.expanded && currentUser && !currentUser.isTutorOnly && (
             <div className="tt-scarcity-banner">
-              <TTIcon name="shield" size={17} style={{ color: '#00DC7D', flexShrink: 0 }} />
+              <TTIcon name="shield" size={18} style={{ color: 'var(--tt-emerald-text)', flexShrink: 0 }} />
               <div>
                 <strong>Ventana Anti-Escasez activa (±1,800 pts)</strong>
                 <p>
-                  Como hay menos de 6 rivales en tu rango base (±1,200), ampliamos tus retos oficiales a los 8 rivales más cercanos y tu cuota mensual baja a <b>{adaptiveRadar.monthlyQuota} partidos/mes</b>.
+                  Como hay menos de 6 rivales en tu rango base (±1,200), ampliamos tus retos
+                  oficiales a los 8 rivales más cercanos y tu cuota mensual baja a{' '}
+                  <b>{adaptiveRadar.monthlyQuota} partidos/mes</b>.
                 </p>
               </div>
             </div>
@@ -1019,7 +1021,7 @@ export default function RetosView({
 
           <div className="tt-radar-controls">
             <div className="tt-search-box">
-              <TTIcon name="search" size={17} style={{ opacity: 0.65 }} />
+              <TTIcon name="search" size={17} style={{ opacity: 0.7 }} />
               <input
                 type="search"
                 value={rivalSearch}
@@ -1032,7 +1034,7 @@ export default function RetosView({
             <div className="tt-filter-pills-row">
               <button
                 type="button"
-                className={`tt-filter-chip tt-glass-press ${onlyInRange ? 'is-active' : ''}`}
+                className={`tt-rt-3d-chip ${onlyInRange ? 'is-active' : ''}`}
                 onClick={() => {
                   triggerHaptic('light');
                   setOnlyInRange((v) => !v);
@@ -1047,7 +1049,7 @@ export default function RetosView({
 
               <button
                 type="button"
-                className={`tt-filter-chip tt-glass-press ${categoryFilter === 'ALL' ? 'is-active' : ''}`}
+                className={`tt-rt-3d-chip ${categoryFilter === 'ALL' ? 'is-active' : ''}`}
                 onClick={() => {
                   triggerHaptic('light');
                   setCategoryFilter('ALL');
@@ -1060,7 +1062,7 @@ export default function RetosView({
                 <button
                   key={cat.id}
                   type="button"
-                  className={`tt-filter-chip tt-glass-press ${categoryFilter === cat.id ? 'is-active' : ''}`}
+                  className={`tt-rt-3d-chip ${categoryFilter === cat.id ? 'is-active' : ''}`}
                   onClick={() => {
                     triggerHaptic('light');
                     setCategoryFilter(cat.id);
@@ -1150,7 +1152,9 @@ export default function RetosView({
                       ) : !inOfficialRange ? (
                         <div className="tt-rival-forecast-line">
                           <span>
-                            Fuera de tu rango oficial (±{adaptiveRadar.effectiveWindow.toLocaleString('es-PE')} pts) · Disponible como amistoso
+                            Fuera de tu rango oficial (±
+                            {adaptiveRadar.effectiveWindow.toLocaleString('es-PE')} pts) · Disponible
+                            como amistoso
                           </span>
                         </div>
                       ) : null}
@@ -1160,7 +1164,7 @@ export default function RetosView({
                       {inOfficialRange ? (
                         <button
                           type="button"
-                          className="tt-btn tt-btn-primary tt-btn-sm tt-glass-press"
+                          className="tt-btn tt-btn-primary tt-btn-sm"
                           onClick={() => {
                             triggerHaptic('medium');
                             openCreateChallengeModal(player, false);
@@ -1171,7 +1175,7 @@ export default function RetosView({
                       ) : (
                         <button
                           type="button"
-                          className="tt-btn tt-btn-ghost tt-btn-sm tt-glass-press"
+                          className="tt-btn tt-btn-ghost tt-btn-sm"
                           onClick={() => {
                             triggerHaptic('light');
                             openCreateChallengeModal(player, true);
@@ -1190,28 +1194,31 @@ export default function RetosView({
       )}
 
       {/* ====================================================================
-          MODAL 1: PACTAR NUEVO DESAFÍO (ELO + DESGLOSE DE GEMAS HASTA 6-0, 6-0)
+          MODAL 1: PACTAR NUEVO DESAFÍO (ELO + GEMAS HASTA 6-0, 6-0 + MODO CLARO)
           ==================================================================== */}
       <ModalPortal
         isOpen={Boolean(challengeTarget)}
         onClose={() => setChallengeTarget(null)}
         title="Pactar Nuevo Desafío"
         subtitle={
-          challengeTarget
-            ? `${currentUser?.name || 'Tú'} vs. ${challengeTarget.name}`
-            : ''
+          challengeTarget ? `${currentUser?.name || 'Tú'} vs. ${challengeTarget.name}` : ''
         }
         icon={<IconBadge name="challenge" variant="emerald" size={38} />}
       >
         {challengeTarget && (
-          <form onSubmit={handleSubmitNewChallenge} className="tt-form-stack">
+          <form onSubmit={handleSubmitNewChallenge} className={`tt-form-stack ${modeClass}`}>
             {challengeTarget.isTutelado && (
               <div className="tt-tutor-only-card">
-                <TTIcon name="shield" size={17} style={{ color: '#7DD3FC', flexShrink: 0 }} />
+                <TTIcon
+                  name="shield"
+                  size={17}
+                  style={{ color: 'var(--tt-sky-text, #7DD3FC)', flexShrink: 0 }}
+                />
                 <div>
                   <strong>Cuenta Juvenil Tutelada (-18)</strong>
                   <p>
-                    Este reto y toda coordinación por WhatsApp se enviarán directamente al padre/madre verificado ({challengeTarget.tutorName || 'Tutor'}).
+                    Este reto y toda coordinación por WhatsApp se enviarán directamente al
+                    padre/madre verificado ({challengeTarget.tutorName || 'Tutor'}).
                   </p>
                 </div>
               </div>
@@ -1243,7 +1250,8 @@ export default function RetosView({
                 <div className="tt-gems-forecast-strip">
                   <div className="tt-gems-forecast-top">
                     <span>
-                      Gemas por victoria {currentUser?.isVip ? '· Socio VIP (×2.5)' : '· Plan Estándar'}
+                      Gemas por victoria{' '}
+                      {currentUser?.isVip ? '· Socio VIP (×2.5)' : '· Plan Estándar'}
                     </span>
                     <strong>
                       +{victoryGemsRange.min} a +{victoryGemsRange.max} 💎
@@ -1267,7 +1275,8 @@ export default function RetosView({
 
                   {!currentUser?.isVip && (
                     <small className="tt-gems-vip-upsell">
-                      Máximo posible con <b>6-0, 6-0</b>: <b>+{victoryGemsRange.standardMax} 💎</b> (Socio VIP gana hasta <b>+{victoryGemsRange.vipMax} 💎</b>).
+                      Máximo posible con <b>6-0, 6-0</b>: <b>+{victoryGemsRange.standardMax} 💎</b>{' '}
+                      (Socio VIP gana hasta <b>+{victoryGemsRange.vipMax} 💎</b>).
                     </small>
                   )}
                 </div>
@@ -1284,7 +1293,7 @@ export default function RetosView({
                       key={m}
                       type="button"
                       disabled={blocked}
-                      className={`tt-choice-pill tt-glass-press ${formMode === m ? 'is-selected' : ''}`}
+                      className={`tt-choice-pill ${formMode === m ? 'is-selected' : ''}`}
                       onClick={() => {
                         triggerHaptic('light');
                         setFormMode(m);
@@ -1306,7 +1315,7 @@ export default function RetosView({
                     <button
                       key={club.id}
                       type="button"
-                      className={`tt-venue-option tt-glass-press ${selected ? 'is-selected' : ''}`}
+                      className={`tt-venue-option ${selected ? 'is-selected' : ''}`}
                       onClick={() => {
                         triggerHaptic('light');
                         setFormClubId(club.id);
@@ -1331,7 +1340,7 @@ export default function RetosView({
 
                 <button
                   type="button"
-                  className={`tt-venue-option is-custom tt-glass-press ${
+                  className={`tt-venue-option is-custom ${
                     formClubId === 'custom' ? 'is-selected' : ''
                   }`}
                   onClick={() => {
@@ -1393,7 +1402,7 @@ export default function RetosView({
                 <button
                   key={slot}
                   type="button"
-                  className={`tt-slot-chip tt-glass-press ${formTime === slot ? 'is-selected' : ''}`}
+                  className={`tt-slot-chip ${formTime === slot ? 'is-selected' : ''}`}
                   onClick={() => {
                     triggerHaptic('light');
                     setFormTime(slot);
@@ -1411,7 +1420,7 @@ export default function RetosView({
                   <button
                     key={opt}
                     type="button"
-                    className={`tt-choice-pill tt-glass-press ${formBalls === opt ? 'is-selected' : ''}`}
+                    className={`tt-choice-pill ${formBalls === opt ? 'is-selected' : ''}`}
                     onClick={() => {
                       triggerHaptic('light');
                       setFormBalls(opt);
@@ -1426,12 +1435,12 @@ export default function RetosView({
             <div style={{ display: 'flex', gap: 10, paddingTop: 6 }}>
               <button
                 type="button"
-                className="tt-btn tt-btn-ghost tt-glass-press"
+                className="tt-btn tt-btn-ghost"
                 onClick={() => setChallengeTarget(null)}
               >
                 Cancelar
               </button>
-              <button type="submit" className="tt-btn tt-btn-primary tt-glass-press" style={{ flex: 1 }}>
+              <button type="submit" className="tt-btn tt-btn-primary" style={{ flex: 1 }}>
                 Enviar Desafío
               </button>
             </div>
@@ -1440,7 +1449,7 @@ export default function RetosView({
       </ModalPortal>
 
       {/* ====================================================================
-          MODAL 2: SUBIR RESULTADO DIRECTO (JUGADORES) | EN VIVO (ÁRBITRO)
+          MODAL 2: SUBIR RESULTADO DIRECTO (JUGADORES) | EN VIVO (ÁRBITRO 3D)
           ==================================================================== */}
       <ModalPortal
         isOpen={Boolean(activeScoreboardChallenge && activeSbData)}
@@ -1458,14 +1467,14 @@ export default function RetosView({
         isWide
       >
         {activeScoreboardChallenge && activeSbData && (
-          <div className="tt-mc-container">
+          <div className={`tt-mc-container ${modeClass}`}>
             {activeSbData.perms.canConfirmOfficial && (
-              <div className="tt-score-mode-switch" role="tablist">
+              <div className="tt-rt-3d-dock is-two" role="tablist">
                 <button
                   type="button"
                   role="tab"
                   aria-selected={scoreModalMode === 'direct'}
-                  className={scoreModalMode === 'direct' ? 'is-active' : ''}
+                  className={`tt-rt-3d-tab ${scoreModalMode === 'direct' ? 'is-active' : ''}`}
                   onClick={() => {
                     triggerHaptic('light');
                     setScoreModalMode('direct');
@@ -1477,7 +1486,7 @@ export default function RetosView({
                   type="button"
                   role="tab"
                   aria-selected={scoreModalMode === 'live'}
-                  className={scoreModalMode === 'live' ? 'is-active' : ''}
+                  className={`tt-rt-3d-tab ${scoreModalMode === 'live' ? 'is-active' : ''}`}
                   onClick={() => {
                     triggerHaptic('light');
                     handleActivateLiveRefereeMode(activeScoreboardChallenge);
@@ -1495,7 +1504,7 @@ export default function RetosView({
                   <span>S1</span>
                   <span>S2</span>
                   {(activeSbData.scoreEval.needsSuperTieBreak || directBuilt.needsStb) && (
-                    <span style={{ color: '#E5C16C' }}>STB</span>
+                    <span style={{ color: '#F4DA92' }}>STB</span>
                   )}
                 </div>
               </div>
@@ -1576,7 +1585,8 @@ export default function RetosView({
             {activeSbData.perms.canConfirmOfficial && scoreModalMode === 'direct' && (
               <div className="tt-mc-controls-wrap">
                 <p className="tt-direct-hint">
-                  Escribe el marcador final de cada set. Al enviarlo, tu rival recibirá una alerta para confirmarlo.
+                  Escribe el marcador final de cada set. Al enviarlo, tu rival recibirá una alerta
+                  para confirmarlo.
                 </p>
 
                 <div className="tt-direct-set-box">
@@ -1776,7 +1786,10 @@ export default function RetosView({
                           <span>{activeSbData.pA?.name?.split(' ')[0]}</span>
                           <strong
                             style={{
-                              color: activeSbData.previewElo.deltaA >= 0 ? '#00B365' : '#EF4444',
+                              color:
+                                activeSbData.previewElo.deltaA >= 0
+                                  ? 'var(--tt-emerald-text)'
+                                  : 'var(--tt-danger-text, #EF4444)',
                             }}
                           >
                             {activeSbData.previewElo.deltaA >= 0
@@ -1789,7 +1802,10 @@ export default function RetosView({
                           <span>{activeSbData.pB?.name?.split(' ')[0]}</span>
                           <strong
                             style={{
-                              color: activeSbData.previewElo.deltaB >= 0 ? '#00B365' : '#EF4444',
+                              color:
+                                activeSbData.previewElo.deltaB >= 0
+                                  ? 'var(--tt-emerald-text)'
+                                  : 'var(--tt-danger-text, #EF4444)',
                             }}
                           >
                             {activeSbData.previewElo.deltaB >= 0
@@ -1813,7 +1829,7 @@ export default function RetosView({
 
                     <button
                       type="button"
-                      className="tt-btn tt-btn-primary tt-glass-press"
+                      className="tt-btn tt-btn-primary"
                       style={{ width: '100%', marginTop: 10 }}
                       onClick={() =>
                         handleSubmitMatchResult({
@@ -1851,7 +1867,7 @@ export default function RetosView({
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                       <button
                         type="button"
-                        className="tt-btn tt-btn-secondary tt-btn-sm tt-glass-press"
+                        className="tt-btn tt-btn-secondary tt-btn-sm"
                         onClick={() =>
                           handleSubmitMatchResult({
                             scoreObj: createEmptyLiveScore(),
@@ -1864,7 +1880,7 @@ export default function RetosView({
                       </button>
                       <button
                         type="button"
-                        className="tt-btn tt-btn-secondary tt-btn-sm tt-glass-press"
+                        className="tt-btn tt-btn-secondary tt-btn-sm"
                         onClick={() =>
                           handleSubmitMatchResult({
                             scoreObj: createEmptyLiveScore(),
@@ -1962,7 +1978,7 @@ export default function RetosView({
                               <div className="tt-stepper-btns">
                                 <button
                                   type="button"
-                                  className="tt-step-minus tt-glass-press"
+                                  className="tt-step-minus"
                                   disabled={sObj.a <= 0}
                                   onClick={() => {
                                     triggerHaptic('light');
@@ -1978,7 +1994,7 @@ export default function RetosView({
                                 </button>
                                 <button
                                   type="button"
-                                  className="tt-step-plus tt-glass-press"
+                                  className="tt-step-plus"
                                   disabled={!canAddA}
                                   onClick={() => {
                                     triggerHaptic('score');
@@ -2002,7 +2018,7 @@ export default function RetosView({
                               <div className="tt-stepper-btns">
                                 <button
                                   type="button"
-                                  className="tt-step-minus tt-glass-press"
+                                  className="tt-step-minus"
                                   disabled={sObj.b <= 0}
                                   onClick={() => {
                                     triggerHaptic('light');
@@ -2018,7 +2034,7 @@ export default function RetosView({
                                 </button>
                                 <button
                                   type="button"
-                                  className="tt-step-plus is-champagne tt-glass-press"
+                                  className="tt-step-plus is-champagne"
                                   disabled={!canAddB}
                                   onClick={() => {
                                     triggerHaptic('score');
@@ -2048,7 +2064,7 @@ export default function RetosView({
                                 <div className="tt-stepper-btns">
                                   <button
                                     type="button"
-                                    className="tt-step-minus tt-glass-press"
+                                    className="tt-step-minus"
                                     disabled={sObj.tbA <= 0}
                                     onClick={() =>
                                       handleScoreboardAction({
@@ -2063,7 +2079,7 @@ export default function RetosView({
                                   </button>
                                   <button
                                     type="button"
-                                    className="tt-step-plus tt-glass-press"
+                                    className="tt-step-plus"
                                     onClick={() =>
                                       handleScoreboardAction({
                                         type: 'TB_DELTA',
@@ -2085,7 +2101,7 @@ export default function RetosView({
                                 <div className="tt-stepper-btns">
                                   <button
                                     type="button"
-                                    className="tt-step-minus tt-glass-press"
+                                    className="tt-step-minus"
                                     disabled={sObj.tbB <= 0}
                                     onClick={() =>
                                       handleScoreboardAction({
@@ -2100,7 +2116,7 @@ export default function RetosView({
                                   </button>
                                   <button
                                     type="button"
-                                    className="tt-step-plus is-champagne tt-glass-press"
+                                    className="tt-step-plus is-champagne"
                                     onClick={() =>
                                       handleScoreboardAction({
                                         type: 'TB_DELTA',
@@ -2142,12 +2158,13 @@ export default function RetosView({
                         <div className="tt-dual-stepper">
                           <div className="tt-stepper-side">
                             <span className="tt-stepper-name">
-                              {activeSbData.pA?.name?.split(' ')[0]} ({activeSbData.liveScore.set3.a})
+                              {activeSbData.pA?.name?.split(' ')[0]} (
+                              {activeSbData.liveScore.set3.a})
                             </span>
                             <div className="tt-stepper-btns">
                               <button
                                 type="button"
-                                className="tt-step-minus tt-glass-press"
+                                className="tt-step-minus"
                                 disabled={activeSbData.liveScore.set3.a <= 0}
                                 onClick={() =>
                                   handleScoreboardAction({
@@ -2161,7 +2178,7 @@ export default function RetosView({
                               </button>
                               <button
                                 type="button"
-                                className="tt-step-plus tt-glass-press"
+                                className="tt-step-plus"
                                 onClick={() =>
                                   handleScoreboardAction({
                                     type: 'STB_DELTA',
@@ -2177,12 +2194,13 @@ export default function RetosView({
 
                           <div className="tt-stepper-side">
                             <span className="tt-stepper-name">
-                              {activeSbData.pB?.name?.split(' ')[0]} ({activeSbData.liveScore.set3.b})
+                              {activeSbData.pB?.name?.split(' ')[0]} (
+                              {activeSbData.liveScore.set3.b})
                             </span>
                             <div className="tt-stepper-btns">
                               <button
                                 type="button"
-                                className="tt-step-minus tt-glass-press"
+                                className="tt-step-minus"
                                 disabled={activeSbData.liveScore.set3.b <= 0}
                                 onClick={() =>
                                   handleScoreboardAction({
@@ -2196,7 +2214,7 @@ export default function RetosView({
                               </button>
                               <button
                                 type="button"
-                                className="tt-step-plus is-champagne tt-glass-press"
+                                className="tt-step-plus is-champagne"
                                 onClick={() =>
                                   handleScoreboardAction({
                                     type: 'STB_DELTA',
@@ -2233,7 +2251,7 @@ export default function RetosView({
                       {activeSbData.perms.canConfirmOfficial ? (
                         <button
                           type="button"
-                          className="tt-btn tt-btn-primary tt-glass-press"
+                          className="tt-btn tt-btn-primary"
                           style={{ width: '100%' }}
                           onClick={() =>
                             handleSubmitMatchResult({
@@ -2246,7 +2264,8 @@ export default function RetosView({
                         </button>
                       ) : (
                         <p className="tt-muted" style={{ margin: 0, fontSize: '0.78rem' }}>
-                          Como Árbitro en cancha completaste el marcador. Los dos jugadores ya pueden confirmar el resultado final.
+                          Como Árbitro en cancha completaste el marcador. Los dos jugadores ya
+                          pueden confirmar el resultado final.
                         </p>
                       )}
                     </div>
@@ -2269,9 +2288,10 @@ export default function RetosView({
 
             {!activeSbData.perms.canEditScore && (
               <div className="tt-spectator-note">
-                <TTIcon name="vision" size={18} style={{ color: '#00DC7D' }} />
+                <TTIcon name="vision" size={18} style={{ color: 'var(--tt-emerald-text)' }} />
                 <span>
-                  Estás viendo el partido en modo espectador. El marcador se actualiza en vivo desde cancha.
+                  Estás viendo el partido en modo espectador. El marcador se actualiza en vivo
+                  desde cancha.
                 </span>
               </div>
             )}
@@ -2306,39 +2326,55 @@ export default function RetosView({
         .tt-retos-view {
           display: flex;
           flex-direction: column;
-          gap: 13px;
+          gap: 14px;
+          color: var(--tt-text);
+        }
+        .tt-retos-view.is-light {
+          color: #1E0734;
         }
 
-        /* Física táctil elástica compartida */
+        /* Física táctil compartida */
         .tt-glass-press {
           transition:
-            transform 170ms cubic-bezier(0.22, 1.38, 0.36, 1),
-            box-shadow 220ms ease,
-            border-color 200ms ease,
-            background-color 200ms ease !important;
+            transform 125ms cubic-bezier(0.22, 1.35, 0.36, 1),
+            box-shadow 125ms ease,
+            border-color 180ms ease,
+            background-color 180ms ease !important;
         }
         .tt-glass-press:active {
-          transform: scale(0.95) !important;
+          transform: translateY(2px) scale(0.97) !important;
         }
         .tt-rt-avatar-btn {
-          transition: transform 180ms cubic-bezier(0.22, 1.35, 0.36, 1);
+          transition: transform 160ms cubic-bezier(0.22, 1.35, 0.36, 1);
         }
         .tt-rt-avatar-btn:active {
           transform: scale(0.93);
         }
 
-        /* 1. HERO COMPACTO CON 3 CAPAS PRECARGADAS (CROSSFADE SIN ESPERAS) */
+        /* ==================================================================
+           1. CARRUSEL HERO 3D (3 CAPAS PRECARGADAS + CTA 3D TÁCTIL)
+           ================================================================== */
         .tt-hero-stage {
           position: relative;
-          min-height: 178px;
-          border-radius: 23px;
+          min-height: 184px;
+          border-radius: 24px;
           overflow: hidden;
-          background: linear-gradient(135deg, #24093F 0%, #140324 100%);
-          border: 1px solid rgba(255, 255, 255, 0.14);
-          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), var(--tt-shadow-md);
+          background: linear-gradient(135deg, #270A45 0%, #140324 100%);
+          border: 1.5px solid rgba(255, 255, 255, 0.18);
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.22),
+            0 5px 0 #0D0219,
+            0 16px 32px rgba(0, 0, 0, 0.38);
           display: flex;
           flex-direction: column;
           justify-content: flex-end;
+        }
+        .tt-retos-view.is-light .tt-hero-stage {
+          border-color: rgba(30, 7, 52, 0.24);
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.24),
+            0 5px 0 #CBBFE3,
+            0 14px 28px rgba(30, 7, 52, 0.16);
         }
         .tt-hero-stage-bg {
           position: absolute;
@@ -2362,15 +2398,15 @@ export default function RetosView({
           z-index: 1;
           background: linear-gradient(
             180deg,
-            rgba(20, 5, 36, 0.24) 0%,
-            rgba(20, 5, 36, 0.62) 48%,
-            rgba(16, 3, 29, 0.95) 100%
+            rgba(20, 5, 36, 0.26) 0%,
+            rgba(20, 5, 36, 0.64) 48%,
+            rgba(16, 3, 29, 0.96) 100%
           );
         }
         .tt-hero-stage-content {
           position: relative;
           z-index: 2;
-          padding: 15px 16px;
+          padding: 16px;
           display: flex;
           flex-direction: column;
           gap: 6px;
@@ -2380,27 +2416,28 @@ export default function RetosView({
           align-items: center;
           gap: 6px;
           align-self: flex-start;
-          padding: 4px 10px;
+          padding: 4px 11px;
           border-radius: 999px;
-          background: rgba(18, 3, 33, 0.68);
-          border: 1px solid rgba(0, 220, 125, 0.44);
+          background: rgba(16, 3, 30, 0.78);
+          border: 1px solid rgba(0, 220, 125, 0.55);
           backdrop-filter: blur(10px);
           -webkit-backdrop-filter: blur(10px);
-          color: #00DC7D;
+          color: #22F397;
           font-size: 0.63rem;
-          font-weight: 800;
+          font-weight: 900;
           letter-spacing: 0.08em;
           text-transform: uppercase;
+          box-shadow: 0 4px 12px rgba(0, 220, 125, 0.22);
         }
         .tt-hero-headline {
           margin: 0;
           font-family: var(--tt-font-display);
           font-style: italic;
           font-weight: 900;
-          font-size: clamp(1.26rem, 5vw, 1.72rem);
+          font-size: clamp(1.28rem, 5vw, 1.74rem);
           line-height: 1.04;
           color: #FAF9F5;
-          text-shadow: 0 3px 12px rgba(0, 0, 0, 0.65);
+          text-shadow: 0 3px 14px rgba(0, 0, 0, 0.7);
           animation: ttRtSlideText 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
         }
         @keyframes ttRtSlideText {
@@ -2410,36 +2447,48 @@ export default function RetosView({
         .tt-hero-subcopy {
           margin: 0;
           font-size: 0.78rem;
-          line-height: 1.34;
-          color: rgba(250, 249, 245, 0.86);
+          line-height: 1.35;
+          color: rgba(250, 249, 245, 0.88);
         }
         .tt-hero-footer-row {
-          margin-top: 4px;
+          margin-top: 6px;
           display: flex;
           align-items: center;
           justify-content: space-between;
           gap: 10px;
           flex-wrap: wrap;
         }
+        .tt-hero-cta-3d,
         .tt-hero-cta-pill {
           display: inline-flex;
           align-items: center;
           gap: 7px;
-          min-height: 36px;
-          padding: 0 14px;
-          border-radius: 999px;
-          background: rgba(250, 249, 245, 0.95);
-          color: #1E0734;
-          font-size: 0.73rem;
+          min-height: 39px;
+          padding: 0 15px;
+          border-radius: 13px;
+          background: linear-gradient(180deg, #FFFFFF 0%, #ECE6F6 100%);
+          border: 1px solid #FFFFFF;
+          color: #160428;
+          font-size: 0.74rem;
           font-weight: 900;
           letter-spacing: 0.04em;
-          box-shadow: inset 0 1px 0 #FFFFFF, 0 8px 18px rgba(0, 0, 0, 0.3);
+          box-shadow:
+            inset 0 1px 0 #FFFFFF,
+            0 4px 0 #B6A7D4,
+            0 10px 20px rgba(0, 0, 0, 0.38);
+          transition: transform 110ms ease, box-shadow 110ms ease;
+        }
+        .tt-hero-cta-3d:active,
+        .tt-hero-cta-pill:active {
+          transform: translateY(3px) scale(0.98);
+          box-shadow: inset 0 1px 0 #FFFFFF, 0 1px 0 #B6A7D4;
         }
         .tt-cta-emerald-dot {
           width: 8px;
           height: 8px;
           border-radius: 50%;
           background-color: #00DC7D;
+          box-shadow: 0 0 8px rgba(0, 220, 125, 0.85);
           flex-shrink: 0;
         }
         .tt-hero-controls {
@@ -2456,30 +2505,37 @@ export default function RetosView({
           width: 7px;
           height: 7px;
           border-radius: 999px;
-          background: rgba(250, 249, 245, 0.38);
+          background: rgba(250, 249, 245, 0.42);
           transition: width 240ms cubic-bezier(0.22, 1.25, 0.36, 1), background-color 200ms ease;
         }
         .tt-hero-dot.is-active {
-          width: 22px;
-          background: #00DC7D;
+          width: 24px;
+          background: #00E582;
+          box-shadow: 0 0 10px rgba(0, 229, 130, 0.7);
         }
         .tt-hero-arrows {
           display: flex;
-          gap: 5px;
+          gap: 6px;
         }
         .tt-circle-nav-btn {
-          width: 29px;
-          height: 29px;
-          border-radius: 50%;
-          background: rgba(250, 249, 245, 0.14);
-          border: 1px solid rgba(250, 249, 245, 0.24);
+          width: 31px;
+          height: 31px;
+          border-radius: 10px;
+          background: rgba(26, 8, 46, 0.76);
+          border: 1px solid rgba(250, 249, 245, 0.3);
           backdrop-filter: blur(8px);
           -webkit-backdrop-filter: blur(8px);
           color: #FAF9F5;
-          font-size: 1rem;
+          font-size: 1.05rem;
+          font-weight: 800;
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 2px 0 #0D0219;
           display: inline-flex;
           align-items: center;
           justify-content: center;
+          transition: transform 110ms ease;
+        }
+        .tt-circle-nav-btn:active {
+          transform: translateY(2px);
         }
         .tt-live-dot-inline {
           width: 7px;
@@ -2490,13 +2546,18 @@ export default function RetosView({
           animation: ttLivePulse 1.6s infinite;
         }
 
-        /* 2. ALERTA RETOS ENTRANTES */
+        /* ==================================================================
+           2. ALERTA PRIORITARIA 3D DE RETOS ENTRANTES
+           ================================================================== */
         .tt-incoming-alert {
-          border-radius: 19px;
-          padding: 13px;
-          background: linear-gradient(135deg, #21073A 0%, #140324 100%);
-          border: 1px solid rgba(0, 220, 125, 0.48);
-          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 12px 26px rgba(0, 220, 125, 0.14);
+          border-radius: 20px;
+          padding: 14px;
+          background: linear-gradient(145deg, #270A46 0%, #150328 100%);
+          border: 1.5px solid rgba(0, 220, 125, 0.62);
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.2),
+            0 5px 0 #0D0219,
+            0 12px 26px rgba(0, 220, 125, 0.18);
           color: #FAF9F5;
         }
         .tt-incoming-alert-head {
@@ -2508,191 +2569,320 @@ export default function RetosView({
           display: block;
           font-size: 0.63rem;
           font-weight: 900;
-          letter-spacing: 0.08em;
-          color: #00DC7D;
+          letter-spacing: 0.09em;
+          color: #22F397;
+        }
+        .tt-rt-hero-ghost-btn {
+          min-height: 40px;
+          padding: 0 14px;
+          border-radius: 12px;
+          background: linear-gradient(180deg, #3A1763 0%, #240B41 100%);
+          border: 1.5px solid rgba(255, 255, 255, 0.24);
+          color: #FAF9F5;
+          font-size: 0.77rem;
+          font-weight: 900;
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 3px 0 #0E021A;
+          transition: transform 110ms ease, box-shadow 110ms ease;
+        }
+        .tt-rt-hero-ghost-btn:active {
+          transform: translateY(2px);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 1px 0 #0E021A;
         }
 
-        /* 3. SUB-TABS CON SLIDER ELÁSTICO LIQUID GLASS */
-        .tt-subtabs-bar {
-          position: relative;
+        /* ==================================================================
+           3. DOCK 3D TÁCTIL (CARTELERA | TUS DESAFÍOS | LANZAR RETO)
+           ================================================================== */
+        .tt-rt-3d-dock {
           display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          padding: 4px;
-          border-radius: 18px;
-          background: var(--tt-surface-2);
-          border: 1px solid var(--tt-border);
-          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
-          backdrop-filter: blur(14px);
-          -webkit-backdrop-filter: blur(14px);
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 7px;
+          padding: 6px;
+          border-radius: 19px;
+          background: rgba(13, 2, 25, 0.82);
+          border: 1.5px solid rgba(255, 255, 255, 0.14);
+          box-shadow:
+            inset 0 2px 7px rgba(0, 0, 0, 0.54),
+            0 1px 0 rgba(255, 255, 255, 0.08);
         }
-        .tt-subtab-slider {
-          position: absolute;
-          top: 4px;
-          bottom: 4px;
-          left: 4px;
-          width: calc((100% - 8px) / 3);
-          border-radius: 13px;
-          background: linear-gradient(135deg, #00DC7D 0%, #00B365 100%);
-          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 6px 16px rgba(0, 220, 125, 0.3);
-          transition: transform 320ms cubic-bezier(0.22, 1.24, 0.36, 1);
-          pointer-events: none;
-          z-index: 0;
+        .tt-rt-3d-dock.is-two {
+          grid-template-columns: 1fr 1fr;
+          gap: 8px;
         }
-        .tt-retos-view.is-light .tt-subtab-slider {
-          background: #1E0734;
-          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 6px 16px rgba(30, 7, 52, 0.22);
+        .tt-retos-view.is-light .tt-rt-3d-dock,
+        .tt-mc-container.is-light .tt-rt-3d-dock,
+        html[data-theme='light'] .tt-rt-3d-dock {
+          background: #E8E1F4;
+          border-color: rgba(30, 7, 52, 0.16);
+          box-shadow: inset 0 2px 6px rgba(30, 7, 52, 0.14);
         }
-        .tt-subtab-btn {
-          position: relative;
-          z-index: 1;
-          min-height: 41px;
+
+        .tt-rt-3d-tab {
+          min-height: 43px;
+          padding: 0 7px;
           border-radius: 13px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
           gap: 5px;
-          font-size: 0.77rem;
+          font-size: 0.76rem;
           font-weight: 800;
-          color: var(--tt-text-muted);
-          transition: color 200ms ease;
+          white-space: nowrap;
+          cursor: pointer;
+          background: linear-gradient(180deg, #321357 0%, #20093B 100%);
+          color: rgba(250, 249, 245, 0.88);
+          border: 1px solid rgba(255, 255, 255, 0.16);
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.2),
+            0 4px 0 #10021E,
+            0 6px 12px rgba(0, 0, 0, 0.26);
+          transition:
+            transform 115ms cubic-bezier(0.22, 1.35, 0.36, 1),
+            box-shadow 115ms ease,
+            background 170ms ease,
+            color 150ms ease;
         }
-        .tt-subtab-btn.is-active {
-          color: #10021E;
+        .tt-rt-3d-tab:active {
+          transform: translateY(3px) scale(0.985);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 1px 0 #10021E;
+        }
+        .tt-rt-3d-tab.is-active {
+          background: linear-gradient(180deg, #22F397 0%, #00C96F 56%, #00A85B 100%);
+          color: #0D0219;
           font-weight: 900;
+          border-color: rgba(170, 255, 218, 0.8);
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.72),
+            0 4px 0 #007540,
+            0 10px 20px rgba(0, 220, 125, 0.34);
         }
-        .tt-retos-view.is-light .tt-subtab-btn.is-active {
-          color: #00DC7D;
+        .tt-rt-3d-tab.is-active:active {
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 1px 0 #007540;
         }
+
+        .tt-retos-view.is-light .tt-rt-3d-tab,
+        .tt-mc-container.is-light .tt-rt-3d-tab,
+        html[data-theme='light'] .tt-rt-3d-tab {
+          background: linear-gradient(180deg, #FFFFFF 0%, #F1ECF9 100%);
+          color: #2B1147;
+          border-color: rgba(30, 7, 52, 0.18);
+          box-shadow:
+            inset 0 1px 0 #FFFFFF,
+            0 4px 0 #C8BDDF,
+            0 5px 10px rgba(30, 7, 52, 0.08);
+        }
+        .tt-retos-view.is-light .tt-rt-3d-tab:active,
+        .tt-mc-container.is-light .tt-rt-3d-tab:active,
+        html[data-theme='light'] .tt-rt-3d-tab:active {
+          box-shadow: inset 0 1px 0 #FFFFFF, 0 1px 0 #C8BDDF;
+        }
+        .tt-retos-view.is-light .tt-rt-3d-tab.is-active,
+        .tt-mc-container.is-light .tt-rt-3d-tab.is-active,
+        html[data-theme='light'] .tt-rt-3d-tab.is-active {
+          background: linear-gradient(180deg, #35115C 0%, #1E0734 100%);
+          color: #00E582;
+          border-color: #1E0734;
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.28),
+            0 4px 0 #0D0218,
+            0 8px 18px rgba(30, 7, 52, 0.26);
+        }
+
         .tt-subtab-chip {
-          min-width: 18px;
-          height: 18px;
+          min-width: 19px;
+          height: 19px;
           padding: 0 5px;
           border-radius: 999px;
-          background: rgba(0, 220, 125, 0.2);
-          color: var(--tt-emerald-text);
+          background: rgba(0, 220, 125, 0.22);
+          color: #22F397;
           font-size: 0.65rem;
           font-weight: 900;
           display: inline-flex;
           align-items: center;
           justify-content: center;
         }
-        .tt-retos-view.is-dark .tt-subtab-btn.is-active .tt-subtab-chip {
-          background: rgba(16, 2, 30, 0.22);
-          color: #10021E;
+        .tt-retos-view.is-light .tt-subtab-chip {
+          background: rgba(30, 7, 52, 0.12);
+          color: #1E0734;
+        }
+        .tt-retos-view.is-dark .tt-rt-3d-tab.is-active .tt-subtab-chip {
+          background: rgba(13, 2, 25, 0.22);
+          color: #0D0219;
+        }
+        .tt-retos-view.is-light .tt-rt-3d-tab.is-active .tt-subtab-chip {
+          background: rgba(0, 229, 130, 0.22);
+          color: #00E582;
         }
 
-        /* 4. FILTROS, BANNERS ANTI-ESCASEZ Y TUTELA */
+        /* ==================================================================
+           4. FILTROS 3D TÁCTILES (TODOS | EN JUEGO | PROGRAMADOS | RESULTADOS)
+           ================================================================== */
         .tt-retos-panel {
           display: flex;
           flex-direction: column;
-          gap: 12px;
+          gap: 13px;
         }
         .tt-rt-panel-in {
-          animation: ttRtFade 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+          animation: ttRtFade 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
         }
         @keyframes ttRtFade {
           from { opacity: 0; transform: translateY(7px); }
           to { opacity: 1; transform: translateY(0); }
         }
+
+        .tt-filter-pills-row {
+          display: flex;
+          gap: 8px;
+          overflow-x: auto;
+          padding: 2px 1px 6px;
+          scrollbar-width: none;
+        }
+        .tt-filter-pills-row::-webkit-scrollbar {
+          display: none;
+        }
+
+        .tt-rt-3d-chip {
+          flex-shrink: 0;
+          min-height: 38px;
+          padding: 0 14px;
+          border-radius: 13px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          font-size: 0.75rem;
+          font-weight: 800;
+          cursor: pointer;
+          background: linear-gradient(180deg, #321357 0%, #20093B 100%);
+          border: 1.5px solid rgba(255, 255, 255, 0.17);
+          color: #EDE8F5;
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.2),
+            0 3px 0 #10021E,
+            0 6px 12px rgba(0, 0, 0, 0.24);
+          transition:
+            transform 110ms cubic-bezier(0.22, 1.35, 0.36, 1),
+            box-shadow 110ms ease,
+            background 160ms ease,
+            color 150ms ease;
+        }
+        .tt-rt-3d-chip:active {
+          transform: translateY(2px) scale(0.97);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 1px 0 #10021E;
+        }
+        .tt-rt-3d-chip.is-active {
+          background: linear-gradient(180deg, #22F397 0%, #00C96F 56%, #00A85B 100%);
+          border-color: rgba(170, 255, 218, 0.8);
+          color: #0D0219;
+          font-weight: 900;
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.72),
+            0 3px 0 #007540,
+            0 8px 18px rgba(0, 220, 125, 0.32);
+        }
+        .tt-retos-view.is-light .tt-rt-3d-chip {
+          background: linear-gradient(180deg, #FFFFFF 0%, #F1ECF9 100%);
+          border-color: rgba(30, 7, 52, 0.19);
+          color: #1E0734;
+          box-shadow:
+            inset 0 1px 0 #FFFFFF,
+            0 3px 0 #C8BDDF,
+            0 4px 10px rgba(30, 7, 52, 0.08);
+        }
+        .tt-retos-view.is-light .tt-rt-3d-chip.is-active {
+          background: linear-gradient(180deg, #35115C 0%, #1E0734 100%);
+          border-color: #1E0734;
+          color: #00E582;
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.28),
+            0 3px 0 #0D0218,
+            0 8px 16px rgba(30, 7, 52, 0.24);
+        }
+        .tt-chip-live-dot {
+          width: 7px;
+          height: 7px;
+          border-radius: 50%;
+          background: #00E582;
+          box-shadow: 0 0 8px rgba(0, 229, 130, 0.9);
+          flex-shrink: 0;
+        }
+        .tt-retos-view.is-dark .tt-rt-3d-chip.is-active .tt-chip-live-dot {
+          background: #0D0219;
+          box-shadow: none;
+        }
+
+        /* BANNERS ANTI-ESCASEZ Y TUTELA */
         .tt-scarcity-banner {
           display: flex;
           align-items: flex-start;
           gap: 10px;
-          padding: 11px 13px;
+          padding: 12px 13px;
           border-radius: 16px;
-          background: rgba(0, 220, 125, 0.11);
-          border: 1px solid rgba(0, 220, 125, 0.38);
+          background: rgba(0, 220, 125, 0.13);
+          border: 1.5px solid rgba(0, 220, 125, 0.45);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 3px 0 rgba(0, 117, 64, 0.35);
           font-size: 0.75rem;
         }
         .tt-scarcity-banner strong {
           display: block;
           color: var(--tt-emerald-text);
-          font-size: 0.78rem;
+          font-size: 0.79rem;
         }
         .tt-scarcity-banner p {
           margin: 2px 0 0;
           color: var(--tt-text-muted);
-          line-height: 1.38;
+          line-height: 1.4;
         }
 
         .tt-tutor-only-card {
           display: flex;
           align-items: flex-start;
           gap: 10px;
-          padding: 11px 13px;
+          padding: 12px 13px;
           border-radius: 16px;
-          background: rgba(56, 189, 248, 0.12);
-          border: 1px solid rgba(56, 189, 248, 0.4);
+          background: rgba(56, 189, 248, 0.14);
+          border: 1.5px solid rgba(56, 189, 248, 0.46);
           font-size: 0.75rem;
+        }
+        .tt-retos-view.is-light .tt-tutor-only-card,
+        .tt-form-stack.is-light .tt-tutor-only-card {
+          background: #E8F6FE;
+          border-color: rgba(14, 138, 198, 0.42);
         }
         .tt-tutor-only-card strong {
           display: block;
-          font-size: 0.78rem;
+          font-size: 0.79rem;
           color: var(--tt-text);
         }
         .tt-tutor-only-card p {
           margin: 2px 0 0;
           color: var(--tt-text-muted);
-          line-height: 1.38;
+          line-height: 1.4;
         }
 
         .tt-tutela-mini-pill {
           display: inline-block;
-          padding: 1px 6px;
-          border-radius: 6px;
-          background: rgba(56, 189, 248, 0.18);
-          border: 1px solid rgba(125, 211, 252, 0.45);
+          padding: 2px 7px;
+          border-radius: 7px;
+          background: rgba(56, 189, 248, 0.2);
+          border: 1px solid rgba(125, 211, 252, 0.5);
           color: #7DD3FC;
-          font-size: 0.56rem;
+          font-size: 0.57rem;
           font-weight: 900;
           letter-spacing: 0.04em;
         }
         .tt-retos-view.is-light .tt-tutela-mini-pill {
           background: #E0F2FE;
-          border-color: #7DD3FC;
+          border-color: #38BDF8;
           color: #0369A1;
         }
 
-        .tt-filter-pills-row {
-          display: flex;
-          gap: 7px;
-          overflow-x: auto;
-          padding-bottom: 2px;
-          scrollbar-width: none;
-        }
-        .tt-filter-pills-row::-webkit-scrollbar {
-          display: none;
-        }
-        .tt-filter-chip {
-          flex-shrink: 0;
-          min-height: 34px;
-          padding: 0 13px;
-          border-radius: 999px;
-          font-size: 0.74rem;
-          font-weight: 700;
-          background: var(--tt-surface-2);
-          border: 1px solid var(--tt-border);
-          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-          color: var(--tt-text-muted);
-        }
-        .tt-filter-chip.is-active {
-          background: rgba(0, 220, 125, 0.16);
-          border-color: rgba(0, 220, 125, 0.52);
-          color: #00DC7D;
-          font-weight: 800;
-          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 4px 12px rgba(0, 220, 125, 0.18);
-        }
-        .tt-retos-view.is-light .tt-filter-chip.is-active {
-          background: #1E0734;
-          border-color: #1E0734;
-          color: #00DC7D;
-        }
-
-        /* 5. TARJETAS PÓSTER VS (LIQUID GLASS + CHAMPÁN SOBRIO) */
+        /* ==================================================================
+           5. TARJETAS PÓSTER VS 3D + BADGES ILUMINADOS (CLARO Y OSCURO)
+           ================================================================== */
         .tt-matches-grid {
           display: grid;
           grid-template-columns: 1fr;
-          gap: 12px;
+          gap: 14px;
         }
         @media (min-width: 760px) {
           .tt-matches-grid {
@@ -2700,20 +2890,32 @@ export default function RetosView({
           }
         }
         .tt-match-card {
-          border-radius: 22px;
-          padding: 14px;
-          background: var(--tt-surface);
-          border: 1px solid var(--tt-border);
-          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), var(--tt-shadow-sm);
-          backdrop-filter: blur(14px);
-          -webkit-backdrop-filter: blur(14px);
+          border-radius: 23px;
+          padding: 15px;
+          background: linear-gradient(180deg, rgba(44, 17, 74, 0.96) 0%, rgba(23, 6, 42, 0.99) 100%);
+          border: 1.5px solid rgba(255, 255, 255, 0.16);
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.18),
+            0 5px 0 #0F021C,
+            0 14px 26px rgba(0, 0, 0, 0.32);
           display: flex;
           flex-direction: column;
-          gap: 12px;
+          gap: 13px;
+        }
+        .tt-retos-view.is-light .tt-match-card {
+          background: linear-gradient(180deg, #FFFFFF 0%, #F7F4FC 100%);
+          border-color: rgba(30, 7, 52, 0.18);
+          box-shadow:
+            inset 0 1px 0 #FFFFFF,
+            0 5px 0 #D2C8E6,
+            0 12px 24px rgba(30, 7, 52, 0.1);
         }
         .tt-match-card.is-live {
-          border-color: rgba(0, 220, 125, 0.5);
-          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 10px 24px rgba(0, 220, 125, 0.14);
+          border-color: rgba(0, 229, 130, 0.62);
+          box-shadow:
+            inset 0 1px 0 rgba(168, 255, 218, 0.28),
+            0 5px 0 #005C32,
+            0 12px 28px rgba(0, 220, 125, 0.2);
         }
         .tt-match-card-top {
           display: flex;
@@ -2721,60 +2923,99 @@ export default function RetosView({
           justify-content: space-between;
           gap: 8px;
         }
+
+        /* BADGES DE ESTADO 3D CON VOLUMEN Y CONTRASTE REAL */
         .tt-match-pill {
           display: inline-flex;
           align-items: center;
           gap: 6px;
-          padding: 4px 10px;
-          border-radius: 999px;
-          font-size: 0.64rem;
+          padding: 5px 11px;
+          border-radius: 10px;
+          font-size: 0.63rem;
           font-weight: 900;
           letter-spacing: 0.06em;
+          text-transform: uppercase;
         }
         .tt-match-pill.is-live {
-          background: rgba(0, 220, 125, 0.16);
-          color: #00DC7D;
-          border: 1px solid rgba(0, 220, 125, 0.35);
+          background: linear-gradient(180deg, #22F397 0%, #00B966 100%);
+          color: #0D0219;
+          border: 1px solid rgba(170, 255, 218, 0.78);
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.68),
+            0 2px 0 #007540,
+            0 6px 14px rgba(0, 220, 125, 0.3);
         }
         .tt-retos-view.is-light .tt-match-pill.is-live {
-          background: #1E0734;
-          color: #00DC7D;
-          border-color: transparent;
+          background: linear-gradient(180deg, #35115C 0%, #1E0734 100%);
+          color: #00E582;
+          border-color: #1E0734;
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), 0 2px 0 #0D0218;
         }
         .tt-match-pill.is-scheduled {
-          background: rgba(147, 197, 253, 0.15);
-          color: #93C5FD;
+          background: linear-gradient(180deg, rgba(96, 165, 250, 0.28) 0%, rgba(37, 99, 235, 0.18) 100%);
+          color: #BAE6FD;
+          border: 1px solid rgba(125, 211, 252, 0.56);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 2px 0 rgba(12, 74, 110, 0.65);
         }
         .tt-retos-view.is-light .tt-match-pill.is-scheduled {
-          background: rgba(30, 7, 52, 0.08);
-          color: #1E0734;
+          background: linear-gradient(180deg, #E8F6FE 0%, #D5ECFC 100%);
+          color: #0369A1;
+          border-color: #7DD3FC;
+          box-shadow: inset 0 1px 0 #FFFFFF, 0 2px 0 #93C5FD;
         }
         .tt-match-pill.is-pending {
-          background: rgba(229, 193, 108, 0.14);
-          color: #E5C16C;
-          border: 1px solid rgba(229, 193, 108, 0.34);
+          background: linear-gradient(180deg, rgba(249, 231, 178, 0.26) 0%, rgba(201, 155, 59, 0.14) 100%);
+          color: #F8E5AC;
+          border: 1px solid rgba(229, 193, 108, 0.62);
+          box-shadow:
+            inset 0 1px 0 rgba(255, 245, 214, 0.3),
+            0 2px 0 rgba(92, 62, 10, 0.68),
+            0 4px 12px rgba(229, 193, 108, 0.16);
         }
         .tt-retos-view.is-light .tt-match-pill.is-pending {
-          background: #FBF4E0;
-          color: #8A5D10;
-          border-color: rgba(154, 107, 22, 0.28);
+          background: linear-gradient(180deg, #FFFBF0 0%, #F9E9BC 100%);
+          color: #7A4F05;
+          border-color: rgba(180, 126, 22, 0.52);
+          box-shadow: inset 0 1px 0 #FFFFFF, 0 2px 0 #DEC277;
         }
         .tt-match-pill.is-disputed {
-          background: rgba(239, 68, 68, 0.16);
-          color: #F87171;
+          background: linear-gradient(180deg, rgba(248, 113, 113, 0.28) 0%, rgba(185, 28, 28, 0.18) 100%);
+          color: #FECACA;
+          border: 1px solid rgba(248, 113, 113, 0.58);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 2px 0 rgba(127, 29, 29, 0.7);
         }
         .tt-retos-view.is-light .tt-match-pill.is-disputed {
-          background: #FEE2E2;
+          background: linear-gradient(180deg, #FFF5F5 0%, #FEE2E2 100%);
           color: #B91C1C;
+          border-color: #F87171;
+          box-shadow: inset 0 1px 0 #FFFFFF, 0 2px 0 #FCA5A5;
         }
         .tt-match-pill.is-finished {
-          background: var(--tt-surface-2);
-          color: var(--tt-text-muted);
+          background: linear-gradient(180deg, #321357 0%, #20093B 100%);
+          color: rgba(250, 249, 245, 0.85);
+          border: 1px solid rgba(255, 255, 255, 0.16);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 2px 0 #10021E;
         }
+        .tt-retos-view.is-light .tt-match-pill.is-finished {
+          background: linear-gradient(180deg, #FFFFFF 0%, #EFEAF8 100%);
+          color: #361C54;
+          border-color: rgba(30, 7, 52, 0.18);
+          box-shadow: inset 0 1px 0 #FFFFFF, 0 2px 0 #C8BDDF;
+        }
+
         .tt-match-mode-tag {
-          font-size: 0.7rem;
-          font-weight: 700;
-          color: var(--tt-text-muted);
+          padding: 3px 9px;
+          border-radius: 8px;
+          background: rgba(255, 255, 255, 0.08);
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          font-size: 0.68rem;
+          font-weight: 800;
+          color: rgba(250, 249, 245, 0.84);
+        }
+        .tt-retos-view.is-light .tt-match-mode-tag {
+          background: #F1ECF9;
+          border-color: rgba(30, 7, 52, 0.14);
+          color: #361C54;
         }
 
         .tt-match-vs-grid {
@@ -2792,8 +3033,8 @@ export default function RetosView({
           min-width: 0;
         }
         .tt-match-player-name {
-          font-size: 0.86rem;
-          font-weight: 800;
+          font-size: 0.87rem;
+          font-weight: 900;
           line-height: 1.18;
           color: var(--tt-text);
           display: -webkit-box;
@@ -2806,7 +3047,8 @@ export default function RetosView({
           align-items: center;
           justify-content: center;
           gap: 4px;
-          font-size: 0.7rem;
+          font-size: 0.71rem;
+          font-weight: 700;
           color: var(--tt-text-muted);
           flex-wrap: wrap;
         }
@@ -2819,17 +3061,14 @@ export default function RetosView({
         }
         .tt-winner-chip {
           display: inline-block;
-          padding: 2px 8px;
-          border-radius: 999px;
-          background: rgba(0, 220, 125, 0.16);
-          color: #00DC7D;
+          padding: 3px 9px;
+          border-radius: 8px;
+          background: linear-gradient(180deg, #22F397 0%, #00B866 100%);
+          color: #0D0219;
           font-size: 0.61rem;
           font-weight: 900;
           letter-spacing: 0.08em;
-        }
-        .tt-retos-view.is-light .tt-winner-chip {
-          background: #007A44;
-          color: #FFFFFF;
+          box-shadow: 0 2px 0 #007540;
         }
         .tt-match-center-col {
           display: flex;
@@ -2842,32 +3081,36 @@ export default function RetosView({
           font-family: var(--tt-font-display);
           font-style: italic;
           font-weight: 900;
-          font-size: 1.16rem;
-          color: #E5C16C;
+          font-size: 1.24rem;
+          color: #F4DA92;
           line-height: 1;
+          text-shadow: 0 2px 10px rgba(229, 193, 108, 0.35);
         }
         .tt-retos-view.is-light .tt-vs-emblem {
-          color: #9A6B16;
+          color: #8A5D10;
+          text-shadow: none;
         }
         .tt-match-date-chip {
-          font-size: 0.69rem;
+          font-size: 0.7rem;
           font-weight: 800;
           color: var(--tt-text);
           white-space: nowrap;
         }
         .tt-match-time-chip {
-          font-size: 0.68rem;
+          font-size: 0.69rem;
           font-weight: 700;
           color: var(--tt-text-muted);
           white-space: nowrap;
         }
 
+        /* MINI MARCADOR EN TARJETA */
         .tt-mini-scoreboard {
-          border-radius: 14px;
-          padding: 10px 12px;
-          background: #17042A;
+          border-radius: 15px;
+          padding: 11px 12px;
+          background: linear-gradient(180deg, #1E0636 0%, #130324 100%);
           color: #FAF9F5;
-          border: 1px solid rgba(0, 220, 125, 0.24);
+          border: 1.5px solid rgba(0, 220, 125, 0.34);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 3px 0 #0A0114;
           display: flex;
           flex-direction: column;
           gap: 6px;
@@ -2892,10 +3135,10 @@ export default function RetosView({
           margin-left: auto;
         }
         .tt-sb-cell {
-          width: 26px;
-          height: 24px;
+          width: 27px;
+          height: 25px;
           border-radius: 7px;
-          background: rgba(250, 249, 245, 0.12);
+          background: rgba(250, 249, 245, 0.14);
           font-weight: 900;
           font-size: 0.82rem;
           display: inline-flex;
@@ -2903,8 +3146,8 @@ export default function RetosView({
           justify-content: center;
         }
         .tt-sb-cell.is-stb {
-          background: rgba(229, 193, 108, 0.2);
-          color: #F3DC9B;
+          background: rgba(229, 193, 108, 0.24);
+          color: #F6E2A8;
           min-width: 30px;
           width: auto;
           padding: 0 6px;
@@ -2912,40 +3155,44 @@ export default function RetosView({
         .tt-delta-pill {
           min-width: 40px;
           text-align: right;
-          font-size: 0.75rem;
+          font-size: 0.76rem;
           font-weight: 900;
         }
-        .tt-delta-pill.is-pos {
-          color: #00DC7D;
-        }
-        .tt-delta-pill.is-neg {
-          color: #F87171;
-        }
+        .tt-delta-pill.is-pos { color: #00E582; }
+        .tt-delta-pill.is-neg { color: #F87171; }
         .tt-mini-sb-foot {
           margin-top: 2px;
           padding-top: 6px;
-          border-top: 1px solid rgba(250, 249, 245, 0.12);
+          border-top: 1px solid rgba(250, 249, 245, 0.14);
           display: flex;
           justify-content: space-between;
           gap: 8px;
-          font-size: 0.68rem;
-          color: rgba(250, 249, 245, 0.76);
+          font-size: 0.69rem;
+          color: rgba(250, 249, 245, 0.8);
         }
 
+        /* BARRA DE SEDE + ACCIONES + MODO ESPECTADOR CON PROFUNDIDAD */
         .tt-match-venue-bar {
           display: flex;
           flex-direction: column;
           gap: 4px;
-          padding: 9px 11px;
-          border-radius: 13px;
-          background: var(--tt-surface-2);
+          padding: 10px 12px;
+          border-radius: 14px;
+          background: rgba(13, 2, 25, 0.56);
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.32);
+        }
+        .tt-retos-view.is-light .tt-match-venue-bar {
+          background: #F2EEFA;
+          border-color: rgba(30, 7, 52, 0.14);
+          box-shadow: inset 0 2px 4px rgba(30, 7, 52, 0.08);
         }
         .tt-match-venue-item {
           display: flex;
           align-items: center;
           gap: 7px;
-          font-size: 0.75rem;
-          font-weight: 700;
+          font-size: 0.76rem;
+          font-weight: 800;
           color: var(--tt-text);
         }
         .tt-match-venue-item.is-subtle {
@@ -2962,57 +3209,78 @@ export default function RetosView({
           min-height: 40px !important;
           padding: 0 13px !important;
           font-size: 0.77rem !important;
-          border-radius: 12px !important;
+          border-radius: 13px !important;
         }
         .tt-icon-action-btn {
-          width: 40px;
-          height: 40px;
-          border-radius: 12px;
+          width: 42px;
+          height: 42px;
+          border-radius: 13px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
           flex-shrink: 0;
+          transition: transform 110ms ease, box-shadow 110ms ease;
+        }
+        .tt-icon-action-btn:active {
+          transform: translateY(2px);
         }
         .tt-icon-action-btn.is-wa {
-          background: rgba(37, 211, 102, 0.15);
-          color: #16A34A;
-          border: 1px solid rgba(37, 211, 102, 0.35);
-        }
-        .tt-retos-view.is-dark .tt-icon-action-btn.is-wa {
+          background: linear-gradient(180deg, rgba(37, 211, 102, 0.24) 0%, rgba(22, 163, 74, 0.14) 100%);
           color: #4ADE80;
+          border: 1.5px solid rgba(37, 211, 102, 0.5);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 3px 0 rgba(20, 83, 45, 0.7);
         }
+        .tt-retos-view.is-light .tt-icon-action-btn.is-wa {
+          background: linear-gradient(180deg, #EBFCF2 0%, #D3F8E2 100%);
+          color: #15803D;
+          border-color: rgba(22, 163, 74, 0.45);
+          box-shadow: inset 0 1px 0 #FFFFFF, 0 3px 0 #86EFAC;
+        }
+
         .tt-waiting-banner {
           flex: 1;
           display: flex;
           align-items: center;
           gap: 7px;
-          padding: 9px 11px;
-          border-radius: 12px;
-          background: rgba(229, 193, 108, 0.12);
-          border: 1px solid rgba(229, 193, 108, 0.3);
-          color: #E5C16C;
+          padding: 10px 12px;
+          border-radius: 13px;
+          background: linear-gradient(180deg, rgba(229, 193, 108, 0.18) 0%, rgba(229, 193, 108, 0.09) 100%);
+          border: 1.5px solid rgba(229, 193, 108, 0.46);
+          color: #F6E2A8;
           font-size: 0.74rem;
           font-weight: 800;
         }
         .tt-retos-view.is-light .tt-waiting-banner {
-          color: #8A5D10;
-          background: #FBF4E0;
+          background: linear-gradient(180deg, #FFFBF0 0%, #FAF0D1 100%);
+          border-color: rgba(168, 118, 22, 0.42);
+          color: #7A4F05;
         }
+
         .tt-spectator-pill {
           flex: 1;
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          gap: 6px;
-          min-height: 36px;
-          border-radius: 11px;
-          background: var(--tt-surface-2);
-          color: var(--tt-text-muted);
-          font-size: 0.72rem;
-          font-weight: 700;
+          gap: 7px;
+          min-height: 38px;
+          border-radius: 12px;
+          background: linear-gradient(180deg, #2D104F 0%, #1F0839 100%);
+          border: 1px solid rgba(255, 255, 255, 0.14);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 2px 0 #0F021C;
+          color: rgba(250, 249, 245, 0.8);
+          font-size: 0.73rem;
+          font-weight: 800;
+        }
+        .tt-retos-view.is-light .tt-spectator-pill {
+          background: linear-gradient(180deg, #FFFFFF 0%, #F1ECF9 100%);
+          border-color: rgba(30, 7, 52, 0.16);
+          box-shadow: inset 0 1px 0 #FFFFFF, 0 2px 0 #D2C8E6;
+          color: #46325E;
         }
 
-        /* 6. RADAR DE RIVALES */
+        /* ==================================================================
+           6. RADAR DE RIVALES 3D
+           ================================================================== */
         .tt-radar-controls {
           display: flex;
           flex-direction: column;
@@ -3025,35 +3293,47 @@ export default function RetosView({
           padding: 0 14px;
           min-height: 46px;
           border-radius: 15px;
-          background: var(--tt-surface);
-          border: 1px solid var(--tt-border);
-          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+          background: var(--tt-bg-input);
+          border: 1.5px solid var(--tt-border-medium);
+          box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.18);
+          color: var(--tt-text);
+        }
+        .tt-retos-view.is-light .tt-search-box {
+          background: #FFFFFF;
+          border-color: rgba(30, 7, 52, 0.22);
+          color: #1E0734;
+          box-shadow: inset 0 2px 4px rgba(30, 7, 52, 0.06);
         }
         .tt-search-box input {
           width: 100%;
           border: none;
           background: transparent;
-          color: var(--tt-text);
+          color: inherit;
           font-size: 16px;
           outline: none;
         }
         .tt-rivals-list {
           display: flex;
           flex-direction: column;
-          gap: 10px;
+          gap: 11px;
         }
         .tt-rival-row {
           display: flex;
           align-items: center;
           gap: 12px;
-          padding: 12px 13px;
-          border-radius: 18px;
-          background: var(--tt-surface);
-          border: 1px solid var(--tt-border);
-          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+          padding: 13px;
+          border-radius: 19px;
+          background: linear-gradient(180deg, rgba(44, 17, 74, 0.96) 0%, rgba(23, 6, 42, 0.98) 100%);
+          border: 1.5px solid rgba(255, 255, 255, 0.15);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 4px 0 #0F021C;
+        }
+        .tt-retos-view.is-light .tt-rival-row {
+          background: linear-gradient(180deg, #FFFFFF 0%, #F7F4FC 100%);
+          border-color: rgba(30, 7, 52, 0.17);
+          box-shadow: inset 0 1px 0 #FFFFFF, 0 4px 0 #D2C8E6;
         }
         .tt-rival-row.is-out-of-range {
-          opacity: 0.75;
+          opacity: 0.78;
         }
         .tt-rival-info {
           flex: 1;
@@ -3066,7 +3346,7 @@ export default function RetosView({
           display: flex;
           align-items: center;
           gap: 6px;
-          font-size: 0.9rem;
+          font-size: 0.91rem;
           flex-wrap: wrap;
         }
         .tt-rival-name-line strong {
@@ -3075,17 +3355,12 @@ export default function RetosView({
           text-overflow: ellipsis;
         }
         .tt-vip-micro-pill {
-          padding: 1px 6px;
+          padding: 2px 6px;
           border-radius: 6px;
-          background: rgba(229, 193, 108, 0.16);
-          border: 1px solid rgba(229, 193, 108, 0.42);
-          color: #E5C16C;
+          background: linear-gradient(180deg, #FAE9B6 0%, #D4A33D 100%);
+          color: #1A1002;
           font-size: 0.58rem;
           font-weight: 900;
-        }
-        .tt-retos-view.is-light .tt-vip-micro-pill {
-          background: #FBF4E0;
-          color: #8A5D10;
         }
         .tt-rival-meta-line {
           display: flex;
@@ -3099,9 +3374,10 @@ export default function RetosView({
           display: inline-flex;
           align-items: center;
           gap: 4px;
-          padding: 2px 7px;
+          padding: 2px 8px;
           border-radius: 999px;
           background: var(--tt-surface-2);
+          border: 1px solid var(--tt-border);
           color: var(--tt-text-secondary);
           font-weight: 800;
           font-size: 0.66rem;
@@ -3110,38 +3386,41 @@ export default function RetosView({
           display: flex;
           align-items: center;
           gap: 6px;
-          font-size: 0.7rem;
+          font-size: 0.71rem;
           color: var(--tt-text-muted);
           flex-wrap: wrap;
         }
         .tt-rival-forecast-line .is-win {
           color: var(--tt-emerald-text);
-          font-weight: 800;
-        }
-        .tt-rival-forecast-line .is-gems {
-          color: #E5C16C;
           font-weight: 900;
         }
-        .tt-retos-view.is-light .tt-rival-forecast-line .is-gems {
-          color: #9A6B16;
+        .tt-rival-forecast-line .is-gems {
+          color: var(--tt-gold-text, #F4DA92);
+          font-weight: 900;
         }
         .tt-rival-forecast-line .is-loss {
-          color: #EF4444;
+          color: var(--tt-danger-text, #F87171);
           font-weight: 700;
         }
         .tt-rival-forecast-line .is-expanded {
-          color: #7DD3FC;
+          color: var(--tt-sky-text, #7DD3FC);
           font-weight: 800;
         }
         .tt-rival-cta-col {
           flex-shrink: 0;
         }
 
-        /* 7. FORMULARIOS EN MODAL + BLOQUE DE GEMAS HASTA 6-0, 6-0 */
+        /* ==================================================================
+           7. MODAL 1: PACTAR DESAFÍO (SELECTORES 3D + GEMAS 6-0, 6-0 + MODO CLARO)
+           ================================================================== */
         .tt-form-stack {
           display: flex;
           flex-direction: column;
           gap: 14px;
+          color: var(--tt-text);
+        }
+        .tt-form-stack.is-light {
+          color: #1E0734;
         }
         .tt-field-group {
           display: flex;
@@ -3149,17 +3428,17 @@ export default function RetosView({
           gap: 6px;
         }
         .tt-field-label {
-          font-size: 0.74rem;
+          font-size: 0.75rem;
           font-weight: 800;
           color: var(--tt-text-muted);
         }
         .tt-forecast-box {
-          border-radius: 16px;
-          padding: 12px;
-          background: linear-gradient(135deg, #1E0734 0%, #140424 100%);
+          border-radius: 17px;
+          padding: 13px;
+          background: linear-gradient(145deg, #250A42 0%, #140324 100%);
           color: #FAF9F5;
-          border: 1px solid rgba(0, 220, 125, 0.34);
-          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+          border: 1.5px solid rgba(0, 220, 125, 0.44);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 4px 0 #0D0219;
         }
         .tt-forecast-head {
           display: flex;
@@ -3167,15 +3446,16 @@ export default function RetosView({
           justify-content: space-between;
           gap: 8px;
           margin-bottom: 10px;
-          font-size: 0.8rem;
+          font-size: 0.81rem;
         }
         .tt-rematch-tag {
-          padding: 3px 8px;
+          padding: 3px 9px;
           border-radius: 999px;
-          background: rgba(229, 193, 108, 0.2);
-          color: #F3DC9B;
+          background: rgba(229, 193, 108, 0.22);
+          border: 1px solid rgba(229, 193, 108, 0.45);
+          color: #F6E2A8;
           font-size: 0.66rem;
-          font-weight: 800;
+          font-weight: 900;
         }
         .tt-forecast-grid {
           display: grid;
@@ -3185,36 +3465,23 @@ export default function RetosView({
         .tt-forecast-cell {
           padding: 9px 10px;
           border-radius: 12px;
-          background: rgba(250, 249, 245, 0.07);
+          background: rgba(250, 249, 245, 0.08);
           display: flex;
           flex-direction: column;
           gap: 2px;
         }
-        .tt-forecast-cell span {
-          font-size: 0.68rem;
-          opacity: 0.78;
-        }
-        .tt-forecast-cell strong {
-          font-size: 1.15rem;
-          font-weight: 900;
-        }
-        .tt-forecast-cell.is-win strong {
-          color: #00DC7D;
-        }
-        .tt-forecast-cell.is-loss strong {
-          color: #F87171;
-        }
-        .tt-forecast-cell small {
-          font-size: 0.66rem;
-          opacity: 0.74;
-        }
+        .tt-forecast-cell span { font-size: 0.68rem; opacity: 0.82; }
+        .tt-forecast-cell strong { font-size: 1.15rem; font-weight: 900; }
+        .tt-forecast-cell.is-win strong { color: #00E582; }
+        .tt-forecast-cell.is-loss strong { color: #F87171; }
+        .tt-forecast-cell small { font-size: 0.66rem; opacity: 0.78; }
 
         .tt-gems-forecast-strip {
           margin-top: 10px;
           padding: 10px 11px;
           border-radius: 13px;
-          background: linear-gradient(135deg, rgba(0, 220, 125, 0.14) 0%, rgba(229, 193, 108, 0.1) 100%);
-          border: 1px solid rgba(0, 220, 125, 0.36);
+          background: linear-gradient(135deg, rgba(0, 220, 125, 0.16) 0%, rgba(229, 193, 108, 0.12) 100%);
+          border: 1px solid rgba(0, 220, 125, 0.42);
           display: flex;
           flex-direction: column;
           gap: 7px;
@@ -3226,56 +3493,44 @@ export default function RetosView({
           gap: 8px;
           font-size: 0.74rem;
         }
-        .tt-gems-forecast-top span {
-          color: rgba(250, 249, 245, 0.88);
-          font-weight: 700;
-        }
-        .tt-gems-forecast-top strong {
-          color: #00DC7D;
-          font-size: 0.84rem;
-          font-weight: 900;
-          white-space: nowrap;
-        }
+        .tt-gems-forecast-top span { color: rgba(250, 249, 245, 0.9); font-weight: 700; }
+        .tt-gems-forecast-top strong { color: #22F397; font-size: 0.85rem; font-weight: 900; white-space: nowrap; }
         .tt-gems-tiers-row {
           display: grid;
           grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 5px;
         }
         @media (min-width: 480px) {
-          .tt-gems-tiers-row {
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-          }
+          .tt-gems-tiers-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
         }
         .tt-gems-tiers-row span {
           padding: 5px 7px;
           border-radius: 9px;
-          background: rgba(16, 3, 29, 0.56);
-          border: 1px solid rgba(250, 249, 245, 0.1);
+          background: rgba(16, 3, 29, 0.6);
+          border: 1px solid rgba(250, 249, 245, 0.12);
           font-size: 0.64rem;
-          color: rgba(250, 249, 245, 0.86);
+          color: rgba(250, 249, 245, 0.9);
           text-align: center;
           white-space: nowrap;
         }
         .tt-gems-tiers-row span.is-max {
-          background: rgba(229, 193, 108, 0.18);
-          border-color: rgba(229, 193, 108, 0.45);
-          color: #F5E1A4;
+          background: rgba(229, 193, 108, 0.22);
+          border-color: rgba(229, 193, 108, 0.55);
+          color: #F8E5AC;
         }
         .tt-gems-vip-upsell {
           font-size: 0.66rem;
           line-height: 1.35;
-          color: rgba(250, 249, 245, 0.78);
+          color: rgba(250, 249, 245, 0.82);
         }
-        .tt-gems-vip-upsell b {
-          color: #F5E1A4;
-        }
+        .tt-gems-vip-upsell b { color: #F8E5AC; }
 
         .tt-gems-preview-pill {
           margin-top: 9px;
           padding: 9px 12px;
           border-radius: 12px;
-          background: linear-gradient(135deg, rgba(0, 220, 125, 0.14) 0%, rgba(229, 193, 108, 0.1) 100%);
-          border: 1px solid rgba(0, 220, 125, 0.4);
+          background: linear-gradient(135deg, rgba(0, 220, 125, 0.16) 0%, rgba(229, 193, 108, 0.12) 100%);
+          border: 1.5px solid rgba(0, 220, 125, 0.45);
           display: flex;
           align-items: center;
           justify-content: space-between;
@@ -3286,68 +3541,103 @@ export default function RetosView({
         }
         .tt-gems-preview-pill strong {
           color: var(--tt-emerald-text);
-          font-size: 0.86rem;
+          font-size: 0.87rem;
           font-weight: 900;
           white-space: nowrap;
         }
 
+        /* SELECTORES 3D DE MODALIDAD, SEDE, HORARIO Y PELOTAS */
         .tt-toggle-pair {
           display: grid;
           grid-template-columns: 1fr 1fr;
-          gap: 8px;
+          gap: 9px;
         }
+        .tt-choice-pill,
+        .tt-venue-option,
+        .tt-slot-chip {
+          cursor: pointer;
+          background: linear-gradient(180deg, #321357 0%, #20093B 100%);
+          border: 1.5px solid rgba(255, 255, 255, 0.16);
+          color: #FAF9F5;
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 3px 0 #10021E;
+          transition: transform 110ms ease, box-shadow 110ms ease, background 150ms ease;
+        }
+        .tt-choice-pill:active:not(:disabled),
+        .tt-venue-option:active,
+        .tt-slot-chip:active {
+          transform: translateY(2px);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 1px 0 #10021E;
+        }
+        .tt-form-stack.is-light .tt-choice-pill,
+        .tt-form-stack.is-light .tt-venue-option,
+        .tt-form-stack.is-light .tt-slot-chip,
+        html[data-theme='light'] .tt-choice-pill,
+        html[data-theme='light'] .tt-venue-option,
+        html[data-theme='light'] .tt-slot-chip {
+          background: linear-gradient(180deg, #FFFFFF 0%, #F1ECF9 100%);
+          border-color: rgba(30, 7, 52, 0.19);
+          color: #1E0734;
+          box-shadow: inset 0 1px 0 #FFFFFF, 0 3px 0 #C8BDDF;
+        }
+
         .tt-choice-pill {
-          min-height: 42px;
+          min-height: 43px;
           padding: 8px 12px;
           border-radius: 13px;
-          background: var(--tt-surface-2);
-          border: 1px solid var(--tt-border);
-          color: var(--tt-text);
           font-size: 0.78rem;
-          font-weight: 700;
+          font-weight: 800;
           text-align: center;
         }
         .tt-choice-pill:disabled {
           opacity: 0.45;
           cursor: not-allowed;
         }
-        .tt-choice-pill.is-selected {
-          background: rgba(0, 220, 125, 0.16);
-          border-color: #00DC7D;
-          color: var(--tt-emerald-text);
-          font-weight: 800;
+        .tt-choice-pill.is-selected,
+        .tt-venue-option.is-selected,
+        .tt-slot-chip.is-selected {
+          background: linear-gradient(180deg, #22F397 0%, #00C96F 56%, #00A85B 100%) !important;
+          border-color: rgba(170, 255, 218, 0.8) !important;
+          color: #0D0219 !important;
+          font-weight: 900;
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.72),
+            0 3px 0 #007540,
+            0 6px 14px rgba(0, 220, 125, 0.28) !important;
         }
-        .tt-retos-view.is-light .tt-choice-pill.is-selected {
-          background: #1E0734;
-          border-color: #1E0734;
-          color: #00DC7D;
+        .tt-form-stack.is-light .tt-choice-pill.is-selected,
+        .tt-form-stack.is-light .tt-venue-option.is-selected,
+        .tt-form-stack.is-light .tt-slot-chip.is-selected,
+        html[data-theme='light'] .tt-choice-pill.is-selected,
+        html[data-theme='light'] .tt-venue-option.is-selected,
+        html[data-theme='light'] .tt-slot-chip.is-selected {
+          background: linear-gradient(180deg, #35115C 0%, #1E0734 100%) !important;
+          border-color: #1E0734 !important;
+          color: #00E582 !important;
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.26),
+            0 3px 0 #0D0218,
+            0 6px 14px rgba(30, 7, 52, 0.24) !important;
         }
+
         .tt-venues-select-grid {
           display: grid;
           grid-template-columns: 1fr 1fr;
-          gap: 8px;
+          gap: 9px;
         }
         .tt-venue-option {
-          min-height: 46px;
+          min-height: 48px;
           padding: 8px 10px;
           border-radius: 13px;
-          background: var(--tt-surface-2);
-          border: 1px solid var(--tt-border);
-          color: var(--tt-text);
           display: flex;
           align-items: center;
           gap: 8px;
           font-size: 0.77rem;
-          font-weight: 700;
+          font-weight: 800;
           text-align: left;
         }
         .tt-venue-option.is-custom {
           grid-column: 1 / -1;
           justify-content: center;
-        }
-        .tt-venue-option.is-selected {
-          border-color: #00DC7D;
-          background: rgba(0, 220, 125, 0.14);
         }
         .tt-date-time-grid {
           display: grid;
@@ -3356,65 +3646,43 @@ export default function RetosView({
         }
         .tt-quick-slots-row {
           display: flex;
-          gap: 6px;
+          gap: 7px;
           overflow-x: auto;
-          padding-bottom: 2px;
+          padding: 2px 1px 6px;
         }
         .tt-slot-chip {
           flex-shrink: 0;
-          padding: 6px 11px;
-          border-radius: 999px;
+          padding: 7px 12px;
+          border-radius: 11px;
           font-size: 0.74rem;
-          font-weight: 700;
-          background: var(--tt-surface-2);
-          border: 1px solid var(--tt-border);
-          color: var(--tt-text-muted);
-        }
-        .tt-slot-chip.is-selected {
-          background: #00DC7D;
-          border-color: #00DC7D;
-          color: #10021E;
-          font-weight: 900;
+          font-weight: 800;
         }
         .tt-balls-stack {
           display: flex;
           flex-direction: column;
-          gap: 7px;
+          gap: 8px;
         }
 
-        /* 8. MODAL MARCADOR DIRECTO + MODO ÁRBITRO */
+        /* ==================================================================
+           8. MODAL 2: MARCADOR DIRECTO + MODO ÁRBITRO 3D (OSCURO Y CLARO)
+           ================================================================== */
         .tt-mc-container {
           display: flex;
           flex-direction: column;
           gap: 13px;
+          color: var(--tt-text);
         }
-        .tt-score-mode-switch {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 5px;
-          padding: 4px;
-          border-radius: 14px;
-          background: var(--tt-surface-2);
-          border: 1px solid var(--tt-border);
-        }
-        .tt-score-mode-switch button {
-          min-height: 38px;
-          border-radius: 10px;
-          font-size: 0.76rem;
-          font-weight: 800;
-          color: var(--tt-text-muted);
-        }
-        .tt-score-mode-switch button.is-active {
-          background: #1E0734;
-          color: #00DC7D;
+        .tt-mc-container.is-light {
+          color: #1E0734;
         }
 
         .tt-stadium-board {
-          border-radius: 18px;
-          padding: 13px;
-          background: linear-gradient(135deg, #250942 0%, #140324 100%);
+          border-radius: 19px;
+          padding: 14px;
+          background: linear-gradient(145deg, #270A45 0%, #140324 100%);
           color: #FAF9F5;
-          border: 1.5px solid rgba(0, 220, 125, 0.34);
+          border: 1.5px solid rgba(0, 220, 125, 0.42);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 4px 0 #0C0117;
           display: flex;
           flex-direction: column;
           gap: 9px;
@@ -3423,9 +3691,9 @@ export default function RetosView({
           display: flex;
           justify-content: space-between;
           font-size: 0.65rem;
-          font-weight: 800;
+          font-weight: 900;
           letter-spacing: 0.08em;
-          color: rgba(250, 249, 245, 0.6);
+          color: rgba(250, 249, 245, 0.65);
         }
         .tt-stadium-row {
           display: flex;
@@ -3433,7 +3701,7 @@ export default function RetosView({
           justify-content: space-between;
           gap: 10px;
           padding-top: 8px;
-          border-top: 1px solid rgba(250, 249, 245, 0.1);
+          border-top: 1px solid rgba(250, 249, 245, 0.12);
         }
         .tt-stadium-player {
           display: flex;
@@ -3443,14 +3711,14 @@ export default function RetosView({
         }
         .tt-stadium-player strong {
           display: block;
-          font-size: 0.86rem;
+          font-size: 0.87rem;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
         }
         .tt-stadium-player small {
           font-size: 0.68rem;
-          color: rgba(250, 249, 245, 0.66);
+          color: rgba(250, 249, 245, 0.7);
         }
         .tt-stadium-cols {
           display: flex;
@@ -3458,16 +3726,16 @@ export default function RetosView({
           flex-shrink: 0;
         }
         .tt-stadium-head .tt-stadium-cols span {
-          width: 34px;
+          width: 35px;
           text-align: center;
         }
         .tt-st-num {
-          width: 34px;
-          height: 34px;
-          border-radius: 9px;
-          background: rgba(250, 249, 245, 0.12);
+          width: 35px;
+          height: 35px;
+          border-radius: 10px;
+          background: rgba(250, 249, 245, 0.14);
           font-family: var(--tt-font-display);
-          font-size: 1.15rem;
+          font-size: 1.18rem;
           font-weight: 900;
           display: inline-flex;
           align-items: center;
@@ -3475,12 +3743,12 @@ export default function RetosView({
         }
         .tt-st-num sup {
           font-size: 0.6rem;
-          color: #00DC7D;
+          color: #22F397;
           margin-left: 1px;
         }
         .tt-st-num.is-stb {
-          background: rgba(229, 193, 108, 0.22);
-          color: #F3DC9B;
+          background: rgba(229, 193, 108, 0.24);
+          color: #F6E2A8;
           min-width: 38px;
           width: auto;
           padding: 0 6px;
@@ -3490,25 +3758,38 @@ export default function RetosView({
           margin: 0;
           font-size: 0.77rem;
           color: var(--tt-text-muted);
-          line-height: 1.4;
+          line-height: 1.42;
         }
-        .tt-direct-set-box {
-          border-radius: 16px;
-          padding: 12px;
-          background: var(--tt-surface-2);
-          border: 1px solid var(--tt-border);
+        .tt-direct-set-box,
+        .tt-set-control-card {
+          border-radius: 17px;
+          padding: 13px;
+          background: linear-gradient(180deg, #2D104F 0%, #1E0838 100%);
+          border: 1.5px solid rgba(255, 255, 255, 0.14);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 4px 0 #0F021C;
           display: flex;
           flex-direction: column;
           gap: 10px;
         }
-        .tt-direct-set-box.is-stb-card {
-          border-color: rgba(229, 193, 108, 0.5);
+        .tt-mc-container.is-light .tt-direct-set-box,
+        .tt-mc-container.is-light .tt-set-control-card,
+        html[data-theme='light'] .tt-direct-set-box,
+        html[data-theme='light'] .tt-set-control-card {
+          background: linear-gradient(180deg, #FFFFFF 0%, #F4F0FA 100%);
+          border-color: rgba(30, 7, 52, 0.17);
+          box-shadow: inset 0 1px 0 #FFFFFF, 0 4px 0 #D2C8E6;
         }
-        .tt-direct-set-head {
+        .tt-direct-set-box.is-stb-card,
+        .tt-set-control-card.is-stb-card {
+          border-color: rgba(229, 193, 108, 0.56);
+        }
+        .tt-direct-set-head,
+        .tt-set-control-head {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          font-size: 0.8rem;
+          gap: 8px;
+          font-size: 0.81rem;
         }
         .tt-direct-set-head span {
           font-size: 0.7rem;
@@ -3533,24 +3814,30 @@ export default function RetosView({
         }
         .tt-direct-num-input {
           width: 100%;
-          height: 52px;
+          height: 54px;
           border-radius: 14px;
-          background: var(--tt-surface);
+          background: var(--tt-bg-input);
           border: 1.5px solid var(--tt-border-medium);
           color: var(--tt-text);
           text-align: center;
           font-family: var(--tt-font-display);
-          font-size: 1.65rem;
+          font-size: 1.7rem;
           font-weight: 900;
+        }
+        .tt-mc-container.is-light .tt-direct-num-input {
+          background: #FFFFFF;
+          color: #1E0734;
+          border-color: rgba(30, 7, 52, 0.24);
         }
         .tt-direct-num-input:focus {
           outline: none;
           border-color: #00DC7D;
+          box-shadow: 0 0 0 3px rgba(0, 220, 125, 0.2);
         }
         .tt-direct-dash {
           font-size: 1.4rem;
           font-weight: 900;
-          padding-bottom: 12px;
+          padding-bottom: 13px;
           color: var(--tt-text-muted);
         }
         .tt-direct-tb-row {
@@ -3558,27 +3845,27 @@ export default function RetosView({
           align-items: center;
           justify-content: center;
           gap: 8px;
-          padding-top: 6px;
+          padding-top: 7px;
           border-top: 1px solid var(--tt-border);
           font-size: 0.72rem;
           font-weight: 700;
           color: var(--tt-text-muted);
         }
         .tt-direct-tb-input {
-          width: 48px;
+          width: 50px;
           height: 36px;
           border-radius: 10px;
-          background: var(--tt-surface);
-          border: 1px solid var(--tt-border-medium);
+          background: var(--tt-bg-input);
+          border: 1.5px solid var(--tt-border-medium);
           color: var(--tt-text);
           text-align: center;
           font-weight: 900;
         }
         .tt-direct-validation-note {
-          padding: 11px 13px;
-          border-radius: 13px;
+          padding: 12px 13px;
+          border-radius: 14px;
           background: var(--tt-surface-2);
-          border: 1px dashed var(--tt-border-medium);
+          border: 1.5px dashed var(--tt-border-medium);
           color: var(--tt-text-muted);
           font-size: 0.76rem;
           font-weight: 700;
@@ -3588,37 +3875,16 @@ export default function RetosView({
         .tt-mc-controls-wrap {
           display: flex;
           flex-direction: column;
-          gap: 11px;
-        }
-        .tt-set-control-card {
-          border-radius: 16px;
-          padding: 12px;
-          background: var(--tt-surface-2);
-          border: 1px solid var(--tt-border);
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-        }
-        .tt-set-control-card.is-stb-card {
-          border-color: rgba(229, 193, 108, 0.45);
-        }
-        .tt-set-control-head {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 8px;
-          font-size: 0.8rem;
+          gap: 12px;
         }
         .tt-unlock-btn {
-          padding: 4px 10px;
-          border-radius: 999px;
-          background: rgba(229, 193, 108, 0.16);
-          color: #E5C16C;
+          padding: 5px 11px;
+          border-radius: 10px;
+          background: rgba(229, 193, 108, 0.2);
+          border: 1px solid rgba(229, 193, 108, 0.45);
+          color: var(--tt-gold-text, #F4DA92);
           font-size: 0.7rem;
-          font-weight: 800;
-        }
-        .tt-retos-view.is-light .tt-unlock-btn {
-          color: #8A5D10;
+          font-weight: 900;
         }
         .tt-tb-panel {
           display: flex;
@@ -3629,9 +3895,10 @@ export default function RetosView({
           text-align: center;
           padding: 6px 10px;
           border-radius: 10px;
-          background: rgba(0, 220, 125, 0.15);
+          background: rgba(0, 220, 125, 0.16);
+          border: 1px solid rgba(0, 220, 125, 0.4);
           color: var(--tt-emerald-text);
-          font-size: 0.68rem;
+          font-size: 0.69rem;
           font-weight: 900;
         }
         .tt-dual-stepper {
@@ -3652,30 +3919,61 @@ export default function RetosView({
         }
         .tt-stepper-btns {
           display: flex;
-          gap: 6px;
+          gap: 7px;
         }
         .tt-step-minus {
-          width: 40px;
-          height: 44px;
-          border-radius: 12px;
-          background: var(--tt-surface);
-          border: 1px solid var(--tt-border);
-          color: var(--tt-text);
-          font-size: 1.2rem;
-          font-weight: 800;
+          width: 42px;
+          height: 46px;
+          border-radius: 13px;
+          background: linear-gradient(180deg, #35155A 0%, #230A40 100%);
+          border: 1.5px solid rgba(255, 255, 255, 0.18);
+          color: #FAF9F5;
+          font-size: 1.25rem;
+          font-weight: 900;
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 4px 0 #10021E;
+          transition: transform 105ms ease, box-shadow 105ms ease;
         }
+        .tt-step-minus:active:not(:disabled) {
+          transform: translateY(3px);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 1px 0 #10021E;
+        }
+        .tt-mc-container.is-light .tt-step-minus {
+          background: linear-gradient(180deg, #FFFFFF 0%, #EFEAF8 100%);
+          border-color: rgba(30, 7, 52, 0.2);
+          color: #1E0734;
+          box-shadow: inset 0 1px 0 #FFFFFF, 0 4px 0 #C8BDDF;
+        }
+
         .tt-step-plus {
           flex: 1;
-          height: 44px;
-          border-radius: 12px;
-          background: linear-gradient(135deg, #00DC7D 0%, #00B365 100%);
-          color: #10021E;
-          font-size: 0.82rem;
+          height: 46px;
+          border-radius: 13px;
+          background: linear-gradient(180deg, #22F397 0%, #00C96F 56%, #00A85B 100%);
+          border: 1px solid rgba(170, 255, 218, 0.78);
+          color: #0D0219;
+          font-size: 0.83rem;
           font-weight: 900;
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.7),
+            0 4px 0 #007540,
+            0 8px 16px rgba(0, 220, 125, 0.28);
+          transition: transform 105ms ease, box-shadow 105ms ease;
+        }
+        .tt-step-plus:active:not(:disabled) {
+          transform: translateY(3px);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 1px 0 #007540;
         }
         .tt-step-plus.is-champagne {
-          background: linear-gradient(135deg, #F5E1A4 0%, #CCA046 100%);
-          color: #1A1102;
+          background: linear-gradient(180deg, #FAE9B6 0%, #E5C16C 56%, #C89938 100%);
+          border-color: rgba(255, 245, 214, 0.78);
+          color: #1A1002;
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.72),
+            0 4px 0 #8A6012,
+            0 8px 16px rgba(229, 193, 108, 0.28);
+        }
+        .tt-step-plus.is-champagne:active:not(:disabled) {
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 1px 0 #8A6012;
         }
 
         .tt-judge-assign-box {
@@ -3684,10 +3982,11 @@ export default function RetosView({
           gap: 6px;
         }
         .tt-elo-preview-card {
-          border-radius: 16px;
-          padding: 13px;
-          background: rgba(0, 220, 125, 0.1);
-          border: 1.5px solid rgba(0, 220, 125, 0.45);
+          border-radius: 17px;
+          padding: 14px;
+          background: rgba(0, 220, 125, 0.12);
+          border: 1.5px solid rgba(0, 220, 125, 0.5);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 4px 0 rgba(0, 117, 64, 0.36);
         }
         .tt-elo-preview-head {
           display: flex;
@@ -3696,7 +3995,7 @@ export default function RetosView({
           margin-bottom: 10px;
         }
         .tt-elo-preview-head span {
-          font-size: 0.72rem;
+          font-size: 0.73rem;
           color: var(--tt-text-muted);
         }
         .tt-elo-preview-deltas {
@@ -3705,9 +4004,10 @@ export default function RetosView({
           gap: 8px;
         }
         .tt-elo-preview-deltas > div {
-          padding: 8px 10px;
-          border-radius: 11px;
+          padding: 9px 10px;
+          border-radius: 12px;
           background: var(--tt-surface);
+          border: 1px solid var(--tt-border);
           display: flex;
           flex-direction: column;
           gap: 2px;
@@ -3721,27 +4021,28 @@ export default function RetosView({
           padding-top: 2px;
         }
         .tt-text-action {
-          font-size: 0.75rem;
-          font-weight: 700;
+          font-size: 0.76rem;
+          font-weight: 800;
           color: var(--tt-text-muted);
           text-decoration: underline;
         }
         .tt-text-action.is-danger {
-          color: #EF4444;
+          color: var(--tt-danger-text, #EF4444);
         }
         .tt-wo-box {
-          padding: 11px;
-          border-radius: 13px;
-          background: rgba(239, 68, 68, 0.1);
-          border: 1px solid rgba(239, 68, 68, 0.32);
+          padding: 12px;
+          border-radius: 14px;
+          background: rgba(239, 68, 68, 0.12);
+          border: 1.5px solid rgba(239, 68, 68, 0.4);
         }
         .tt-spectator-note {
           display: flex;
           align-items: center;
           gap: 10px;
-          padding: 12px;
+          padding: 13px;
           border-radius: 14px;
           background: var(--tt-surface-2);
+          border: 1px solid var(--tt-border);
           font-size: 0.8rem;
           color: var(--tt-text-muted);
         }
@@ -3754,14 +4055,13 @@ export default function RetosView({
         }
         .tt-rule-callout.is-ok {
           background: rgba(0, 220, 125, 0.14);
-          border: 1px solid rgba(0, 220, 125, 0.4);
+          border: 1.5px solid rgba(0, 220, 125, 0.45);
         }
         .tt-rule-callout.is-warn {
-          background: rgba(229, 193, 108, 0.14);
-          border: 1px solid rgba(229, 193, 108, 0.42);
+          background: rgba(229, 193, 108, 0.16);
+          border: 1.5px solid rgba(229, 193, 108, 0.48);
         }
       `}</style>
     </section>
   );
 }
-
