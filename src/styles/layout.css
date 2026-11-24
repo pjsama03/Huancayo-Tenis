@@ -1,5 +1,5 @@
 /* ==========================================================================
-   TOTAL TENIS · LAYOUT MAESTRO, ANCLAJE IPHONE PWA Y ACABADO PREMIUM
+   TOTAL TENIS · LAYOUT MAESTRO, ANCLAJE IPHONE PWA Y SISTEMA 3D TÁCTIL
    Consumo directo de src/styles/tokens.css
    Mobile-First Universal (320px -> 430px) + Adaptación Desktop (768px+)
    ========================================================================== */
@@ -56,8 +56,7 @@ body {
   background-color: var(--tt-bg-app);
 }
 
-/* Lienzo raíz con iluminación atmosférica de estadio y altura física real
-   (elimina el recorte de ~59px de WebKit en iPhone PWA standalone) */
+/* Lienzo raíz con iluminación atmosférica de estadio y altura física real */
 .tt-app-viewport {
   position: fixed !important;
   top: 0 !important;
@@ -73,8 +72,8 @@ body {
   background:
     radial-gradient(
       ellipse 95% 42% at 50% -8%,
-      rgba(104, 34, 176, 0.42) 0%,
-      rgba(0, 220, 125, 0.08) 46%,
+      rgba(104, 34, 176, 0.46) 0%,
+      rgba(0, 220, 125, 0.09) 46%,
       rgba(22, 4, 40, 0) 76%
     ),
     linear-gradient(180deg, #1b0630 0%, #160428 45%, #11021f 100%) !important;
@@ -84,17 +83,18 @@ body {
   background:
     radial-gradient(
       ellipse 95% 36% at 50% -10%,
-      rgba(0, 220, 125, 0.09) 0%,
-      rgba(250, 249, 245, 0) 70%
+      rgba(0, 220, 125, 0.11) 0%,
+      rgba(104, 34, 176, 0.04) 45%,
+      rgba(247, 245, 240, 0) 74%
     ),
-    #faf9f5 !important;
+    #f7f5f0 !important;
 }
 
 html[data-tier='lite'] .tt-app-viewport.is-dark {
   background: #160428 !important;
 }
 html[data-tier='lite'] .tt-app-viewport.is-light {
-  background: #faf9f5 !important;
+  background: #f7f5f0 !important;
 }
 
 html[data-standalone='true'] .tt-main-inner {
@@ -212,7 +212,7 @@ textarea {
 }
 
 /* --------------------------------------------------------------------------
-   3. SHELL PRINCIPAL Y DOCK ANCLADO AL CONTENEDOR FÍSICO (NO FIXED BUG)
+   3. SHELL PRINCIPAL Y DOCK ANCLADO AL CONTENEDOR FÍSICO
    -------------------------------------------------------------------------- */
 .tt-app-shell {
   width: 100%;
@@ -248,7 +248,6 @@ html[data-keyboard='open'] .tt-bottom-dock {
   pointer-events: none;
 }
 
-/* Base del Dock compatible con BottomDock.jsx (sin forzar position: fixed) */
 .tt-bottom-dock {
   position: absolute;
   left: 0;
@@ -275,13 +274,13 @@ html[data-keyboard='open'] .tt-bottom-dock {
 }
 
 /* --------------------------------------------------------------------------
-   4. MOTOR UNIVERSAL DE PORTALES (SCROLL ESTABLE SIN REBOTE EN IPHONE)
+   4. MOTOR UNIVERSAL DE PORTALES (SCROLL ESTABLE + MODO CLARO BLINDADO)
    -------------------------------------------------------------------------- */
 .tt-modal-backdrop {
   position: fixed;
   inset: 0;
   z-index: var(--tt-z-modal-backdrop);
-  background-color: rgba(8, 1, 18, 0.8);
+  background-color: rgba(8, 1, 18, 0.78);
   backdrop-filter: blur(var(--tt-blur-md));
   -webkit-backdrop-filter: blur(var(--tt-blur-md));
   display: flex;
@@ -308,9 +307,9 @@ html[data-keyboard='open'] .tt-bottom-dock {
   width: 100%;
   max-width: 560px;
   max-height: calc(100% - 8px);
-  background-color: var(--tt-bg-surface);
+  background: var(--tt-3d-card-grad);
   color: var(--tt-text-primary);
-  border: 1px solid var(--tt-border-medium);
+  border: 1.5px solid var(--tt-border-medium);
   border-radius: var(--tt-radius-xl);
   box-shadow: var(--tt-card-specular), var(--tt-shadow-lg);
   backdrop-filter: blur(var(--tt-blur-md));
@@ -319,6 +318,12 @@ html[data-keyboard='open'] .tt-bottom-dock {
   flex-direction: column;
   overflow: hidden;
   animation: ttModalPop var(--tt-dur-base) var(--tt-ease-spring) both;
+}
+
+html[data-theme='light'] .tt-modal-sheet {
+  background: linear-gradient(180deg, #ffffff 0%, #f8f5fc 100%);
+  color: #1e0734;
+  border-color: rgba(30, 7, 52, 0.2);
 }
 
 .tt-modal-sheet.is-wide {
@@ -342,6 +347,7 @@ html[data-keyboard='open'] .tt-bottom-dock {
   padding: 15px 16px 13px;
   border-bottom: 1px solid var(--tt-border-subtle);
   background-color: transparent;
+  color: var(--tt-text-primary);
 }
 
 .tt-modal-backdrop.is-fullscreen .tt-modal-head {
@@ -368,20 +374,20 @@ html[data-keyboard='open'] .tt-bottom-dock {
   width: 40px;
   height: 40px;
   min-width: 40px;
-  border-radius: var(--tt-radius-pill);
-  background-color: var(--tt-bg-pill);
-  border: 1px solid var(--tt-border-subtle);
+  border-radius: 13px;
+  background: var(--tt-3d-surface-grad);
+  border: 1.5px solid var(--tt-3d-surface-border);
   color: var(--tt-text-primary);
+  box-shadow: var(--tt-3d-surface-specular), 0 3px 0 var(--tt-3d-surface-edge);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: transform var(--tt-dur-fast) var(--tt-ease-spring),
-    background-color var(--tt-dur-fast) ease;
+  transition: transform 110ms var(--tt-ease-spring), box-shadow 110ms ease;
 }
 
 .tt-modal-close-btn:active {
-  transform: scale(0.9);
-  background-color: var(--tt-danger-soft);
+  transform: translateY(2px) scale(0.95);
+  box-shadow: var(--tt-3d-surface-specular), 0 1px 0 var(--tt-3d-surface-edge);
 }
 
 @keyframes ttFadeBackdrop {
@@ -401,7 +407,7 @@ html[data-keyboard='open'] .tt-bottom-dock {
 }
 
 /* --------------------------------------------------------------------------
-   5. ESTADOS VACÍOS LIMPIOS (ELIMINA RECUADRO NEGRO EN ILUSTRACIONES)
+   5. ESTADOS VACÍOS LIMPIOS
    -------------------------------------------------------------------------- */
 .tt-empty-card img,
 .tt-empty-illustration {
@@ -481,12 +487,15 @@ html[data-tier='lite'] .tt-reveal-item {
 }
 
 /* --------------------------------------------------------------------------
-   7. TARJETAS CRISTALINAS PREMIUM, MICRO-AURAS, PODIO Y BOTONES JOYA
+   7. TARJETAS 3D CRISTALINAS, PODIO Y BOTONES FÍSICOS 3D GLOBALES
    -------------------------------------------------------------------------- */
 .tt-card,
 .tt-match-card,
 .tt-rival-row {
-  box-shadow: var(--tt-card-specular), var(--tt-shadow-sm);
+  box-shadow:
+    var(--tt-card-specular),
+    0 4px 0 var(--tt-3d-card-edge),
+    var(--tt-shadow-sm);
   transition:
     border-color var(--tt-dur-fast) ease,
     box-shadow var(--tt-dur-base) ease,
@@ -497,15 +506,19 @@ html[data-tier='lite'] .tt-reveal-item {
   .tt-card-interactive:hover,
   .tt-match-card:hover,
   .tt-proshop-card:hover {
-    border-color: rgba(0, 220, 125, 0.48);
-    box-shadow: var(--tt-card-specular), 0 0 22px rgba(0, 220, 125, 0.16), var(--tt-shadow-md);
+    border-color: rgba(0, 220, 125, 0.55);
+    box-shadow:
+      var(--tt-card-specular),
+      0 5px 0 var(--tt-3d-card-edge),
+      0 0 24px rgba(0, 220, 125, 0.18),
+      var(--tt-shadow-md);
     transform: translateY(-2px);
   }
 }
 
 .tt-card {
-  background-color: var(--tt-bg-surface);
-  border: 1px solid var(--tt-border-subtle);
+  background: var(--tt-3d-card-grad);
+  border: 1.5px solid var(--tt-border);
   border-radius: var(--tt-radius-lg);
   padding: 16px;
   position: relative;
@@ -513,40 +526,43 @@ html[data-tier='lite'] .tt-reveal-item {
 }
 
 .tt-card-interactive:active {
-  transform: scale(0.985);
+  transform: translateY(2px) scale(0.988);
 }
 
 .tt-podium-1 {
   border: 1.5px solid var(--tt-podium-gold-border);
-  box-shadow: var(--tt-card-specular), var(--tt-podium-gold-glow);
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.18) 0%, var(--tt-bg-surface) 58%);
+  box-shadow: var(--tt-card-specular), 0 4px 0 #7c4a06, var(--tt-podium-gold-glow);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, var(--tt-bg-surface) 58%);
 }
 
 .tt-podium-2 {
   border: 1.5px solid var(--tt-podium-silver-border);
-  box-shadow: var(--tt-card-specular), var(--tt-podium-silver-glow);
-  background: linear-gradient(135deg, rgba(203, 213, 225, 0.14) 0%, var(--tt-bg-surface) 58%);
+  box-shadow: var(--tt-card-specular), 0 4px 0 #475569, var(--tt-podium-silver-glow);
+  background: linear-gradient(135deg, rgba(203, 213, 225, 0.16) 0%, var(--tt-bg-surface) 58%);
 }
 
 .tt-podium-3 {
   border: 1.5px solid var(--tt-podium-bronze-border);
-  box-shadow: var(--tt-card-specular), var(--tt-podium-bronze-glow);
-  background: linear-gradient(135deg, rgba(217, 119, 87, 0.15) 0%, var(--tt-bg-surface) 58%);
+  box-shadow: var(--tt-card-specular), 0 4px 0 #7c2d12, var(--tt-podium-bronze-glow);
+  background: linear-gradient(135deg, rgba(217, 119, 87, 0.17) 0%, var(--tt-bg-surface) 58%);
 }
 
 html[data-theme='light'] .tt-podium-1 {
   background: linear-gradient(135deg, #fffbeb 0%, #ffffff 62%);
   border-color: #d97706;
+  box-shadow: inset 0 1px 0 #ffffff, 0 4px 0 #d4a74b, 0 10px 22px rgba(217, 119, 6, 0.14);
 }
 
 html[data-theme='light'] .tt-podium-2 {
   background: linear-gradient(135deg, #f8fafc 0%, #ffffff 62%);
   border-color: #94a3b8;
+  box-shadow: inset 0 1px 0 #ffffff, 0 4px 0 #cbd5e1, 0 10px 22px rgba(100, 116, 139, 0.12);
 }
 
 html[data-theme='light'] .tt-podium-3 {
   background: linear-gradient(135deg, #fff7ed 0%, #ffffff 62%);
   border-color: #c2410c;
+  box-shadow: inset 0 1px 0 #ffffff, 0 4px 0 #e0a68b, 0 10px 22px rgba(194, 65, 12, 0.12);
 }
 
 .tt-badge-vip {
@@ -555,13 +571,13 @@ html[data-theme='light'] .tt-podium-3 {
   gap: 4px;
   padding: 3px 9px;
   border-radius: var(--tt-radius-pill);
-  background: var(--tt-podium-gold-grad);
+  background: var(--tt-grad-gold);
   color: #1a0d00;
   font-size: 0.7rem;
   font-weight: 900;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 3px 10px rgba(245, 158, 11, 0.42);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65), 0 2px 0 var(--tt-3d-gold-edge);
 }
 
 .tt-badge-standard {
@@ -570,8 +586,8 @@ html[data-theme='light'] .tt-podium-3 {
   gap: 4px;
   padding: 3px 9px;
   border-radius: var(--tt-radius-pill);
-  background-color: var(--tt-bg-pill);
-  border: 1px solid var(--tt-border-medium);
+  background: var(--tt-3d-surface-grad);
+  border: 1px solid var(--tt-3d-surface-border);
   color: var(--tt-text-primary);
   font-size: 0.68rem;
   font-weight: 800;
@@ -579,81 +595,140 @@ html[data-theme='light'] .tt-podium-3 {
   text-transform: uppercase;
 }
 
+/* BOTONES 3D TÁCTILES GLOBALES (RELIEVE REAL + HUNDIMIENTO AL PULSAR) */
 .tt-btn {
+  position: relative;
   min-height: var(--tt-touch-min);
   padding: 10px 18px;
-  border-radius: var(--tt-radius-pill);
-  font-weight: 800;
+  border-radius: 15px;
+  font-weight: 900;
   font-size: var(--tt-text-sm);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   letter-spacing: 0.015em;
-  transition: transform var(--tt-dur-fast) var(--tt-ease-spring),
-    box-shadow var(--tt-dur-fast) ease,
-    opacity var(--tt-dur-fast) ease;
+  border: 1px solid transparent;
+  transition:
+    transform 115ms cubic-bezier(0.22, 1.35, 0.36, 1),
+    box-shadow 115ms ease,
+    filter 150ms ease;
   white-space: nowrap;
 }
 
-.tt-btn:active {
-  transform: scale(0.955);
+.tt-btn:active:not(:disabled) {
+  transform: translateY(3px) scale(0.985) !important;
 }
 
 .tt-btn-primary {
   background: var(--tt-grad-mint);
   color: var(--tt-text-on-emerald);
+  border-color: var(--tt-3d-emerald-border);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.5),
-    0 10px 24px rgba(0, 220, 125, 0.34);
+    inset 0 1px 0 rgba(255, 255, 255, 0.68),
+    0 4px 0 var(--tt-3d-emerald-edge),
+    0 10px 22px rgba(0, 220, 125, 0.32) !important;
+}
+
+.tt-btn-primary:active:not(:disabled) {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    0 1px 0 var(--tt-3d-emerald-edge),
+    0 4px 10px rgba(0, 220, 125, 0.24) !important;
 }
 
 .tt-btn-secondary {
-  background-color: rgba(250, 249, 245, 0.09);
-  border: 1.5px solid rgba(250, 249, 245, 0.22);
-  color: #faf9f5;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  background: var(--tt-3d-surface-grad);
+  border: 1.5px solid var(--tt-3d-surface-border);
+  color: var(--tt-text-primary);
+  box-shadow:
+    var(--tt-3d-surface-specular),
+    0 4px 0 var(--tt-3d-surface-edge),
+    0 8px 18px rgba(0, 0, 0, 0.26) !important;
+}
+
+.tt-btn-secondary:active:not(:disabled) {
+  box-shadow:
+    var(--tt-3d-surface-specular),
+    0 1px 0 var(--tt-3d-surface-edge) !important;
 }
 
 html[data-theme='light'] .tt-btn-secondary {
-  background-color: #1e0734;
+  background: linear-gradient(180deg, #35115c 0%, #1e0734 100%);
   border-color: #1e0734;
   color: #faf9f5;
-  box-shadow: 0 6px 16px rgba(30, 7, 52, 0.16);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.26),
+    0 4px 0 #0d0218,
+    0 8px 18px rgba(30, 7, 52, 0.22) !important;
+}
+
+html[data-theme='light'] .tt-btn-secondary:active:not(:disabled) {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 1px 0 #0d0218 !important;
 }
 
 .tt-btn-gold {
-  background: var(--tt-podium-gold-grad);
+  background: var(--tt-grad-gold);
   color: var(--tt-text-on-gold);
+  border-color: var(--tt-3d-gold-border);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.55),
-    0 10px 24px rgba(245, 158, 11, 0.36);
+    inset 0 1px 0 rgba(255, 255, 255, 0.72),
+    0 4px 0 var(--tt-3d-gold-edge),
+    0 10px 22px rgba(229, 193, 108, 0.32) !important;
+}
+
+.tt-btn-gold:active:not(:disabled) {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    0 1px 0 var(--tt-3d-gold-edge) !important;
 }
 
 .tt-btn-clay {
   background: var(--tt-grad-clay);
   color: #ffffff;
+  border-color: var(--tt-3d-clay-border);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.28),
-    0 8px 20px rgba(200, 90, 50, 0.34);
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 4px 0 var(--tt-3d-clay-edge),
+    0 8px 20px rgba(200, 90, 50, 0.32) !important;
+}
+
+.tt-btn-clay:active:not(:disabled) {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    0 1px 0 var(--tt-3d-clay-edge) !important;
 }
 
 .tt-btn-ghost {
-  background-color: var(--tt-bg-pill);
-  border: 1px solid var(--tt-border-medium);
+  background: var(--tt-3d-surface-grad);
+  border: 1.5px solid var(--tt-3d-surface-border);
   color: var(--tt-text-primary);
+  box-shadow:
+    var(--tt-3d-surface-specular),
+    0 3px 0 var(--tt-3d-surface-edge),
+    0 6px 12px rgba(0, 0, 0, 0.14) !important;
+}
+
+.tt-btn-ghost:active:not(:disabled) {
+  box-shadow:
+    var(--tt-3d-surface-specular),
+    0 1px 0 var(--tt-3d-surface-edge) !important;
 }
 
 .tt-btn-danger {
-  background-color: var(--tt-danger-soft);
-  border: 1px solid rgba(239, 68, 68, 0.45);
-  color: #fca5a5;
+  background: linear-gradient(180deg, rgba(239, 68, 68, 0.26) 0%, rgba(185, 28, 28, 0.22) 100%);
+  border: 1.5px solid rgba(248, 113, 113, 0.55);
+  color: var(--tt-danger-text);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 3px 0 #7f1d1d !important;
 }
 
 html[data-theme='light'] .tt-btn-danger {
-  background-color: #fef2f2;
-  border-color: #fca5a5;
+  background: linear-gradient(180deg, #fff5f5 0%, #fee2e2 100%);
+  border-color: #f87171;
   color: #b91c1c;
+  box-shadow: inset 0 1px 0 #ffffff, 0 3px 0 #fca5a5 !important;
 }
 
 .tt-score-tap-btn {
@@ -662,7 +737,7 @@ html[data-theme='light'] .tt-btn-danger {
   padding: 12px 14px;
   border-radius: var(--tt-radius-md);
   background: var(--tt-grad-mint);
-  color: #10021e;
+  color: #0d0219;
   font-weight: 900;
   font-size: var(--tt-text-base);
   display: flex;
@@ -670,12 +745,17 @@ html[data-theme='light'] .tt-btn-danger {
   align-items: center;
   justify-content: center;
   gap: 2px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 10px 24px rgba(0, 220, 125, 0.34);
-  transition: transform 110ms var(--tt-ease-spring);
+  border: 1px solid var(--tt-3d-emerald-border);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.65),
+    0 5px 0 var(--tt-3d-emerald-edge),
+    0 12px 24px rgba(0, 220, 125, 0.34);
+  transition: transform 110ms var(--tt-ease-spring), box-shadow 110ms ease;
 }
 
 .tt-score-tap-btn:active {
-  transform: scale(0.94);
+  transform: translateY(3px) scale(0.97);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 2px 0 var(--tt-3d-emerald-edge);
 }
 
 .tt-input {
@@ -690,9 +770,22 @@ html[data-theme='light'] .tt-btn-danger {
   transition: border-color var(--tt-dur-fast) ease, box-shadow var(--tt-dur-fast) ease;
 }
 
+.tt-input::placeholder {
+  color: var(--tt-text-muted);
+  opacity: 0.85;
+}
+
 .tt-input:focus {
   border-color: var(--tt-emerald-500);
-  box-shadow: 0 0 0 3px rgba(0, 220, 125, 0.18);
+  box-shadow: 0 0 0 3px rgba(0, 220, 125, 0.2);
+}
+
+html[data-theme='light'] .tt-input,
+html[data-theme='light'] select.tt-input,
+html[data-theme='light'] textarea.tt-input {
+  background-color: #ffffff;
+  color: #1e0734;
+  border-color: rgba(30, 7, 52, 0.24);
 }
 
 .tt-carousel {
@@ -715,36 +808,52 @@ html[data-theme='light'] .tt-btn-danger {
   gap: 8px;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 2px 2px 6px;
+  padding: 2px 2px 8px;
 }
 
 .tt-filter-pill {
   min-height: 38px;
   padding: 0 14px;
-  border-radius: var(--tt-radius-pill);
-  background-color: var(--tt-bg-pill);
-  border: 1px solid var(--tt-border-subtle);
-  color: var(--tt-text-secondary);
+  border-radius: 13px;
+  background: var(--tt-3d-surface-grad);
+  border: 1.5px solid var(--tt-3d-surface-border);
+  color: var(--tt-text-primary);
   font-size: 0.8rem;
-  font-weight: 700;
+  font-weight: 800;
   white-space: nowrap;
   flex-shrink: 0;
-  transition: background-color var(--tt-dur-fast) ease, color var(--tt-dur-fast) ease,
-    border-color var(--tt-dur-fast) ease, transform var(--tt-dur-fast) var(--tt-ease-spring);
+  box-shadow: var(--tt-3d-surface-specular), 0 3px 0 var(--tt-3d-surface-edge);
+  transition:
+    transform 110ms cubic-bezier(0.22, 1.35, 0.36, 1),
+    box-shadow 110ms ease,
+    background 160ms ease,
+    color 160ms ease;
+}
+
+.tt-filter-pill:active {
+  transform: translateY(2px) scale(0.97);
+  box-shadow: var(--tt-3d-surface-specular), 0 1px 0 var(--tt-3d-surface-edge);
 }
 
 .tt-filter-pill.is-active {
   background: var(--tt-grad-mint);
-  border-color: transparent;
-  color: #10021e;
-  font-weight: 800;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 4px 16px rgba(0, 220, 125, 0.3);
+  border-color: var(--tt-3d-emerald-border);
+  color: #0d0219;
+  font-weight: 900;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.68),
+    0 3px 0 var(--tt-3d-emerald-edge),
+    0 6px 16px rgba(0, 220, 125, 0.3);
 }
 
 html[data-theme='light'] .tt-filter-pill.is-active {
-  background: #1e0734;
-  color: #00dc7d;
-  box-shadow: 0 4px 14px rgba(30, 7, 52, 0.18);
+  background: linear-gradient(180deg, #35115c 0%, #1e0734 100%);
+  border-color: #1e0734;
+  color: #00e582;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    0 3px 0 #0d0218,
+    0 6px 14px rgba(30, 7, 52, 0.22);
 }
 
 /* --------------------------------------------------------------------------
@@ -808,20 +917,21 @@ html[data-theme='light'] .tt-filter-pill.is-active {
 }
 
 .tt-proshop-card {
-  background-color: var(--tt-bg-surface);
-  border: 1px solid var(--tt-border-subtle);
+  background: var(--tt-3d-card-grad);
+  border: 1.5px solid var(--tt-border);
   border-radius: var(--tt-radius-lg);
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  box-shadow: var(--tt-card-specular), var(--tt-shadow-sm);
-  transition: transform var(--tt-dur-fast) var(--tt-ease-spring),
+  box-shadow: var(--tt-card-specular), 0 4px 0 var(--tt-3d-card-edge), var(--tt-shadow-sm);
+  transition:
+    transform var(--tt-dur-fast) var(--tt-ease-spring),
     border-color var(--tt-dur-fast) ease,
     box-shadow var(--tt-dur-base) ease;
 }
 
 .tt-proshop-card:active {
-  transform: scale(0.98);
+  transform: translateY(2px) scale(0.985);
   border-color: var(--tt-emerald-500);
 }
 
