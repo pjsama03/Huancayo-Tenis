@@ -13,6 +13,7 @@ import {
   buildWhatsappLink,
   getCategoryFloorPoints,
 } from '../utils/cloudService';
+import { AdminSponsorsManager } from '../components/SponsorPlacements';
 
 /* ==========================================================================
    CONFIGURACIÓN DEL PANEL ADMIN (SIN PIN EN FRONTEND · SE VALIDA EN SERVIDOR)
@@ -295,6 +296,7 @@ export default function AdminSuiteModal({
   onAdminResolveDispute,
   onAdminToggleClubActive,
   onAdminSaveSponsors,
+  onPreviewSponsorInterstitial,
   onAdminPurgeArchivedMatches,
   onNotify,
 }) {
@@ -2048,22 +2050,30 @@ return (
               </div>
             )}
 
-            {/* 5. PATROCINADORES NATIVOS */}
-            {activeTab === 'sponsors' && (
-              <form onSubmit={handleSaveSponsorsConfig} className="tt-adm-panel tt-adm-form-stack">
-                <span className="tt-adm-kicker">PATROCINADORES OFICIALES DEL CIRCUITO</span>
-                <div className="tt-adm-toggle-line">
-                  <div>
-                    <strong>Title Sponsor (Co-branding)</strong>
-                    <small>Aparece en cabecera y pie de Stories 9:16.</small>
-                  </div>
-                  <button
-                    type="button"
-                    className={`tt-adm-chip ${sponsors.titleSponsorActive ? 'is-emerald' : ''}`}
-                    onClick={() =>
-                      setSponsors((s) => ({ ...s, titleSponsorActive: !s.titleSponsorActive }))
-                    }
-                  >
+           {/* 5. MOTOR COMERCIAL DE PATROCINADORES (3 NIVELES + MÉTRICAS) */}
+         {activeTab === 'sponsors' && (
+           <AdminSponsorsManager
+             sponsorsConfig={sponsorsConfig || sponsors}
+             onSaveSponsors={(nextCfg) => {
+               setSponsors(nextCfg);
+               try {
+                 window.localStorage.setItem(
+                   ADMIN_SUITE_EDITABLE_CONFIG.sponsorsStorageKey,
+                   JSON.stringify(nextCfg)
+                 );
+               } catch {
+                 // continuar
+               }
+               if (onAdminSaveSponsors) onAdminSaveSponsors(nextCfg);
+             }}
+             onPreviewInterstitial={(campaign) => {
+               if (onPreviewSponsorInterstitial) {
+                 onPreviewSponsorInterstitial(campaign);
+               }
+             }}
+             onNotify={onNotify}
+           />
+         )}
                     {sponsors.titleSponsorActive ? 'ON' : 'OFF'}
                   </button>
                 </div>
