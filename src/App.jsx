@@ -52,6 +52,12 @@ import {
   triggerHaptic,
 } from './components/AppIcons';
 import { calculateMatchVictoryGems } from './components/RetosParts';
+import {
+  SponsorInterstitialModal,
+  normalizeSponsorsConfig,
+  readCachedSponsorsConfig,
+  writeCachedSponsorsConfig,
+} from './components/SponsorPlacements';
 import SplashScreen from './components/SplashScreen';
 import HeaderAndDrawer from './components/HeaderAndDrawer';
 import BottomDock from './components/BottomDock';
@@ -398,7 +404,45 @@ export default function App() {
   const [gemLedger, setGemLedger] = useState([]);
   const [complaints, setComplaints] = useState([]);
   const [notices, setNotices] = useState([]);
-  const [sponsorsConfig, setSponsorsConfig] = useState(null);
+  const [sponsorsConfig, setSponsorsConfig] = useState(() => readCachedSponsorsConfig());
+  const [previewSponsorCampaign, setPreviewSponsorCampaign] = useState(null);
+  const sponsorsConfigRef = useRef(null);
+  const trackedImpressionsRef = useRef(new Set());
+
+  useEffect(() => {
+    sponsorsConfigRef.current = sponsorsConfig;
+    if (sponsorsConfig) writeCachedSponsorsConfig(sponsorsConfig);
+  }, [sponsorsConfig]);
+
+  const handleTrackSponsorMetric = useCallback((campaignId, field) => {
+    if (!campaignId || (field !== 'impressions' && field !== 'clicks')) return;
+    if (field === 'impressions') {
+      if (trackedImpressionsRef.current.has(campaignId)) return;
+      trackedImpressionsRef.current.add(campaignId);
+    }
+    const base = normalizeSponsorsConfig(sponsorsConfigRef.current);
+    let found = false;
+    const nextCampaigns = base.campaigns.map((c) => {
+      if (c.id !== campaignId) return c;
+      found = true;
+      return { ...c, [field]: (Number(c[field]) || 0) + 1 };
+    });
+    if (!found) return;
+    const nextCfg = { ...base, campaigns: nextCampaigns };
+    setSponsorsConfig(nextCfg);
+    writeCachedSponsorsConfig(nextCfg);
+    saveCloudSetting('sponsors_config', nextCfg).catch(() => {});
+  }, []);
+
+  const handleTrackSponsorImpression = useCallback(
+    (campaignId) => handleTrackSponsorMetric(campaignId, 'impressions'),
+    [handleTrackSponsorMetric]
+  );
+
+  const handleTrackSponsorClick = useCallback(
+    (campaignId) => handleTrackSponsorMetric(campaignId, 'clicks'),
+    [handleTrackSponsorMetric]
+  );
   const [cloudSynced, setCloudSynced] = useState(false);
 
   const [theme, setTheme] = useState(() => {
