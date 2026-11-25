@@ -39,6 +39,11 @@ import {
   stepLiveScoreboard,
 } from '../utils/tenisEngine';
 import { buildWhatsappLink, getEffectiveContactPhone } from '../utils/cloudService';
+import {
+  SponsorStaticBanner,
+  buildSponsorHref,
+  getActiveSponsorsByLevel,
+} from '../components/SponsorPlacements';
 
 /* ==========================================================================
    VISTA PRINCIPAL: RetosView
@@ -51,6 +56,9 @@ export default function RetosView({
   currentUser = null,
   isAdmin = false,
   theme = 'dark',
+  sponsorsConfig = null,
+  onTrackSponsorImpression,
+  onTrackSponsorClick,
   quickChallengeRival = null,
   onConsumeQuickChallenge,
   onCreateChallenge,
@@ -238,7 +246,27 @@ export default function RetosView({
     const pA = featuredLive ? playersMap[featuredLive.playerAId] : null;
     const pB = featuredLive ? playersMap[featuredLive.playerBId] : null;
 
-    return [
+    const sponsorSlides = getActiveSponsorsByLevel(sponsorsConfig, 'CAROUSEL').map((sp) => {
+      const href = buildSponsorHref(sp);
+      return {
+        id: `sp-hero-${sp.id}`,
+        sponsorId: sp.id,
+        tag: sp.priceText
+          ? `${sp.tag || 'PATROCINADOR OFICIAL'} · ${sp.priceText}`
+          : sp.tag || 'PATROCINADOR OFICIAL',
+        title: sp.title || sp.brandName || 'Promoción Oficial',
+        subtitle: sp.description || (sp.brandName ? `Presentado por ${sp.brandName}` : ''),
+        image: sp.imageUrl || ASSETS.torneoApertura,
+        ctaLabel: sp.ctaLabel || 'VER OFERTA',
+        onCta: () => {
+          triggerHaptic('medium');
+          if (onTrackSponsorClick) onTrackSponsorClick(sp.id);
+          if (href) window.open(href, '_blank', 'noopener,noreferrer');
+        },
+      };
+    });
+
+    const baseSlides = [
       {
         id: 'slide-1',
         tag: featuredLive ? 'EN CANCHA AHORA' : 'CIRCUITO OFICIAL',
@@ -281,9 +309,25 @@ export default function RetosView({
         },
       },
     ];
-  }, [liveChallenges, playersMap, onGoToTournaments, openScoreModal]);
+
+    return [...sponsorSlides, ...baseSlides];
+  }, [
+    liveChallenges,
+    playersMap,
+    sponsorsConfig,
+    onGoToTournaments,
+    openScoreModal,
+    onTrackSponsorClick,
+  ]);
 
   const currentSlideIdx = heroSlideIdx % heroSlides.length;
+  const activeSlide = heroSlides[currentSlideIdx];
+
+  useEffect(() => {
+    if (activeSlide?.sponsorId && onTrackSponsorImpression) {
+      onTrackSponsorImpression(activeSlide.sponsorId);
+    }
+  }, [activeSlide?.sponsorId, onTrackSponsorImpression]);
   const activeSlide = heroSlides[currentSlideIdx];
 
   useEffect(() => {
@@ -891,7 +935,12 @@ return (
               </button>
             ))}
           </div>
-
+          <SponsorStaticBanner
+         sponsorsConfig={sponsorsConfig}
+         theme={theme}
+         onTrackImpression={onTrackSponsorImpression}
+         onTrackClick={onTrackSponsorClick}
+       />
           {publicBoardChallenges.length === 0 ? (
             <EmptyStateCard
               theme={theme}
