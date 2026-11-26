@@ -14,6 +14,7 @@ import {
   MatchPosterCard,
   PlayerAvatarWithClub,
   QUICK_TIME_SLOTS,
+  RetosAssignJudgeModal,
   RetosCelebrationModal,
   RetosRescheduleModal,
   buildLiveScoreFromDirectDraft,
@@ -36,9 +37,10 @@ import {
   evaluateMatchScore,
   getMatchPermissions,
   getPreMatchForecast,
+  isChallengeExpiredWithoutResult,
+  isChallengeVisibleInRetosBoard,
   stepLiveScoreboard,
 } from '../utils/tenisEngine';
-import { buildWhatsappLink, getEffectiveContactPhone } from '../utils/cloudService';
 import {
   SponsorStaticBanner,
   buildSponsorHref,
@@ -82,6 +84,7 @@ export default function RetosView({
   const [scoreModalMode, setScoreModalMode] = useState('direct');
   const [directDraft, setDirectDraft] = useState(() => createDirectDraftFromScore(null));
   const [rescheduleTarget, setRescheduleTarget] = useState(null);
+  const [assignJudgeTarget, setAssignJudgeTarget] = useState(null);
   const [celebrationPayload, setCelebrationPayload] = useState(null);
   const [showWalkoverBox, setShowWalkoverBox] = useState(false);
 
@@ -94,7 +97,6 @@ export default function RetosView({
 
   const [reschedDate, setReschedDate] = useState(() => getTodayDateInputValue(2));
   const [reschedTime, setReschedTime] = useState('19:00');
-  const [reschedReason, setReschedReason] = useState('Lluvia intensa en cancha');
 
   const playersMap = useMemo(() => {
     const map = {};
@@ -121,7 +123,10 @@ export default function RetosView({
   );
 
   const liveChallenges = useMemo(
-    () => (challenges || []).filter((c) => c.status === 'IN_PLAY'),
+    () =>
+      (challenges || []).filter(
+        (c) => c.status === 'IN_PLAY' && !isChallengeExpiredWithoutResult(c)
+      ),
     [challenges]
   );
 
@@ -132,6 +137,7 @@ export default function RetosView({
     );
   }, [challenges, currentUser]);
 
+  // Paso 8F: ocultar expirados sin resultado (>6h sin árbitro) y resultados >72h en Retos
   const myChallenges = useMemo(() => {
     if (!currentUser?.id) return [];
     const orderWeight = {
@@ -143,12 +149,12 @@ export default function RetosView({
       FINISHED: 5,
     };
     return (challenges || [])
+      .filter((c) => isChallengeVisibleInRetosBoard(c))
       .filter(
         (c) =>
-          c.status !== 'DECLINED' &&
-          (c.playerAId === currentUser.id ||
-            c.playerBId === currentUser.id ||
-            c.judgeId === currentUser.id)
+          c.playerAId === currentUser.id ||
+          c.playerBId === currentUser.id ||
+          c.judgeId === currentUser.id
       )
       .sort((a, b) => (orderWeight[a.status] ?? 9) - (orderWeight[b.status] ?? 9));
   }, [challenges, currentUser]);
@@ -163,7 +169,7 @@ export default function RetosView({
       DISPUTED: 5,
     };
     return (challenges || [])
-      .filter((c) => c.status !== 'DECLINED')
+      .filter((c) => isChallengeVisibleInRetosBoard(c))
       .filter((c) => {
         if (boardFilter === 'ALL') return true;
         if (boardFilter === 'IN_PLAY') {
@@ -223,16 +229,29 @@ export default function RetosView({
     (ch, preferredMode = 'direct') => {
       if (!ch) return;
       const perms = getMatchPermissions(ch, currentUser, isAdmin);
+      if (perms.isExpiredNoResult && !isAdmin) {
+        triggerHaptic('warning');
+        if (onNotify) {
+          onNotify(
+            'Venció el límite de 6 horas sin resultado. El encuentro se anuló sin penalidad.',
+            'info'
+          );
+        }
+        return;
+      }
+
       setActiveScoreboardId(ch.id);
       setDirectDraft(createDirectDraftFromScore(ch.liveScore));
       setShowWalkoverBox(false);
-      if (perms.isJudge || (!perms.canEditScore && ch.status === 'IN_PLAY')) {
+
+      // Modo Árbitro exclusivo para el tercero designado (o modo espectador si hay árbitro)
+      if (perms.isJudge || ch.judgeId || (!perms.canEditScore && ch.status === 'IN_PLAY')) {
         setScoreModalMode('live');
       } else {
         setScoreModalMode(preferredMode);
       }
     },
-    [currentUser, isAdmin]
+    [currentUser, isAdmin, onNotify]
   );
 
   const heroSlides = useMemo(() => {
@@ -324,14 +343,27 @@ export default function RetosView({
   }, [activeSlide?.sponsorId, onTrackSponsorImpression]);
 
   useEffect(() => {
-    if (challengeTarget || activeScoreboardId || rescheduleTarget || celebrationPayload) {
+    if (
+      challengeTarget ||
+      activeScoreboardId ||
+      rescheduleTarget ||
+      assignJudgeTarget ||
+      celebrationPayload
+    ) {
       return undefined;
     }
     const id = window.setInterval(() => {
       setHeroSlideIdx((prev) => (prev + 1) % heroSlides.length);
     }, 8000);
     return () => window.clearInterval(id);
-  }, [heroSlides.length, challengeTarget, activeScoreboardId, rescheduleTarget, celebrationPayload]);
+  }, [
+    heroSlides.length,
+    challengeTarget,
+    activeScoreboardId,
+    rescheduleTarget,
+    assignJudgeTarget,
+    celebrationPayload,
+  ]);
 
   const openCreateChallengeModal = useCallback(
     (rival, forceFriendly = false) => {
@@ -401,6 +433,7 @@ export default function RetosView({
       playerAId: currentUser.id,
       playerBId: challengeTarget.id,
       judgeId: null,
+      judgeName: '',
       clubId: isCustom ? 'custom' : selectedClub?.id || 'custom',
       clubName: venueName,
       scheduledIso,
@@ -410,6 +443,7 @@ export default function RetosView({
       ballsAgreement: formBalls,
       status: 'PENDING',
       rescheduleCount: 0,
+      pendingReschedule: null,
       liveScore: createEmptyLiveScore(),
       winnerId: null,
     };
@@ -440,19 +474,10 @@ export default function RetosView({
     if (onNotify) onNotify('Desafío declinado.', 'info');
   };
 
-  const handleActivateLiveRefereeMode = (ch) => {
-    if (!ch || !onUpdateChallenge) return;
-    if (ch.status !== 'IN_PLAY') {
-      onUpdateChallenge(ch.id, {
-        status: 'IN_PLAY',
-        liveScore: ch.liveScore || createEmptyLiveScore(),
-      });
-    }
-    setScoreModalMode('live');
-  };
-
   const handleScoreboardAction = (action) => {
     if (!activeScoreboardChallenge || !onUpdateChallenge) return;
+    const perms = getMatchPermissions(activeScoreboardChallenge, currentUser, isAdmin);
+    if (!perms.canJudgeLiveScore) return;
     const nextScore = stepLiveScoreboard(activeScoreboardChallenge.liveScore, action);
     const patch = { liveScore: nextScore };
     if (activeScoreboardChallenge.status === 'SCHEDULED') {
@@ -462,19 +487,20 @@ export default function RetosView({
     setDirectDraft(createDirectDraftFromScore(nextScore));
   };
 
-  const handleAssignJudge = (judgeId) => {
-    if (!activeScoreboardChallenge || !onUpdateChallenge) return;
-    const patch = { judgeId: judgeId || null };
-    if (judgeId && activeScoreboardChallenge.status === 'SCHEDULED') {
-      patch.status = 'IN_PLAY';
-    }
-    onUpdateChallenge(activeScoreboardChallenge.id, patch);
-    const jPlayer = playersMap[judgeId];
+  // Paso 8F: Designar Árbitro (24h a 1 min antes, solo los 2 jugadores o Admin)
+  const handleAssignJudge = (targetChallengeId, judgeId) => {
+    const ch = (challenges || []).find((c) => c.id === targetChallengeId);
+    if (!ch || !onUpdateChallenge) return;
+    const jPlayer = judgeId ? playersMap[judgeId] : null;
+    onUpdateChallenge(ch.id, {
+      judgeId: jPlayer ? jPlayer.id : null,
+      judgeName: jPlayer ? jPlayer.name : '',
+    });
     if (onNotify) {
       onNotify(
         jPlayer
-          ? `${jPlayer.name} fue designado como Árbitro en cancha. Ya puede llevar el marcador en vivo.`
-          : 'Se retiró el Árbitro en cancha.',
+          ? `${jPlayer.name} fue designado como Árbitro. Tendrá acceso exclusivo al Modo Árbitro en vivo.`
+          : 'Se retiró el Árbitro asignado.',
         'info'
       );
     }
@@ -484,11 +510,25 @@ export default function RetosView({
     scoreObj,
     isWalkover = false,
     walkoverWinnerSide = null,
+    submittedByJudge = false,
   }) => {
     if (!activeScoreboardChallenge) return;
     const pA = playersMap[activeScoreboardChallenge.playerAId];
     const pB = playersMap[activeScoreboardChallenge.playerBId];
     if (!pA || !pB) return;
+
+    const perms = getMatchPermissions(activeScoreboardChallenge, currentUser, isAdmin);
+    if (!perms.isUploadWindowOpen && !isAdmin) {
+      triggerHaptic('warning');
+      if (onNotify) {
+        onNotify(
+          'Venció el límite de 6 horas sin resultado. Este encuentro expiró sin penalidad.',
+          'warning'
+        );
+      }
+      setActiveScoreboardId(null);
+      return;
+    }
 
     const finalScoreObj = scoreObj || activeScoreboardChallenge.liveScore || createEmptyLiveScore();
     const isOfficial = activeScoreboardChallenge.mode !== 'Amistoso';
@@ -541,10 +581,12 @@ export default function RetosView({
     }
 
     const closesImmediately =
-      isAdmin ||
-      (activeScoreboardChallenge.status === 'SCORE_PROPOSED' &&
-        activeScoreboardChallenge.proposedBy &&
-        activeScoreboardChallenge.proposedBy !== currentUser?.id);
+      !submittedByJudge &&
+      (isAdmin ||
+        (activeScoreboardChallenge.status === 'SCORE_PROPOSED' &&
+          !perms.judgeSubmitted &&
+          activeScoreboardChallenge.proposedBy &&
+          activeScoreboardChallenge.proposedBy !== currentUser?.id));
 
     if (onFinalizeMatch) {
       onFinalizeMatch({
@@ -553,6 +595,7 @@ export default function RetosView({
         liveScore: finalScoreObj,
         isWalkover,
         walkoverWinnerSide,
+        submittedByJudge,
       });
     }
 
@@ -587,49 +630,70 @@ export default function RetosView({
     }
   };
 
+  // Paso 8F: Proponer cambio de horario (>= 24h antes · requiere doble acuerdo)
   const handleConfirmReschedule = (e) => {
     e.preventDefault();
     if (!rescheduleTarget || !onUpdateChallenge) return;
     const perms = getMatchPermissions(rescheduleTarget, currentUser, isAdmin);
-    const rival =
-      playersMap[
-        rescheduleTarget.playerAId === currentUser?.id
-          ? rescheduleTarget.playerBId
-          : rescheduleTarget.playerAId
-      ];
+
+    if (perms.rescheduleMode !== 'ORDINARY_ALLOWED') {
+      triggerHaptic('warning');
+      if (onNotify) {
+        onNotify(
+          'Faltan menos de 24 horas para el partido. Ya no está disponible el cambio de hora.',
+          'warning'
+        );
+      }
+      setRescheduleTarget(null);
+      return;
+    }
 
     const newIso = new Date(`${reschedDate}T${reschedTime}:00-05:00`).toISOString();
     const { dateText, timeText } = formatDynamicDateAndTime(newIso);
 
-    if (perms.rescheduleMode === 'ORDINARY_ALLOWED') {
-      onUpdateChallenge(rescheduleTarget.id, {
-        scheduledIso: newIso,
+    onUpdateChallenge(rescheduleTarget.id, {
+      pendingReschedule: {
+        newIso,
         dateLabel: dateText,
         timeLabel: timeText,
-        rescheduleCount: (Number(rescheduleTarget.rescheduleCount) || 0) + 1,
+        proposedBy: currentUser?.id || '',
+        proposedAt: new Date().toISOString(),
+      },
+    });
+
+    triggerHaptic('success');
+    if (onNotify) {
+      onNotify(
+        `Propuesta enviada (${dateText} · ${timeText}). El horario cambiará cuando tu rival acepte.`,
+        'success'
+      );
+    }
+    setRescheduleTarget(null);
+  };
+
+  // Paso 8F: Respuesta del rival al cambio de hora propuesto (doble acuerdo)
+  const handleRespondReschedule = (ch, accept) => {
+    if (!ch || !onUpdateChallenge) return;
+    const pr = ch.pendingReschedule || ch.liveScore?._meta?.pendingReschedule;
+    if (!pr?.newIso) return;
+
+    if (accept) {
+      onUpdateChallenge(ch.id, {
+        scheduledIso: pr.newIso,
+        dateLabel: pr.dateLabel,
+        timeLabel: pr.timeLabel,
+        rescheduleCount: (Number(ch.rescheduleCount) || 0) + 1,
+        pendingReschedule: null,
       });
-      triggerHaptic('success');
-      if (onNotify) onNotify(`Horario actualizado para ${dateText} · ${timeText}.`, 'success');
+      if (onNotify) {
+        onNotify(`Horario actualizado de común acuerdo: ${pr.dateLabel} · ${pr.timeLabel}.`, 'success');
+      }
     } else {
-      onUpdateChallenge(rescheduleTarget.id, {
-        scheduledIso: newIso,
-        dateLabel: dateText,
-        timeLabel: timeText,
-        climateNote: reschedReason,
-      });
-      triggerHaptic('medium');
-      if (onNotify) onNotify(`Reprogramación registrada (${reschedReason}).`, 'info');
-      const targetPhone = getEffectiveContactPhone(rival, players);
-      if (rival && targetPhone && (!rival.hideWhatsapp || rival.isTutelado)) {
-        const waMsg = rival.isTutelado
-          ? `Hola ${rival.tutorName || 'Padre/Madre'}, aviso desde TOTAL TENIS: por "${reschedReason}", propongo reprogramar el partido con ${rival.name} en ${rescheduleTarget.clubName} para el ${dateText} a las ${timeText}.`
-          : `Hola ${rival.name}, aviso desde TOTAL TENIS: por "${reschedReason}", propongo reprogramar nuestro partido en ${rescheduleTarget.clubName} para el ${dateText} a las ${timeText}.`;
-        const wa = buildWhatsappLink(targetPhone, waMsg);
-        window.open(wa, '_blank', 'noopener,noreferrer');
+      onUpdateChallenge(ch.id, { pendingReschedule: null });
+      if (onNotify) {
+        onNotify('Propuesta rechazada. Se mantiene el horario original.', 'info');
       }
     }
-
-    setRescheduleTarget(null);
   };
 
   const preMatchForecast = useMemo(() => {
@@ -657,10 +721,12 @@ export default function RetosView({
     const perms = getMatchPermissions(activeScoreboardChallenge, currentUser, isAdmin);
 
     const liveScore = activeScoreboardChallenge.liveScore || createEmptyLiveScore();
-    const effectiveScore =
-      scoreModalMode === 'direct' && perms.canConfirmOfficial
-        ? directBuilt.liveScore
-        : liveScore;
+    const useDirect =
+      scoreModalMode === 'direct' &&
+      !perms.isJudge &&
+      (!activeScoreboardChallenge.judgeId || isAdmin) &&
+      perms.canEditScore;
+    const effectiveScore = useDirect ? directBuilt.liveScore : liveScore;
 
     const scoreEval = evaluateMatchScore(effectiveScore);
     const previewElo =
@@ -714,7 +780,7 @@ export default function RetosView({
     [myChallenges]
   );
 
-return (
+  return (
     <section
       className={`tt-retos-view ${modeClass}`}
       aria-label="Retos y Cartelera Oficial TOTAL TENIS"
@@ -897,7 +963,7 @@ return (
               { id: 'ALL', label: 'Todos' },
               { id: 'IN_PLAY', label: 'En juego' },
               { id: 'SCHEDULED', label: 'Programados' },
-              { id: 'FINISHED', label: 'Resultados' },
+              { id: 'FINISHED', label: 'Resultados (72h)' },
             ].map((f) => (
               <button
                 key={f.id}
@@ -950,6 +1016,8 @@ return (
                     setReschedTime('19:00');
                     setRescheduleTarget(item);
                   }}
+                  onRespondReschedule={handleRespondReschedule}
+                  onOpenAssignJudge={(item) => setAssignJudgeTarget(item)}
                   onOpenPlayerProfile={onOpenPlayerProfile}
                   onOpenStories={onOpenStoriesWithMatch}
                 />
@@ -1005,6 +1073,8 @@ return (
                     setReschedTime('19:00');
                     setRescheduleTarget(item);
                   }}
+                  onRespondReschedule={handleRespondReschedule}
+                  onOpenAssignJudge={(item) => setAssignJudgeTarget(item)}
                   onOpenPlayerProfile={onOpenPlayerProfile}
                   onOpenStories={onOpenStoriesWithMatch}
                 />
@@ -1471,7 +1541,7 @@ return (
         )}
       </ModalPortal>
 
-      {/* MODAL 2: SUBIR RESULTADO DIRECTO | EN VIVO (ÁRBITRO 3D) */}
+      {/* MODAL 2: SUBIR RESULTADO DIRECTO (SIN ÁRBITRO · 6H) | MODO ÁRBITRO EXCLUSIVO */}
       <ModalPortal
         isOpen={Boolean(activeScoreboardChallenge && activeSbData)}
         onClose={() => {
@@ -1479,7 +1549,9 @@ return (
           setActiveScoreboardId(null);
         }}
         title={
-          scoreModalMode === 'direct' && activeSbData?.perms?.canConfirmOfficial
+          activeSbData?.perms?.isJudge
+            ? 'Modo Árbitro Oficial (En Vivo)'
+            : scoreModalMode === 'direct' && activeSbData?.perms?.canEditScore
             ? 'Subir Resultado Final'
             : 'Marcador en Vivo'
         }
@@ -1489,7 +1561,7 @@ return (
       >
         {activeScoreboardChallenge && activeSbData && (
           <div className={`tt-mc-container ${modeClass}`}>
-            {activeSbData.perms.canConfirmOfficial && (
+            {isAdmin && (
               <div className="tt-rt-3d-dock is-two" role="tablist">
                 <button
                   type="button"
@@ -1510,17 +1582,21 @@ return (
                   className={`tt-rt-3d-tab ${scoreModalMode === 'live' ? 'is-active' : ''}`}
                   onClick={() => {
                     triggerHaptic('light');
-                    handleActivateLiveRefereeMode(activeScoreboardChallenge);
+                    setScoreModalMode('live');
                   }}
                 >
-                  Modo Árbitro (en vivo)
+                  Modo Árbitro (Admin)
                 </button>
               </div>
             )}
 
             <div className="tt-stadium-board">
               <div className="tt-stadium-head">
-                <span>JUGADORES</span>
+                <span>
+                  {activeSbData.judgePlayer
+                    ? `ÁRBITRO: ${activeSbData.judgePlayer.name.toUpperCase()}`
+                    : 'JUGADORES'}
+                </span>
                 <div className="tt-stadium-cols">
                   <span>S1</span>
                   <span>S2</span>
@@ -1603,156 +1679,21 @@ return (
               </div>
             </div>
 
-            {activeSbData.perms.canConfirmOfficial && scoreModalMode === 'direct' && (
-              <div className="tt-mc-controls-wrap">
-                <p className="tt-direct-hint">
-                  Escribe el marcador final de cada set. Al enviarlo, tu rival recibirá una alerta
-                  para confirmarlo.
-                </p>
+            {/* A. RESULTADO DIRECTO PARA JUGADORES SIN ÁRBITRO (VENTANA 6H) */}
+            {activeSbData.perms.canEditScore &&
+              !activeSbData.perms.isJudge &&
+              (!activeScoreboardChallenge.judgeId || isAdmin) &&
+              scoreModalMode === 'direct' && (
+                <div className="tt-mc-controls-wrap">
+                  <p className="tt-direct-hint">
+                    Escribe el marcador final de cada set (plazo máximo sin árbitro: 6 h desde la
+                    hora pactada). Al enviarlo, tu rival recibirá una alerta para confirmarlo.
+                  </p>
 
-                <div className="tt-direct-set-box">
-                  <div className="tt-direct-set-head">
-                    <strong>Set 1</strong>
-                    <span>Ej. 6 - 4, 7 - 5 o 7 - 6</span>
-                  </div>
-                  <div className="tt-direct-inputs-row">
-                    <label className="tt-direct-field">
-                      <span>{activeSbData.pA?.name?.split(' ')[0]}</span>
-                      <input
-                        type="number"
-                        inputMode="numeric"
-                        min={0}
-                        max={7}
-                        placeholder="0"
-                        className="tt-direct-num-input"
-                        value={directDraft.s1a}
-                        onChange={(e) =>
-                          setDirectDraft((d) => ({ ...d, s1a: e.target.value.slice(0, 1) }))
-                        }
-                      />
-                    </label>
-                    <span className="tt-direct-dash">–</span>
-                    <label className="tt-direct-field">
-                      <span>{activeSbData.pB?.name?.split(' ')[0]}</span>
-                      <input
-                        type="number"
-                        inputMode="numeric"
-                        min={0}
-                        max={7}
-                        placeholder="0"
-                        className="tt-direct-num-input"
-                        value={directDraft.s1b}
-                        onChange={(e) =>
-                          setDirectDraft((d) => ({ ...d, s1b: e.target.value.slice(0, 1) }))
-                        }
-                      />
-                    </label>
-                  </div>
-
-                  {directBuilt.s1Tb && (
-                    <div className="tt-direct-tb-row">
-                      <span>Tie-Break Set 1 (opcional):</span>
-                      <input
-                        type="number"
-                        inputMode="numeric"
-                        min={0}
-                        placeholder={Number(directDraft.s1a) === 7 ? '7' : '5'}
-                        className="tt-direct-tb-input"
-                        value={directDraft.tb1a}
-                        onChange={(e) =>
-                          setDirectDraft((d) => ({ ...d, tb1a: e.target.value.slice(0, 2) }))
-                        }
-                      />
-                      <span>–</span>
-                      <input
-                        type="number"
-                        inputMode="numeric"
-                        min={0}
-                        placeholder={Number(directDraft.s1b) === 7 ? '7' : '5'}
-                        className="tt-direct-tb-input"
-                        value={directDraft.tb1b}
-                        onChange={(e) =>
-                          setDirectDraft((d) => ({ ...d, tb1b: e.target.value.slice(0, 2) }))
-                        }
-                      />
-                    </div>
-                  )}
-                </div>
-
-                <div className="tt-direct-set-box">
-                  <div className="tt-direct-set-head">
-                    <strong>Set 2</strong>
-                    <span>Ej. 6 - 3, 4 - 6 o 7 - 6</span>
-                  </div>
-                  <div className="tt-direct-inputs-row">
-                    <label className="tt-direct-field">
-                      <span>{activeSbData.pA?.name?.split(' ')[0]}</span>
-                      <input
-                        type="number"
-                        inputMode="numeric"
-                        min={0}
-                        max={7}
-                        placeholder="0"
-                        className="tt-direct-num-input"
-                        value={directDraft.s2a}
-                        onChange={(e) =>
-                          setDirectDraft((d) => ({ ...d, s2a: e.target.value.slice(0, 1) }))
-                        }
-                      />
-                    </label>
-                    <span className="tt-direct-dash">–</span>
-                    <label className="tt-direct-field">
-                      <span>{activeSbData.pB?.name?.split(' ')[0]}</span>
-                      <input
-                        type="number"
-                        inputMode="numeric"
-                        min={0}
-                        max={7}
-                        placeholder="0"
-                        className="tt-direct-num-input"
-                        value={directDraft.s2b}
-                        onChange={(e) =>
-                          setDirectDraft((d) => ({ ...d, s2b: e.target.value.slice(0, 1) }))
-                        }
-                      />
-                    </label>
-                  </div>
-
-                  {directBuilt.s2Tb && (
-                    <div className="tt-direct-tb-row">
-                      <span>Tie-Break Set 2 (opcional):</span>
-                      <input
-                        type="number"
-                        inputMode="numeric"
-                        min={0}
-                        placeholder={Number(directDraft.s2a) === 7 ? '7' : '5'}
-                        className="tt-direct-tb-input"
-                        value={directDraft.tb2a}
-                        onChange={(e) =>
-                          setDirectDraft((d) => ({ ...d, tb2a: e.target.value.slice(0, 2) }))
-                        }
-                      />
-                      <span>–</span>
-                      <input
-                        type="number"
-                        inputMode="numeric"
-                        min={0}
-                        placeholder={Number(directDraft.s2b) === 7 ? '7' : '5'}
-                        className="tt-direct-tb-input"
-                        value={directDraft.tb2b}
-                        onChange={(e) =>
-                          setDirectDraft((d) => ({ ...d, tb2b: e.target.value.slice(0, 2) }))
-                        }
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {directBuilt.needsStb && (
-                  <div className="tt-direct-set-box is-stb-card">
+                  <div className="tt-direct-set-box">
                     <div className="tt-direct-set-head">
-                      <strong>3er Set · Super Tie-Break (a 10+)</strong>
-                      <span>Diferencia de 2 puntos</span>
+                      <strong>Set 1</strong>
+                      <span>Ej. 6 - 4, 7 - 5 o 7 - 6</span>
                     </div>
                     <div className="tt-direct-inputs-row">
                       <label className="tt-direct-field">
@@ -1761,12 +1702,12 @@ return (
                           type="number"
                           inputMode="numeric"
                           min={0}
-                          max={30}
-                          placeholder="10"
+                          max={7}
+                          placeholder="0"
                           className="tt-direct-num-input"
-                          value={directDraft.s3a}
+                          value={directDraft.s1a}
                           onChange={(e) =>
-                            setDirectDraft((d) => ({ ...d, s3a: e.target.value.slice(0, 2) }))
+                            setDirectDraft((d) => ({ ...d, s1a: e.target.value.slice(0, 1) }))
                           }
                         />
                       </label>
@@ -1777,175 +1718,303 @@ return (
                           type="number"
                           inputMode="numeric"
                           min={0}
-                          max={30}
-                          placeholder="8"
+                          max={7}
+                          placeholder="0"
                           className="tt-direct-num-input"
-                          value={directDraft.s3b}
+                          value={directDraft.s1b}
                           onChange={(e) =>
-                            setDirectDraft((d) => ({ ...d, s3b: e.target.value.slice(0, 2) }))
+                            setDirectDraft((d) => ({ ...d, s1b: e.target.value.slice(0, 1) }))
                           }
                         />
                       </label>
                     </div>
-                  </div>
-                )}
 
-                {activeSbData.scoreEval.finished ? (
-                  <div className="tt-elo-preview-card">
-                    <div className="tt-elo-preview-head">
-                      <strong>Marcador listo: {activeSbData.scoreEval.summary}</strong>
-                      <span>
-                        {activeScoreboardChallenge.mode === 'Amistoso'
-                          ? 'Partido amistoso (sin cambio de puntos)'
-                          : 'Se enviará a tu rival para confirmar puntos y Gemas'}
-                      </span>
+                    {directBuilt.s1Tb && (
+                      <div className="tt-direct-tb-row">
+                        <span>Tie-Break Set 1 (opcional):</span>
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          min={0}
+                          placeholder={Number(directDraft.s1a) === 7 ? '7' : '5'}
+                          className="tt-direct-tb-input"
+                          value={directDraft.tb1a}
+                          onChange={(e) =>
+                            setDirectDraft((d) => ({ ...d, tb1a: e.target.value.slice(0, 2) }))
+                          }
+                        />
+                        <span>–</span>
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          min={0}
+                          placeholder={Number(directDraft.s1b) === 7 ? '7' : '5'}
+                          className="tt-direct-tb-input"
+                          value={directDraft.tb1b}
+                          onChange={(e) =>
+                            setDirectDraft((d) => ({ ...d, tb1b: e.target.value.slice(0, 2) }))
+                          }
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="tt-direct-set-box">
+                    <div className="tt-direct-set-head">
+                      <strong>Set 2</strong>
+                      <span>Ej. 6 - 3, 4 - 6 o 7 - 6</span>
+                    </div>
+                    <div className="tt-direct-inputs-row">
+                      <label className="tt-direct-field">
+                        <span>{activeSbData.pA?.name?.split(' ')[0]}</span>
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          min={0}
+                          max={7}
+                          placeholder="0"
+                          className="tt-direct-num-input"
+                          value={directDraft.s2a}
+                          onChange={(e) =>
+                            setDirectDraft((d) => ({ ...d, s2a: e.target.value.slice(0, 1) }))
+                          }
+                        />
+                      </label>
+                      <span className="tt-direct-dash">–</span>
+                      <label className="tt-direct-field">
+                        <span>{activeSbData.pB?.name?.split(' ')[0]}</span>
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          min={0}
+                          max={7}
+                          placeholder="0"
+                          className="tt-direct-num-input"
+                          value={directDraft.s2b}
+                          onChange={(e) =>
+                            setDirectDraft((d) => ({ ...d, s2b: e.target.value.slice(0, 1) }))
+                          }
+                        />
+                      </label>
                     </div>
 
-                    {activeSbData.previewElo?.ok && (
-                      <div className="tt-elo-preview-deltas">
-                        <div>
+                    {directBuilt.s2Tb && (
+                      <div className="tt-direct-tb-row">
+                        <span>Tie-Break Set 2 (opcional):</span>
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          min={0}
+                          placeholder={Number(directDraft.s2a) === 7 ? '7' : '5'}
+                          className="tt-direct-tb-input"
+                          value={directDraft.tb2a}
+                          onChange={(e) =>
+                            setDirectDraft((d) => ({ ...d, tb2a: e.target.value.slice(0, 2) }))
+                          }
+                        />
+                        <span>–</span>
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          min={0}
+                          placeholder={Number(directDraft.s2b) === 7 ? '7' : '5'}
+                          className="tt-direct-tb-input"
+                          value={directDraft.tb2b}
+                          onChange={(e) =>
+                            setDirectDraft((d) => ({ ...d, tb2b: e.target.value.slice(0, 2) }))
+                          }
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {directBuilt.needsStb && (
+                    <div className="tt-direct-set-box is-stb-card">
+                      <div className="tt-direct-set-head">
+                        <strong>3er Set · Super Tie-Break (a 10+)</strong>
+                        <span>Diferencia de 2 puntos</span>
+                      </div>
+                      <div className="tt-direct-inputs-row">
+                        <label className="tt-direct-field">
                           <span>{activeSbData.pA?.name?.split(' ')[0]}</span>
-                          <strong
-                            style={{
-                              color:
-                                activeSbData.previewElo.deltaA >= 0
-                                  ? 'var(--tt-emerald-text)'
-                                  : 'var(--tt-danger-text, #EF4444)',
-                            }}
-                          >
-                            {activeSbData.previewElo.deltaA >= 0
-                              ? `+${activeSbData.previewElo.deltaA}`
-                              : activeSbData.previewElo.deltaA}{' '}
-                            pts
-                          </strong>
-                        </div>
-                        <div>
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            min={0}
+                            max={30}
+                            placeholder="10"
+                            className="tt-direct-num-input"
+                            value={directDraft.s3a}
+                            onChange={(e) =>
+                              setDirectDraft((d) => ({ ...d, s3a: e.target.value.slice(0, 2) }))
+                            }
+                          />
+                        </label>
+                        <span className="tt-direct-dash">–</span>
+                        <label className="tt-direct-field">
                           <span>{activeSbData.pB?.name?.split(' ')[0]}</span>
-                          <strong
-                            style={{
-                              color:
-                                activeSbData.previewElo.deltaB >= 0
-                                  ? 'var(--tt-emerald-text)'
-                                  : 'var(--tt-danger-text, #EF4444)',
-                            }}
-                          >
-                            {activeSbData.previewElo.deltaB >= 0
-                              ? `+${activeSbData.previewElo.deltaB}`
-                              : activeSbData.previewElo.deltaB}{' '}
-                            pts
-                          </strong>
-                        </div>
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            min={0}
+                            max={30}
+                            placeholder="8"
+                            className="tt-direct-num-input"
+                            value={directDraft.s3b}
+                            onChange={(e) =>
+                              setDirectDraft((d) => ({ ...d, s3b: e.target.value.slice(0, 2) }))
+                            }
+                          />
+                        </label>
                       </div>
-                    )}
+                    </div>
+                  )}
 
-                    {activeSbData.previewVictoryGems?.awarded > 0 && (
-                      <div className="tt-gems-preview-pill">
+                  {activeSbData.scoreEval.finished ? (
+                    <div className="tt-elo-preview-card">
+                      <div className="tt-elo-preview-head">
+                        <strong>Marcador listo: {activeSbData.scoreEval.summary}</strong>
                         <span>
-                          Gemas para {activeSbData.winnerPreviewObj?.name?.split(' ')[0]} ·{' '}
-                          {activeSbData.previewVictoryGems.tierLabel}
+                          {activeScoreboardChallenge.mode === 'Amistoso'
+                            ? 'Partido amistoso (sin cambio de puntos)'
+                            : 'Se enviará a tu rival para confirmar puntos y Gemas'}
                         </span>
-                        <strong>+{activeSbData.previewVictoryGems.awarded} 💎</strong>
                       </div>
-                    )}
 
+                      {activeSbData.previewElo?.ok && (
+                        <div className="tt-elo-preview-deltas">
+                          <div>
+                            <span>{activeSbData.pA?.name?.split(' ')[0]}</span>
+                            <strong
+                              style={{
+                                color:
+                                  activeSbData.previewElo.deltaA >= 0
+                                    ? 'var(--tt-emerald-text)'
+                                    : 'var(--tt-danger-text, #EF4444)',
+                              }}
+                            >
+                              {activeSbData.previewElo.deltaA >= 0
+                                ? `+${activeSbData.previewElo.deltaA}`
+                                : activeSbData.previewElo.deltaA}{' '}
+                              pts
+                            </strong>
+                          </div>
+                          <div>
+                            <span>{activeSbData.pB?.name?.split(' ')[0]}</span>
+                            <strong
+                              style={{
+                                color:
+                                  activeSbData.previewElo.deltaB >= 0
+                                    ? 'var(--tt-emerald-text)'
+                                    : 'var(--tt-danger-text, #EF4444)',
+                              }}
+                            >
+                              {activeSbData.previewElo.deltaB >= 0
+                                ? `+${activeSbData.previewElo.deltaB}`
+                                : activeSbData.previewElo.deltaB}{' '}
+                              pts
+                            </strong>
+                          </div>
+                        </div>
+                      )}
+
+                      {activeSbData.previewVictoryGems?.awarded > 0 && (
+                        <div className="tt-gems-preview-pill">
+                          <span>
+                            Gemas para {activeSbData.winnerPreviewObj?.name?.split(' ')[0]} ·{' '}
+                            {activeSbData.previewVictoryGems.tierLabel}
+                          </span>
+                          <strong>+{activeSbData.previewVictoryGems.awarded} 💎</strong>
+                        </div>
+                      )}
+
+                      <button
+                        type="button"
+                        className="tt-btn tt-btn-primary"
+                        style={{ width: '100%', marginTop: 10 }}
+                        onClick={() =>
+                          handleSubmitMatchResult({
+                            scoreObj: activeSbData.effectiveScore,
+                            isWalkover: false,
+                            submittedByJudge: false,
+                          })
+                        }
+                      >
+                        {isAdmin ? 'Confirmar Resultado Oficial' : 'Enviar Resultado a mi Rival'}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="tt-direct-validation-note">
+                      {directBuilt.needsStb
+                        ? 'Empataron 1-1 en sets: ingresa el Super Tie-Break (a 10 puntos con diferencia de 2).'
+                        : 'Completa Set 1 y Set 2 con un marcador válido (ej. 6-4, 6-2 o 7-6) para enviar el resultado.'}
+                    </div>
+                  )}
+
+                  <div className="tt-mc-secondary-bar">
                     <button
                       type="button"
-                      className="tt-btn tt-btn-primary"
-                      style={{ width: '100%', marginTop: 10 }}
-                      onClick={() =>
-                        handleSubmitMatchResult({
-                          scoreObj: activeSbData.effectiveScore,
-                          isWalkover: false,
-                        })
-                      }
+                      className="tt-text-action"
+                      onClick={() => setShowWalkoverBox((v) => !v)}
                     >
-                      {isAdmin ? 'Confirmar Resultado Oficial' : 'Enviar Resultado a mi Rival'}
+                      Reportar Walkover (Inasistencia)
                     </button>
                   </div>
-                ) : (
-                  <div className="tt-direct-validation-note">
-                    {directBuilt.needsStb
-                      ? 'Empataron 1-1 en sets: ingresa el Super Tie-Break (a 10 puntos con diferencia de 2).'
-                      : 'Completa Set 1 y Set 2 con un marcador válido (ej. 6-4, 6-2 o 7-6) para enviar el resultado.'}
-                  </div>
-                )}
 
-                <div className="tt-mc-secondary-bar">
-                  <button
-                    type="button"
-                    className="tt-text-action"
-                    onClick={() => setShowWalkoverBox((v) => !v)}
-                  >
-                    Reportar Walkover (Inasistencia)
-                  </button>
-                </div>
-
-                {showWalkoverBox && (
-                  <div className="tt-wo-box">
-                    <p style={{ margin: '0 0 8px', fontSize: '0.78rem' }}>
-                      Selecciona quién se presentó en cancha para registrar el Walkover:
-                    </p>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                      <button
-                        type="button"
-                        className="tt-btn tt-btn-secondary tt-btn-sm"
-                        onClick={() =>
-                          handleSubmitMatchResult({
-                            scoreObj: createEmptyLiveScore(),
-                            isWalkover: true,
-                            walkoverWinnerSide: 'A',
-                          })
-                        }
-                      >
-                        Gana {activeSbData.pA?.name?.split(' ')[0]} (W.O.)
-                      </button>
-                      <button
-                        type="button"
-                        className="tt-btn tt-btn-secondary tt-btn-sm"
-                        onClick={() =>
-                          handleSubmitMatchResult({
-                            scoreObj: createEmptyLiveScore(),
-                            isWalkover: true,
-                            walkoverWinnerSide: 'B',
-                          })
-                        }
-                      >
-                        Gana {activeSbData.pB?.name?.split(' ')[0]} (W.O.)
-                      </button>
+                  {showWalkoverBox && (
+                    <div className="tt-wo-box">
+                      <p style={{ margin: '0 0 8px', fontSize: '0.78rem' }}>
+                        Selecciona quién se presentó en cancha para registrar el Walkover:
+                      </p>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                        <button
+                          type="button"
+                          className="tt-btn tt-btn-secondary tt-btn-sm"
+                          onClick={() =>
+                            handleSubmitMatchResult({
+                              scoreObj: createEmptyLiveScore(),
+                              isWalkover: true,
+                              walkoverWinnerSide: 'A',
+                              submittedByJudge: false,
+                            })
+                          }
+                        >
+                          Gana {activeSbData.pA?.name?.split(' ')[0]} (W.O.)
+                        </button>
+                        <button
+                          type="button"
+                          className="tt-btn tt-btn-secondary tt-btn-sm"
+                          onClick={() =>
+                            handleSubmitMatchResult({
+                              scoreObj: createEmptyLiveScore(),
+                              isWalkover: true,
+                              walkoverWinnerSide: 'B',
+                              submittedByJudge: false,
+                            })
+                          }
+                        >
+                          Gana {activeSbData.pB?.name?.split(' ')[0]} (W.O.)
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
-            )}
+                  )}
+                </div>
+              )}
 
-            {activeSbData.perms.canEditScore &&
-              (scoreModalMode === 'live' || !activeSbData.perms.canConfirmOfficial) && (
+            {/* B. MODO ÁRBITRO EXCLUSIVO (SOLO EL TERCERO DESIGNADO O ADMIN) */}
+            {activeSbData.perms.canJudgeLiveScore &&
+              (scoreModalMode === 'live' || activeSbData.perms.isJudge) && (
                 <div className="tt-mc-controls-wrap">
-                  {activeSbData.perms.canAssignJudge && (
-                    <div className="tt-judge-assign-box">
-                      <label className="tt-field-label" htmlFor="tt-judge-select">
-                        Designar Árbitro en Cancha (lleva los games en vivo)
-                      </label>
-                      <select
-                        id="tt-judge-select"
-                        className="tt-input"
-                        value={activeScoreboardChallenge.judgeId || ''}
-                        onChange={(e) => handleAssignJudge(e.target.value)}
-                      >
-                        <option value="">Sin árbitro externo asignado</option>
-                        {players
-                          .filter(
-                            (p) =>
-                              !p.isTutorOnly &&
-                              p.id !== activeScoreboardChallenge.playerAId &&
-                              p.id !== activeScoreboardChallenge.playerBId
-                          )
-                          .map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.name} ({getCategoryByPoints(p.points).name})
-                            </option>
-                          ))}
-                      </select>
+                  {activeSbData.perms.isJudge && (
+                    <div className="tt-rule-callout is-ok">
+                      <TTIcon name="shield" size={17} />
+                      <div>
+                        <strong>Modo Árbitro Oficial Activo</strong>
+                        <p style={{ margin: '2px 0 0', fontSize: '0.74rem', opacity: 0.9 }}>
+                          Solo tú controlas los games en vivo. Al cerrar el marcador pasará a{' '}
+                          <b>EN REVISIÓN</b> para que ambos jugadores lo confirmen.
+                        </p>
+                      </div>
                     </div>
                   )}
 
@@ -2257,6 +2326,11 @@ return (
                     <div className="tt-elo-preview-card">
                       <div className="tt-elo-preview-head">
                         <strong>Marcador completo: {activeSbData.scoreEval.summary}</strong>
+                        <span>
+                          {activeSbData.perms.isJudge && !isAdmin
+                            ? 'Al cerrar pasará a EN REVISIÓN para que ambos jugadores lo confirmen.'
+                            : 'Listo para cerrar oficialmente.'}
+                        </span>
                       </div>
 
                       {activeSbData.previewVictoryGems?.awarded > 0 && (
@@ -2269,26 +2343,22 @@ return (
                         </div>
                       )}
 
-                      {activeSbData.perms.canConfirmOfficial ? (
-                        <button
-                          type="button"
-                          className="tt-btn tt-btn-primary"
-                          style={{ width: '100%' }}
-                          onClick={() =>
-                            handleSubmitMatchResult({
-                              scoreObj: activeSbData.liveScore,
-                              isWalkover: false,
-                            })
-                          }
-                        >
-                          {isAdmin ? 'Confirmar Resultado Oficial' : 'Enviar Resultado a mi Rival'}
-                        </button>
-                      ) : (
-                        <p className="tt-muted" style={{ margin: 0, fontSize: '0.78rem' }}>
-                          Como Árbitro en cancha completaste el marcador. Los dos jugadores ya
-                          pueden confirmar el resultado final.
-                        </p>
-                      )}
+                      <button
+                        type="button"
+                        className="tt-btn tt-btn-primary"
+                        style={{ width: '100%' }}
+                        onClick={() =>
+                          handleSubmitMatchResult({
+                            scoreObj: activeSbData.liveScore,
+                            isWalkover: false,
+                            submittedByJudge: activeSbData.perms.isJudge && !isAdmin,
+                          })
+                        }
+                      >
+                        {activeSbData.perms.isJudge && !isAdmin
+                          ? 'Cerrar Marcador y Enviar a Revisión'
+                          : 'Confirmar Resultado Oficial'}
+                      </button>
                     </div>
                   )}
 
@@ -2307,12 +2377,14 @@ return (
                 </div>
               )}
 
+            {/* C. MODO ESPECTADOR / ÁRBITRO EN CONTROL */}
             {!activeSbData.perms.canEditScore && (
               <div className="tt-spectator-note">
                 <TTIcon name="vision" size={18} style={{ color: 'var(--tt-emerald-text)' }} />
                 <span>
-                  Estás viendo el partido en modo espectador. El marcador se actualiza en vivo
-                  desde cancha.
+                  {activeScoreboardChallenge.judgeId && activeSbData.perms.isParticipant
+                    ? `El Árbitro designado (${activeSbData.judgePlayer?.name || 'en cancha'}) lleva el marcador en vivo. Cuando termine recibirás el aviso de revisión.`
+                    : 'Estás viendo el partido en modo espectador. El marcador se actualiza en vivo desde cancha.'}
                 </span>
               </div>
             )}
@@ -2328,10 +2400,15 @@ return (
         setReschedDate={setReschedDate}
         reschedTime={reschedTime}
         setReschedTime={setReschedTime}
-        reschedReason={reschedReason}
-        setReschedReason={setReschedReason}
         onConfirm={handleConfirmReschedule}
         onClose={() => setRescheduleTarget(null)}
+      />
+
+      <RetosAssignJudgeModal
+        challenge={assignJudgeTarget}
+        players={players}
+        onSelectJudge={handleAssignJudge}
+        onClose={() => setAssignJudgeTarget(null)}
       />
 
       <RetosCelebrationModal
@@ -2348,6 +2425,18 @@ return (
           color: var(--tt-text);
         }
         .tt-retos-view.is-light {
+          color: #1E0734;
+        }
+        .tt-resched-proposal-box {
+          padding: 11px 12px;
+          border-radius: 14px;
+          background: linear-gradient(180deg, rgba(229, 193, 108, 0.2) 0%, rgba(229, 193, 108, 0.08) 100%);
+          border: 1.5px solid rgba(229, 193, 108, 0.55);
+          color: #FAF9F5;
+        }
+        .tt-retos-view.is-light .tt-resched-proposal-box {
+          background: linear-gradient(180deg, #FFFBF0 0%, #F9E9BC 100%);
+          border-color: rgba(180, 126, 22, 0.48);
           color: #1E0734;
         }
         .tt-glass-press {
@@ -3183,6 +3272,7 @@ return (
           display: flex;
           align-items: center;
           gap: 8px;
+          flex-wrap: wrap;
         }
         .tt-btn-sm {
           min-height: 40px !important;
@@ -3929,11 +4019,6 @@ return (
         }
         .tt-step-plus.is-champagne:active:not(:disabled) {
           box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 1px 0 #8A6012;
-        }
-        .tt-judge-assign-box {
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
         }
         .tt-elo-preview-card {
           border-radius: 17px;
