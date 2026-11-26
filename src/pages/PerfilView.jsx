@@ -14,7 +14,7 @@ import {
   getCategoryByPoints,
   getClubById,
 } from '../data/playersAndClubsData';
-import { ELO_CONFIG } from '../utils/tenisEngine';
+import { ELO_CONFIG, getPlayerOfficialMatches, isOfficiallyRankedPlayer } from '../utils/tenisEngine';
 import {
   buildWhatsappLink,
   createTuteladoProfile,
@@ -196,14 +196,24 @@ export default function PerfilView({
     return idx >= 0 && idx < CATEGORIES_SCALE.length - 1 ? CATEGORIES_SCALE[idx + 1] : null;
   }, [category]);
 
+  const officialMatchesPlayed = useMemo(
+    () => getPlayerOfficialMatches(profile),
+    [profile]
+  );
+
+  const isOfficiallyRanked = useMemo(
+    () => isOfficiallyRankedPlayer(profile),
+    [profile]
+  );
+
   const officialRank = useMemo(() => {
-    if (!profile?.id || profile.isTutorOnly) return null;
+    if (!profile?.id || !isOfficiallyRankedPlayer(profile)) return null;
     const sorted = [...(players || [])]
-      .filter((p) => !p.isTutorOnly)
+      .filter((p) => isOfficiallyRankedPlayer(p))
       .sort((a, b) => (Number(b.points) || 0) - (Number(a.points) || 0));
     const idx = sorted.findIndex((p) => p.id === profile.id);
     return idx >= 0 ? idx + 1 : null;
-  }, [players, profile?.id, profile?.isTutorOnly]);
+  }, [players, profile]);
 
   const levelProgress = useMemo(() => {
     if (!nextCategory) return { pct: 100, remaining: 0 };
@@ -767,11 +777,15 @@ export default function PerfilView({
 
           <div className="tt-pf-kpi-grid">
             <div className="tt-pf-kpi-tile">
-              <span>PUESTO</span>
-              <strong>{officialRank ? `#${officialRank}` : '—'}</strong>
+              <span>{isOfficiallyRanked ? 'PUESTO' : 'ESTADO'}</span>
+              <strong>
+                {officialRank
+                  ? `#${officialRank}`
+                  : `PROV. (${Math.min(officialMatchesPlayed, ELO_CONFIG.CALIBRATION_MATCHES)}/${ELO_CONFIG.CALIBRATION_MATCHES})`}
+              </strong>
             </div>
             <div className="tt-pf-kpi-tile is-emerald">
-              <span>PUNTOS</span>
+              <span>{isOfficiallyRanked ? 'PUNTOS' : 'ELO PROV.'}</span>
               <strong>{Number(profile.points || 0).toLocaleString('es-PE')}</strong>
             </div>
             <div className="tt-pf-kpi-tile">
