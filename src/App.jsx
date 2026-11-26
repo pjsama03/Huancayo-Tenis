@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import './styles/tactile3d.css';
 
 import * as PlayersData from './data/playersAndClubsData';
 import * as StoreData from './data/storeAndTournamentsData';
@@ -370,7 +371,7 @@ function snapshotPreMatchRankMap(playersList) {
 
 /* ==========================================================================
    COMPONENTE RAÍZ MAESTRO: App
-   (SUPABASE REALTIME + SPONSORS 3 NIVELES + CACHÉ 0 MS + EXENCIÓN VIP)
+   (SUPABASE REALTIME + SPONSORS 3 NIVELES + CANDADO GLOBAL SESIÓN + 3D)
    ========================================================================== */
 export default function App() {
   const scrollContainerRef = useRef(null);
@@ -513,6 +514,17 @@ export default function App() {
   const openAuthSheet = useCallback((mode = 'login') => {
     setAuthModal({ open: true, mode });
   }, []);
+
+  const requireAuth = useCallback(
+    (actionLabel = 'realizar esta acción') => {
+      if (currentUserId || isAdminSession) return true;
+      triggerHaptic('warning');
+      showToast(`Inicia sesión con tu cuenta para ${actionLabel}.`, 'warning');
+      openAuthSheet('login');
+      return false;
+    },
+    [currentUserId, isAdminSession, showToast, openAuthSheet]
+  );
 
   /* ------------------------------------------------------------------------
      1. TEMA Y RENDIMIENTO ADAPTATIVO
@@ -938,20 +950,25 @@ export default function App() {
   /* ------------------------------------------------------------------------
      5. GESTIÓN FAMILIAR (-18), EMANCIPACIÓN (+18) Y RESET AL PISO ADMIN
      ------------------------------------------------------------------------ */
-  const handleCreateTutelado = useCallback(async (tutorPlayer, childData) => {
-    const created = await createTuteladoProfile(tutorPlayer, childData);
-    if (created?.id) {
-      setPlayers((prev) =>
-        mergeListById(prev, created, false).sort(
-          (a, b) => (Number(b.points) || 0) - (Number(a.points) || 0)
-        )
-      );
-    }
-    return created;
-  }, []);
+  const handleCreateTutelado = useCallback(
+    async (tutorPlayer, childData) => {
+      if (!requireAuth('registrar un menor tutelado')) return null;
+      const created = await createTuteladoProfile(tutorPlayer, childData);
+      if (created?.id) {
+        setPlayers((prev) =>
+          mergeListById(prev, created, false).sort(
+            (a, b) => (Number(b.points) || 0) - (Number(a.points) || 0)
+          )
+        );
+      }
+      return created;
+    },
+    [requireAuth]
+  );
 
   const handleSwitchActiveProfile = useCallback(
     (targetProfileId) => {
+      if (!requireAuth('cambiar de perfil')) return;
       if (!targetProfileId) return;
       const target = playersRef.current.find((p) => p.id === targetProfileId);
       if (!target) return;
@@ -983,18 +1000,22 @@ export default function App() {
         'info'
       );
     },
-    [currentUser, tutorParentId, effectiveIsAdmin, showToast]
+    [requireAuth, currentUser, tutorParentId, effectiveIsAdmin, showToast]
   );
 
-  const handleStartEmancipation = useCallback(async (minorId) => {
-    const updated = await startMinorEmancipation(minorId);
-    if (updated?.id) {
-      setPlayers((prev) =>
-        prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p))
-      );
-    }
-    return updated;
-  }, []);
+  const handleStartEmancipation = useCallback(
+    async (minorId) => {
+      if (!requireAuth('emancipar una cuenta juvenil')) return null;
+      const updated = await startMinorEmancipation(minorId);
+      if (updated?.id) {
+        setPlayers((prev) =>
+          prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p))
+        );
+      }
+      return updated;
+    },
+    [requireAuth]
+  );
 
   const handleAdminResetFloorPoints = useCallback(async () => {
     const resetList = await applyCategoryFloorResetToPlayers(playersRef.current);
@@ -1034,6 +1055,7 @@ export default function App() {
 
   const handleUpdatePlayer = useCallback(
     async (playerId, patch) => {
+      if (!requireAuth('editar el perfil')) return;
       if (!playerId || !patch) return;
       const finalPatch = { ...patch };
 
@@ -1070,34 +1092,39 @@ export default function App() {
         showToast('No se pudieron guardar los cambios en la nube.', 'warning');
       }
     },
-    [showToast]
+    [requireAuth, showToast]
   );
 
-  const handleCreateChallenge = useCallback(async (newChallenge) => {
-    if (!newChallenge?.id) return;
-    const res = await runWithLock(`create-challenge-${newChallenge.id}`, async () => {
-      setChallenges((prev) => mergeListById(prev, newChallenge, true));
-      await upsertCloudChallenge(newChallenge);
+  const handleCreateChallenge = useCallback(
+    async (newChallenge) => {
+      if (!requireAuth('lanzar un desafío')) return;
+      if (!newChallenge?.id) return;
+      const res = await runWithLock(`create-challenge-${newChallenge.id}`, async () => {
+        setChallenges((prev) => mergeListById(prev, newChallenge, true));
+        await upsertCloudChallenge(newChallenge);
 
-      const challenger = playersRef.current.find((p) => p.id === newChallenge.playerAId);
-      if (newChallenge.playerBId) {
-        sendPushNotification({
-          targetPlayerIds: resolvePushRecipients([newChallenge.playerBId], playersRef.current),
-          title: '¡Nuevo desafío en TOTAL TENIS!',
-          message: `${challenger?.name || 'Un jugador'} te retó en ${
-            newChallenge.clubName || 'cancha'
-          } (${newChallenge.dateLabel || ''} ${newChallenge.timeLabel || ''}).`,
-          path: '/',
-        });
-      }
-      requestPushPermission();
-    });
+        const challenger = playersRef.current.find((p) => p.id === newChallenge.playerAId);
+        if (newChallenge.playerBId) {
+          sendPushNotification({
+            targetPlayerIds: resolvePushRecipients([newChallenge.playerBId], playersRef.current),
+            title: '¡Nuevo desafío en TOTAL TENIS!',
+            message: `${challenger?.name || 'Un jugador'} te retó en ${
+              newChallenge.clubName || 'cancha'
+            } (${newChallenge.dateLabel || ''} ${newChallenge.timeLabel || ''}).`,
+            path: '/',
+          });
+        }
+        requestPushPermission();
+      });
 
-    if (res.locked) return;
-  }, []);
+      if (res.locked) return;
+    },
+    [requireAuth]
+  );
 
   const handleUpdateChallenge = useCallback(
     async (challengeId, patch) => {
+      if (!requireAuth('modificar un encuentro')) return;
       if (!challengeId || !patch) return;
       const current = challenges.find((c) => c.id === challengeId);
       if (!current) return;
@@ -1141,7 +1168,7 @@ export default function App() {
         }
       });
     },
-    [challenges, currentUser?.id, effectiveIsAdmin, showToast]
+    [requireAuth, challenges, currentUser?.id, effectiveIsAdmin, showToast]
   );
 
   const applyOfficialMatchResult = useCallback(
@@ -1367,6 +1394,7 @@ export default function App() {
 
   const handleFinalizeMatch = useCallback(
     async ({ challenge, eloResult, liveScore, isWalkover = false }) => {
+      if (!requireAuth('registrar resultados')) return;
       if (!challenge || !eloResult?.ok) return;
 
       const isParticipant =
@@ -1443,11 +1471,12 @@ export default function App() {
         );
       });
     },
-    [currentUser, effectiveIsAdmin, applyOfficialMatchResult, showToast]
+    [requireAuth, currentUser, effectiveIsAdmin, applyOfficialMatchResult, showToast]
   );
 
   const handleConfirmProposedScore = useCallback(
     async (ch) => {
+      if (!requireAuth('confirmar un marcador')) return;
       if (!ch || ch.status !== 'SCORE_PROPOSED') return;
       const meta = ch.liveScore?._meta || {};
       const winnerSide = meta.winnerSide || (ch.winnerId === ch.playerAId ? 'A' : 'B');
@@ -1466,11 +1495,12 @@ export default function App() {
       });
       triggerHaptic('success');
     },
-    [applyOfficialMatchResult]
+    [requireAuth, applyOfficialMatchResult]
   );
 
   const handleDisputeProposedScore = useCallback(
     async (ch) => {
+      if (!requireAuth('impugnar un marcador')) return;
       if (!ch) return;
       await runWithLock(`dispute-score-${ch.id}`, async () => {
         const updated = {
@@ -1497,7 +1527,7 @@ export default function App() {
         showToast('Marcador impugnado. El Comité revisará el partido sin mover tus puntos.', 'warning');
       });
     },
-    [currentUser, showToast]
+    [requireAuth, currentUser, showToast]
   );
 
   const handleQuickChallengeFromAnywhere = useCallback(
@@ -1533,6 +1563,7 @@ export default function App() {
 
   const handleRequestTournamentInscription = useCallback(
     async ({ tournamentId, playerId }) => {
+      if (!requireAuth('inscribirte en un torneo')) return;
       const target = tournaments.find((t) => t.id === tournamentId);
       if (!target || !playerId) return;
       const updated = {
@@ -1546,7 +1577,7 @@ export default function App() {
         console.error('[TOTAL TENIS] Error guardando preinscripción:', err);
       }
     },
-    [tournaments]
+    [requireAuth, tournaments]
   );
 
   const handleAdminApproveTournamentPayment = useCallback(
@@ -1595,6 +1626,7 @@ export default function App() {
 
   const handleReportClubWeather = useCallback(
     async ({ clubId, conditionKey }) => {
+      if (!requireAuth('reportar el estado de una sede')) return;
       if (!clubId || !conditionKey) return;
 
       await runWithLock(`weather-${clubId}`, async () => {
@@ -1657,11 +1689,12 @@ export default function App() {
         }
       });
     },
-    [currentUserId, clubs, showToast]
+    [requireAuth, currentUserId, clubs, showToast]
   );
 
   const handleDeductGemsForUnlock = useCallback(
     async ({ gemsCost, patchPlayer, ledgerTitle, ledgerDetail }) => {
+      if (!requireAuth('canjear Gemas')) return;
       if (!currentUserId) return;
       const target = playersRef.current.find((p) => p.id === currentUserId);
       if (!target) return;
@@ -1692,14 +1725,15 @@ export default function App() {
         );
       }
     },
-    [currentUserId, appendGemLedger]
+    [requireAuth, currentUserId, appendGemLedger]
   );
 
   const handleRequestVipUpgrade = useCallback(
     ({ playerId }) => {
+      if (!requireAuth('solicitar el Pase Socio VIP')) return;
       handleUpdatePlayer(playerId, { vipStatus: 'PENDING_PAYMENT' });
     },
-    [handleUpdatePlayer]
+    [requireAuth, handleUpdatePlayer]
   );
 
   const handleAdminApproveVip = useCallback(
@@ -2364,7 +2398,9 @@ return (
         onClose={() => setLegalModal((s) => ({ ...s, open: false }))}
         currentUser={currentUser}
         complaints={complaints}
+        onOpenAuth={openAuthSheet}
         onSubmitComplaint={async (record) => {
+          if (!requireAuth('registrar una reclamación')) return;
           try {
             const saved = await submitOfficialComplaintRpc({
               playerId: currentUser?.id || null,
