@@ -466,6 +466,18 @@ export function getExpectedProbability(ratingA, ratingB) {
   return 1 / (1 + Math.pow(10, (rB - rA) / ELO_CONFIG.DIVISOR));
 }
 
+export function getPlayerOfficialMatches(player) {
+  if (!player) return 0;
+  const fromRecord = (Number(player.wins) || 0) + (Number(player.losses) || 0);
+  const fromCalib = Number(player.calibrationPlayed) || 0;
+  return Math.max(fromRecord, fromCalib);
+}
+
+export function isOfficiallyRankedPlayer(player) {
+  if (!player || player.isPaused || player.isTutorOnly) return false;
+  return getPlayerOfficialMatches(player) >= ELO_CONFIG.CALIBRATION_MATCHES;
+}
+
 export function getAdaptiveK(player, totalActivePlayers = 130) {
   const played = (Number(player?.calibrationPlayed) ?? (Number(player?.wins || 0) + Number(player?.losses || 0)));
   const isCalibrating = played < ELO_CONFIG.CALIBRATION_MATCHES;
@@ -753,6 +765,7 @@ export function computeMasterTop8Race(seasonSnapshots, players = [], divisionFil
   const seasons = seasonSnapshots?.seasons || [];
   const rows = (players || [])
     .filter((p) => {
+      if (!isOfficiallyRankedPlayer(p)) return false;
       if (divisionFilter !== 'ALL' && p.division !== divisionFilter) return false;
       if (categoryFilter !== 'ALL' && getCategoryByPoints(p.points).id !== categoryFilter) return false;
       return true;
