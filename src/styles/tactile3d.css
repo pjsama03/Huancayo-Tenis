@@ -26,6 +26,20 @@
 }
 
 /* --------------------------------------------------------------------------
+   0. CORRECCIÓN DE TRANSPARENCIA EN ILUSTRACIONES (SIN CAJA NEGRA EN PERFIL)
+   -------------------------------------------------------------------------- */
+html[data-theme='dark'] img[src*='raquetas-cruzadas-blancas'],
+html:not([data-theme='light']) img[src*='raquetas-cruzadas-blancas'] {
+  mix-blend-mode: screen !important;
+  background: transparent !important;
+}
+
+html[data-theme='light'] img[src*='raquetas-cruzadas-negras'] {
+  mix-blend-mode: multiply !important;
+  background: transparent !important;
+}
+
+/* --------------------------------------------------------------------------
    1. BOTONES GLOBALES 3D TÁCTILES (.tt-btn-primary / secondary / ghost)
    -------------------------------------------------------------------------- */
 html .tt-btn {
@@ -299,9 +313,49 @@ html[data-theme='light'] .tt-includes-box {
 }
 
 /* --------------------------------------------------------------------------
-   3. RANKING, LEGAL, VIP, H2H, NOTICIAS Y MODALES GLOBALES (3D + CLARO/OSCURO)
+   3. MODAL LEGAL (.tt-lg-shell SIEMPRE ES MARFIL -> CONTRASTE GARANTIZADO)
+   Evita texto oscuro invisible sobre fondo morado y texto cortado en móvil.
    -------------------------------------------------------------------------- */
-html .tt-lg-tab,
+html .tt-lg-shell .tt-lg-tab {
+  min-height: 40px;
+  padding: 0 6px !important;
+  border-radius: 12px !important;
+  background: linear-gradient(180deg, #FFFFFF 0%, #F0EAF9 100%) !important;
+  border: 1.5px solid rgba(30, 7, 52, 0.2) !important;
+  color: #1E0734 !important;
+  font-size: 0.68rem !important;
+  font-weight: 800 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  box-shadow:
+    inset 0 1px 0 #FFFFFF,
+    0 3px 0 #C7BCDE !important;
+  transition: transform 110ms cubic-bezier(0.22, 1.38, 0.36, 1), box-shadow 110ms ease !important;
+}
+
+html .tt-lg-shell .tt-lg-tab:active {
+  transform: translateY(2px) scale(0.98) !important;
+  box-shadow: inset 0 1px 0 #FFFFFF, 0 1px 0 #C7BCDE !important;
+}
+
+html .tt-lg-shell .tt-lg-tab.is-active {
+  background: linear-gradient(180deg, #35115C 0%, #1E0734 100%) !important;
+  border-color: #1E0734 !important;
+  color: #00E582 !important;
+  font-weight: 900 !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 3px 0 #0D0218,
+    0 8px 16px rgba(30, 7, 52, 0.22) !important;
+}
+
+html .tt-lg-shell .tt-lg-tab.is-active.is-gold {
+  color: #FDE68A !important;
+}
+
+/* --------------------------------------------------------------------------
+   4. RANKING, VIP, H2H, NOTICIAS Y MODALES GLOBALES (3D + CLARO/OSCURO)
+   -------------------------------------------------------------------------- */
 html .tt-rk-subtab,
 html .tt-rk-pill,
 html .tt-nt-tab,
@@ -311,13 +365,13 @@ html .tt-auth-tab {
   border-radius: 13px !important;
   background: linear-gradient(180deg, #35155C 0%, #21093E 100%) !important;
   border: 1.5px solid rgba(255, 255, 255, 0.17) !important;
+  color: #F2ECF9 !important;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.2),
     0 4px 0 #0F021C !important;
   transition: transform 110ms cubic-bezier(0.22, 1.38, 0.36, 1), box-shadow 110ms ease !important;
 }
 
-html .tt-lg-tab:active,
 html .tt-rk-subtab:active,
 html .tt-rk-pill:active,
 html .tt-nt-tab:active,
@@ -328,7 +382,6 @@ html .tt-auth-tab:active {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 1px 0 #0F021C !important;
 }
 
-html .tt-lg-tab.is-active,
 html .tt-rk-subtab.is-active,
 html .tt-rk-pill.is-active,
 html .tt-nt-tab.is-active,
@@ -345,7 +398,6 @@ html .tt-auth-tab.is-active {
     0 8px 18px rgba(0, 220, 125, 0.32) !important;
 }
 
-html[data-theme='light'] .tt-lg-tab,
 html[data-theme='light'] .tt-rk-subtab,
 html[data-theme='light'] .tt-rk-pill,
 html[data-theme='light'] .tt-nt-tab,
@@ -358,7 +410,6 @@ html[data-theme='light'] .tt-auth-tab {
   box-shadow: inset 0 1px 0 #FFFFFF, 0 4px 0 #C7BCDE !important;
 }
 
-html[data-theme='light'] .tt-lg-tab.is-active,
 html[data-theme='light'] .tt-rk-subtab.is-active,
 html[data-theme='light'] .tt-rk-pill.is-active,
 html[data-theme='light'] .tt-nt-tab.is-active,
