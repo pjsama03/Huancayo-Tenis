@@ -6,6 +6,7 @@ const SITE_ORIGIN = 'https://huancayo-tenis.vercel.app';
 const R2_BASE = 'https://pub-b9f6464ba7f04b679c870f63fb7997ff.r2.dev';
 const PERU_TZ = 'America/Lima';
 const AUTO_CONFIRM_HOURS = 24;
+const MAX_CHALLENGES_HISTORY = 500;
 
 function resolveVideoUrl(url = '') {
   if (typeof url !== 'string' || !url) return '';
@@ -18,12 +19,12 @@ function resolveVideoUrl(url = '') {
 const CLUB_VISUAL_FALLBACKS = {
   'club-country': {
     logo: '/assets/club-country-huancas.png',
-    cover: '/assets/sede-country-club.jpg',
+    cover: '/assets/sede-country-club.png',
     mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Country+Club+Los+Huancas+Huancayo',
     gallery: [
-      { id: 'cc-1', title: 'Cancha Central de Arcilla', image: '/assets/sede-country-club.jpg', url: '/assets/sede-country-club.jpg' },
-      { id: 'cc-2', title: 'Copa Los Huancas · Pista 1', image: '/assets/torneo-apertura.jpg', url: '/assets/torneo-apertura.jpg' },
-      { id: 'cc-3', title: 'Superficie Polvo de Ladrillo', image: '/assets/perfil-bg-arcilla.jpg', url: '/assets/perfil-bg-arcilla.jpg' },
+      { id: 'cc-1', title: 'Cancha Central de Arcilla', image: '/assets/sede-country-club.png', url: '/assets/sede-country-club.png' },
+      { id: 'cc-2', title: 'Copa Los Huancas · Pista 1', image: '/assets/torneo-apertura.png', url: '/assets/torneo-apertura.png' },
+      { id: 'cc-3', title: 'Superficie Polvo de Ladrillo', image: '/assets/perfil-bg-arcilla.png', url: '/assets/perfil-bg-arcilla.png' },
     ],
     rates: { diaRegular: 36, diaVip: 28, nocheRegular: 46, nocheVip: 38 },
     services: ['6 canchas profesionales de arcilla', 'Iluminación LED hasta 10:00 p. m.', 'Vestuarios y estacionamiento privado'],
@@ -31,12 +32,12 @@ const CLUB_VISUAL_FALLBACKS = {
   },
   'club-romina': {
     logo: '/assets/club-romina-cutipa.png',
-    cover: '/assets/sede-romina-cutipa.jpg',
+    cover: '/assets/sede-romina-cutipa.png',
     mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Academia+de+Tenis+Romina+Cutipa+Huancayo',
     gallery: [
-      { id: 'rc-1', title: 'Pista Principal San Carlos', image: '/assets/sede-romina-cutipa.jpg', url: '/assets/sede-romina-cutipa.jpg' },
-      { id: 'rc-2', title: 'Canchas de Competencia', image: '/assets/torneo-altura.jpg', url: '/assets/torneo-altura.jpg' },
-      { id: 'rc-3', title: 'Entrenamiento Técnico', image: '/assets/portada-tips-semana.jpg', url: '/assets/portada-tips-semana.jpg' },
+      { id: 'rc-1', title: 'Pista Principal San Carlos', image: '/assets/sede-romina-cutipa.png', url: '/assets/sede-romina-cutipa.png' },
+      { id: 'rc-2', title: 'Canchas de Competencia', image: '/assets/torneo-altura.png', url: '/assets/torneo-altura.png' },
+      { id: 'rc-3', title: 'Entrenamiento Técnico', image: '/assets/portada-tips-semana.png', url: '/assets/portada-tips-semana.png' },
     ],
     rates: { diaRegular: 32, diaVip: 24, nocheRegular: 42, nocheVip: 34 },
     services: ['4 canchas de arcilla rápida con drenaje', 'Iluminación LED antideslumbrante', 'Zona de calentamiento físico'],
@@ -44,12 +45,12 @@ const CLUB_VISUAL_FALLBACKS = {
   },
   'club-tauro': {
     logo: '/assets/club-tauro.png',
-    cover: '/assets/sede-club-tauro.jpg',
+    cover: '/assets/sede-club-tauro.png',
     mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Tauro+Tenis+Huancayo',
     gallery: [
-      { id: 'tt-1', title: 'Canchas Club Tauro Tenis', image: '/assets/sede-club-tauro.jpg', url: '/assets/sede-club-tauro.jpg' },
-      { id: 'tt-2', title: 'Torneos Nocturnos', image: '/assets/torneo-dobles-valle.jpg', url: '/assets/torneo-dobles-valle.jpg' },
-      { id: 'tt-3', title: 'Arcilla al Atardecer', image: '/assets/bienvenida-hero-claro.jpg', url: '/assets/bienvenida-hero-claro.jpg' },
+      { id: 'tt-1', title: 'Canchas Club Tauro Tenis', image: '/assets/sede-club-tauro.png', url: '/assets/sede-club-tauro.png' },
+      { id: 'tt-2', title: 'Torneos Nocturnos', image: '/assets/torneo-dobles-valle.png', url: '/assets/torneo-dobles-valle.png' },
+      { id: 'tt-3', title: 'Arcilla al Atardecer', image: '/assets/bienvenida-hero-claro.png', url: '/assets/bienvenida-hero-claro.png' },
     ],
     rates: { diaRegular: 30, diaVip: 22, nocheRegular: 40, nocheVip: 32 },
     services: ['3 canchas de arcilla compacta', 'Torres LED nocturnas', 'Estacionamiento y terraza social'],
@@ -57,12 +58,12 @@ const CLUB_VISUAL_FALLBACKS = {
   },
   'club-inkas': {
     logo: '/assets/club-los-inkas.png',
-    cover: '/assets/sede-los-inkas.jpg',
+    cover: '/assets/sede-los-inkas.png',
     mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Club+Los+Inkas+Huancayo+Tenis',
     gallery: [
-      { id: 'li-1', title: 'Canchas Campestres Los Inkas', image: '/assets/sede-los-inkas.jpg', url: '/assets/sede-los-inkas.jpg' },
-      { id: 'li-2', title: 'Vista Abierta al Valle', image: '/assets/bienvenida-hero-claro.jpg', url: '/assets/bienvenida-hero-claro.jpg' },
-      { id: 'li-3', title: 'Cancha 1 Oficial', image: '/assets/torneo-altura.jpg', url: '/assets/torneo-altura.jpg' },
+      { id: 'li-1', title: 'Canchas Campestres Los Inkas', image: '/assets/sede-los-inkas.png', url: '/assets/sede-los-inkas.png' },
+      { id: 'li-2', title: 'Vista Abierta al Valle', image: '/assets/bienvenida-hero-claro.png', url: '/assets/bienvenida-hero-claro.png' },
+      { id: 'li-3', title: 'Cancha 1 Oficial', image: '/assets/torneo-altura.png', url: '/assets/torneo-altura.png' },
     ],
     rates: { diaRegular: 30, diaVip: 22, nocheRegular: 38, nocheVip: 30 },
     services: ['4 canchas campestres de arcilla', 'LED en Canchas 1 y 2', 'Áreas verdes y zona familiar'],
@@ -72,11 +73,11 @@ const CLUB_VISUAL_FALLBACKS = {
 CLUB_VISUAL_FALLBACKS['club-cutipa'] = CLUB_VISUAL_FALLBACKS['club-romina'];
 
 const COACH_PHOTO_FALLBACKS = {
-  'coach-romina': '/assets/sede-romina-cutipa.jpg',
-  'coach-rodrigo': '/assets/sede-country-club.jpg',
-  'coach-carlos': '/assets/sede-club-tauro.jpg',
-  'coach-diego': '/assets/sede-los-inkas.jpg',
-  'coach-andrea': '/assets/sede-los-inkas.jpg',
+  'coach-romina': '/assets/sede-romina-cutipa.png',
+  'coach-rodrigo': '/assets/sede-country-club.png',
+  'coach-carlos': '/assets/sede-club-tauro.png',
+  'coach-diego': '/assets/sede-los-inkas.png',
+  'coach-andrea': '/assets/sede-los-inkas.png',
 };
 
 function getClubFallback(clubId, clubName = '') {
@@ -88,9 +89,9 @@ function getClubFallback(clubId, clubName = '') {
   if (l.includes('inka') || l.includes('inca')) return CLUB_VISUAL_FALLBACKS['club-inkas'];
   return {
     logo: '/assets/logo-total-tenis.png',
-    cover: '/assets/torneo-apertura.jpg',
+    cover: '/assets/torneo-apertura.png',
     mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${clubName || 'Club Tenis'} Huancayo`)}`,
-    gallery: [{ id: 'def-1', title: 'Cancha Oficial', image: '/assets/torneo-apertura.jpg', url: '/assets/torneo-apertura.jpg' }],
+    gallery: [{ id: 'def-1', title: 'Cancha Oficial', image: '/assets/torneo-apertura.png', url: '/assets/torneo-apertura.png' }],
     rates: { diaRegular: 32, diaVip: 25, nocheRegular: 42, nocheVip: 34 },
     services: ['Canchas de arcilla', 'Iluminación LED', 'Estacionamiento'],
     vipBenefits: ['Tarifa preferencial presentando tu Carnet 3D VIP'],
@@ -360,7 +361,7 @@ export function onCloudAuthStateChange(cb) {
 }
 
 /* --------------------------------------------------------------------------
-   5. CONVERSORES SQL <-> REACT (TUTELA + EMANCIPACIÓN + R2)
+   5. CONVERSORES SQL <-> REACT (TUTELA + EMANCIPACIÓN + ÁRBITRO + REPROGRAMACIÓN)
    -------------------------------------------------------------------------- */
 export function dbToPlayer(row) {
   if (!row) return null;
@@ -474,6 +475,10 @@ export function dbToChallenge(row) {
     playerAId: row.player_a_id,
     playerBId: row.player_b_id,
     judgeId: meta.judgeId || null,
+    judgeName: meta.judgeName || '',
+    judgeSubmitted: Boolean(meta.judgeSubmitted),
+    confirmations: meta.confirmations || { a: false, b: false },
+    pendingReschedule: meta.pendingReschedule || null,
     clubId: row.club_id || 'libre',
     clubName: row.club_name || 'Cancha Libre',
     mode: row.mode || 'Por puntos',
@@ -510,11 +515,25 @@ export function challengeToDb(c) {
   if (c.timeLabel !== undefined) out.time_label = c.timeLabel;
   if (c.status !== undefined) out.status = c.status;
 
-  if (c.liveScore !== undefined || c.status === 'SCORE_PROPOSED' || c.judgeId !== undefined || c.ballsAgreement !== undefined || c.rescheduleCount !== undefined) {
+  if (
+    c.liveScore !== undefined ||
+    c.status === 'SCORE_PROPOSED' ||
+    c.judgeId !== undefined ||
+    c.judgeName !== undefined ||
+    c.judgeSubmitted !== undefined ||
+    c.confirmations !== undefined ||
+    c.pendingReschedule !== undefined ||
+    c.ballsAgreement !== undefined ||
+    c.rescheduleCount !== undefined
+  ) {
     const baseLive = c.liveScore && typeof c.liveScore === 'object' ? { ...c.liveScore } : {};
     const nextMeta = { ...(baseLive._meta || {}) };
     if (c.status === 'SCORE_PROPOSED' && !nextMeta.proposedAt) nextMeta.proposedAt = new Date().toISOString();
     if (c.judgeId !== undefined) nextMeta.judgeId = c.judgeId;
+    if (c.judgeName !== undefined) nextMeta.judgeName = c.judgeName;
+    if (c.judgeSubmitted !== undefined) nextMeta.judgeSubmitted = Boolean(c.judgeSubmitted);
+    if (c.confirmations !== undefined) nextMeta.confirmations = c.confirmations;
+    if (c.pendingReschedule !== undefined) nextMeta.pendingReschedule = c.pendingReschedule;
     if (c.ballsAgreement !== undefined) nextMeta.ballsAgreement = c.ballsAgreement;
     if (c.rescheduleCount !== undefined) nextMeta.rescheduleCount = Number(c.rescheduleCount) || 0;
     baseLive._meta = nextMeta;
@@ -584,7 +603,7 @@ export function dbToClub(row) {
 
 export function dbToCoach(row) {
   if (!row) return null;
-  const photo = row.photo_url || COACH_PHOTO_FALLBACKS[row.id] || '/assets/sede-country-club.jpg';
+  const photo = row.photo_url || COACH_PHOTO_FALLBACKS[row.id] || '/assets/sede-country-club.png';
   const accentMap = { emerald: '#00DC7D', gold: '#E5C16C', clay: '#DE8566', royal: '#60A5FA' };
   const accentTheme = row.accent_theme || 'emerald';
   const videos = Array.isArray(row.videos)
@@ -631,7 +650,7 @@ export function dbToCoach(row) {
 
 export function dbToTournament(row) {
   if (!row) return null;
-  const banner = row.banner_url || '/assets/torneo-apertura.jpg';
+  const banner = row.banner_url || '/assets/torneo-apertura.png';
   return {
     id: row.id,
     name: row.name,
@@ -684,7 +703,7 @@ export function dbToProduct(row) {
 }
 
 /* --------------------------------------------------------------------------
-   6. CARGA INICIAL + CRUD EN VIVO + TUTELA / EMANCIPACIÓN + RESET PISO
+   6. CARGA INICIAL + CRUD EN VIVO + TOPE 500 PARTIDOS + TUTELA / EMANCIPACIÓN
    -------------------------------------------------------------------------- */
 export async function fetchAllCloudState(fallbackSeeds = {}) {
   if (!supabase) return null;
@@ -692,7 +711,7 @@ export async function fetchAllCloudState(fallbackSeeds = {}) {
     supabase.from('profiles').select('*').order('points', { ascending: false }),
     supabase.from('clubs').select('*'),
     supabase.from('coaches').select('*'),
-    supabase.from('challenges').select('*').order('created_at', { ascending: false }),
+    supabase.from('challenges').select('*').order('created_at', { ascending: false }).limit(MAX_CHALLENGES_HISTORY),
     supabase.from('tournaments').select('*').order('created_at', { ascending: false }),
     supabase.from('products').select('*').order('sort_order', { ascending: true }),
     supabase.from('complaints').select('*').order('created_at', { ascending: false }),
@@ -749,7 +768,7 @@ export async function fetchAllCloudState(fallbackSeeds = {}) {
       category_label: t.categoryLabel || 'Abierto', draw_size: Number(t.drawSize) || 16,
       min_players: Number(t.minPlayers ?? t.minPlayersForDraw) || 8, entry_fee: Number(t.entryFee) || 45,
       includes_balls: t.includesBalls !== false, has_consolation: t.hasConsolation !== false,
-      includes_items: t.includesItems || [], banner_url: t.bannerUrl || t.banner || '/assets/torneo-apertura.jpg',
+      includes_items: t.includesItems || [], banner_url: t.bannerUrl || t.banner || '/assets/torneo-apertura.png',
       prizes: t.prizes || {}, participants_ids: t.participantsIds || [], pending_payment_ids: t.pendingPaymentIds || [],
       bracket_results: t.bracketResults || {},
     }));
@@ -777,6 +796,30 @@ export async function fetchAllCloudState(fallbackSeeds = {}) {
     seasonSnapshots: settingsMap.season_snapshots || null,
     sponsorsConfig: settingsMap.sponsors_config || null,
   };
+}
+
+/* Tope automático de 500 partidos en `challenges` (mantiene intacto ELO/récord en `profiles`) */
+export async function enforceChallengeHistoryCap(maxCount = MAX_CHALLENGES_HISTORY) {
+  if (!supabase) return 0;
+  try {
+    const { data, error } = await supabase
+      .from('challenges')
+      .select('id, status, created_at')
+      .order('created_at', { ascending: false });
+    if (error || !Array.isArray(data) || data.length <= maxCount) return 0;
+
+    const excess = data
+      .slice(maxCount)
+      .filter((r) => r.status === 'FINISHED' || r.status === 'DECLINED' || r.status === 'EXPIRED_NO_RESULT')
+      .map((r) => r.id);
+
+    if (excess.length === 0) return 0;
+    const { error: delErr } = await supabase.from('challenges').delete().in('id', excess);
+    if (delErr) return 0;
+    return excess.length;
+  } catch {
+    return 0;
+  }
 }
 
 export async function upsertCloudPlayer(playerObj) {
@@ -903,6 +946,9 @@ export async function upsertCloudChallenge(challengeObj) {
   if (!supabase || !challengeObj?.id) return null;
   const { data, error } = await supabase.from('challenges').upsert(challengeToDb(challengeObj)).select().single();
   if (error) throw error;
+  if (challengeObj.status === 'FINISHED' || challengeObj.status === 'EXPIRED_NO_RESULT') {
+    enforceChallengeHistoryCap(MAX_CHALLENGES_HISTORY).catch(() => {});
+  }
   return dbToChallenge(data);
 }
 
