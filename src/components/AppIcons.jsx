@@ -15,7 +15,8 @@ export function resolveMediaUrl(url) {
 }
 
 /* ==========================================================================
-   1. MAPA MAESTRO DE ACTIVOS (IMÁGENES EN public/assets/ + VIDEOS EN R2)
+   1. MAPA MAESTRO DE ACTIVOS (IMÁGENES REALES .PNG EN public/assets/ + R2)
+   Todas las rutas verificadas 1:1 contra public/assets/ (cero errores 404).
    ========================================================================== */
 export const ASSETS = {
   // Identidad Oficial TOTAL TENIS
@@ -23,11 +24,11 @@ export const ASSETS = {
   logoLight: '/assets/logo-total-tenis.png',
   logoOscuro: '/assets/logo-total-tenis.png',
   logoBlanco: '/assets/logo-total-tenis.png',
-  splashDark: '/assets/splash-fondo-oscuro.jpg',
-  bienvenidaClaro: '/assets/bienvenida-hero-claro.jpg',
-  bienvenidaOscuro: '/assets/bienvenida-hero-oscuro.jpg',
-  loginPoster: '/assets/login-poster-esmeralda.jpg',
-  registroPoster: '/assets/registro-poster-purpura.jpg',
+  splashDark: '/assets/splash-fondo-oscuro.png',
+  bienvenidaClaro: '/assets/bienvenida-hero-claro.png',
+  bienvenidaOscuro: '/assets/bienvenida-hero-oscuro.png',
+  loginPoster: '/assets/login-poster-esmeralda.png',
+  registroPoster: '/assets/registro-poster-purpura.png',
 
   // Barra Inferior Definitiva (5 PNGs)
   navRetos: '/assets/nav-retos.png',
@@ -41,28 +42,28 @@ export const ASSETS = {
   clubTauro: '/assets/club-tauro.png',
   clubRomina: '/assets/club-romina-cutipa.png',
   clubInkas: '/assets/club-los-inkas.png',
-  sedeCountry: '/assets/sede-country-club.jpg',
-  sedeRomina: '/assets/sede-romina-cutipa.jpg',
-  sedeTauro: '/assets/sede-club-tauro.jpg',
-  sedeInkas: '/assets/sede-los-inkas.jpg',
+  sedeCountry: '/assets/sede-country-club.png',
+  sedeRomina: '/assets/sede-romina-cutipa.png',
+  sedeTauro: '/assets/sede-club-tauro.png',
+  sedeInkas: '/assets/sede-los-inkas.png',
 
   // Estados Vacíos Oficiales (Claro / Oscuro)
   estadoVacioClaro: '/assets/estado-vacio-claro.png',
   estadoVacioOscuro: '/assets/estado-vacio-oscuro.png',
 
   // Escenarios Grand Slam para Perfil
-  bgArcilla: '/assets/perfil-bg-arcilla.jpg',
-  bgCesped: '/assets/perfil-bg-cesped.jpg',
-  bgDura: '/assets/perfil-bg-dura.jpg',
-  bgFinals: '/assets/perfil-bg-finals.jpg',
-  bgPurpuraOscuro: '/assets/perfil-bg-purpura-oscuro.jpg',
-  bgMarfilClaro: '/assets/perfil-bg-marfil-claro.jpg',
+  bgArcilla: '/assets/perfil-bg-arcilla.png',
+  bgCesped: '/assets/perfil-bg-cesped.png',
+  bgDura: '/assets/perfil-bg-dura.png',
+  bgFinals: '/assets/perfil-bg-finals.png',
+  bgPurpuraOscuro: '/assets/perfil-bg-purpura-oscuro.png',
+  bgMarfilClaro: '/assets/bienvenida-hero-claro.png',
 
   // Portadas Únicas de Torneos
-  torneoAltura: '/assets/torneo-altura.jpg',
-  torneoApertura: '/assets/torneo-apertura.jpg',
-  torneoDoblesValle: '/assets/torneo-dobles-valle.jpg',
-  torneoMasterTop8: '/assets/torneo-master-top8.jpg',
+  torneoAltura: '/assets/torneo-altura.png',
+  torneoApertura: '/assets/torneo-apertura.png',
+  torneoDoblesValle: '/assets/torneo-dobles-valle.png',
+  torneoMasterTop8: '/assets/torneo-master-top8.png',
 
   // Trofeos Oficiales
   trofeoCampeonGira: '/assets/trofeo-campeon-gira.png',
@@ -78,10 +79,10 @@ export const ASSETS = {
   badgeFavorito: '/assets/badge-favorito.png',
 
   // Banners y Portadas Editoriales
-  bannerPaseVip: '/assets/banner-pase-vip.jpg',
-  bannerVisionIa: '/assets/banner-vision-ia.jpg',
-  portadaAcademiaTv: '/assets/portada-academia-tv.jpg',
-  portadaTipsSemana: '/assets/portada-tips-semana.jpg',
+  bannerPaseVip: '/assets/banner-pase-vip.png',
+  bannerVisionIa: '/assets/banner-vision-ia.png',
+  portadaAcademiaTv: '/assets/portada-academia-tv.png',
+  portadaTipsSemana: '/assets/portada-tips-semana.png',
 
   // Clima, Tickets, Racha y Modelos 3D
   climaSeco: '/assets/canva-clima-seco.png',
@@ -196,24 +197,56 @@ export function useScrollReveal(ref, { startRevealed = true } = {}) {
 }
 
 /* ==========================================================================
-   4. COMPONENTE <SmartImage /> (PRELOAD PRIORITARIO + AUTO-FALLBACK)
+   4. COMPONENTE <SmartImage /> (PRIORIDAD .PNG PARA CERO ERRORES 404)
    ========================================================================== */
+const LOCAL_ASSET_ALIASES = {
+  '/assets/perfil-bg-marfil-claro.jpg': '/assets/bienvenida-hero-claro.png',
+  '/assets/perfil-bg-marfil-claro.png': '/assets/bienvenida-hero-claro.png',
+};
+
 function buildExtensionCandidates(src, fallbackSrc) {
   const list = [];
+  const pushUnique = (u) => {
+    if (u && !list.includes(u)) list.push(u);
+  };
+
   if (src) {
-    list.push(src);
-    const match = typeof src === 'string' && src.match(/^(\/assets\/.+)\.(png|jpg|jpeg|webp)$/i);
+    const aliased =
+      typeof src === 'string' && LOCAL_ASSET_ALIASES[src] ? LOCAL_ASSET_ALIASES[src] : src;
+    const match =
+      typeof aliased === 'string' && aliased.match(/^(\/assets\/.+)\.(png|jpg|jpeg|webp)$/i);
     if (match) {
       const base = match[1];
       const ext = match[2].toLowerCase();
-      ['png', 'jpg', 'webp', 'jpeg'].forEach((alt) => {
-        if (alt !== ext) list.push(`${base}.${alt}`);
-      });
+      // En public/assets/ los activos están en .png: priorizar .png elimina los 404 en red
+      if (ext === 'jpg' || ext === 'jpeg') {
+        pushUnique(`${base}.png`);
+        pushUnique(aliased);
+        pushUnique(`${base}.webp`);
+      } else {
+        pushUnique(aliased);
+        ['png', 'webp', 'jpg', 'jpeg'].forEach((alt) => {
+          if (alt !== ext) pushUnique(`${base}.${alt}`);
+        });
+      }
+    } else {
+      pushUnique(aliased);
     }
   }
-  if (fallbackSrc && !list.includes(fallbackSrc)) {
-    list.push(fallbackSrc);
+
+  if (fallbackSrc) {
+    const fbAliased =
+      typeof fallbackSrc === 'string' && LOCAL_ASSET_ALIASES[fallbackSrc]
+        ? LOCAL_ASSET_ALIASES[fallbackSrc]
+        : fallbackSrc;
+    const fbMatch =
+      typeof fbAliased === 'string' && fbAliased.match(/^(\/assets\/.+)\.(jpg|jpeg)$/i);
+    if (fbMatch) {
+      pushUnique(`${fbMatch[1]}.png`);
+    }
+    pushUnique(fbAliased);
   }
+
   return list;
 }
 
