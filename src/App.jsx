@@ -38,6 +38,7 @@ import {
   submitOfficialComplaintRpc,
   submitWeatherReportRpc,
   subscribeToCloudRealtime,
+  updateCloudPassword,
   uploadCompressedMedia,
   upsertCloudChallenge,
   upsertCloudClub,
@@ -146,6 +147,13 @@ function clearSavedLocalSession() {
   } catch {
     // continuar
   }
+}
+
+function hasRecoveryFlagInUrl() {
+  if (typeof window === 'undefined') return false;
+  const hash = String(window.location.hash || '').toLowerCase();
+  const search = String(window.location.search || '').toLowerCase();
+  return hash.includes('type=recovery') || search.includes('type=recovery');
 }
 
 /* ==========================================================================
@@ -371,12 +379,13 @@ function snapshotPreMatchRankMap(playersList) {
 
 /* ==========================================================================
    COMPONENTE RAÍZ MAESTRO: App
-   (SUPABASE REALTIME + SPONSORS 3 NIVELES + CANDADO GLOBAL SESIÓN + 3D)
+   (SUPABASE REALTIME + PASSWORD RECOVERY + PASO 8F ÁRBITRO/6H + CANDADO 3D)
    ========================================================================== */
 export default function App() {
   const scrollContainerRef = useRef(null);
   const toastTimerRef = useRef(null);
   const playersRef = useRef([]);
+  const challengesRef = useRef([]);
   const seasonAutoCloseKeyRef = useRef('');
 
   const defaultSeeds = useMemo(() => {
@@ -392,6 +401,7 @@ export default function App() {
   }, []);
 
   const initialSavedSession = useMemo(() => readSavedLocalSession(), []);
+  const initialRecoveryUrl = useMemo(() => hasRecoveryFlagInUrl(), []);
 
   const [players, setPlayers] = useState(defaultSeeds.players);
   const [clubs, setClubs] = useState(defaultSeeds.clubs);
@@ -411,6 +421,13 @@ export default function App() {
   const trackedImpressionsRef = useRef(new Set());
   const [cloudSynced, setCloudSynced] = useState(false);
 
+  // Flujo real de recuperación de contraseña (al volver del enlace enviado por correo)
+  const [passwordRecoveryOpen, setPasswordRecoveryOpen] = useState(() => initialRecoveryUrl);
+  const [newRecoveryPass, setNewRecoveryPass] = useState('');
+  const [confirmRecoveryPass, setConfirmRecoveryPass] = useState('');
+  const [showRecoveryPass, setShowRecoveryPass] = useState(false);
+  const [savingRecoveryPass, setSavingRecoveryPass] = useState(false);
+
   const [theme, setTheme] = useState(() => {
     try {
       return window.localStorage.getItem(APP_RUNTIME_CONFIG.themeStorageKey) || 'dark';
@@ -421,7 +438,7 @@ export default function App() {
   const sunlightMode = false;
   const [performanceTier, setPerformanceTier] = useState('standard');
 
-  const [showSplash, setShowSplash] = useState(true);
+  const [showSplash, setShowSplash] = useState(() => !initialRecoveryUrl);
   const [isFirstVisit] = useState(() => {
     try {
       return !window.localStorage.getItem(APP_RUNTIME_CONFIG.firstVisitKey);
@@ -456,6 +473,10 @@ export default function App() {
   useEffect(() => {
     playersRef.current = players;
   }, [players]);
+
+  useEffect(() => {
+    challengesRef.current = challenges;
+  }, [challenges]);
 
   useEffect(() => {
     sponsorsConfigRef.current = sponsorsConfig;
@@ -527,6 +548,56 @@ export default function App() {
   );
 
   /* ------------------------------------------------------------------------
+     GUARDADO DE NUEVA CONTRASEÑA TRAS ABRIR EL ENLACE DEL CORREO
+     ------------------------------------------------------------------------ */
+  const handleSaveNewRecoveryPassword = useCallback(
+    async (e) => {
+      e.preventDefault();
+      if (savingRecoveryPass) return;
+
+      if (newRecoveryPass.length < 6) {
+        triggerHaptic('warning');
+        showToast('Tu nueva contraseña debe tener al menos 6 caracteres.', 'warning');
+        return;
+      }
+      if (newRecoveryPass !== confirmRecoveryPass) {
+        triggerHaptic('warning');
+        showToast('Las contraseñas no coinciden. Escríbelas iguales.', 'warning');
+        return;
+      }
+
+      setSavingRecoveryPass(true);
+      try {
+        await updateCloudPassword(newRecoveryPass);
+        triggerHaptic('success');
+        setPasswordRecoveryOpen(false);
+        setNewRecoveryPass('');
+        setConfirmRecoveryPass('');
+        if (typeof window !== 'undefined' && window.history?.replaceState) {
+          window.history.replaceState(null, '', window.location.pathname);
+        }
+        showToast('¡Contraseña actualizada! Ya puedes usar tu nueva clave.', 'success');
+      } catch (err) {
+        triggerHaptic('warning');
+        const msg = String(err?.message || '').toLowerCase();
+        if (msg.includes('different from the old password')) {
+          showToast('Elige una contraseña distinta a la que tenías antes.', 'warning');
+        } else if (msg.includes('session') || msg.includes('expired')) {
+          showToast('El enlace expiró. Solicita un nuevo correo de recuperación.', 'warning');
+        } else {
+          showToast(
+            err?.message || 'No se pudo actualizar tu contraseña. Intenta solicitando otro enlace.',
+            'warning'
+          );
+        }
+      } finally {
+        setSavingRecoveryPass(false);
+      }
+    },
+    [savingRecoveryPass, newRecoveryPass, confirmRecoveryPass, showToast]
+  );
+
+  /* ------------------------------------------------------------------------
      1. TEMA Y RENDIMIENTO ADAPTATIVO
      ------------------------------------------------------------------------ */
   useEffect(() => {
@@ -560,7 +631,7 @@ export default function App() {
   }, []);
 
   /* ------------------------------------------------------------------------
-     2. SINCRONIZACIÓN INICIAL SUPABASE + SESIÓN REAL/PERSISTENTE + REALTIME
+     2. SINCRONIZACIÓN INICIAL SUPABASE + PASSWORD_RECOVERY + REALTIME
      ------------------------------------------------------------------------ */
   const resolveSessionPlayer = useCallback((session, list) => {
     if (!session?.user) return null;
@@ -653,6 +724,11 @@ export default function App() {
 
     const unsubscribeAuth = onCloudAuthStateChange((event, session) => {
       if (!mounted) return;
+      if (event === 'PASSWORD_RECOVERY') {
+        setShowSplash(false);
+        setAuthModal({ open: false, mode: 'login' });
+        setPasswordRecoveryOpen(true);
+      }
       if (event === 'SIGNED_OUT') {
         clearSavedLocalSession();
         setCurrentUserId(null);
@@ -816,7 +892,45 @@ export default function App() {
     return () => window.clearInterval(timer);
   }, [cloudSynced, seasonSnapshots]);
 
-/* ------------------------------------------------------------------------
+  /* ------------------------------------------------------------------------
+     3B. PASO 8F · AUTO-EXPIRACIÓN 6H SIN RESULTADO NI ÁRBITRO (SIN PENALIDAD)
+     ------------------------------------------------------------------------ */
+  useEffect(() => {
+    if (!cloudSynced) return undefined;
+
+    const sweepExpiredMatches = () => {
+      const expired = (challengesRef.current || []).filter(
+        (c) =>
+          (c.status === 'SCHEDULED' || c.status === 'IN_PLAY') &&
+          Engine.isChallengeExpiredWithoutResult(c)
+      );
+      if (!expired.length) return;
+
+      setChallenges((prev) =>
+        prev.map((c) =>
+          expired.some((e) => e.id === c.id)
+            ? { ...c, status: 'EXPIRED_NO_RESULT', pendingReschedule: null }
+            : c
+        )
+      );
+
+      if (currentUserId || isAdminSession) {
+        expired.forEach((c) => {
+          upsertCloudChallenge({
+            ...c,
+            status: 'EXPIRED_NO_RESULT',
+            pendingReschedule: null,
+          }).catch(() => {});
+        });
+      }
+    };
+
+    sweepExpiredMatches();
+    const id = window.setInterval(sweepExpiredMatches, 300000);
+    return () => window.clearInterval(id);
+  }, [cloudSynced, currentUserId, isAdminSession]);
+
+  /* ------------------------------------------------------------------------
      4. DERIVADOS DE ESTADO, TUTELA FAMILIAR Y DETECCIÓN MULTIUSUARIO
      ------------------------------------------------------------------------ */
   const currentUser = useMemo(
@@ -842,7 +956,10 @@ export default function App() {
   );
 
   const liveMatchesCount = useMemo(
-    () => challenges.filter((c) => c.status === 'IN_PLAY').length,
+    () =>
+      challenges.filter(
+        (c) => c.status === 'IN_PLAY' && !Engine.isChallengeExpiredWithoutResult(c)
+      ).length,
     [challenges]
   );
 
@@ -851,28 +968,48 @@ export default function App() {
     return challenges.filter((c) => c.status === 'PENDING' && c.playerBId === currentUser.id);
   }, [challenges, currentUser?.id]);
 
+  // Paso 8F: soporta tanto confirmación rival clásica como DOBLE confirmación cuando cerró un Árbitro
   const pendingScoreConfirmations = useMemo(() => {
     if (!currentUser?.id) return [];
     return challenges.filter((c) => {
       if (c.status !== 'SCORE_PROPOSED') return false;
-      const isParticipant = c.playerAId === currentUser.id || c.playerBId === currentUser.id;
-      if (!isParticipant) return false;
+      const isA = c.playerAId === currentUser.id;
+      const isB = c.playerBId === currentUser.id;
+      if (!isA && !isB) return false;
+
+      const meta = c.liveScore?._meta || {};
+      if (meta.judgeSubmitted) {
+        const conf = meta.confirmations || { a: false, b: false };
+        if ((isA && !conf.a) || (isB && !conf.b)) return true;
+        return isScoreReadyForAutoConfirm(c);
+      }
+
       if (c.proposedBy !== currentUser.id) return true;
       return isScoreReadyForAutoConfirm(c);
     });
   }, [challenges, currentUser?.id]);
 
   const popupChallenge = useMemo(() => {
-    if (showSplash || authModal.open || !currentUser?.id) return null;
+    if (showSplash || authModal.open || passwordRecoveryOpen || !currentUser?.id) return null;
     return incomingPendingChallenges.find((c) => !dismissedIncomingIds.includes(c.id)) || null;
-  }, [showSplash, authModal.open, currentUser?.id, incomingPendingChallenges, dismissedIncomingIds]);
+  }, [
+    showSplash,
+    authModal.open,
+    passwordRecoveryOpen,
+    currentUser?.id,
+    incomingPendingChallenges,
+    dismissedIncomingIds,
+  ]);
 
   const scoreConfirmChallenge = useMemo(() => {
-    if (showSplash || authModal.open || popupChallenge || !currentUser?.id) return null;
+    if (showSplash || authModal.open || passwordRecoveryOpen || popupChallenge || !currentUser?.id) {
+      return null;
+    }
     return pendingScoreConfirmations.find((c) => !dismissedScoreIds.includes(c.id)) || null;
   }, [
     showSplash,
     authModal.open,
+    passwordRecoveryOpen,
     popupChallenge,
     currentUser?.id,
     pendingScoreConfirmations,
@@ -1024,7 +1161,7 @@ export default function App() {
   }, []);
 
   /* ------------------------------------------------------------------------
-     6. ACCIONES CONECTADAS A SUPABASE + STORAGE + GEMAS 6-0, 6-0 + FLIP
+     6. ACCIONES CONECTADAS A SUPABASE + STORAGE + GEMAS 6-0, 6-0 + PASO 8F
      ------------------------------------------------------------------------ */
   const appendGemLedger = useCallback(
     async (entry, targetPlayerId = currentUserId) => {
@@ -1132,8 +1269,10 @@ export default function App() {
       const isParticipant =
         currentUser?.id &&
         (current.playerAId === currentUser.id || current.playerBId === currentUser.id);
-      if (!isParticipant && !effectiveIsAdmin) {
-        showToast('Solo los contendientes pueden modificar este encuentro.', 'warning');
+      const isJudge = Boolean(currentUser?.id && current.judgeId === currentUser.id);
+
+      if (!isParticipant && !isJudge && !effectiveIsAdmin) {
+        showToast('Solo los contendientes o el Árbitro designado pueden modificar este encuentro.', 'warning');
         return;
       }
 
@@ -1165,10 +1304,26 @@ export default function App() {
             message: `El reto programado en ${current.clubName} fue cancelado.`,
             path: '/',
           });
+        } else if (patch.judgeId && patch.judgeId !== current.judgeId) {
+          sendPushNotification({
+            targetPlayerIds: resolvePushRecipients([patch.judgeId], playersRef.current),
+            title: 'Te designaron como Árbitro',
+            message: `Tienes acceso exclusivo al Modo Árbitro en vivo en ${current.clubName}.`,
+            path: '/',
+          });
+        } else if (patch.pendingReschedule?.newIso) {
+          const otherId =
+            currentUser?.id === current.playerAId ? current.playerBId : current.playerAId;
+          sendPushNotification({
+            targetPlayerIds: resolvePushRecipients([otherId], playersRef.current),
+            title: 'Propuesta de cambio de hora',
+            message: `${currentUser?.name || 'Tu rival'} propuso mover el partido a ${patch.pendingReschedule.dateLabel} · ${patch.pendingReschedule.timeLabel}.`,
+            path: '/',
+          });
         }
       });
     },
-    [requireAuth, challenges, currentUser?.id, effectiveIsAdmin, showToast]
+    [requireAuth, challenges, currentUser, effectiveIsAdmin, showToast]
   );
 
   const applyOfficialMatchResult = useCallback(
@@ -1198,6 +1353,7 @@ export default function App() {
         const finishedChallenge = {
           ...challenge,
           status: 'FINISHED',
+          pendingReschedule: null,
           liveScore: effectiveScore,
           winnerId,
           scoreSummary: summary || challenge.scoreSummary || '',
@@ -1392,25 +1548,29 @@ export default function App() {
     [appendGemLedger, currentUserId, focusMyPositionInRanking, showToast]
   );
 
+  // Paso 8F: soporta cierre por Árbitro (pasa a EN REVISIÓN para ambos jugadores)
   const handleFinalizeMatch = useCallback(
-    async ({ challenge, eloResult, liveScore, isWalkover = false }) => {
+    async ({ challenge, eloResult, liveScore, isWalkover = false, submittedByJudge = false }) => {
       if (!requireAuth('registrar resultados')) return;
       if (!challenge || !eloResult?.ok) return;
 
       const isParticipant =
         currentUser?.id &&
         (challenge.playerAId === currentUser.id || challenge.playerBId === currentUser.id);
+      const isJudge = Boolean(currentUser?.id && challenge.judgeId === currentUser.id);
 
-      if (!isParticipant && !effectiveIsAdmin) {
-        showToast('Solo los contendientes o el Comité pueden cargar resultados.', 'warning');
+      if (!isParticipant && !isJudge && !effectiveIsAdmin) {
+        showToast('Solo los contendientes, el Árbitro o el Comité pueden cargar resultados.', 'warning');
         return;
       }
 
       const canFinalizeImmediately =
-        effectiveIsAdmin ||
-        (challenge.status === 'SCORE_PROPOSED' &&
-          challenge.proposedBy &&
-          challenge.proposedBy !== currentUser?.id);
+        !submittedByJudge &&
+        (effectiveIsAdmin ||
+          (challenge.status === 'SCORE_PROPOSED' &&
+            !challenge.liveScore?._meta?.judgeSubmitted &&
+            challenge.proposedBy &&
+            challenge.proposedBy !== currentUser?.id));
 
       if (canFinalizeImmediately) {
         await applyOfficialMatchResult({
@@ -1430,10 +1590,18 @@ export default function App() {
 
       await runWithLock(`propose-score-${challenge.id}`, async () => {
         const winnerId = eloResult.winnerSide === 'A' ? challenge.playerAId : challenge.playerBId;
+        const isJudgeFlow = Boolean(submittedByJudge || (isJudge && !isParticipant));
         const proposedChallenge = {
           ...challenge,
           status: 'SCORE_PROPOSED',
           proposedBy: currentUser?.id || '',
+          judgeSubmitted: isJudgeFlow,
+          confirmations: isJudgeFlow
+            ? { a: false, b: false }
+            : {
+                a: currentUser?.id === challenge.playerAId,
+                b: currentUser?.id === challenge.playerBId,
+              },
           winnerId,
           scoreSummary: eloResult.summary,
           eloDeltaA: eloResult.deltaA,
@@ -1441,8 +1609,16 @@ export default function App() {
           liveScore: {
             ...(liveScore || challenge.liveScore || {}),
             _meta: {
+              ...(challenge.liveScore?._meta || {}),
               proposedAt: new Date().toISOString(),
               proposedBy: currentUser?.id || '',
+              judgeSubmitted: isJudgeFlow,
+              confirmations: isJudgeFlow
+                ? { a: false, b: false }
+                : {
+                    a: currentUser?.id === challenge.playerAId,
+                    b: currentUser?.id === challenge.playerBId,
+                  },
               winnerSide: eloResult.winnerSide,
               newPointsA: eloResult.newPointsA,
               newPointsB: eloResult.newPointsB,
@@ -1456,30 +1632,87 @@ export default function App() {
         );
         await upsertCloudChallenge(proposedChallenge);
 
-        const rivalId =
-          currentUser?.id === challenge.playerAId ? challenge.playerBId : challenge.playerAId;
-        sendPushNotification({
-          targetPlayerIds: resolvePushRecipients([rivalId], playersRef.current),
-          title: 'Confirma tu marcador en TOTAL TENIS',
-          message: `${currentUser?.name || 'Tu rival'} registró ${eloResult.summary}. Ábrelo para confirmar o impugnar.`,
-          path: '/',
-        });
-
-        showToast(
-          'Marcador enviado a tu rival. Cuando lo confirme (o tras 24h) se actualizarán puntos y Gemas.',
-          'success'
-        );
+        if (isJudgeFlow) {
+          sendPushNotification({
+            targetPlayerIds: resolvePushRecipients(
+              [challenge.playerAId, challenge.playerBId],
+              playersRef.current
+            ),
+            title: 'Marcador en revisión (Árbitro)',
+            message: `El Árbitro cerró el partido con ${eloResult.summary}. Ambos jugadores deben confirmar o impugnar.`,
+            path: '/',
+          });
+          showToast(
+            'Marcador enviado a EN REVISIÓN. Ambos jugadores recibirán el aviso para confirmar.',
+            'success'
+          );
+        } else {
+          const rivalId =
+            currentUser?.id === challenge.playerAId ? challenge.playerBId : challenge.playerAId;
+          sendPushNotification({
+            targetPlayerIds: resolvePushRecipients([rivalId], playersRef.current),
+            title: 'Confirma tu marcador en TOTAL TENIS',
+            message: `${currentUser?.name || 'Tu rival'} registró ${eloResult.summary}. Ábrelo para confirmar o impugnar.`,
+            path: '/',
+          });
+          showToast(
+            'Marcador enviado a tu rival. Cuando lo confirme (o tras 24h) se actualizarán puntos y Gemas.',
+            'success'
+          );
+        }
       });
     },
     [requireAuth, currentUser, effectiveIsAdmin, applyOfficialMatchResult, showToast]
   );
 
+  // Paso 8F: si cerró un Árbitro, exige confirmación de AMBOS jugadores antes de mover puntos
   const handleConfirmProposedScore = useCallback(
     async (ch) => {
       if (!requireAuth('confirmar un marcador')) return;
       if (!ch || ch.status !== 'SCORE_PROPOSED') return;
       const meta = ch.liveScore?._meta || {};
       const winnerSide = meta.winnerSide || (ch.winnerId === ch.playerAId ? 'A' : 'B');
+
+      if (meta.judgeSubmitted && !effectiveIsAdmin && !isScoreReadyForAutoConfirm(ch)) {
+        const isA = currentUser?.id === ch.playerAId;
+        const isB = currentUser?.id === ch.playerBId;
+        const prevConf = meta.confirmations || { a: false, b: false };
+        const nextConf = {
+          a: prevConf.a || isA,
+          b: prevConf.b || isB,
+        };
+
+        if (!(nextConf.a && nextConf.b)) {
+          await runWithLock(`partial-confirm-${ch.id}`, async () => {
+            const updated = {
+              ...ch,
+              confirmations: nextConf,
+              liveScore: {
+                ...(ch.liveScore || {}),
+                _meta: {
+                  ...meta,
+                  confirmations: nextConf,
+                },
+              },
+            };
+            setChallenges((prev) => prev.map((c) => (c.id === ch.id ? updated : c)));
+            await upsertCloudChallenge(updated);
+            const otherId = isA ? ch.playerBId : ch.playerAId;
+            sendPushNotification({
+              targetPlayerIds: resolvePushRecipients([otherId], playersRef.current),
+              title: 'Falta tu confirmación de marcador',
+              message: `${currentUser?.name || 'Tu rival'} ya confirmó el ${ch.scoreSummary} cerrado por el Árbitro.`,
+              path: '/',
+            });
+            triggerHaptic('success');
+            showToast(
+              'Tu confirmación quedó registrada. Esperando confirmación de tu rival para cerrar puntos.',
+              'success'
+            );
+          });
+          return;
+        }
+      }
 
       await applyOfficialMatchResult({
         challenge: ch,
@@ -1495,7 +1728,7 @@ export default function App() {
       });
       triggerHaptic('success');
     },
-    [requireAuth, applyOfficialMatchResult]
+    [requireAuth, effectiveIsAdmin, currentUser, applyOfficialMatchResult, showToast]
   );
 
   const handleDisputeProposedScore = useCallback(
@@ -1861,13 +2094,14 @@ export default function App() {
   const scoreWinner = scoreConfirmChallenge
     ? players.find((p) => p.id === scoreConfirmChallenge.winnerId)
     : null;
+  const scoreIsJudgeSubmitted = Boolean(scoreConfirmChallenge?.liveScore?._meta?.judgeSubmitted);
 
   const popupChallengerPhone = getEffectiveContactPhone(popupChallenger, players);
   const popupWaText = popupChallenger?.isTutelado
     ? `Hola ${popupChallenger.tutorName || 'Padre/Madre'}, recibí el reto de ${popupChallenger.name} en TOTAL TENIS para ${popupChallenge?.clubName || ''} (${popupChallenge?.dateLabel || ''} ${popupChallenge?.timeLabel || ''}). ¿Coordinamos otra hora o sede?`
     : `Hola ${popupChallenger?.name || ''}, recibí tu reto en TOTAL TENIS para ${popupChallenge?.clubName || ''} (${popupChallenge?.dateLabel || ''} ${popupChallenge?.timeLabel || ''}). ¿Coordinamos otra hora o sede?`;
 
-return (
+  return (
     <div className={`tt-app-viewport ${theme === 'light' ? 'is-light' : 'is-dark'}`}>
       {/* 1. SPLASH SCREEN / BIENVENIDA */}
       {showSplash && (
@@ -2088,7 +2322,69 @@ return (
         sunlightMode={sunlightMode}
       />
 
-      {/* MODAL DE FICHA DE RIVAL — 100% SOLO LECTURA (SIN TUERQUITA NI CARNET) */}
+      {/* MODAL DE RECUPERACIÓN REAL DE CONTRASEÑA (AL ABRIR EL ENLACE DEL CORREO) */}
+      <ModalPortal
+        isOpen={passwordRecoveryOpen}
+        onClose={() => {
+          if (!savingRecoveryPass) setPasswordRecoveryOpen(false);
+        }}
+        title="Crea tu Nueva Contraseña"
+        subtitle="Acceso verificado desde tu correo · TOTAL TENIS"
+        icon={<IconBadge name="shield" variant="emerald" size={38} />}
+        isAuthLayer
+      >
+        <form onSubmit={handleSaveNewRecoveryPassword} className="tt-recovery-form">
+          <p className="tt-recovery-copy">
+            Tu enlace de recuperación fue validado correctamente. Escribe tu nueva contraseña para
+            actualizar tu cuenta de TOTAL TENIS.
+          </p>
+
+          <label className="tt-recovery-field">
+            <span>Nueva contraseña (mín. 6 caracteres)</span>
+            <input
+              type={showRecoveryPass ? 'text' : 'password'}
+              className="tt-input"
+              value={newRecoveryPass}
+              onChange={(e) => setNewRecoveryPass(e.target.value)}
+              placeholder="Escribe tu nueva clave"
+              autoComplete="new-password"
+              required
+            />
+          </label>
+
+          <label className="tt-recovery-field">
+            <span>Confirma tu nueva contraseña</span>
+            <input
+              type={showRecoveryPass ? 'text' : 'password'}
+              className="tt-input"
+              value={confirmRecoveryPass}
+              onChange={(e) => setConfirmRecoveryPass(e.target.value)}
+              placeholder="Repite la nueva clave"
+              autoComplete="new-password"
+              required
+            />
+          </label>
+
+          <button
+            type="button"
+            className="tt-btn tt-btn-ghost tt-btn-sm"
+            onClick={() => setShowRecoveryPass((v) => !v)}
+          >
+            {showRecoveryPass ? 'Ocultar contraseñas' : 'Ver contraseñas'}
+          </button>
+
+          <button
+            type="submit"
+            disabled={savingRecoveryPass}
+            className="tt-btn tt-btn-primary"
+            style={{ width: '100%' }}
+          >
+            {savingRecoveryPass ? 'Guardando nueva clave...' : 'Guardar Nueva Contraseña'}
+          </button>
+        </form>
+      </ModalPortal>
+
+      {/* MODAL DE FICHA DE RIVAL — 100% SOLO LECTURA */}
       <ModalPortal
         isOpen={Boolean(inspectedPlayer)}
         onClose={() => setInspectPlayerId(null)}
@@ -2152,7 +2448,7 @@ return (
         )}
       </ModalPortal>
 
-      {/* POP-UP AUTOMÁTICO DE RETO ENTRANTE (WHATSAPP ENRUTADO AL TUTOR SI APLICA) */}
+      {/* POP-UP AUTOMÁTICO DE RETO ENTRANTE */}
       <ModalPortal
         isOpen={Boolean(popupChallenge)}
         onClose={() => {
@@ -2237,7 +2533,7 @@ return (
         )}
       </ModalPortal>
 
-      {/* POP-UP DE DOBLE CONFIRMACIÓN DE MARCADOR */}
+      {/* POP-UP DE DOBLE CONFIRMACIÓN DE MARCADOR (JUGADOR O ÁRBITRO) */}
       <ModalPortal
         isOpen={Boolean(scoreConfirmChallenge)}
         onClose={() => {
@@ -2245,8 +2541,12 @@ return (
             setDismissedScoreIds((prev) => [...prev, scoreConfirmChallenge.id]);
           }
         }}
-        title="Confirma el Marcador"
-        subtitle="Validación oficial entre ambos jugadores"
+        title={scoreIsJudgeSubmitted ? 'Revisión de Marcador (Árbitro)' : 'Confirma el Marcador'}
+        subtitle={
+          scoreIsJudgeSubmitted
+            ? 'Validación requerida por ambos jugadores'
+            : 'Validación oficial entre ambos jugadores'
+        }
         icon={<IconBadge name="trophy" variant="emerald" size={38} />}
         isTopLayer
       >
@@ -2254,7 +2554,11 @@ return (
           <div className="tt-incoming-popup-stack">
             <div className="tt-ip-rival-card">
               <div style={{ width: '100%' }}>
-                <strong>{scoreProposer?.name || 'Tu rival'} cargó el resultado</strong>
+                <strong>
+                  {scoreIsJudgeSubmitted
+                    ? `El Árbitro (${scoreProposer?.name || scoreConfirmChallenge.judgeName || 'Oficial'}) cerró el partido`
+                    : `${scoreProposer?.name || 'Tu rival'} cargó el resultado`}
+                </strong>
                 <span>
                   {scoreConfirmChallenge.clubName} · Marcador:{' '}
                   <b style={{ color: '#00DC7D' }}>{scoreConfirmChallenge.scoreSummary}</b>
@@ -2277,10 +2581,10 @@ return (
               >
                 {busyActionId === scoreConfirmChallenge.id
                   ? 'Confirmando puntos...'
-                  : 'Confirmar Marcador y Actualizar Puntos'}
+                  : 'Confirmar Marcador Oficial'}
               </button>
 
-              {scoreConfirmChallenge.proposedBy !== currentUser?.id && (
+              {(scoreIsJudgeSubmitted || scoreConfirmChallenge.proposedBy !== currentUser?.id) && (
                 <button
                   type="button"
                   className="tt-btn tt-btn-secondary"
@@ -2554,7 +2858,7 @@ return (
         onNavigateTab={handleSelectTab}
       />
 
-      {/* AUTH AL FINAL DEL ÁRBOL + CAPA MÁXIMA isAuthLayer PARA SUBIR SIEMPRE ENCIMA */}
+      {/* AUTH AL FINAL DEL ÁRBOL + CAPA MÁXIMA isAuthLayer */}
       <AuthAndOnboardingModal
         isOpen={authModal.open}
         initialMode={authModal.mode}
@@ -2588,6 +2892,7 @@ return (
         isSuppressed={Boolean(
           showSplash ||
             authModal.open ||
+            passwordRecoveryOpen ||
             adminModalOpen ||
             partnerModalOpen ||
             popupChallenge ||
@@ -2632,7 +2937,24 @@ return (
           background: var(--tt-bg, #160428);
           color: var(--tt-text, #FAF9F5);
         }
-
+        .tt-recovery-form {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+        .tt-recovery-copy {
+          margin: 0;
+          font-size: 0.82rem;
+          line-height: 1.45;
+          color: var(--tt-text-muted);
+        }
+        .tt-recovery-field {
+          display: flex;
+          flex-direction: column;
+          gap: 5px;
+          font-size: 0.76rem;
+          font-weight: 800;
+        }
         .tt-slim-ticker-bar {
           flex-shrink: 0;
           padding: 0 10px 6px;
@@ -2686,7 +3008,6 @@ return (
           from { opacity: 0; transform: translateY(3px); }
           to { opacity: 1; transform: translateY(0); }
         }
-
         .tt-main-scroll {
           flex: 1;
           min-height: 0;
@@ -2706,7 +3027,6 @@ return (
           from { opacity: 0; transform: translateY(5px); }
           to { opacity: 1; transform: translateY(0); }
         }
-
         .tt-rival-seg-bar {
           display: grid;
           grid-template-columns: 1fr 1fr;
@@ -2734,7 +3054,6 @@ return (
           font-size: 0.76rem;
           font-weight: 800;
         }
-
         .tt-incoming-popup-stack {
           display: flex;
           flex-direction: column;
@@ -2766,7 +3085,6 @@ return (
           font-weight: 800;
           color: #00DC7D;
         }
-
         .tt-global-toast {
           position: fixed;
           left: 50%;
