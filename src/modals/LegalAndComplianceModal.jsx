@@ -29,7 +29,7 @@ export const LEGAL_EDITABLE_CONFIG = {
   customBookIconSrc: '/assets/icon-libro-reclamaciones.png',
   lastUpdated: 'Noviembre 2026',
 
- /* 6 CLÁUSULAS OBLIGATORIAS DE TÉRMINOS Y CONDICIONES */
+  /* 6 CLÁUSULAS OBLIGATORIAS DE TÉRMINOS Y CONDICIONES */
   termsClauses: [
     {
       number: '01',
@@ -165,13 +165,11 @@ function DualLayerLegalCrest({ variant = 'reclamaciones', size = 44 }) {
 
           {variant === 'reclamaciones' && (
             <>
-              {/* Capa trasera con profundidad */}
               <path
                 d="M4.5 7.5C4.5 6.1 5.6 5 7 5H13.2C14.5 5 15.8 5.6 16.6 6.6V22.5C15.7 21.6 14.5 21.1 13.2 21.1H7C5.6 21.1 4.5 20 4.5 18.6V7.5Z"
                 fill={`url(#tt-lg-g-${variant})`}
                 fillOpacity="0.28"
               />
-              {/* Páginas abiertas en relieve metálico */}
               <path
                 d="M14 7.2C12.8 5.9 11 5.2 9 5.2H5.8C4.8 5.2 4 6 4 7V19.2C4 20.2 4.8 21 5.8 21H9.4C11.2 21 12.9 21.6 14 22.8M14 7.2C15.2 5.9 17 5.2 19 5.2H22.2C23.2 5.2 24 6 24 7V19.2C24 20.2 23.2 21 22.2 21H18.6C16.8 21 15.1 21.6 14 22.8M14 7.2V22.8"
                 stroke={`url(#tt-lg-g-${variant})`}
@@ -179,7 +177,6 @@ function DualLayerLegalCrest({ variant = 'reclamaciones', size = 44 }) {
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
-              {/* Sello de verificación dorado */}
               <circle cx="19.5" cy="12" r="2.4" fill={`url(#tt-lg-g-${variant})`} />
             </>
           )}
@@ -273,7 +270,7 @@ function downloadComplaintReceiptText(record) {
     `   Incidente       : ${record.detail}`,
     record.consumerRequest ? `   Pedido          : ${record.consumerRequest}` : null,
     '------------------------------------------------------------',
-   `Plazo legal de respuesta: hasta ${LEGAL_EDITABLE_CONFIG.responseDeadlineDays} días hábiles improrrogables`,
+    `Plazo legal de respuesta: hasta ${LEGAL_EDITABLE_CONFIG.responseDeadlineDays} días hábiles improrrogables`,
     '(Ley N° 29571, Ley N° 31435 y Ley N° 32495 - Indecopi Perú).',
     '============================================================',
   ]
@@ -300,6 +297,7 @@ export default function LegalAndComplianceModal({
   onClose,
   currentUser = null,
   complaints = [],
+  onOpenAuth,
   onSubmitComplaint,
   onNotify,
 }) {
@@ -360,6 +358,15 @@ export default function LegalAndComplianceModal({
 
   const handleSubmitClaim = (e) => {
     e.preventDefault();
+    if (!currentUser) {
+      triggerHaptic('warning');
+      if (onNotify) {
+        onNotify('Inicia sesión con tu cuenta para registrar una Hoja de Reclamación.', 'warning');
+      }
+      if (onClose) onClose();
+      if (onOpenAuth) onOpenAuth('login');
+      return;
+    }
     if (!formValidation.ok) {
       triggerHaptic('warning');
       if (onNotify) onNotify(formValidation.hint, 'warning');
@@ -395,7 +402,6 @@ export default function LegalAndComplianceModal({
       status: 'REGISTRADA',
     };
 
-    // Respaldo persistente local + envío a la capa de base de datos/Supabase
     try {
       const raw = window.localStorage.getItem(COMPLAINTS_STORAGE_KEY);
       const prev = raw ? JSON.parse(raw) : [];
@@ -511,11 +517,10 @@ export default function LegalAndComplianceModal({
         </div>
 
         {/* ==================================================================
-            PESTAÑA 1: LIBRO DE RECLAMACIONES VIRTUAL (INDECOPI PERÚ)
+            PESTAÑA 1: LIBRO DE RECLAMACIONES VIRTUAL (SOLO USUARIOS LOGUEADOS)
             ================================================================== */}
         {activeTab === 'reclamaciones' && (
           <div className="tt-lg-stack">
-            {/* Cabecera Institucional Centrada con Blasón de Doble Capa */}
             <div className="tt-lg-indecopi-banner">
               <DualLayerLegalCrest variant="reclamaciones" size={50} />
               <div className="tt-lg-ib-text">
@@ -527,8 +532,43 @@ export default function LegalAndComplianceModal({
               </div>
             </div>
 
-            {submittedRecord ? (
-              /* CONSTANCIA OFICIAL GENERADA CON CÓDIGO CORRELATIVO */
+            {!currentUser ? (
+              <div className="tt-lg-auth-gate">
+                <div className="tt-lg-ag-icon" aria-hidden="true">
+                  <TTIcon name="shield" size={28} style={{ color: '#00DC7D' }} />
+                </div>
+                <h4>Inicia sesión para registrar una reclamación</h4>
+                <p>
+                  Para proteger la identidad del consumidor y dar seguimiento oficial a tu caso,
+                  debes estar conectado con tu cuenta de TOTAL TENIS antes de enviar una Hoja de
+                  Reclamación.
+                </p>
+                <div className="tt-lg-ag-actions">
+                  <button
+                    type="button"
+                    className="tt-lg-btn-primary"
+                    onClick={() => {
+                      triggerHaptic('medium');
+                      if (onClose) onClose();
+                      if (onOpenAuth) onOpenAuth('login');
+                    }}
+                  >
+                    Iniciar Sesión
+                  </button>
+                  <button
+                    type="button"
+                    className="tt-lg-btn-outline"
+                    onClick={() => {
+                      triggerHaptic('light');
+                      if (onClose) onClose();
+                      if (onOpenAuth) onOpenAuth('register');
+                    }}
+                  >
+                    Crear Cuenta Gratis
+                  </button>
+                </div>
+              </div>
+            ) : submittedRecord ? (
               <div className="tt-lg-receipt-card">
                 <div className="tt-lg-rc-badge">
                   <TTIcon name="check" size={20} />
@@ -610,7 +650,6 @@ export default function LegalAndComplianceModal({
                 </button>
               </div>
             ) : (
-              /* FORMULARIO OFICIAL COMPLETO Y ARMONIOSO */
               <form onSubmit={handleSubmitClaim} className="tt-lg-form">
                 <div className="tt-lg-field">
                   <label htmlFor="tt-lr-name">Nombre completo del consumidor</label>
@@ -693,7 +732,6 @@ export default function LegalAndComplianceModal({
                   </div>
                 </div>
 
-                {/* Tipo: Reclamo vs Queja con aclaración legal en lenguaje humano */}
                 <div className="tt-lg-field">
                   <label>Tipo de registro</label>
                   <div className="tt-lg-type-grid">
@@ -779,7 +817,7 @@ export default function LegalAndComplianceModal({
         )}
 
         {/* ==================================================================
-            PESTAÑA 2: TÉRMINOS Y CONDICIONES (5 CLÁUSULAS OBLIGATORIAS + SBS)
+            PESTAÑA 2: TÉRMINOS Y CONDICIONES (6 CLÁUSULAS OBLIGATORIAS + SBS)
             ================================================================== */}
         {activeTab === 'terms' && (
           <div className="tt-lg-stack">
@@ -809,7 +847,6 @@ export default function LegalAndComplianceModal({
               ))}
             </div>
 
-            {/* Aviso expreso de transparencia financiera (Blindaje SBS / Cero Billetera Digital) */}
             <div className="tt-lg-sbs-callout">
               <TTIcon name="shield" size={18} style={{ color: '#00DC7D', flexShrink: 0 }} />
               <div>
@@ -852,7 +889,6 @@ export default function LegalAndComplianceModal({
               ))}
             </div>
 
-            {/* Panel Directo para Ejercer Derechos ARCO */}
             <div className="tt-lg-arco-card">
               <div className="tt-lg-arco-top">
                 <span className="tt-lg-kicker" style={{ color: '#7CF5C0' }}>
@@ -886,7 +922,6 @@ export default function LegalAndComplianceModal({
           </div>
         )}
 
-        {/* PIE LEGAL DISCRETO DE MARCA */}
         <footer className="tt-lg-footer">
           <SmartImage
             src={ASSETS.logoOscuro || ASSETS.logo}
@@ -897,9 +932,6 @@ export default function LegalAndComplianceModal({
         </footer>
       </div>
 
-      {/* ====================================================================
-          ESTILOS ENCAPSULADOS (BLANCO MARFIL EDITORIAL + PÚRPURA + ESMERALDA)
-          ==================================================================== */}
       <style>{`
         .tt-lg-shell {
           border-radius: 20px;
@@ -915,8 +947,50 @@ export default function LegalAndComplianceModal({
           flex-direction: column;
           gap: 13px;
         }
-
-        /* Insignia Vectorial de Doble Capa con Relieve */
+        .tt-lg-auth-gate {
+          border-radius: 20px;
+          padding: 22px 16px;
+          background: linear-gradient(180deg, #FFFFFF 0%, #F4F0FA 100%);
+          border: 1.5px solid rgba(30, 7, 52, 0.16);
+          box-shadow: inset 0 1px 0 #FFFFFF, 0 5px 0 #D0C5E6;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          text-align: center;
+          gap: 10px;
+        }
+        .tt-lg-ag-icon {
+          width: 58px;
+          height: 58px;
+          border-radius: 18px;
+          background: linear-gradient(180deg, #2D0F4E 0%, #17042A 100%);
+          border: 1.5px solid rgba(0, 220, 125, 0.55);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 4px 0 #0B0116;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .tt-lg-auth-gate h4 {
+          margin: 2px 0 0;
+          font-family: var(--tt-font-display);
+          font-size: 1.28rem;
+          color: #1E0734;
+        }
+        .tt-lg-auth-gate p {
+          margin: 0;
+          font-size: 0.8rem;
+          line-height: 1.46;
+          color: rgba(30, 7, 52, 0.78);
+          max-width: 420px;
+        }
+        .tt-lg-ag-actions {
+          width: 100%;
+          max-width: 340px;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 9px;
+          margin-top: 4px;
+        }
         .tt-lg-crest {
           position: relative;
           border-radius: 14px;
@@ -935,23 +1009,21 @@ export default function LegalAndComplianceModal({
           box-shadow: 0 8px 20px rgba(245, 158, 11, 0.22),
             inset 0 1px 1px rgba(254, 240, 138, 0.3);
         }
-
-        /* Conmutador Superior 3 Pestañas */
         .tt-lg-tabs {
           display: grid;
           grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 5px;
-          padding: 4px;
+          gap: 6px;
+          padding: 5px;
           border-radius: 15px;
           background: rgba(30, 7, 52, 0.08);
         }
         .tt-lg-tab {
-          min-height: 38px;
+          min-height: 40px;
           padding: 0 6px;
           border-radius: 11px;
           font-size: 0.72rem;
           font-weight: 800;
-          color: rgba(30, 7, 52, 0.68);
+          color: rgba(30, 7, 52, 0.72);
           white-space: nowrap;
           transition: background-color 180ms ease, color 180ms ease, transform 120ms ease;
         }
@@ -966,7 +1038,6 @@ export default function LegalAndComplianceModal({
         .tt-lg-tab.is-active.is-gold {
           color: #FDE68A;
         }
-
         .tt-lg-kicker {
           display: block;
           font-size: 0.62rem;
@@ -974,8 +1045,6 @@ export default function LegalAndComplianceModal({
           letter-spacing: 0.09em;
           color: #008A4E;
         }
-
-        /* Cabecera Indecopi / Documentos */
         .tt-lg-indecopi-banner,
         .tt-lg-doc-hero {
           border-radius: 18px;
@@ -1008,8 +1077,6 @@ export default function LegalAndComplianceModal({
           line-height: 1.42;
           color: rgba(30, 7, 52, 0.72);
         }
-
-        /* Formulario Libro de Reclamaciones */
         .tt-lg-form {
           display: flex;
           flex-direction: column;
@@ -1043,7 +1110,7 @@ export default function LegalAndComplianceModal({
           background: #FFFFFF;
           border: 1.5px solid rgba(30, 7, 52, 0.14);
           color: #1E0734;
-          font-size: 0.86rem;
+          font-size: 16px;
           font-weight: 600;
           font-family: inherit;
         }
@@ -1059,7 +1126,6 @@ export default function LegalAndComplianceModal({
           outline: none;
           border-color: #00B868;
         }
-
         .tt-lg-choice-pair {
           display: grid;
           grid-template-columns: 1fr 1fr;
@@ -1068,18 +1134,19 @@ export default function LegalAndComplianceModal({
         .tt-lg-choice {
           min-height: 44px;
           border-radius: 12px;
-          background: #FFFFFF;
-          border: 1.5px solid rgba(30, 7, 52, 0.14);
-          color: rgba(30, 7, 52, 0.72);
+          background: linear-gradient(180deg, #FFFFFF 0%, #EFEAF8 100%);
+          border: 1.5px solid rgba(30, 7, 52, 0.18);
+          box-shadow: inset 0 1px 0 #FFFFFF, 0 3px 0 #C8BDDF;
+          color: #1E0734;
           font-size: 0.78rem;
           font-weight: 800;
         }
         .tt-lg-choice.is-on {
-          background: #1E0734;
+          background: linear-gradient(180deg, #35115C 0%, #1E0734 100%);
           border-color: #1E0734;
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 3px 0 #0D0218;
           color: #00DC7D;
         }
-
         .tt-lg-type-grid {
           display: grid;
           grid-template-columns: 1fr 1fr;
@@ -1088,8 +1155,9 @@ export default function LegalAndComplianceModal({
         .tt-lg-type-card {
           padding: 11px;
           border-radius: 15px;
-          background: #FFFFFF;
-          border: 1.5px solid rgba(30, 7, 52, 0.14);
+          background: linear-gradient(180deg, #FFFFFF 0%, #F4F0FA 100%);
+          border: 1.5px solid rgba(30, 7, 52, 0.18);
+          box-shadow: inset 0 1px 0 #FFFFFF, 0 3px 0 #C8BDDF;
           color: #1E0734;
           text-align: left;
           display: flex;
@@ -1097,8 +1165,9 @@ export default function LegalAndComplianceModal({
           gap: 3px;
         }
         .tt-lg-type-card.is-on {
-          background: #1E0734;
+          background: linear-gradient(180deg, #35115C 0%, #1E0734 100%);
           border-color: #00DC7D;
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 3px 0 #0D0218;
           color: #FAF9F5;
         }
         .tt-lg-type-card strong {
@@ -1109,7 +1178,6 @@ export default function LegalAndComplianceModal({
           line-height: 1.32;
           opacity: 0.76;
         }
-
         .tt-lg-legal-note {
           margin: 2px 0;
           padding: 10px 12px;
@@ -1119,14 +1187,13 @@ export default function LegalAndComplianceModal({
           line-height: 1.42;
           color: rgba(30, 7, 52, 0.74);
         }
-
-        /* Botones Armoniosos */
         .tt-lg-btn-primary {
           min-height: 46px;
           padding: 0 18px;
-          border-radius: 999px;
-          background: #1E0734;
-          color: #00DC7D;
+          border-radius: 14px;
+          background: linear-gradient(180deg, #35115C 0%, #1E0734 100%);
+          color: #00E582;
+          border: 1.5px solid #1E0734;
           font-size: 0.84rem;
           font-weight: 900;
           display: inline-flex;
@@ -1134,27 +1201,32 @@ export default function LegalAndComplianceModal({
           justify-content: center;
           gap: 7px;
           text-decoration: none;
-          box-shadow: 0 10px 22px rgba(30, 7, 52, 0.22);
-          transition: transform 130ms ease;
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 4px 0 #0D0218, 0 10px 20px rgba(30, 7, 52, 0.22);
+          transition: transform 115ms ease, box-shadow 115ms ease;
         }
         .tt-lg-btn-primary:active {
-          transform: scale(0.97);
+          transform: translateY(3px);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 1px 0 #0D0218;
         }
         .tt-lg-btn-primary.is-muted {
           background: rgba(30, 7, 52, 0.16);
+          border-color: transparent;
           color: rgba(30, 7, 52, 0.72);
           box-shadow: none;
         }
         .tt-lg-btn-primary.is-emerald-fill {
-          background: #00DC7D;
+          background: linear-gradient(180deg, #24F499 0%, #00C96F 56%, #00A85B 100%);
+          border-color: rgba(176, 255, 222, 0.8);
           color: #120321;
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72), 0 4px 0 #00743F;
         }
         .tt-lg-btn-outline {
-          min-height: 44px;
+          min-height: 46px;
           padding: 0 16px;
-          border-radius: 999px;
-          background: transparent;
-          border: 1.5px solid #1E0734;
+          border-radius: 14px;
+          background: linear-gradient(180deg, #FFFFFF 0%, #EFEAF8 100%);
+          border: 1.5px solid rgba(30, 7, 52, 0.24);
+          box-shadow: inset 0 1px 0 #FFFFFF, 0 4px 0 #C8BDDF;
           color: #1E0734;
           font-size: 0.8rem;
           font-weight: 900;
@@ -1163,13 +1235,18 @@ export default function LegalAndComplianceModal({
           justify-content: center;
           gap: 7px;
           text-decoration: none;
+          transition: transform 115ms ease, box-shadow 115ms ease;
+        }
+        .tt-lg-btn-outline:active {
+          transform: translateY(3px);
+          box-shadow: inset 0 1px 0 #FFFFFF, 0 1px 0 #C8BDDF;
         }
         .tt-lg-btn-outline.is-dark-surface {
-          border-color: rgba(250, 249, 245, 0.4);
+          background: linear-gradient(180deg, #35155C 0%, #21093E 100%);
+          border-color: rgba(250, 249, 245, 0.35);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 4px 0 #0D0218;
           color: #FAF9F5;
         }
-
-        /* Constancia Oficial Generada */
         .tt-lg-receipt-card {
           border-radius: 20px;
           padding: 18px 15px;
@@ -1247,8 +1324,6 @@ export default function LegalAndComplianceModal({
           color: #008A4E;
           text-decoration: underline;
         }
-
-        /* Tarjetas de Cláusulas (Términos y Privacidad) */
         .tt-lg-clauses-list {
           display: flex;
           flex-direction: column;
@@ -1303,7 +1378,6 @@ export default function LegalAndComplianceModal({
           line-height: 1.5;
           color: rgba(30, 7, 52, 0.8);
         }
-
         .tt-lg-sbs-callout {
           padding: 13px;
           border-radius: 16px;
@@ -1319,7 +1393,6 @@ export default function LegalAndComplianceModal({
           opacity: 0.82;
           line-height: 1.44;
         }
-
         .tt-lg-arco-card {
           border-radius: 18px;
           padding: 15px;
@@ -1351,8 +1424,6 @@ export default function LegalAndComplianceModal({
             grid-template-columns: 1fr 1fr;
           }
         }
-
-        /* Pie Legal Discreto */
         .tt-lg-footer {
           padding-top: 10px;
           border-top: 1px solid rgba(30, 7, 52, 0.1);
