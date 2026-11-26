@@ -45,10 +45,6 @@ import {
   getActiveSponsorsByLevel,
 } from '../components/SponsorPlacements';
 
-/* ==========================================================================
-   VISTA PRINCIPAL: RetosView
-   (ACABADO 3D TÁCTIL + LIQUID GLASS + RETO EN 1 TOQUE + GEMAS HASTA 6-0, 6-0)
-   ========================================================================== */
 export default function RetosView({
   players = [],
   clubs = INITIAL_CLUBS,
@@ -73,7 +69,7 @@ export default function RetosView({
   const isLight = theme === 'light';
   const modeClass = isLight ? 'is-light' : 'is-dark';
 
-  const [subTab, setSubTab] = useState('cartelera'); // 'cartelera' | 'mis-retos' | 'lanzar'
+  const [subTab, setSubTab] = useState('cartelera');
   const [heroSlideIdx, setHeroSlideIdx] = useState(0);
 
   const [rivalSearch, setRivalSearch] = useState('');
@@ -108,7 +104,6 @@ export default function RetosView({
     return map;
   }, [players]);
 
-  // Motor adaptativo Anti-Escasez (±1,200 normal -> ±1,800 hasta 8 rivales si hay < 6 en tu rango)
   const adaptiveRadar = useMemo(
     () => computeAdaptiveOfficialRivals(players, currentUser),
     [players, currentUser]
@@ -240,7 +235,6 @@ export default function RetosView({
     [currentUser, isAdmin]
   );
 
-  /* Carrusel Hero con las 3 fotos precargadas desde el segundo 0 */
   const heroSlides = useMemo(() => {
     const featuredLive = liveChallenges[0];
     const pA = featuredLive ? playersMap[featuredLive.playerAId] : null;
@@ -328,7 +322,6 @@ export default function RetosView({
       onTrackSponsorImpression(activeSlide.sponsorId);
     }
   }, [activeSlide?.sponsorId, onTrackSponsorImpression]);
-  const activeSlide = heroSlides[currentSlideIdx];
 
   useEffect(() => {
     if (challengeTarget || activeScoreboardId || rescheduleTarget || celebrationPayload) {
@@ -340,9 +333,6 @@ export default function RetosView({
     return () => window.clearInterval(id);
   }, [heroSlides.length, challengeTarget, activeScoreboardId, rescheduleTarget, celebrationPayload]);
 
-  /* ------------------------------------------------------------------------
-     ACCIONES DE NEGOCIO (INCLUYE RETO DIRECTO EN 1 TOQUE DESDE RANKING/H2H)
-     ------------------------------------------------------------------------ */
   const openCreateChallengeModal = useCallback(
     (rival, forceFriendly = false) => {
       if (!rival) return;
@@ -381,7 +371,6 @@ export default function RetosView({
     [currentUser, isRivalInOfficialRange, clubs, onNotify, onOpenAuth]
   );
 
-  // Disparo instantáneo del modal "Pactar Nuevo Desafío" al llegar desde Ranking, Perfil o H2H
   useEffect(() => {
     if (!quickChallengeRival?.id) return;
     openCreateChallengeModal(quickChallengeRival, false);
@@ -643,9 +632,6 @@ export default function RetosView({
     setRescheduleTarget(null);
   };
 
-  /* ------------------------------------------------------------------------
-     CÁLCULOS EN VIVO PARA LOS MODALES (ELO + GEMAS HASTA 6-0, 6-0)
-     ------------------------------------------------------------------------ */
   const preMatchForecast = useMemo(() => {
     if (!currentUser || !challengeTarget) return null;
     return getPreMatchForecast(
@@ -733,9 +719,7 @@ return (
       className={`tt-retos-view ${modeClass}`}
       aria-label="Retos y Cartelera Oficial TOTAL TENIS"
     >
-      {/* ====================================================================
-          1. CARRUSEL HERO 3D INSTANTÁNEO (3 FOTOS PRECARGADAS + CROSSFADE)
-          ==================================================================== */}
+      {/* 1. CARRUSEL HERO 3D INSTANTÁNEO (SPONSORS NIVEL 1 + CIRCUITO) */}
       <div className="tt-hero-stage">
         {heroSlides.map((slide, idx) => (
           <SmartImage
@@ -814,9 +798,7 @@ return (
         </div>
       </div>
 
-      {/* ====================================================================
-          2. ALERTA PRIORITARIA 3D DE RETOS ENTRANTES PENDIENTES
-          ==================================================================== */}
+      {/* 2. ALERTA PRIORITARIA 3D DE RETOS ENTRANTES PENDIENTES */}
       {incomingPending.length > 0 && (
         <div className="tt-incoming-alert">
           <div className="tt-incoming-alert-head">
@@ -858,9 +840,7 @@ return (
         </div>
       )}
 
-      {/* ====================================================================
-          3. DOCK 3D TÁCTIL DE 3 SUB-VISTAS (CARTELERA | TUS DESAFÍOS | LANZAR RETO)
-          ==================================================================== */}
+      {/* 3. DOCK 3D TÁCTIL DE 3 SUB-VISTAS */}
       <div className="tt-rt-3d-dock" role="tablist" aria-label="Secciones de Retos">
         <button
           type="button"
@@ -909,9 +889,7 @@ return (
         </button>
       </div>
 
-      {/* ====================================================================
-          4A. CARTELERA PÚBLICA (FILTROS 3D + TARJETAS PÓSTER VS CON RELIEVE)
-          ==================================================================== */}
+      {/* 4A. CARTELERA PÚBLICA + BANNER ESTÁTICO EXCLUSIVO NIVEL 2 */}
       {subTab === 'cartelera' && (
         <div key="panel-cartelera" className="tt-retos-panel tt-rt-panel-in">
           <div className="tt-filter-pills-row">
@@ -935,12 +913,14 @@ return (
               </button>
             ))}
           </div>
+
           <SponsorStaticBanner
-         sponsorsConfig={sponsorsConfig}
-         theme={theme}
-         onTrackImpression={onTrackSponsorImpression}
-         onTrackClick={onTrackSponsorClick}
-       />
+            sponsorsConfig={sponsorsConfig}
+            theme={theme}
+            onTrackImpression={onTrackSponsorImpression}
+            onTrackClick={onTrackSponsorClick}
+          />
+
           {publicBoardChallenges.length === 0 ? (
             <EmptyStateCard
               theme={theme}
@@ -979,9 +959,7 @@ return (
         </div>
       )}
 
-      {/* ====================================================================
-          4B. TUS DESAFÍOS
-          ==================================================================== */}
+      {/* 4B. TUS DESAFÍOS */}
       {subTab === 'mis-retos' && (
         <div key="panel-mis-retos" className="tt-retos-panel tt-rt-panel-in">
           {!currentUser ? (
@@ -1036,9 +1014,7 @@ return (
         </div>
       )}
 
-      {/* ====================================================================
-          4C. LANZAR RETO (RADAR 3D CON ANTI-ESCASEZ + PROTECCIÓN TUTELA)
-          ==================================================================== */}
+      {/* 4C. LANZAR RETO */}
       {subTab === 'lanzar' && (
         <div key="panel-lanzar" className="tt-retos-panel tt-rt-panel-in">
           {currentUser?.isTutorOnly && (
@@ -1242,9 +1218,7 @@ return (
         </div>
       )}
 
-      {/* ====================================================================
-          MODAL 1: PACTAR NUEVO DESAFÍO (ELO + GEMAS HASTA 6-0, 6-0 + MODO CLARO)
-          ==================================================================== */}
+      {/* MODAL 1: PACTAR NUEVO DESAFÍO */}
       <ModalPortal
         isOpen={Boolean(challengeTarget)}
         onClose={() => setChallengeTarget(null)}
@@ -1497,9 +1471,7 @@ return (
         )}
       </ModalPortal>
 
-      {/* ====================================================================
-          MODAL 2: SUBIR RESULTADO DIRECTO (JUGADORES) | EN VIVO (ÁRBITRO 3D)
-          ==================================================================== */}
+      {/* MODAL 2: SUBIR RESULTADO DIRECTO | EN VIVO (ÁRBITRO 3D) */}
       <ModalPortal
         isOpen={Boolean(activeScoreboardChallenge && activeSbData)}
         onClose={() => {
@@ -2348,9 +2320,6 @@ return (
         )}
       </ModalPortal>
 
-      {/* ====================================================================
-          MODALES 3 y 4: REPROGRAMACIÓN 24H + CELEBRACIÓN POST-PARTIDO
-          ==================================================================== */}
       <RetosRescheduleModal
         rescheduleTarget={rescheduleTarget}
         currentUser={currentUser}
@@ -2381,8 +2350,6 @@ return (
         .tt-retos-view.is-light {
           color: #1E0734;
         }
-
-        /* Física táctil compartida */
         .tt-glass-press {
           transition:
             transform 125ms cubic-bezier(0.22, 1.35, 0.36, 1),
@@ -2399,10 +2366,6 @@ return (
         .tt-rt-avatar-btn:active {
           transform: scale(0.93);
         }
-
-        /* ==================================================================
-           1. CARRUSEL HERO 3D (3 CAPAS PRECARGADAS + CTA 3D TÁCTIL)
-           ================================================================== */
         .tt-hero-stage {
           position: relative;
           min-height: 184px;
@@ -2594,10 +2557,6 @@ return (
           display: inline-block;
           animation: ttLivePulse 1.6s infinite;
         }
-
-        /* ==================================================================
-           2. ALERTA PRIORITARIA 3D DE RETOS ENTRANTES
-           ================================================================== */
         .tt-incoming-alert {
           border-radius: 20px;
           padding: 14px;
@@ -2637,10 +2596,6 @@ return (
           transform: translateY(2px);
           box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 1px 0 #0E021A;
         }
-
-        /* ==================================================================
-           3. DOCK 3D TÁCTIL (CARTELERA | TUS DESAFÍOS | LANZAR RETO)
-           ================================================================== */
         .tt-rt-3d-dock {
           display: grid;
           grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2664,7 +2619,6 @@ return (
           border-color: rgba(30, 7, 52, 0.16);
           box-shadow: inset 0 2px 6px rgba(30, 7, 52, 0.14);
         }
-
         .tt-rt-3d-tab {
           min-height: 43px;
           padding: 0 7px;
@@ -2707,7 +2661,6 @@ return (
         .tt-rt-3d-tab.is-active:active {
           box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 1px 0 #007540;
         }
-
         .tt-retos-view.is-light .tt-rt-3d-tab,
         .tt-mc-container.is-light .tt-rt-3d-tab,
         html[data-theme='light'] .tt-rt-3d-tab {
@@ -2735,7 +2688,6 @@ return (
             0 4px 0 #0D0218,
             0 8px 18px rgba(30, 7, 52, 0.26);
         }
-
         .tt-subtab-chip {
           min-width: 19px;
           height: 19px;
@@ -2761,10 +2713,6 @@ return (
           background: rgba(0, 229, 130, 0.22);
           color: #00E582;
         }
-
-        /* ==================================================================
-           4. FILTROS 3D TÁCTILES (TODOS | EN JUEGO | PROGRAMADOS | RESULTADOS)
-           ================================================================== */
         .tt-retos-panel {
           display: flex;
           flex-direction: column;
@@ -2777,7 +2725,6 @@ return (
           from { opacity: 0; transform: translateY(7px); }
           to { opacity: 1; transform: translateY(0); }
         }
-
         .tt-filter-pills-row {
           display: flex;
           gap: 8px;
@@ -2788,7 +2735,6 @@ return (
         .tt-filter-pills-row::-webkit-scrollbar {
           display: none;
         }
-
         .tt-rt-3d-chip {
           flex-shrink: 0;
           min-height: 38px;
@@ -2858,8 +2804,6 @@ return (
           background: #0D0219;
           box-shadow: none;
         }
-
-        /* BANNERS ANTI-ESCASEZ Y TUTELA */
         .tt-scarcity-banner {
           display: flex;
           align-items: flex-start;
@@ -2881,7 +2825,6 @@ return (
           color: var(--tt-text-muted);
           line-height: 1.4;
         }
-
         .tt-tutor-only-card {
           display: flex;
           align-items: flex-start;
@@ -2907,7 +2850,6 @@ return (
           color: var(--tt-text-muted);
           line-height: 1.4;
         }
-
         .tt-tutela-mini-pill {
           display: inline-block;
           padding: 2px 7px;
@@ -2924,10 +2866,6 @@ return (
           border-color: #38BDF8;
           color: #0369A1;
         }
-
-        /* ==================================================================
-           5. TARJETAS PÓSTER VS 3D + BADGES ILUMINADOS (CLARO Y OSCURO)
-           ================================================================== */
         .tt-matches-grid {
           display: grid;
           grid-template-columns: 1fr;
@@ -2972,8 +2910,6 @@ return (
           justify-content: space-between;
           gap: 8px;
         }
-
-        /* BADGES DE ESTADO 3D CON VOLUMEN Y CONTRASTE REAL */
         .tt-match-pill {
           display: inline-flex;
           align-items: center;
@@ -3051,7 +2987,6 @@ return (
           border-color: rgba(30, 7, 52, 0.18);
           box-shadow: inset 0 1px 0 #FFFFFF, 0 2px 0 #C8BDDF;
         }
-
         .tt-match-mode-tag {
           padding: 3px 9px;
           border-radius: 8px;
@@ -3066,7 +3001,6 @@ return (
           border-color: rgba(30, 7, 52, 0.14);
           color: #361C54;
         }
-
         .tt-match-vs-grid {
           display: grid;
           grid-template-columns: 1fr auto 1fr;
@@ -3151,8 +3085,6 @@ return (
           color: var(--tt-text-muted);
           white-space: nowrap;
         }
-
-        /* MINI MARCADOR EN TARJETA */
         .tt-mini-scoreboard {
           border-radius: 15px;
           padding: 11px 12px;
@@ -3219,8 +3151,6 @@ return (
           font-size: 0.69rem;
           color: rgba(250, 249, 245, 0.8);
         }
-
-        /* BARRA DE SEDE + ACCIONES + MODO ESPECTADOR CON PROFUNDIDAD */
         .tt-match-venue-bar {
           display: flex;
           flex-direction: column;
@@ -3285,7 +3215,6 @@ return (
           border-color: rgba(22, 163, 74, 0.45);
           box-shadow: inset 0 1px 0 #FFFFFF, 0 3px 0 #86EFAC;
         }
-
         .tt-waiting-banner {
           flex: 1;
           display: flex;
@@ -3304,7 +3233,6 @@ return (
           border-color: rgba(168, 118, 22, 0.42);
           color: #7A4F05;
         }
-
         .tt-spectator-pill {
           flex: 1;
           display: inline-flex;
@@ -3326,10 +3254,6 @@ return (
           box-shadow: inset 0 1px 0 #FFFFFF, 0 2px 0 #D2C8E6;
           color: #46325E;
         }
-
-        /* ==================================================================
-           6. RADAR DE RIVALES 3D
-           ================================================================== */
         .tt-radar-controls {
           display: flex;
           flex-direction: column;
@@ -3458,10 +3382,6 @@ return (
         .tt-rival-cta-col {
           flex-shrink: 0;
         }
-
-        /* ==================================================================
-           7. MODAL 1: PACTAR DESAFÍO (SELECTORES 3D + GEMAS 6-0, 6-0 + MODO CLARO)
-           ================================================================== */
         .tt-form-stack {
           display: flex;
           flex-direction: column;
@@ -3524,7 +3444,6 @@ return (
         .tt-forecast-cell.is-win strong { color: #00E582; }
         .tt-forecast-cell.is-loss strong { color: #F87171; }
         .tt-forecast-cell small { font-size: 0.66rem; opacity: 0.78; }
-
         .tt-gems-forecast-strip {
           margin-top: 10px;
           padding: 10px 11px;
@@ -3573,7 +3492,6 @@ return (
           color: rgba(250, 249, 245, 0.82);
         }
         .tt-gems-vip-upsell b { color: #F8E5AC; }
-
         .tt-gems-preview-pill {
           margin-top: 9px;
           padding: 9px 12px;
@@ -3594,8 +3512,6 @@ return (
           font-weight: 900;
           white-space: nowrap;
         }
-
-        /* SELECTORES 3D DE MODALIDAD, SEDE, HORARIO Y PELOTAS */
         .tt-toggle-pair {
           display: grid;
           grid-template-columns: 1fr 1fr;
@@ -3628,7 +3544,6 @@ return (
           color: #1E0734;
           box-shadow: inset 0 1px 0 #FFFFFF, 0 3px 0 #C8BDDF;
         }
-
         .tt-choice-pill {
           min-height: 43px;
           padding: 8px 12px;
@@ -3667,7 +3582,6 @@ return (
             0 3px 0 #0D0218,
             0 6px 14px rgba(30, 7, 52, 0.24) !important;
         }
-
         .tt-venues-select-grid {
           display: grid;
           grid-template-columns: 1fr 1fr;
@@ -3711,10 +3625,6 @@ return (
           flex-direction: column;
           gap: 8px;
         }
-
-        /* ==================================================================
-           8. MODAL 2: MARCADOR DIRECTO + MODO ÁRBITRO 3D (OSCURO Y CLARO)
-           ================================================================== */
         .tt-mc-container {
           display: flex;
           flex-direction: column;
@@ -3724,7 +3634,6 @@ return (
         .tt-mc-container.is-light {
           color: #1E0734;
         }
-
         .tt-stadium-board {
           border-radius: 19px;
           padding: 14px;
@@ -3802,7 +3711,6 @@ return (
           width: auto;
           padding: 0 6px;
         }
-
         .tt-direct-hint {
           margin: 0;
           font-size: 0.77rem;
@@ -3920,7 +3828,6 @@ return (
           font-weight: 700;
           text-align: center;
         }
-
         .tt-mc-controls-wrap {
           display: flex;
           flex-direction: column;
@@ -3992,7 +3899,6 @@ return (
           color: #1E0734;
           box-shadow: inset 0 1px 0 #FFFFFF, 0 4px 0 #C8BDDF;
         }
-
         .tt-step-plus {
           flex: 1;
           height: 46px;
@@ -4024,7 +3930,6 @@ return (
         .tt-step-plus.is-champagne:active:not(:disabled) {
           box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 1px 0 #8A6012;
         }
-
         .tt-judge-assign-box {
           display: flex;
           flex-direction: column;
