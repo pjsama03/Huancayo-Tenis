@@ -348,6 +348,17 @@ export async function sendCloudPasswordReset(email) {
   return true;
 }
 
+export async function updateCloudPassword(newPassword) {
+  if (!supabase) throw new Error('Conexión en la nube no disponible');
+  const clean = String(newPassword || '');
+  if (clean.length < 6) {
+    throw new Error('Tu nueva contraseña debe tener al menos 6 caracteres.');
+  }
+  const { data, error } = await supabase.auth.updateUser({ password: clean });
+  if (error) throw error;
+  return data;
+}
+
 export async function signOutCloudAccount() {
   unlinkOneSignalUser();
   if (!supabase) return;
