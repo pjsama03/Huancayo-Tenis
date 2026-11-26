@@ -26,7 +26,7 @@ export const LEGAL_EDITABLE_CONFIG = {
   arcoEmail: APP_CONFIG.supportEmail || 'soporte@totaltenis.pe',
   supportWhatsApp: APP_CONFIG.supportWhatsApp || '964812340',
   responseDeadlineDays: 15, // Plazo legal Indecopi (15 días hábiles improrrogables)
-  customBookIconSrc: '/assets/icon-libro-reclamaciones.png',
+  customBookIconSrc: '',
   lastUpdated: 'Noviembre 2026',
 
   /* 6 CLÁUSULAS OBLIGATORIAS DE TÉRMINOS Y CONDICIONES */
@@ -125,7 +125,7 @@ function DualLayerLegalCrest({ variant = 'reclamaciones', size = 44 }) {
       style={{ width: size, height: size }}
       aria-hidden="true"
     >
-      {variant === 'reclamaciones' && (
+      {variant === 'reclamaciones' && Boolean(LEGAL_EDITABLE_CONFIG.customBookIconSrc) && (
         <img
           src={LEGAL_EDITABLE_CONFIG.customBookIconSrc}
           alt=""
