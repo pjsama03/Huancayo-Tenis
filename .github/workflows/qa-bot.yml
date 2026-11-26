@@ -1,0 +1,40 @@
+name: QA Bot Automatizado TOTAL TENIS
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: 'URL de la app a auditar'
+        required: false
+        default: 'https://huancayo-tenis.vercel.app'
+
+jobs:
+  qa-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Instalar Playwright (sin tocar package.json)
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+
+      - name: Ejecutar auditoría automática y capturas
+        env:
+          QA_TARGET_URL: ${{ github.event.inputs.target_url || 'https://huancayo-tenis.vercel.app' }}
+        run: node tests/qa-audit.spec.mjs
+
+      - name: Subir reporte y capturas de pantalla
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-report-and-screenshots
+          path: qa-output/
+          retention-days: 14
