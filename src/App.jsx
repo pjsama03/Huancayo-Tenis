@@ -156,6 +156,18 @@ function hasRecoveryFlagInUrl() {
   return hash.includes('type=recovery') || search.includes('type=recovery');
 }
 
+function readAuthErrorFromUrl() {
+  if (typeof window === 'undefined') return null;
+  const raw = `${window.location.hash || ''}&${window.location.search || ''}`.replace(/^#|\?/g, '');
+  if (!raw.includes('error=')) return null;
+  const params = new URLSearchParams(raw);
+  const error = params.get('error');
+  const code = params.get('error_code') || '';
+  const desc = params.get('error_description') || '';
+  if (!error) return null;
+  return { error, code, desc };
+}
+
 /* ==========================================================================
    CINTA SUPERIOR AISLADA (NO RE-RENDERIZA App NI RESETEA SCROLL DE MODALES)
    ========================================================================== */
@@ -350,7 +362,7 @@ function mergeListById(prevList, nextItem, prepend = true) {
 
 function sortPlayersForOfficialRanking(list) {
   return [...(list || [])]
-    .filter((p) => !p.isPaused && !p.isTutorOnly)
+    .filter((p) => Engine.isOfficiallyRankedPlayer(p))
     .sort((a, b) => {
       const diffPts = (Number(b.points) || 0) - (Number(a.points) || 0);
       if (diffPts !== 0) return diffPts;
@@ -402,6 +414,7 @@ export default function App() {
 
   const initialSavedSession = useMemo(() => readSavedLocalSession(), []);
   const initialRecoveryUrl = useMemo(() => hasRecoveryFlagInUrl(), []);
+  const initialAuthUrlError = useMemo(() => readAuthErrorFromUrl(), []);
 
   const [players, setPlayers] = useState(defaultSeeds.players);
   const [clubs, setClubs] = useState(defaultSeeds.clubs);
@@ -438,7 +451,7 @@ export default function App() {
   const sunlightMode = false;
   const [performanceTier, setPerformanceTier] = useState('standard');
 
-  const [showSplash, setShowSplash] = useState(() => !initialRecoveryUrl);
+  const [showSplash, setShowSplash] = useState(() => !initialRecoveryUrl && !initialAuthUrlError);
   const [isFirstVisit] = useState(() => {
     try {
       return !window.localStorage.getItem(APP_RUNTIME_CONFIG.firstVisitKey);
@@ -535,6 +548,23 @@ export default function App() {
   const openAuthSheet = useCallback((mode = 'login') => {
     setAuthModal({ open: true, mode });
   }, []);
+
+  useEffect(() => {
+    if (!initialAuthUrlError) return;
+    if (typeof window !== 'undefined' && window.history?.replaceState) {
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+    const isOtpExpired =
+      initialAuthUrlError.code === 'otp_expired' ||
+      String(initialAuthUrlError.desc || '').toLowerCase().includes('expired');
+    showToast(
+      isOtpExpired
+        ? 'El enlace de correo expiró o ya fue consumido. Solicita uno nuevo ahora.'
+        : 'El enlace de acceso no es válido. Solicita uno nuevo.',
+      'warning'
+    );
+    setAuthModal({ open: true, mode: 'forgot' });
+  }, [initialAuthUrlError, showToast]);
 
   const requireAuth = useCallback(
     (actionLabel = 'realizar esta acción') => {
