@@ -270,7 +270,7 @@ function downloadExcelCsv(filename, headers, rows) {
 
 /* ==========================================================================
    COMPONENTE PRINCIPAL: AdminSuiteModal
-   (PIN BLINDADO EN SERVIDOR + CENTRO DE RECUPERACIÓN AUTH + ACABADO 3D TÁCTIL)
+   (PIN BLINDADO EN SERVIDOR + CENTRO AUTH + SPONSORS 3 NIVELES + 3D TÁCTIL)
    ========================================================================== */
 export default function AdminSuiteModal({
   isOpen = false,
@@ -308,7 +308,6 @@ export default function AdminSuiteModal({
   const [inlinePinInput, setInlinePinInput] = useState('');
   const [activeTab, setActiveTab] = useState('pagos');
 
-  // Cuentas, Directorio Auth y Recuperación Real
   const [accountSearch, setAccountSearch] = useState('');
   const [editingPlayerId, setEditingPlayerId] = useState(null);
   const [editEmail, setEditEmail] = useState('');
@@ -325,7 +324,6 @@ export default function AdminSuiteModal({
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [confirmOrphanAuthId, setConfirmOrphanAuthId] = useState(null);
 
-  // Control Total de Temporadas + Excepciones ("Modo Dios")
   const normalizedSeasons = useMemo(() => ensureFourSeasons(seasonSnapshots), [seasonSnapshots]);
   const [calSeasonNum, setCalSeasonNum] = useState(Number(seasonSnapshots?.currentSeason) || 4);
   const [calStartDate, setCalStartDate] = useState(getTodayIsoPeru());
@@ -336,10 +334,8 @@ export default function AdminSuiteModal({
   const [confirmClearSnap, setConfirmClearSnap] = useState(false);
   const [isResettingPoints, setIsResettingPoints] = useState(false);
 
-  // Monitor del Ecosistema (Cloudflare R2 en Vivo)
   const [r2Stats, setR2Stats] = useState({ loading: false, error: '', data: null });
 
-  // Torneo Personalizable
   const [showNewTourney, setShowNewTourney] = useState(false);
   const [ntName, setNtName] = useState('');
   const [ntClubId, setNtClubId] = useState(clubs?.[0]?.id || 'club-country');
@@ -349,7 +345,6 @@ export default function AdminSuiteModal({
   const [ntIncludesBalls, setNtIncludesBalls] = useState(true);
   const [ntHasConsolation, setNtHasConsolation] = useState(true);
 
-  // Clubes & Sponsors
   const [disabledClubIds, setDisabledClubIds] = useState([]);
   const [sponsors, setSponsors] = useState(() => {
     if (sponsorsConfig) return sponsorsConfig;
@@ -367,17 +362,14 @@ export default function AdminSuiteModal({
       weatherSponsorName: '',
       raffleSponsorActive: true,
       rafflePrizeText: '2 Tarros de Pelotas Pro + 1 Encordado Completo',
+      campaigns: [],
     };
   });
 
-  // Reclamaciones & Respaldo
   const [localComplaints, setLocalComplaints] = useState([]);
   const [hasDownloadedBackup, setHasDownloadedBackup] = useState(false);
   const [confirmPurgeDemo, setConfirmPurgeDemo] = useState(false);
 
-  /* ------------------------------------------------------------------------
-     CONEXIÓN SEGURA CON /api/admin-accounts (SIN EXPONER PIN NI LLAVES)
-     ------------------------------------------------------------------------ */
   const callAdminAccountsApi = useCallback(
     async (action, payload = {}, pinOverride = null) => {
       const pinToUse = String(pinOverride !== null ? pinOverride : verifiedPin || '').trim();
@@ -500,9 +492,6 @@ export default function AdminSuiteModal({
     }
   }, [isOpen, isUnlocked, activeTab, verifiedPin, authDirectory.synced, fetchAuthDirectory]);
 
-  /* ------------------------------------------------------------------------
-     DERIVADOS DE ESTADO Y CRUCE CON SUPABASE AUTH
-     ------------------------------------------------------------------------ */
   const playersMap = useMemo(() => {
     const m = {};
     (players || []).forEach((p) => {
@@ -610,9 +599,6 @@ export default function AdminSuiteModal({
     };
   }, [players.length, challenges.length]);
 
-  /* ------------------------------------------------------------------------
-     DESBLOQUEO SEGURO CONTRA EL SERVIDOR (ADMIN_MASTER_PIN EN VERCEL)
-     ------------------------------------------------------------------------ */
   const handleUnlockSubmit = async (e) => {
     e.preventDefault();
     const candidate = pinInput.trim();
@@ -666,9 +652,6 @@ export default function AdminSuiteModal({
     }
   };
 
-  /* ------------------------------------------------------------------------
-     ACCIONES DE RECUPERACIÓN DE CUENTAS, CORREOS Y BORRADO TOTAL (AUTH + PERFIL)
-     ------------------------------------------------------------------------ */
   const handleCopyEmail = async (email) => {
     if (!email) return;
     triggerHaptic('light');
@@ -686,8 +669,9 @@ export default function AdminSuiteModal({
       return;
     }
     triggerHaptic('medium');
+    const appOrigin = typeof window !== 'undefined' ? window.location.origin : '';
     const msg = resolvedEmail
-      ? `Hola ${p.name.split(' ')[0]}, te escribimos de soporte TOTAL TENIS 🎾\n\nEl correo con el que está registrada tu cuenta es:\n📧 ${resolvedEmail}\n\nPuedes ingresar aquí: https://huancayo-tenis.vercel.app (si olvidaste tu clave avísanos y te enviamos un enlace directo).`
+      ? `Hola ${p.name.split(' ')[0]}, te escribimos de soporte TOTAL TENIS 🎾\n\nEl correo con el que está registrada tu cuenta es:\n📧 ${resolvedEmail}\n\nPuedes ingresar aquí: ${appOrigin} (si olvidaste tu clave avísanos y te enviamos un enlace directo).`
       : `Hola ${p.name.split(' ')[0]}, te escribimos de soporte TOTAL TENIS 🎾 para ayudarte a recuperar el acceso a tu cuenta.`;
     window.open(buildWhatsappLink(p.whatsapp, msg), '_blank', 'noopener,noreferrer');
   };
@@ -863,9 +847,6 @@ export default function AdminSuiteModal({
     }
   };
 
-  /* ------------------------------------------------------------------------
-     ACCIONES TEMPORADAS + RESET REAL AL PISO DE CATEGORÍA (300+)
-     ------------------------------------------------------------------------ */
   const executeFloorReset = async () => {
     setIsResettingPoints(true);
     try {
@@ -972,7 +953,6 @@ export default function AdminSuiteModal({
     }
   };
 
-  /* Acciones Torneos, Sponsors y Excel */
   const handleCreateCustomTournament = (e) => {
     e.preventDefault();
     if (ntName.trim().length < 4) return;
@@ -1015,18 +995,6 @@ export default function AdminSuiteModal({
     setShowNewTourney(false);
     triggerHaptic('success');
     if (onNotify) onNotify(`Torneo "${created.name}" publicado.`, 'success');
-  };
-
-  const handleSaveSponsorsConfig = (e) => {
-    e.preventDefault();
-    try {
-      window.localStorage.setItem(ADMIN_SUITE_EDITABLE_CONFIG.sponsorsStorageKey, JSON.stringify(sponsors));
-    } catch {
-      // continuar
-    }
-    if (onAdminSaveSponsors) onAdminSaveSponsors(sponsors);
-    triggerHaptic('success');
-    if (onNotify) onNotify('Configuración de patrocinadores guardada.', 'success');
   };
 
   const handleExportPlayersExcel = () => {
@@ -1100,8 +1068,7 @@ export default function AdminSuiteModal({
     : r2MB >= 5120
     ? { label: 'ALERTA > 5 GB', cls: 'is-gold' }
     : { label: 'SEGURO · S/ 0.00', cls: 'is-emerald' };
-
-return (
+  return (
     <ModalPortal
       isOpen={isOpen}
       onClose={onClose}
@@ -1370,7 +1337,6 @@ return (
                   </div>
                 )}
 
-                {/* PANEL DE CORREOS HUÉRFANOS ATRAPADOS EN AUTH (SIN PERFIL) */}
                 {orphanAuthUsers.length > 0 && (
                   <div className="tt-adm-panel is-alert tt-adm-form-stack">
                     <span className="tt-adm-kicker" style={{ margin: 0, color: '#FECACA' }}>
@@ -1672,7 +1638,7 @@ return (
               </div>
             )}
 
-            {/* 3. TEMPORADAS AUTÓNOMAS 00:00 + RESET AL PISO (300+) + EXCEPCIONES */}
+            {/* 3. TEMPORADAS AUTÓNOMAS 00:00 + RESET AL PISO + EXCEPCIONES */}
             {activeTab === 'temporadas' && (
               <div className="tt-adm-stack">
                 <form
@@ -1781,7 +1747,6 @@ return (
                   </button>
                 </form>
 
-                {/* PANEL DE EXCEPCIONES */}
                 <div className="tt-adm-panel tt-adm-form-stack">
                   <div
                     style={{
@@ -1861,7 +1826,6 @@ return (
                   </div>
                 </div>
 
-                {/* Crear Torneo */}
                 <div className="tt-adm-panel">
                   <div
                     style={{
@@ -1955,7 +1919,6 @@ return (
                   )}
                 </div>
 
-                {/* Disputas y Marcadores por Validar */}
                 <div className="tt-adm-panel">
                   <span className="tt-adm-kicker">DISPUTAS Y MARCADORES EN CURSO</span>
                   {disputedChallenges.length === 0 ? (
@@ -2050,79 +2013,29 @@ return (
               </div>
             )}
 
-           {/* 5. MOTOR COMERCIAL DE PATROCINADORES (3 NIVELES + MÉTRICAS) */}
-         {activeTab === 'sponsors' && (
-           <AdminSponsorsManager
-             sponsorsConfig={sponsorsConfig || sponsors}
-             onSaveSponsors={(nextCfg) => {
-               setSponsors(nextCfg);
-               try {
-                 window.localStorage.setItem(
-                   ADMIN_SUITE_EDITABLE_CONFIG.sponsorsStorageKey,
-                   JSON.stringify(nextCfg)
-                 );
-               } catch {
-                 // continuar
-               }
-               if (onAdminSaveSponsors) onAdminSaveSponsors(nextCfg);
-             }}
-             onPreviewInterstitial={(campaign) => {
-               if (onPreviewSponsorInterstitial) {
-                 onPreviewSponsorInterstitial(campaign);
-               }
-             }}
-             onNotify={onNotify}
-           />
-         )}
-                    {sponsors.titleSponsorActive ? 'ON' : 'OFF'}
-                  </button>
-                </div>
-                <input
-                  className="tt-adm-input"
-                  value={sponsors.titleSponsorName}
-                  onChange={(e) => setSponsors((s) => ({ ...s, titleSponsorName: e.target.value }))}
-                  placeholder="Nombre del Sponsor Principal"
-                />
-
-                <div className="tt-adm-toggle-line">
-                  <div>
-                    <strong>Auspiciador Clima en Sedes</strong>
-                    <small>Acompaña el estado de canchas en Sedes Oficiales.</small>
-                  </div>
-                  <button
-                    type="button"
-                    className={`tt-adm-chip ${sponsors.weatherSponsorActive ? 'is-emerald' : ''}`}
-                    onClick={() =>
-                      setSponsors((s) => ({
-                        ...s,
-                        weatherSponsorActive: !s.weatherSponsorActive,
-                      }))
-                    }
-                  >
-                    {sponsors.weatherSponsorActive ? 'ON' : 'OFF'}
-                  </button>
-                </div>
-                <input
-                  className="tt-adm-input"
-                  value={sponsors.weatherSponsorName}
-                  onChange={(e) =>
-                    setSponsors((s) => ({ ...s, weatherSponsorName: e.target.value }))
+            {/* 5. MOTOR COMERCIAL DE PATROCINADORES (3 NIVELES + MÉTRICAS) */}
+            {activeTab === 'sponsors' && (
+              <AdminSponsorsManager
+                sponsorsConfig={sponsorsConfig || sponsors}
+                onSaveSponsors={(nextCfg) => {
+                  setSponsors(nextCfg);
+                  try {
+                    window.localStorage.setItem(
+                      ADMIN_SUITE_EDITABLE_CONFIG.sponsorsStorageKey,
+                      JSON.stringify(nextCfg)
+                    );
+                  } catch {
+                    // continuar
                   }
-                  placeholder="Nombre del Sponsor de Clima"
-                />
-
-                <label className="tt-adm-lbl">
-                  <span>Premio del Sorteo Mensual (Pro Shop)</span>
-                  <input
-                    className="tt-adm-input"
-                    value={sponsors.rafflePrizeText}
-                    onChange={(e) => setSponsors((s) => ({ ...s, rafflePrizeText: e.target.value }))}
-                  />
-                </label>
-                <button type="submit" className="tt-adm-btn-emerald">
-                  Guardar Patrocinadores
-                </button>
-              </form>
+                  if (onAdminSaveSponsors) onAdminSaveSponsors(nextCfg);
+                }}
+                onPreviewInterstitial={(campaign) => {
+                  if (onPreviewSponsorInterstitial) {
+                    onPreviewSponsorInterstitial(campaign);
+                  }
+                }}
+                onNotify={onNotify}
+              />
             )}
 
             {/* 6. LIBRO DE RECLAMACIONES */}
@@ -2397,8 +2310,6 @@ return (
         .tt-adm-shell * {
           box-sizing: border-box;
         }
-
-        /* PANTALLA DE BLOQUEO CON PIN EN SERVIDOR */
         .tt-adm-lock-screen {
           padding: 20px 10px;
           display: flex;
@@ -2456,13 +2367,11 @@ return (
           font-weight: 800;
           color: #FCA5A5;
         }
-
         .tt-adm-inline-pin-row {
           display: flex;
           gap: 8px;
           align-items: center;
         }
-
         .tt-adm-body,
         .tt-adm-stack,
         .tt-adm-form-stack,
@@ -2471,8 +2380,6 @@ return (
           flex-direction: column;
           gap: 11px;
         }
-
-        /* KPIS SUPERIORES 3D */
         .tt-adm-kpi-grid {
           display: grid;
           grid-template-columns: repeat(2, 1fr);
@@ -2515,8 +2422,6 @@ return (
           font-size: 0.64rem;
           color: rgba(250, 249, 245, 0.7);
         }
-
-        /* PESTAÑAS 3D TÁCTILES DEL PANEL ADMIN */
         .tt-adm-tabs {
           display: flex;
           gap: 7px;
@@ -2554,8 +2459,6 @@ return (
             0 3px 0 #007540,
             0 6px 14px rgba(0, 220, 125, 0.28);
         }
-
-        /* PANELES Y FILAS CON RELIEVE */
         .tt-adm-panel {
           padding: 14px;
           border-radius: 17px;
@@ -2586,7 +2489,6 @@ return (
           line-height: 1.44;
           color: rgba(250, 249, 245, 0.78);
         }
-
         .tt-adm-floor-legend {
           padding: 9px 11px;
           border-radius: 12px;
@@ -2604,7 +2506,6 @@ return (
         .tt-adm-floor-legend b {
           color: #FAF9F5;
         }
-
         .tt-adm-eco-grid {
           display: grid;
           grid-template-columns: 1fr 1fr;
@@ -2638,7 +2539,6 @@ return (
           font-size: 0.64rem;
           color: rgba(250, 249, 245, 0.7);
         }
-
         .tt-adm-seasons-strip {
           display: grid;
           grid-template-columns: repeat(4, 1fr);
@@ -2674,7 +2574,6 @@ return (
           font-weight: 900;
           color: #7CF5C0;
         }
-
         .tt-adm-row {
           display: flex;
           align-items: center;
@@ -2694,7 +2593,6 @@ return (
           font-size: 0.7rem;
           color: rgba(250, 249, 245, 0.7);
         }
-
         .tt-adm-account-card {
           padding: 12px;
           border-radius: 16px;
@@ -2741,7 +2639,6 @@ return (
           padding-top: 6px;
           border-top: 1px solid rgba(255, 255, 255, 0.12);
         }
-
         .tt-adm-input {
           width: 100%;
           min-height: 43px;
@@ -2795,8 +2692,6 @@ return (
           font-size: 0.69rem;
           color: rgba(250, 249, 245, 0.7);
         }
-
-        /* BOTONES 3D TÁCTILES ADMIN */
         .tt-adm-btn-emerald,
         .tt-adm-btn-gold,
         .tt-adm-btn-ghost,
@@ -2830,7 +2725,6 @@ return (
           padding: 0 12px;
           font-size: 0.73rem;
         }
-
         .tt-adm-btn-emerald {
           background: linear-gradient(180deg, #22F397 0%, #00C96F 56%, #00A85B 100%);
           color: #0D0219;
@@ -2843,7 +2737,6 @@ return (
         .tt-adm-btn-emerald:active:not(:disabled) {
           box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 1px 0 #007540;
         }
-
         .tt-adm-btn-gold {
           background: linear-gradient(180deg, #FAE9B6 0%, #E5C16C 56%, #C89938 100%);
           color: #1A1002;
@@ -2856,7 +2749,6 @@ return (
         .tt-adm-btn-gold:active:not(:disabled) {
           box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 1px 0 #8A6012;
         }
-
         .tt-adm-btn-ghost {
           background: linear-gradient(180deg, #35155A 0%, #230A40 100%);
           border-color: rgba(255, 255, 255, 0.2);
@@ -2866,7 +2758,6 @@ return (
         .tt-adm-btn-ghost:active:not(:disabled) {
           box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 1px 0 #10021E;
         }
-
         .tt-adm-btn-danger {
           background: linear-gradient(180deg, rgba(248, 113, 113, 0.3) 0%, rgba(185, 28, 28, 0.22) 100%);
           border-color: rgba(248, 113, 113, 0.58);
@@ -2882,8 +2773,6 @@ return (
           opacity: 0.45;
           cursor: not-allowed;
         }
-
-        /* CHIPS 3D DE ACCIÓN RÁPIDA */
         .tt-adm-chip {
           padding: 6px 11px;
           border-radius: 10px;
@@ -2918,7 +2807,6 @@ return (
           color: #FECACA;
           box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 2px 0 #7F1D1D;
         }
-
         .tt-adm-tag-gold,
         .tt-adm-tag-emerald,
         .tt-adm-tag-red,
@@ -2945,7 +2833,6 @@ return (
           border: 1px solid rgba(125, 211, 252, 0.58);
           color: #E0F2FE;
         }
-
         .tt-adm-mem-row {
           display: flex;
           justify-content: space-between;
