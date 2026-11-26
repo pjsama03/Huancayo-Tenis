@@ -370,7 +370,7 @@ function snapshotPreMatchRankMap(playersList) {
 
 /* ==========================================================================
    COMPONENTE RAÍZ MAESTRO: App
-   (SUPABASE REALTIME + SESIÓN PERSISTENTE + RETO 1 TOQUE + GEMAS 6-0, 6-0)
+   (SUPABASE REALTIME + SPONSORS 3 NIVELES + CACHÉ 0 MS + EXENCIÓN VIP)
    ========================================================================== */
 export default function App() {
   const scrollContainerRef = useRef(null);
@@ -408,6 +408,53 @@ export default function App() {
   const [previewSponsorCampaign, setPreviewSponsorCampaign] = useState(null);
   const sponsorsConfigRef = useRef(null);
   const trackedImpressionsRef = useRef(new Set());
+  const [cloudSynced, setCloudSynced] = useState(false);
+
+  const [theme, setTheme] = useState(() => {
+    try {
+      return window.localStorage.getItem(APP_RUNTIME_CONFIG.themeStorageKey) || 'dark';
+    } catch {
+      return 'dark';
+    }
+  });
+  const sunlightMode = false;
+  const [performanceTier, setPerformanceTier] = useState('standard');
+
+  const [showSplash, setShowSplash] = useState(true);
+  const [isFirstVisit] = useState(() => {
+    try {
+      return !window.localStorage.getItem(APP_RUNTIME_CONFIG.firstVisitKey);
+    } catch {
+      return false;
+    }
+  });
+  const [activeTab, setActiveTab] = useState(APP_RUNTIME_CONFIG.defaultTab);
+  const [torneosInitialSubTab, setTorneosInitialSubTab] = useState('gira');
+  const [quickChallengeRival, setQuickChallengeRival] = useState(null);
+
+  const [isAdminSession, setIsAdminSession] = useState(() => Boolean(initialSavedSession?.isAdmin));
+  const [activePartner, setActivePartner] = useState(null);
+
+  const [proShopModal, setProShopModal] = useState({ open: false, mode: 'shop' });
+  const [h2hModal, setH2hModal] = useState({ open: false, playerA: null, playerB: null });
+  const [storiesModal, setStoriesModal] = useState({ open: false, payload: null });
+  const [noticesModal, setNoticesModal] = useState({ open: false, tab: 'notificaciones' });
+  const [vipScaleModal, setVipScaleModal] = useState({ open: false, tab: 'vip' });
+  const [authModal, setAuthModal] = useState({ open: false, mode: 'login' });
+  const [legalModal, setLegalModal] = useState({ open: false, section: 'reclamaciones' });
+  const [partnerModalOpen, setPartnerModalOpen] = useState(false);
+  const [adminModalOpen, setAdminModalOpen] = useState(false);
+  const [tutorialOpen, setTutorialOpen] = useState(false);
+
+  const [inspectPlayerId, setInspectPlayerId] = useState(null);
+  const [dismissedIncomingIds, setDismissedIncomingIds] = useState([]);
+  const [dismissedScoreIds, setDismissedScoreIds] = useState([]);
+  const [busyActionId, setBusyActionId] = useState(null);
+  const [toast, setToast] = useState(null);
+
+  useEffect(() => {
+    playersRef.current = players;
+  }, [players]);
 
   useEffect(() => {
     sponsorsConfigRef.current = sponsorsConfig;
@@ -443,56 +490,7 @@ export default function App() {
     (campaignId) => handleTrackSponsorMetric(campaignId, 'clicks'),
     [handleTrackSponsorMetric]
   );
-  const [cloudSynced, setCloudSynced] = useState(false);
 
-  const [theme, setTheme] = useState(() => {
-    try {
-      return window.localStorage.getItem(APP_RUNTIME_CONFIG.themeStorageKey) || 'dark';
-    } catch {
-      return 'dark';
-    }
-  });
-  const sunlightMode = false;
-  const [performanceTier, setPerformanceTier] = useState('standard');
-
-  const [showSplash, setShowSplash] = useState(true);
-  const [isFirstVisit] = useState(() => {
-    try {
-      return !window.localStorage.getItem(APP_RUNTIME_CONFIG.firstVisitKey);
-    } catch {
-      return false;
-    }
-  });
-  const [activeTab, setActiveTab] = useState(APP_RUNTIME_CONFIG.defaultTab);
-  const [torneosInitialSubTab, setTorneosInitialSubTab] = useState('gira');
-  const [quickChallengeRival, setQuickChallengeRival] = useState(null);
-
-  const [isAdminSession, setIsAdminSession] = useState(() => Boolean(initialSavedSession?.isAdmin));
-  const [activePartner, setActivePartner] = useState(null);
-
-  // Control centralizado de Modales
-  const [proShopModal, setProShopModal] = useState({ open: false, mode: 'shop' });
-  const [h2hModal, setH2hModal] = useState({ open: false, playerA: null, playerB: null });
-  const [storiesModal, setStoriesModal] = useState({ open: false, payload: null });
-  const [noticesModal, setNoticesModal] = useState({ open: false, tab: 'notificaciones' });
-  const [vipScaleModal, setVipScaleModal] = useState({ open: false, tab: 'vip' });
-  const [authModal, setAuthModal] = useState({ open: false, mode: 'login' });
-  const [legalModal, setLegalModal] = useState({ open: false, section: 'reclamaciones' });
-  const [partnerModalOpen, setPartnerModalOpen] = useState(false);
-  const [adminModalOpen, setAdminModalOpen] = useState(false);
-  const [tutorialOpen, setTutorialOpen] = useState(false);
-
-  const [inspectPlayerId, setInspectPlayerId] = useState(null);
-  const [dismissedIncomingIds, setDismissedIncomingIds] = useState([]);
-  const [dismissedScoreIds, setDismissedScoreIds] = useState([]);
-  const [busyActionId, setBusyActionId] = useState(null);
-  const [toast, setToast] = useState(null);
-
-  useEffect(() => {
-    playersRef.current = players;
-  }, [players]);
-
-  // Persistir sesión activa en disco para sobrevivir cierres de app (Elías, rápido, sandbox, tutela)
   useEffect(() => {
     if (currentUserId) {
       writeSavedLocalSession({
@@ -594,14 +592,17 @@ export default function App() {
           if (cloudData.seasonSnapshots?.seasons?.length) {
             setSeasonSnapshots(cloudData.seasonSnapshots);
           }
-          if (cloudData.sponsorsConfig) setSponsorsConfig(cloudData.sponsorsConfig);
+          if (cloudData.sponsorsConfig) {
+            const cleanSp = normalizeSponsorsConfig(cloudData.sponsorsConfig);
+            setSponsorsConfig(cleanSp);
+            writeCachedSponsorsConfig(cleanSp);
+          }
         }
 
         const saved = readSavedLocalSession();
         const matched = resolveSessionPlayer(session, loadedPlayers);
 
         if (matched) {
-          // Si un padre con sesión real estaba gestionando a su hijo tutelado, conservar ese subperfil
           const savedChild =
             saved?.userId && saved.userId !== matched.id
               ? loadedPlayers.find(
@@ -614,7 +615,6 @@ export default function App() {
           setIsAdminSession(Boolean(matched.isAdmin || saved?.isAdmin));
           linkOneSignalUser(matched.id);
         } else if (saved?.userId) {
-          // Restaurar perfil guardado localmente (ej. Elías, acceso rápido o modo pruebas)
           const savedPlayer = loadedPlayers.find((p) => p.id === saved.userId);
           if (savedPlayer) {
             setCurrentUserId(savedPlayer.id);
@@ -641,7 +641,6 @@ export default function App() {
 
     const unsubscribeAuth = onCloudAuthStateChange((event, session) => {
       if (!mounted) return;
-      // Solo limpiar cuando ocurre un cierre de sesión real (jamás en INITIAL_SESSION sin JWT)
       if (event === 'SIGNED_OUT') {
         clearSavedLocalSession();
         setCurrentUserId(null);
@@ -731,7 +730,9 @@ export default function App() {
           setSeasonSnapshots(payload.new.value);
         }
         if (payload.new.key === 'sponsors_config') {
-          setSponsorsConfig(payload.new.value || null);
+          const cleanSp = payload.new.value ? normalizeSponsorsConfig(payload.new.value) : null;
+          setSponsorsConfig(cleanSp);
+          if (cleanSp) writeCachedSponsorsConfig(cleanSp);
         }
       },
     });
@@ -884,7 +885,6 @@ export default function App() {
     }
   }, []);
 
-  // Centra suavemente al jugador en su fila del Ranking (o Podio Top 3) acompañando el FLIP
   const focusMyPositionInRanking = useCallback((newRank) => {
     const scrollToTarget = () => {
       if (typeof document === 'undefined') return;
@@ -1144,7 +1144,6 @@ export default function App() {
     [challenges, currentUser?.id, effectiveIsAdmin, showToast]
   );
 
-  /* Confirmación definitiva de puntos + Gemas por victoria (hasta 6-0, 6-0) + Auto-scroll al Ranking */
   const applyOfficialMatchResult = useCallback(
     async ({
       challenge,
@@ -1209,7 +1208,6 @@ export default function App() {
           let totalAwardedGems = 0;
 
           if (isOfficial && won) {
-            // 1. Gemas por victoria oficial en cancha (hasta +10 Estándar / +25 VIP con 6-0, 6-0)
             const matchGems = calculateMatchVictoryGems(
               effectiveScore,
               Boolean(p.isVip),
@@ -1227,7 +1225,6 @@ export default function App() {
               });
             }
 
-            // 2. Bono Mata Gigantes (victoria ante rival de categoría superior)
             if (!isWalkover && opponent) {
               const myCatIdx = getCatRankIndex(p.points);
               const oppCatIdx = getCatRankIndex(opponent.points);
@@ -1243,7 +1240,6 @@ export default function App() {
               }
             }
 
-            // 3. Bono por racha de 3+ victorias seguidas
             if (!isWalkover && nextStreak >= 3) {
               const streakBonus = p.isVip ? 13 : 5;
               totalAwardedGems += streakBonus;
@@ -1328,7 +1324,6 @@ export default function App() {
         setDismissedScoreIds((prev) => prev.filter((id) => id !== challenge.id));
         setBusyActionId(null);
 
-        // Salto automático directo a tu posición en el Ranking + centrado FLIP
         if (
           autoJumpToRanking &&
           isOfficial &&
@@ -1370,7 +1365,6 @@ export default function App() {
     [appendGemLedger, currentUserId, focusMyPositionInRanking, showToast]
   );
 
-  /* Doble confirmación de marcador */
   const handleFinalizeMatch = useCallback(
     async ({ challenge, eloResult, liveScore, isWalkover = false }) => {
       if (!challenge || !eloResult?.ok) return;
@@ -1506,7 +1500,6 @@ export default function App() {
     [currentUser, showToast]
   );
 
-  /* Reto directo en 1 toque desde Ranking, Ficha de Rival o Cara a Cara (H2H) */
   const handleQuickChallengeFromAnywhere = useCallback(
     (rival) => {
       if (!rival?.id) return;
@@ -1600,7 +1593,6 @@ export default function App() {
     [tournaments]
   );
 
-  /* Reporte climático anti-farmeo (+3 Gemas, 1/24h usuario, 3h sede) */
   const handleReportClubWeather = useCallback(
     async ({ clubId, conditionKey }) => {
       if (!clubId || !conditionKey) return;
@@ -1836,12 +1828,12 @@ export default function App() {
     ? players.find((p) => p.id === scoreConfirmChallenge.winnerId)
     : null;
 
-const popupChallengerPhone = getEffectiveContactPhone(popupChallenger, players);
+  const popupChallengerPhone = getEffectiveContactPhone(popupChallenger, players);
   const popupWaText = popupChallenger?.isTutelado
     ? `Hola ${popupChallenger.tutorName || 'Padre/Madre'}, recibí el reto de ${popupChallenger.name} en TOTAL TENIS para ${popupChallenge?.clubName || ''} (${popupChallenge?.dateLabel || ''} ${popupChallenge?.timeLabel || ''}). ¿Coordinamos otra hora o sede?`
     : `Hola ${popupChallenger?.name || ''}, recibí tu reto en TOTAL TENIS para ${popupChallenge?.clubName || ''} (${popupChallenge?.dateLabel || ''} ${popupChallenge?.timeLabel || ''}). ¿Coordinamos otra hora o sede?`;
 
-  return (
+return (
     <div className={`tt-app-viewport ${theme === 'light' ? 'is-light' : 'is-dark'}`}>
       {/* 1. SPLASH SCREEN / BIENVENIDA */}
       {showSplash && (
@@ -1904,6 +1896,9 @@ const popupChallengerPhone = getEffectiveContactPhone(popupChallenger, players);
                 isAdmin={effectiveIsAdmin}
                 theme={theme}
                 sunlightMode={sunlightMode}
+                sponsorsConfig={sponsorsConfig}
+                onTrackSponsorImpression={handleTrackSponsorImpression}
+                onTrackSponsorClick={handleTrackSponsorClick}
                 quickChallengeRival={quickChallengeRival}
                 onConsumeQuickChallenge={handleConsumeQuickChallenge}
                 onCreateChallenge={handleCreateChallenge}
@@ -2496,12 +2491,18 @@ const popupChallengerPhone = getEffectiveContactPhone(popupChallenger, players);
           }
         }}
         onAdminSaveSponsors={async (cfg) => {
-          setSponsorsConfig(cfg);
+          const clean = normalizeSponsorsConfig(cfg);
+          setSponsorsConfig(clean);
+          writeCachedSponsorsConfig(clean);
           try {
-            await saveCloudSetting('sponsors_config', cfg);
+            await saveCloudSetting('sponsors_config', clean);
           } catch {
             // continuar
           }
+        }}
+        onPreviewSponsorInterstitial={(campaign) => {
+          setAdminModalOpen(false);
+          setPreviewSponsorCampaign(campaign);
         }}
         onAdminPurgeArchivedMatches={async () => {
           const finishedIds = challenges.filter((c) => c.status === 'FINISHED').map((c) => c.id);
@@ -2542,6 +2543,26 @@ const popupChallengerPhone = getEffectiveContactPhone(popupChallenger, players);
         }}
         onOpenLegalModal={(section) => setLegalModal({ open: true, section })}
         onNotify={showToast}
+      />
+
+      {/* PATROCINADOR NIVEL 3: INTERSTICIAL PANTALLA COMPLETA (SOCIOS VIP EXENTOS) */}
+      <SponsorInterstitialModal
+        sponsorsConfig={sponsorsConfig}
+        isVip={Boolean(currentUser?.isVip)}
+        isSuppressed={Boolean(
+          showSplash ||
+            authModal.open ||
+            adminModalOpen ||
+            partnerModalOpen ||
+            popupChallenge ||
+            scoreConfirmChallenge ||
+            tutorialOpen
+        )}
+        previewCampaign={previewSponsorCampaign}
+        onClosePreview={() => setPreviewSponsorCampaign(null)}
+        onOpenVipCard={() => setVipScaleModal({ open: true, tab: 'vip' })}
+        onTrackImpression={handleTrackSponsorImpression}
+        onTrackClick={handleTrackSponsorClick}
       />
 
       {toast && (
@@ -2763,30 +2784,6 @@ const popupChallengerPhone = getEffectiveContactPhone(popupChallenger, players);
         @keyframes ttToastDrop {
           from { opacity: 0; transform: translate(-50%, -14px); }
           to { opacity: 1; transform: translate(-50%, 0); }
-        }
-        /* LIQUID GLASS & FÍSICA ELÁSTICA GLOBAL (RANKING, TORNEOS, RETOS, SEDES) */
-        .tt-btn {
-          position: relative;
-          overflow: hidden;
-          transition:
-            transform 175ms cubic-bezier(0.22, 1.38, 0.36, 1),
-            box-shadow 220ms ease,
-            border-color 200ms ease,
-            filter 180ms ease !important;
-        }
-        .tt-btn:active {
-          transform: scale(0.95) !important;
-        }
-        .tt-btn-primary {
-          box-shadow:
-            inset 0 1px 0 rgba(255, 255, 255, 0.45),
-            0 8px 20px rgba(0, 220, 125, 0.28) !important;
-        }
-        .tt-btn-secondary,
-        .tt-btn-ghost {
-          backdrop-filter: blur(14px) saturate(145%);
-          -webkit-backdrop-filter: blur(14px) saturate(145%);
-          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14) !important;
         }
         .tt-card,
         .tt-torneos-view button:not(:disabled) {
