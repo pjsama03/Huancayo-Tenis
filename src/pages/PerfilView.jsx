@@ -159,11 +159,13 @@ export default function PerfilView({
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSavingPhoto, setIsSavingPhoto] = useState(false);
 
-  // Estudio de Foto y Fondo
+  // Estudio de Foto y Fondo (completo: Zoom, X/Y, Rotación, Silueta y Escenarios)
   const [draftPhoto, setDraftPhoto] = useState('');
   const [draftZoom, setDraftZoom] = useState(1);
   const [draftOffsetX, setDraftOffsetX] = useState(0);
   const [draftOffsetY, setDraftOffsetY] = useState(0);
+  const [draftRotate, setDraftRotate] = useState(0);
+  const [draftSilhouetteMode, setDraftSilhouetteMode] = useState(false);
   const [draftScenarioId, setDraftScenarioId] = useState('default');
 
   // Ajustes táctiles
@@ -318,9 +320,17 @@ export default function PerfilView({
   const activeScenario =
     PROFILE_SCENARIOS.find((s) => s.id === (profile.scenarioId || 'default')) ||
     PROFILE_SCENARIOS[0];
+  const draftScenarioObj =
+    PROFILE_SCENARIOS.find((s) => s.id === draftScenarioId) || PROFILE_SCENARIOS[0];
   const scenarioBgImg = isLight ? activeScenario.imageLight : activeScenario.imageDark;
   const useLightHero = isLight && activeScenario.id === 'default';
   const recentMatches = finishedMatches.slice(0, 6);
+
+  const savedZoom = Number(profile.photoTransform?.zoom) || 1;
+  const savedOffsetX = Number(profile.photoTransform?.x) || 0;
+  const savedOffsetY = Number(profile.photoTransform?.y) || 0;
+  const savedRotate = Number(profile.photoTransform?.rotate) || 0;
+  const savedSilhouette = Boolean(profile.photoTransform?.silhouette);
 
   const openPhotoStudio = () => {
     if (!isOwnProfile) return;
@@ -329,8 +339,19 @@ export default function PerfilView({
     setDraftZoom(profile.photoTransform?.zoom ?? 1);
     setDraftOffsetX(profile.photoTransform?.x ?? 0);
     setDraftOffsetY(profile.photoTransform?.y ?? 0);
+    setDraftRotate(profile.photoTransform?.rotate ?? 0);
+    setDraftSilhouetteMode(Boolean(profile.photoTransform?.silhouette));
     setDraftScenarioId(profile.scenarioId || 'default');
     setIsPhotoStudioOpen(true);
+  };
+
+  const handleResetPhotoTransform = () => {
+    triggerHaptic('light');
+    setDraftZoom(1);
+    setDraftOffsetX(0);
+    setDraftOffsetY(0);
+    setDraftRotate(0);
+    setDraftSilhouetteMode(false);
   };
 
   const handleFilePicked = async (e) => {
@@ -340,6 +361,9 @@ export default function PerfilView({
       const compressed = await compressImageFileToDataUrl(file);
       setDraftPhoto(compressed);
       triggerHaptic('success');
+      if (onNotify) {
+        onNotify('Foto cargada. Ajusta el zoom, encuadre o rotación y guarda los cambios.', 'success');
+      }
     } catch {
       if (onNotify) onNotify('No pudimos procesar esa foto. Usa JPG o PNG.', 'warning');
     }
@@ -377,11 +401,17 @@ export default function PerfilView({
           avatar: finalUrl,
           fullBodyPhoto: finalUrl,
           scenarioId: draftScenarioId,
-          photoTransform: { zoom: draftZoom, x: draftOffsetX, y: draftOffsetY },
+          photoTransform: {
+            zoom: draftZoom,
+            x: draftOffsetX,
+            y: draftOffsetY,
+            rotate: draftRotate,
+            silhouette: draftSilhouetteMode,
+          },
         });
       }
       triggerHaptic('success');
-      if (onNotify) onNotify('Foto y fondo actualizados.', 'success');
+      if (onNotify) onNotify('Foto, encuadre y fondo actualizados.', 'success');
       setIsPhotoStudioOpen(false);
     } catch {
       triggerHaptic('warning');
@@ -596,7 +626,9 @@ export default function PerfilView({
 
         <div className="tt-pf-hero-main">
           <div
-            className={`tt-pf-avatar-wrap ${isOwnProfile ? 'is-editable' : ''}`}
+            className={`tt-pf-avatar-wrap ${isOwnProfile ? 'is-editable' : ''} ${
+              savedSilhouette ? 'is-silhouette' : ''
+            }`}
             onClick={isOwnProfile ? openPhotoStudio : undefined}
           >
             <SmartImage
@@ -604,7 +636,13 @@ export default function PerfilView({
               alt={profile.name}
               initials={profile.name}
               priority
-              style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top' }}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                objectPosition: 'center top',
+                transform: `translate(${savedOffsetX}%, ${savedOffsetY}%) scale(${savedZoom}) rotate(${savedRotate}deg)`,
+              }}
             />
           </div>
 
@@ -952,43 +990,145 @@ export default function PerfilView({
         </>
       )}
 
-      {/* MODAL 1: ESTUDIO DE FOTO Y FONDOS CANJEABLES */}
+      {/* MODAL 1: ESTUDIO DE FOTO COMPLETO (ZOOM, X/Y, ROTACIÓN, SILUETA Y FONDOS) */}
       <ModalPortal
         isOpen={isPhotoStudioOpen}
         onClose={() => setIsPhotoStudioOpen(false)}
-        title="Foto y Fondos de Perfil"
-        subtitle="Personaliza tu portada con tus Gemas"
+        title="Estudio de Foto y Fondos"
+        subtitle="Ajusta zoom, encuadre, rotación y escenario de portada"
         icon={<IconBadge name="camera" variant="emerald" size={36} />}
         isTopLayer
       >
         <div className={`tt-pf-modal-stack ${modeClass}`}>
-          <div className="tt-pf-preview-box">
+          <div className="tt-pf-studio-stage">
             <SmartImage
-              src={draftPhoto || profile.avatar}
-              alt=""
-              initials={profile.name}
-              style={{
-                width: 94,
-                height: 94,
-                borderRadius: '50%',
-                objectFit: 'cover',
-                border: '2.5px solid #00DC7D',
-                boxShadow: '0 8px 18px rgba(0, 220, 125, 0.25)',
-              }}
+              src={isLight ? draftScenarioObj.imageLight : draftScenarioObj.imageDark}
+              fallbackSrc={ASSETS.bgPurpuraOscuro}
+              alt={draftScenarioObj.name}
+              className="tt-pf-studio-bg"
             />
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              style={{ display: 'none' }}
-              onChange={handleFilePicked}
-            />
+            <div className="tt-pf-studio-scrim" />
+
+            <div className="tt-pf-studio-stage-inner">
+              <div
+                className={`tt-pf-studio-frame ${draftSilhouetteMode ? 'is-silhouette' : ''}`}
+              >
+                <SmartImage
+                  src={draftPhoto || profile.avatar}
+                  alt={profile.name}
+                  initials={profile.name}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    objectPosition: 'center top',
+                    transform: `translate(${draftOffsetX}%, ${draftOffsetY}%) scale(${draftZoom}) rotate(${draftRotate}deg)`,
+                  }}
+                />
+              </div>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={handleFilePicked}
+              />
+
+              <div className="tt-pf-studio-stage-btns">
+                <button
+                  type="button"
+                  className="tt-pf-3d-btn is-emerald is-sm"
+                  disabled={isSavingPhoto}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <TTIcon name="camera" size={15} /> Subir Foto
+                </button>
+                <button
+                  type="button"
+                  className="tt-pf-3d-btn is-surface is-sm"
+                  disabled={isSavingPhoto}
+                  onClick={handleResetPhotoTransform}
+                >
+                  Restablecer
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* CONTROLES DE TAMAÑO, ENCUADRE, ROTACIÓN Y SILUETA RESTAURADOS */}
+          <div className="tt-pf-studio-sliders">
+            <label className="tt-pf-slider-row">
+              <div className="tt-pf-slider-head">
+                <span>Zoom / Tamaño</span>
+                <strong>{draftZoom.toFixed(2)}x</strong>
+              </div>
+              <input
+                type="range"
+                min="1"
+                max="2.5"
+                step="0.05"
+                value={draftZoom}
+                onChange={(e) => setDraftZoom(Number(e.target.value))}
+              />
+            </label>
+
+            <label className="tt-pf-slider-row">
+              <div className="tt-pf-slider-head">
+                <span>Desplazamiento Vertical</span>
+                <strong>{draftOffsetY}%</strong>
+              </div>
+              <input
+                type="range"
+                min="-35"
+                max="35"
+                step="1"
+                value={draftOffsetY}
+                onChange={(e) => setDraftOffsetY(Number(e.target.value))}
+              />
+            </label>
+
+            <label className="tt-pf-slider-row">
+              <div className="tt-pf-slider-head">
+                <span>Desplazamiento Horizontal</span>
+                <strong>{draftOffsetX}%</strong>
+              </div>
+              <input
+                type="range"
+                min="-35"
+                max="35"
+                step="1"
+                value={draftOffsetX}
+                onChange={(e) => setDraftOffsetX(Number(e.target.value))}
+              />
+            </label>
+
+            <label className="tt-pf-slider-row">
+              <div className="tt-pf-slider-head">
+                <span>Rotación</span>
+                <strong>{draftRotate}°</strong>
+              </div>
+              <input
+                type="range"
+                min="-15"
+                max="15"
+                step="1"
+                value={draftRotate}
+                onChange={(e) => setDraftRotate(Number(e.target.value))}
+              />
+            </label>
+
             <button
               type="button"
-              className="tt-pf-3d-btn is-surface is-sm"
-              onClick={() => fileInputRef.current?.click()}
+              className={`tt-pf-silhouette-btn ${draftSilhouetteMode ? 'is-on' : ''}`}
+              onClick={() => {
+                triggerHaptic('light');
+                setDraftSilhouetteMode((v) => !v);
+              }}
             >
-              <TTIcon name="camera" size={15} /> Elegir Foto del Celular
+              {draftSilhouetteMode
+                ? '✓ Efecto Silueta Editorial Activo'
+                : 'Activar Recorte / Silueta Editorial'}
             </button>
           </div>
 
@@ -1028,7 +1168,7 @@ export default function PerfilView({
             style={{ width: '100%' }}
             onClick={handleSavePhotoStudio}
           >
-            {isSavingPhoto ? 'Guardando...' : 'Guardar Cambios'}
+            {isSavingPhoto ? 'Subiendo foto en la nube...' : 'Guardar Foto y Escenario'}
           </button>
         </div>
       </ModalPortal>
@@ -1202,11 +1342,12 @@ export default function PerfilView({
             />
             <select
               className="tt-pf-input"
+              aria-label="Género"
               value={childDivision}
               onChange={(e) => setChildDivision(e.target.value)}
             >
-              <option value="Varones">Varones</option>
-              <option value="Damas">Damas</option>
+              <option value="Varones">Masculino</option>
+              <option value="Damas">Femenino</option>
             </select>
           </div>
 
@@ -1574,6 +1715,11 @@ export default function PerfilView({
           box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
         }
         .tt-pf-avatar-wrap.is-editable { cursor: pointer; }
+        .tt-pf-avatar-wrap.is-silhouette,
+        .tt-pf-studio-frame.is-silhouette {
+          border-radius: 42% 42% 18px 18px;
+          filter: contrast(1.08) saturate(1.12) drop-shadow(0 8px 16px rgba(0, 220, 125, 0.32));
+        }
         .tt-pf-id-col {
           flex: 1;
           min-width: 0;
@@ -2027,21 +2173,133 @@ export default function PerfilView({
         }
 
         /* ==================================================================
-           3. MODALES INTERNOS (FOTO, AJUSTES Y TUTELA — 3D + MODO CLARO)
+           3. MODALES INTERNOS (ESTUDIO DE FOTO RESTAURADO + AJUSTES + TUTELA)
            ================================================================== */
-        .tt-pf-preview-box {
+        .tt-pf-studio-stage {
+          position: relative;
+          border-radius: 18px;
+          overflow: hidden;
+          padding: 16px 14px;
+          background: #160428;
+          border: 1.5px solid rgba(0, 220, 125, 0.35);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 4px 0 #0D0219;
+        }
+        .tt-pf-modal-stack.is-light .tt-pf-studio-stage {
+          border-color: rgba(30, 7, 52, 0.22);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 4px 0 #C8BDDF;
+        }
+        .tt-pf-studio-bg {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          opacity: 0.55;
+        }
+        .tt-pf-studio-scrim {
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(180deg, rgba(16, 4, 30, 0.32) 0%, rgba(16, 4, 30, 0.86) 100%);
+          pointer-events: none;
+        }
+        .tt-pf-studio-stage-inner {
+          position: relative;
+          z-index: 2;
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 10px;
+          gap: 12px;
+        }
+        .tt-pf-studio-frame {
+          width: 122px;
+          height: 146px;
+          border-radius: 22px;
+          overflow: hidden;
+          border: 3px solid #00DC7D;
+          background: #1E0734;
+          box-shadow: 0 12px 26px rgba(0, 0, 0, 0.45);
+          transition: border-radius 180ms ease, filter 180ms ease;
+        }
+        .tt-pf-studio-stage-btns {
+          display: flex;
+          gap: 8px;
+          flex-wrap: wrap;
+          justify-content: center;
+        }
+        .tt-pf-studio-sliders {
+          display: flex;
+          flex-direction: column;
+          gap: 9px;
           padding: 13px;
           border-radius: 16px;
-          background: rgba(255, 255, 255, 0.05);
-          border: 1px solid rgba(255, 255, 255, 0.14);
+          background: linear-gradient(180deg, #2D104F 0%, #1E0838 100%);
+          border: 1.5px solid rgba(255, 255, 255, 0.14);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 4px 0 #0F021C;
         }
-        .tt-pf-modal-stack.is-light .tt-pf-preview-box {
-          background: #F4F0FA;
-          border-color: rgba(30, 7, 52, 0.15);
+        .tt-pf-modal-stack.is-light .tt-pf-studio-sliders {
+          background: linear-gradient(180deg, #FFFFFF 0%, #F4F0FA 100%);
+          border-color: rgba(30, 7, 52, 0.17);
+          box-shadow: inset 0 1px 0 #FFFFFF, 0 4px 0 #D2C8E6;
+        }
+        .tt-pf-slider-row {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+        .tt-pf-slider-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          font-size: 0.74rem;
+          font-weight: 800;
+        }
+        .tt-pf-slider-head strong {
+          color: #00E582;
+          font-weight: 900;
+        }
+        .tt-pf-modal-stack.is-light .tt-pf-slider-head strong {
+          color: #007A44;
+        }
+        .tt-pf-slider-row input[type='range'] {
+          width: 100%;
+          accent-color: #00DC7D;
+          cursor: pointer;
+        }
+        .tt-pf-silhouette-btn {
+          margin-top: 2px;
+          min-height: 41px;
+          padding: 0 14px;
+          border-radius: 12px;
+          background: linear-gradient(180deg, #35155A 0%, #230A40 100%);
+          border: 1.5px solid rgba(255, 255, 255, 0.18);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 3px 0 #0F021C;
+          color: #FAF9F5;
+          font-size: 0.76rem;
+          font-weight: 800;
+          cursor: pointer;
+          transition: transform 110ms ease, box-shadow 110ms ease;
+        }
+        .tt-pf-silhouette-btn:active {
+          transform: translateY(2px);
+        }
+        .tt-pf-silhouette-btn.is-on {
+          background: linear-gradient(180deg, #22F397 0%, #00B866 100%);
+          border-color: rgba(168, 255, 218, 0.8);
+          color: #0D0219;
+          font-weight: 900;
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.68), 0 3px 0 #007540;
+        }
+        .tt-pf-modal-stack.is-light .tt-pf-silhouette-btn {
+          background: linear-gradient(180deg, #FFFFFF 0%, #EFEAF8 100%);
+          border-color: rgba(30, 7, 52, 0.2);
+          color: #1E0734;
+          box-shadow: inset 0 1px 0 #FFFFFF, 0 3px 0 #C8BDDF;
+        }
+        .tt-pf-modal-stack.is-light .tt-pf-silhouette-btn.is-on {
+          background: linear-gradient(180deg, #35115C 0%, #1E0734 100%);
+          border-color: #1E0734;
+          color: #00E582;
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 3px 0 #0D0218;
         }
 
         .tt-pf-scen-grid {
