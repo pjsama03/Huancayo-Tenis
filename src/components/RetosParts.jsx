@@ -189,9 +189,6 @@ export function buildLiveScoreFromDirectDraft(draft) {
 
 /* ==========================================================================
    MOTOR DE VENTANA DINÁMICA ANTI-ESCASEZ (REGLA OFICIAL APROBADA)
-   - Ventana base: ±1,200 pts (cuota 4 partidos/mes).
-   - Si hay < 6 rivales activos en ±1,200 pts: se amplía automáticamente a los
-     8 rivales más cercanos hasta ±1,800 pts y la cuota mensual baja a 2 PJ.
    ========================================================================== */
 export function computeAdaptiveOfficialRivals(players = [], currentUser = null) {
   const myPoints = Number(currentUser?.points) || 1500;
@@ -230,11 +227,6 @@ export function computeAdaptiveOfficialRivals(players = [], currentUser = null) 
 
 /* ==========================================================================
    MOTOR DE GEMAS POR VICTORIA EN CANCHA (ESCALADO HASTA 6-0, 6-0 · VIP ×2.5)
-   - Walkover: 0 💎 (anti-farmeo)
-   - Peleada (3 sets / STB o ≥9 games cedidos): +4 💎 Estándar | +10 💎 VIP
-   - Sólida (2 sets, 5–8 games cedidos):        +6 💎 Estándar | +15 💎 VIP
-   - Contundente (2 sets, 1–4 games cedidos):   +8 💎 Estándar | +20 💎 VIP
-   - Máximo Doble Bicicleta (6-0, 6-0):        +10 💎 Estándar | +25 💎 VIP
    ========================================================================== */
 export function getMatchVictoryGemsRange(isVip = false) {
   return isVip
@@ -385,7 +377,7 @@ export function PlayerAvatarWithClub({
 }
 
 /* ==========================================================================
-   SUBCOMPONENTE 2: TARJETA PÓSTER VS (LIQUID GLASS + WHATSAPP TUTOR -18)
+   SUBCOMPONENTE 2: TARJETA PÓSTER VS (PASO 8F: 24H DOBLE ACUERDO · ÁRBITRO · 6H)
    ========================================================================== */
 export function MatchPosterCard({
   challenge,
@@ -400,6 +392,8 @@ export function MatchPosterCard({
   onAcceptChallenge,
   onDeclineChallenge,
   onOpenReschedule,
+  onRespondReschedule,
+  onOpenAssignJudge,
   onOpenPlayerProfile,
   onOpenStories,
 }) {
@@ -424,7 +418,10 @@ export function MatchPosterCard({
   const statusMeta = isLive
     ? { label: 'EN JUEGO AHORA', cls: 'is-live' }
     : isProposed
-    ? { label: 'POR CONFIRMAR', cls: 'is-pending' }
+    ? {
+        label: perms.judgeSubmitted ? 'EN REVISIÓN · ÁRBITRO' : 'POR CONFIRMAR',
+        cls: 'is-pending',
+      }
     : isDisputed
     ? { label: 'EN REVISIÓN', cls: 'is-disputed' }
     : isPending
@@ -441,6 +438,13 @@ export function MatchPosterCard({
   const whatsappUrl = effectivePhone ? buildWhatsappLink(effectivePhone, waText) : null;
 
   const canManage = perms.isParticipant || perms.isJudge || isAdmin;
+  const pendingResched = perms.pendingReschedule;
+  const showUploadCountdown =
+    (isScheduled || isLive) &&
+    !challenge.judgeId &&
+    perms.hoursSinceStart > 0 &&
+    perms.isUploadWindowOpen &&
+    (perms.isParticipant || isAdmin);
 
   return (
     <article className={`tt-match-card ${statusMeta.cls}`}>
@@ -505,6 +509,51 @@ export function MatchPosterCard({
         </div>
       </div>
 
+      {/* Propuesta de cambio de hora con doble acuerdo (solo participantes / admin) */}
+      {isScheduled && perms.hasPendingReschedule && (perms.isParticipant || isAdmin) && (
+        <div className="tt-resched-proposal-box">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: '0.75rem' }}>
+            <TTIcon name="clock" size={15} style={{ color: '#F6E2A8', flexShrink: 0 }} />
+            <div>
+              <strong>Propuesta de cambio de hora: </strong>
+              <span>
+                {pendingResched.dateLabel} · {pendingResched.timeLabel}
+              </span>
+            </div>
+          </div>
+
+          {perms.canRespondReschedule && onRespondReschedule ? (
+            <div style={{ display: 'flex', gap: 7, marginTop: 8 }}>
+              <button
+                type="button"
+                className="tt-btn tt-btn-primary tt-btn-sm tt-glass-press"
+                style={{ flex: 1 }}
+                onClick={() => {
+                  triggerHaptic('success');
+                  onRespondReschedule(challenge, true);
+                }}
+              >
+                Aceptar nueva hora
+              </button>
+              <button
+                type="button"
+                className="tt-btn tt-btn-ghost tt-btn-sm tt-glass-press"
+                onClick={() => {
+                  triggerHaptic('warning');
+                  onRespondReschedule(challenge, false);
+                }}
+              >
+                Mantener actual
+              </button>
+            </div>
+          ) : (
+            <small style={{ display: 'block', marginTop: 4, opacity: 0.82, fontSize: '0.7rem' }}>
+              Esperando que tu rival acepte el cambio de horario.
+            </small>
+          )}
+        </div>
+      )}
+
       {/* Marcador en Vivo, Por Confirmar o Resultado Final */}
       {(isLive || isProposed || isDisputed || isFinished) && (
         <div className="tt-mini-scoreboard">
@@ -565,7 +614,13 @@ export function MatchPosterCard({
           <div className="tt-mini-sb-foot">
             <span>{challenge.scoreSummary || scoreEval.summary || 'Partido en curso'}</span>
             <span>
-              {judgePlayer
+              {isProposed && perms.judgeSubmitted
+                ? `Revisión: ${perms.confirmations.a ? '✓' : '⏳'} ${
+                    playerA?.name?.split(' ')[0] || 'A'
+                  } · ${perms.confirmations.b ? '✓' : '⏳'} ${
+                    playerB?.name?.split(' ')[0] || 'B'
+                  }`
+                : judgePlayer
                 ? `Árbitro: ${judgePlayer.name}`
                 : isProposed
                 ? 'Esperando confirmación del rival'
@@ -581,7 +636,7 @@ export function MatchPosterCard({
         </div>
       )}
 
-      {/* Sede + Acuerdo de pelotas */}
+      {/* Sede + Acuerdo de pelotas + Árbitro designado / Plazo 6h */}
       <div className="tt-match-venue-bar">
         <div className="tt-match-venue-item">
           <TTIcon name="mapPin" size={15} style={{ color: '#00DC7D' }} />
@@ -593,9 +648,24 @@ export function MatchPosterCard({
             <span>{challenge.ballsAgreement}</span>
           </div>
         )}
+        {judgePlayer && !isFinished && (
+          <div className="tt-match-venue-item is-subtle" style={{ color: '#7CF5C0' }}>
+            <TTIcon name="shield" size={14} style={{ color: '#00DC7D' }} />
+            <span>Árbitro designado: {judgePlayer.name}</span>
+          </div>
+        )}
+        {showUploadCountdown && (
+          <div className="tt-match-venue-item is-subtle" style={{ color: '#F6E2A8' }}>
+            <TTIcon name="clock" size={14} style={{ color: '#E5C16C' }} />
+            <span>
+              Plazo para subir resultado sin árbitro: quedan {perms.uploadHoursLeft} h (si vence se
+              anula sin penalidad)
+            </span>
+          </div>
+        )}
       </div>
 
-      {/* Acciones por Rol */}
+      {/* Acciones por Rol (Reglas Estrictas Paso 8F) */}
       <div className="tt-match-actions">
         {isPending && perms.isPlayerB && (
           <>
@@ -633,22 +703,53 @@ export function MatchPosterCard({
           </div>
         )}
 
-        {isScheduled && (perms.isParticipant || isAdmin) && (
-          <>
-            <button
-              type="button"
-              className="tt-btn tt-btn-primary tt-btn-sm tt-glass-press"
-              style={{ flex: 1 }}
-              onClick={() => {
-                triggerHaptic('medium');
-                onOpenScoreModal(challenge, 'direct');
-              }}
-            >
-              <TTIcon name="scoreboard" size={16} />
-              Subir Resultado
-            </button>
+        {isScheduled && perms.isJudge && (
+          <button
+            type="button"
+            className="tt-btn tt-btn-primary tt-btn-sm tt-glass-press"
+            style={{ flex: 1 }}
+            onClick={() => {
+              triggerHaptic('medium');
+              onOpenScoreModal(challenge, 'live');
+            }}
+          >
+            <TTIcon name="scoreboard" size={16} />
+            Abrir Modo Árbitro (En Vivo)
+          </button>
+        )}
 
-            {perms.canReschedule && (
+        {isScheduled && (perms.isParticipant || isAdmin) && !perms.isJudge && (
+          <>
+            {challenge.judgeId && !isAdmin ? (
+              <button
+                type="button"
+                className="tt-btn tt-btn-secondary tt-btn-sm tt-glass-press"
+                style={{ flex: 1 }}
+                onClick={() => {
+                  triggerHaptic('light');
+                  onOpenScoreModal(challenge, 'live');
+                }}
+              >
+                <TTIcon name="vision" size={15} />
+                Ver Marcador (Árbitro)
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="tt-btn tt-btn-primary tt-btn-sm tt-glass-press"
+                style={{ flex: 1 }}
+                onClick={() => {
+                  triggerHaptic('medium');
+                  onOpenScoreModal(challenge, 'direct');
+                }}
+              >
+                <TTIcon name="scoreboard" size={16} />
+                Subir Resultado
+              </button>
+            )}
+
+            {/* >= 24h antes: Cambiar hora (doble acuerdo) */}
+            {perms.canProposeReschedule && (
               <button
                 type="button"
                 className="tt-btn tt-btn-secondary tt-btn-sm tt-glass-press"
@@ -658,7 +759,22 @@ export function MatchPosterCard({
                 }}
               >
                 <TTIcon name="clock" size={15} />
-                {perms.rescheduleMode === 'ORDINARY_ALLOWED' ? 'Cambiar hora' : 'Clima'}
+                Cambiar hora
+              </button>
+            )}
+
+            {/* 24h a 1 min antes: Designar Árbitro (SOLO visible a los 2 jugadores / admin) */}
+            {perms.canAssignJudge && onOpenAssignJudge && (
+              <button
+                type="button"
+                className="tt-btn tt-btn-secondary tt-btn-sm tt-glass-press"
+                onClick={() => {
+                  triggerHaptic('light');
+                  onOpenAssignJudge(challenge);
+                }}
+              >
+                <TTIcon name="shield" size={15} />
+                {challenge.judgeId ? 'Cambiar Árbitro' : 'Designar Árbitro'}
               </button>
             )}
           </>
@@ -673,7 +789,7 @@ export function MatchPosterCard({
             style={{ flex: 1 }}
             onClick={() => {
               triggerHaptic('light');
-              onOpenScoreModal(challenge, perms.isJudge ? 'live' : 'direct');
+              onOpenScoreModal(challenge, perms.isJudge || challenge.judgeId ? 'live' : 'direct');
             }}
           >
             <TTIcon name="scoreboard" size={16} />
@@ -689,7 +805,11 @@ export function MatchPosterCard({
           <div className="tt-waiting-banner">
             <TTIcon name="clock" size={15} />
             <span>
-              {challenge.proposedBy === currentUser?.id
+              {perms.judgeSubmitted
+                ? perms.needsMyScoreConfirmation
+                  ? 'El Árbitro cerró el marcador · Confirma o impugna en el aviso'
+                  : 'Ya confirmaste · Esperando confirmación de tu rival'
+                : challenge.proposedBy === currentUser?.id
                 ? 'Resultado enviado · Esperando confirmación del rival'
                 : 'Tu rival subió el marcador · Revisa la ventana de confirmación'}
             </span>
@@ -744,7 +864,7 @@ export function MatchPosterCard({
 }
 
 /* ==========================================================================
-   MODAL 3 EXTRAÍDO: REPROGRAMACIÓN Y REGLA 24 HORAS
+   MODAL 3: PROPONER CAMBIO DE HORA (SOLO HASTA 24H ANTES · DOBLE ACUERDO)
    ========================================================================== */
 export function RetosRescheduleModal({
   rescheduleTarget,
@@ -754,8 +874,6 @@ export function RetosRescheduleModal({
   setReschedDate,
   reschedTime,
   setReschedTime,
-  reschedReason,
-  setReschedReason,
   onConfirm,
   onClose,
 }) {
@@ -763,13 +881,7 @@ export function RetosRescheduleModal({
     <ModalPortal
       isOpen={Boolean(rescheduleTarget)}
       onClose={onClose}
-      title={
-        rescheduleTarget &&
-        getMatchPermissions(rescheduleTarget, currentUser, isAdmin).rescheduleMode ===
-          'ORDINARY_ALLOWED'
-          ? 'Cambiar Fecha y Hora'
-          : 'Suspensión por Clima / Emergencia'
-      }
+      title="Proponer Cambio de Horario"
       subtitle={rescheduleTarget?.clubName || ''}
       icon={<IconBadge name="clock" variant="gold" size={38} />}
     >
@@ -777,92 +889,146 @@ export function RetosRescheduleModal({
         <form onSubmit={onConfirm} className="tt-form-stack">
           {(() => {
             const p = getMatchPermissions(rescheduleTarget, currentUser, isAdmin);
-            const isOrdinary = p.rescheduleMode === 'ORDINARY_ALLOWED';
+            const allowed = p.rescheduleMode === 'ORDINARY_ALLOWED';
             return (
               <>
-                <div className={`tt-rule-callout ${isOrdinary ? 'is-ok' : 'is-warn'}`}>
-                  <TTIcon name={isOrdinary ? 'check' : 'alert'} size={18} />
+                <div className={`tt-rule-callout ${allowed ? 'is-ok' : 'is-warn'}`}>
+                  <TTIcon name={allowed ? 'check' : 'alert'} size={18} />
                   <div>
                     <strong>
-                      {isOrdinary
-                        ? 'Cambio de horario habilitado (1 por partido)'
-                        : 'Faltan menos de 24 h o ya usaste tu cambio'}
+                      {allowed
+                        ? 'Cambio de horario por doble acuerdo (1 por partido)'
+                        : 'Ventana de cambio de hora cerrada (< 24 h)'}
                     </strong>
                     <p style={{ margin: '3px 0 0', fontSize: '0.77rem', opacity: 0.88 }}>
-                      {isOrdinary
-                        ? `Faltan ${p.hoursUntilMatch} horas para el partido. Puedes reprogramar 1 vez sin penalización.`
-                        : 'Solo se permite reprogramar por lluvia o emergencia avisando directo por WhatsApp a tu rival (o tutor).'}
+                      {allowed
+                        ? `Faltan ${p.hoursUntilMatch} h para el partido. Tu propuesta se enviará a tu rival y solo se aplicará cuando ambos estén de acuerdo.`
+                        : 'Faltan menos de 24 horas para el encuentro. Si no logran jugarlo, a las 6 horas de la hora pactada se anula automáticamente sin penalidad.'}
                     </p>
                   </div>
                 </div>
 
-                {!isOrdinary && (
-                  <div className="tt-field-group">
-                    <label className="tt-field-label">Motivo</label>
-                    <div className="tt-balls-stack">
-                      {[
-                        'Lluvia intensa en cancha',
-                        'Cancha inundada',
-                        'Emergencia médica o laboral',
-                      ].map((reason) => (
-                        <button
-                          key={reason}
-                          type="button"
-                          className={`tt-choice-pill tt-glass-press ${
-                            reschedReason === reason ? 'is-selected' : ''
-                          }`}
-                          onClick={() => setReschedReason(reason)}
-                        >
-                          {reason}
-                        </button>
-                      ))}
+                {allowed && (
+                  <>
+                    <div className="tt-date-time-grid">
+                      <div className="tt-field-group">
+                        <label className="tt-field-label" htmlFor="tt-resched-date">
+                          Nueva fecha propuesta
+                        </label>
+                        <input
+                          id="tt-resched-date"
+                          type="date"
+                          className="tt-input"
+                          value={reschedDate}
+                          min={getTodayDateInputValue(0)}
+                          onChange={(e) => setReschedDate(e.target.value)}
+                          required
+                        />
+                      </div>
+                      <div className="tt-field-group">
+                        <label className="tt-field-label" htmlFor="tt-resched-time">
+                          Nueva hora propuesta
+                        </label>
+                        <input
+                          id="tt-resched-time"
+                          type="time"
+                          className="tt-input"
+                          value={reschedTime}
+                          onChange={(e) => setReschedTime(e.target.value)}
+                          required
+                        />
+                      </div>
                     </div>
-                  </div>
+
+                    <button
+                      type="submit"
+                      className="tt-btn tt-btn-primary tt-glass-press"
+                      style={{ width: '100%' }}
+                    >
+                      Enviar Propuesta a mi Rival
+                    </button>
+                  </>
                 )}
-
-                <div className="tt-date-time-grid">
-                  <div className="tt-field-group">
-                    <label className="tt-field-label" htmlFor="tt-resched-date">
-                      Nueva fecha
-                    </label>
-                    <input
-                      id="tt-resched-date"
-                      type="date"
-                      className="tt-input"
-                      value={reschedDate}
-                      min={getTodayDateInputValue(0)}
-                      onChange={(e) => setReschedDate(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="tt-field-group">
-                    <label className="tt-field-label" htmlFor="tt-resched-time">
-                      Nueva hora
-                    </label>
-                    <input
-                      id="tt-resched-time"
-                      type="time"
-                      className="tt-input"
-                      value={reschedTime}
-                      onChange={(e) => setReschedTime(e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  className="tt-btn tt-btn-primary tt-glass-press"
-                  style={{ width: '100%' }}
-                >
-                  {isOrdinary
-                    ? 'Confirmar Nuevo Horario'
-                    : 'Reprogramar y Avisar por WhatsApp'}
-                </button>
               </>
             );
           })()}
         </form>
+      )}
+    </ModalPortal>
+  );
+}
+
+/* ==========================================================================
+   MODAL 3B (PASO 8F): DESIGNAR ÁRBITRO (SOLO 24H A 1 MIN ANTES · 2 JUGADORES)
+   ========================================================================== */
+export function RetosAssignJudgeModal({
+  challenge,
+  players = [],
+  onSelectJudge,
+  onClose,
+}) {
+  const candidates = (players || []).filter(
+    (p) =>
+      !p.isPaused &&
+      !p.isTutorOnly &&
+      p.id !== challenge?.playerAId &&
+      p.id !== challenge?.playerBId
+  );
+
+  return (
+    <ModalPortal
+      isOpen={Boolean(challenge)}
+      onClose={onClose}
+      title="Designar Árbitro en Cancha"
+      subtitle="Ventana 24 h antes del partido · Modo Árbitro exclusivo"
+      icon={<IconBadge name="shield" variant="emerald" size={38} />}
+    >
+      {challenge && (
+        <div className="tt-form-stack">
+          <div className="tt-rule-callout is-ok">
+            <TTIcon name="shield" size={18} />
+            <div>
+              <strong>¿Cómo funciona el Modo Árbitro?</strong>
+              <p style={{ margin: '3px 0 0', fontSize: '0.76rem', opacity: 0.9 }}>
+                El tercero designado llevará el marcador game a game en vivo desde su celular. Al
+                terminar, el resultado pasará a <b>EN REVISIÓN</b> para que ambos jugadores lo
+                confirmen.
+              </p>
+            </div>
+          </div>
+
+          <div className="tt-field-group">
+            <label className="tt-field-label" htmlFor="tt-assign-judge-sel">
+              Selecciona al Árbitro del partido
+            </label>
+            <select
+              id="tt-assign-judge-sel"
+              className="tt-input"
+              value={challenge.judgeId || ''}
+              onChange={(e) => {
+                const picked = e.target.value;
+                triggerHaptic('success');
+                if (onSelectJudge) onSelectJudge(challenge.id, picked || null);
+                onClose();
+              }}
+            >
+              <option value="">Sin árbitro externo (los jugadores suben marcador en 6h)</option>
+              {candidates.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} ({getCategoryByPoints(p.points).name})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <button
+            type="button"
+            className="tt-btn tt-btn-ghost tt-glass-press"
+            onClick={onClose}
+          >
+            Cerrar
+          </button>
+        </div>
       )}
     </ModalPortal>
   );
