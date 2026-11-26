@@ -35,7 +35,6 @@ async function dismissSplashIfPresent(page) {
     await enterBtn.click().catch(() => {});
     await page.waitForTimeout(1200);
   }
-  // Espera extra por si el splash se cierra por temporizador
   await page.waitForTimeout(2600);
 }
 
@@ -144,7 +143,6 @@ async function runAudit() {
   await page.goto(TARGET_URL, { waitUntil: 'networkidle', timeout: 45000 }).catch(() => {});
   await dismissSplashIfPresent(page);
 
-  // Recorrer las 5 pestañas principales en Modo Oscuro (iPhone)
   const tabs = [
     { key: 'retos', regex: /Retos/i, file: '01-iphone-dark-retos.png' },
     { key: 'ranking', regex: /Ranking/i, file: '02-iphone-dark-ranking.png' },
@@ -159,10 +157,10 @@ async function runAudit() {
     await takeShot(page, t.file, `iPhone Oscuro - ${t.key.toUpperCase()}`);
   }
 
-  // Verificar Modal de Torneos (3D Táctil en Cuadro / Octavos)
+  // Verificar Modal de Torneos ("Llaves y Premios" · botones 3D Cuadro / Octavos)
   await clickDockTab(page, /Torneos/i);
   const tourneyBtn = page
-    .locator('button:has-text("Ver Cuadro"), button:has-text("Ver detalles"), button:has-text("Cuadro"), .tt-tn-card')
+    .locator('button:has-text("Llaves y Premios"), button:has-text("Ver Cuadro"), button:has-text("Cuadro")')
     .first();
   if (await tourneyBtn.isVisible().catch(() => false)) {
     await tourneyBtn.click().catch(() => {});
@@ -183,7 +181,9 @@ async function runAudit() {
   });
   await page.waitForTimeout(700);
 
-  const libroBtn = page.locator('button:has-text("Libro de Reclamaciones"), a:has-text("Libro de Reclamaciones")').first();
+  const libroBtn = page
+    .locator('button:has-text("Libro de Reclamaciones"), a:has-text("Libro de Reclamaciones")')
+    .first();
   if (await libroBtn.isVisible().catch(() => false)) {
     await libroBtn.click().catch(() => {});
     await page.waitForTimeout(900);
@@ -205,7 +205,7 @@ async function runAudit() {
       addCheck(
         'Seguridad: Libro de Reclamaciones bloqueado a visitantes',
         false,
-        'El formulario sigue abierto sin estar logueado (sube el nuevo LegalAndComplianceModal.jsx).'
+        'El formulario sigue abierto sin estar logueado.'
       );
     }
 
@@ -218,7 +218,7 @@ async function runAudit() {
     addWarning('No se encontró el botón de Libro de Reclamaciones en el pie de página.');
   }
 
-  // PRUEBA DE SEGURIDAD 2 + UX: Registro ("Género" vs "Rama") y Recuperación
+  // PRUEBA DE SEGURIDAD 2 + UX: Registro ("Género" vs "Rama") y Recuperación (buscando DENTRO del modal)
   await clickDockTab(page, /Perfil/i);
   const authBtn = page
     .locator('button:has-text("Iniciar Sesión"), button:has-text("Entrar"), button:has-text("Crear Cuenta")')
@@ -226,56 +226,75 @@ async function runAudit() {
   if (await authBtn.isVisible().catch(() => false)) {
     await authBtn.click().catch(() => {});
     await page.waitForTimeout(900);
+    const authSheet = page.locator('.tt-auth-sheet-container');
     await takeShot(page, '08-iphone-auth-login.png', 'Portal de Acceso - Iniciar Sesión');
 
-    // Probar pestaña Recuperación
-    const forgotBtn = page.locator('button:has-text("Olvidaste")').first();
+    // Probar pestaña Recuperación dentro del modal
+    const forgotBtn = authSheet.locator('button:has-text("Olvidaste")').first();
     if (await forgotBtn.isVisible().catch(() => false)) {
       await forgotBtn.click().catch(() => {});
       await page.waitForTimeout(700);
       await takeShot(page, '09-iphone-auth-recuperacion.png', 'Portal de Acceso - Recuperación');
-      const backBtn = page.locator('button:has-text("Atrás"), button:has-text("Volver")').first();
+      const backBtn = authSheet.locator('.tt-auth-back-link, button:has-text("Atrás")').first();
       if (await backBtn.isVisible().catch(() => false)) {
         await backBtn.click().catch(() => {});
         await page.waitForTimeout(500);
       }
     }
 
-    // Probar Registro y verificar etiqueta "Género" vs "Rama"
-    const regBtn = page.locator('button:has-text("Regístrate"), button:has-text("Crear cuenta")').first();
+    // Probar Registro DENTRO del modal y verificar etiqueta "Género" vs "Rama"
+    const regBtn = authSheet.locator('button:has-text("Regístrate"), button:has-text("Crear cuenta gratis")').first();
     if (await regBtn.isVisible().catch(() => false)) {
       await regBtn.click().catch(() => {});
       await page.waitForTimeout(800);
       await takeShot(page, '10-iphone-auth-registro.png', 'Portal de Acceso - Registro');
 
-      const bodyText = await page.locator('.tt-auth-sheet-container').innerText().catch(() => '');
+      const bodyText = await authSheet.innerText().catch(() => '');
       const hasRama = /\bRama\b/i.test(bodyText);
       const hasGenero = /G[eé]nero/i.test(bodyText);
       if (hasGenero && !hasRama) {
-        addCheck('Etiqueta Género en Registro', true, 'Muestra "Género" (sin "Rama").');
+        addCheck('Etiqueta Género en Registro', true, 'Muestra "Género" (Masculino / Femenino, sin "Rama").');
       } else {
         addCheck(
           'Etiqueta Género en Registro',
           false,
-          'Todavía aparece "Rama" en lugar de "Género" (sube el nuevo AuthAndOnboardingModal.jsx).'
+          `No se detectó "Género" limpio (hasGenero=${hasGenero}, hasRama=${hasRama}).`
         );
       }
     }
 
-    const closeAuth = page.locator('.tt-auth-close-x, button[aria-label*="Cerrar"]').first();
+    const closeAuth = authSheet.locator('.tt-auth-close-x').first();
     if (await closeAuth.isVisible().catch(() => false)) {
       await closeAuth.click().catch(() => {});
       await page.waitForTimeout(500);
     }
   }
 
-  // PRUEBA DE MODO CLARO EN IPHONE
-  const themeBtn = page
-    .locator('header button[aria-label*="tema" i], header button[aria-label*="claro" i], header button[aria-label*="oscuro" i], button[title*="tema" i]')
-    .first();
-  if (await themeBtn.isVisible().catch(() => false)) {
-    await themeBtn.click().catch(() => {});
-    await page.waitForTimeout(700);
+  // PRUEBA DE MODO CLARO EN IPHONE (abriendo menú lateral ☰ si hace falta)
+  let switchedToLight = false;
+  const menuBtn = page.locator('header button').first();
+  if (await menuBtn.isVisible().catch(() => false)) {
+    await menuBtn.click().catch(() => {});
+    await page.waitForTimeout(600);
+    const drawerThemeBtn = page
+      .locator('button:has-text("Modo Claro"), button:has-text("Tema Claro"), button:has-text("Claro"), button[aria-label*="tema" i]')
+      .first();
+    if (await drawerThemeBtn.isVisible().catch(() => false)) {
+      await drawerThemeBtn.click().catch(() => {});
+      await page.waitForTimeout(700);
+      switchedToLight = true;
+    }
+    const closeDrawer = page.locator('button[aria-label*="Cerrar" i], .tt-drawer-close').first();
+    if (await closeDrawer.isVisible().catch(() => false)) {
+      await closeDrawer.click().catch(() => {});
+      await page.waitForTimeout(500);
+    } else {
+      await page.keyboard.press('Escape').catch(() => {});
+      await page.waitForTimeout(400);
+    }
+  }
+
+  if (switchedToLight) {
     for (const t of tabs.slice(0, 4)) {
       await clickDockTab(page, t.regex);
       await inspectScreenHealth(page, `iPhone Claro · ${t.key.toUpperCase()}`);
@@ -286,10 +305,9 @@ async function runAudit() {
       );
     }
   } else {
-    addWarning('No se encontró el botón de cambio de tema en el header para probar Modo Claro automáticamente.');
+    addWarning('No se pudo activar Modo Claro automáticamente desde el menú lateral.');
   }
 
-  // Evaluar errores de consola y red acumulados en móvil
   addCheck(
     'Consola limpia (sin errores JS en móvil)',
     consoleErrors.length === 0 && pageErrors.length === 0,
@@ -324,7 +342,7 @@ async function runAudit() {
   await browser.close();
 
   // ========================================================================
-  // 3. GENERAR REPORTE MARKDOWN (VISIBLE DIRECTO EN GITHUB ACTIONS)
+  // 3. GENERAR REPORTE MARKDOWN
   // ========================================================================
   const passed = report.checks.filter((c) => c.ok).length;
   const failed = report.checks.filter((c) => !c.ok).length;
