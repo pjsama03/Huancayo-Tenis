@@ -3,6 +3,7 @@ import { APP_CONFIG, getCategoryByPoints } from '../data/playersAndClubsData';
 /* ==========================================================================
    1. PARÁMETROS OFICIALES DEL MOTOR ELO DE PROBABILIDADES FINITAS (TOTAL TENIS)
    Escala 0 a 5,000+ pts · Ancho 1,000 pts/categoría · Divisor D = 2,200 (74%)
+   + Reglas Estrictas de Retos, Árbitro, 6h Sin Penalidad, 72h Vitrina y Tope 500
    ========================================================================== */
 export const ELO_CONFIG = {
   DIVISOR: 2200, // 1 / (1 + 10^(-1000/2200)) = 0.740 (74% entre categorías vecinas)
@@ -18,8 +19,11 @@ export const ELO_CONFIG = {
   WALKOVER_WIN_PCT: 0.55,
   WALKOVER_LOSS_PCT: 0.75,
   MIN_MATCHES_SEASON_TROPHY: 5, // Mínimo 5 partidos oficiales para premio físico #1
-  MAX_RESCHEDULES_ORDINARY: 1, // Máximo 1 cambio ordinario por partido
-  MIN_HOURS_ORDINARY_RESCHEDULE: 24, // Mínimo 24 horas de antelación
+  MAX_RESCHEDULES_ORDINARY: 1, // Máximo 1 cambio ordinario con doble acuerdo por partido
+  MIN_HOURS_ORDINARY_RESCHEDULE: 24, // Cambio de hora solo hasta 24h antes
+  MAX_HOURS_UPLOAD_WITHOUT_JUDGE: 6, // Sin árbitro: máx. 6h tras inicio para subir resultado
+  FINISHED_SHOWCASE_HOURS: 72, // Resultados confirmados visibles 3 días (72h) en Retos
+  MAX_STORED_CHALLENGES: 500, // Tope automático de 500 partidos guardados en historial
 };
 
 /* ==========================================================================
@@ -199,8 +203,6 @@ export function validateSuperTieBreak(aRaw, bRaw) {
 
   // Si ya cumplió >= 10 y diferencia >= 2, está cerrado oficialmente (sin techo superior)
   if (isSuperTieBreakClosed(a, b)) {
-    // Validar que no haya excedido absurdamente después de ya haber ganado con dif >= 2
-    // (Ej. 12-5 es inválido porque debió cerrarse en 10-5; pero 12-10, 14-12, 42-40 SÍ son válidos)
     const maxP = Math.max(a, b);
     const minP = Math.min(a, b);
     if (maxP > 10 && maxP - minP > 2) {
@@ -250,14 +252,12 @@ export function canIncrementRegularGame(setObj, side) {
   if (!setObj || setObj.locked) return false;
   const a = Number(setObj.a) || 0;
   const b = Number(setObj.b) || 0;
-  // Si el set ya está en 6-6 (Tie-Break) o ya terminó (6-0..6-4, 7-5, 7-6), bloquear +1 Game
   if (a === 6 && b === 6) return false;
   const check = validateRegularSet(a, b, setObj.tbA, setObj.tbB);
   if (check.finished) return false;
 
   const nextA = side === 'A' ? a + 1 : a;
   const nextB = side === 'B' ? b + 1 : b;
-  // Prohibido 7-7 o subir a 7 cuando el rival tiene < 5
   if (nextA === 7 && nextB < 5) return false;
   if (nextB === 7 && nextA < 5) return false;
   if (nextA > 7 || nextB > 7 || (nextA === 7 && nextB === 7)) return false;
@@ -296,7 +296,6 @@ export function evaluateMatchScore(liveScore) {
     labels.push(r2.label);
   }
 
-  // Victoria en 2 sets corridos (2-0)
   if (setsA === 2 || setsB === 2) {
     return {
       valid: true,
@@ -311,7 +310,6 @@ export function evaluateMatchScore(liveScore) {
     };
   }
 
-  // Empate 1-1 -> Activa 3er Set Super Tie-Break (a 10+ con dif. >= 2 sin techo)
   if (setsA === 1 && setsB === 1) {
     const r3 = validateSuperTieBreak(s.set3?.a, s.set3?.b);
     if (!r3.valid) {
@@ -368,19 +366,17 @@ export function stepLiveScoreboard(prevScore, action) {
       return createEmptyLiveScore();
 
     case 'GAME_DELTA': {
-      const { setKey, side, delta } = action; // setKey: 'set1' | 'set2'
+      const { setKey, side, delta } = action;
       const target = base[setKey];
       if (!target || target.locked) return base;
 
       if (delta > 0 && !canIncrementRegularGame(target, side)) return base;
       const field = side === 'A' ? 'a' : 'b';
       target[field] = Math.max(0, (Number(target[field]) || 0) + delta);
-      // Si bajaron de 6-6, limpiar tie-break parcial
       if (target.a < 6 || target.b < 6) {
         target.tbA = 0;
         target.tbB = 0;
       }
-      // Si el set se cerró limpiamente (6-0..6-4 o 7-5), auto-confirmar y pasar al siguiente set
       const v = validateRegularSet(target.a, target.b, target.tbA, target.tbB);
       if (v.finished && !v.isTieBreakSet) {
         target.locked = true;
@@ -394,19 +390,17 @@ export function stepLiveScoreboard(prevScore, action) {
     }
 
     case 'TB_DELTA': {
-      const { setKey, side, delta } = action; // Tie-Break de set en 6-6 (a 7+, dif >= 2 sin techo)
+      const { setKey, side, delta } = action;
       const target = base[setKey];
       if (!target || target.locked) return base;
       if (target.a !== 6 || target.b !== 6) return base;
 
       const field = side === 'A' ? 'tbA' : 'tbB';
       const nextVal = Math.max(0, (Number(target[field]) || 0) + delta);
-      // Si ya estaba cerrado y quiere seguir sumando, bloquear; si resta (-1), permitir corrección
       if (delta > 0 && isSetTieBreakClosed(target.tbA, target.tbB)) return base;
 
       target[field] = nextVal;
 
-      // Cierre automático cuando llega a >= 7 Y diferencia >= 2 (ej. 7-5, 8-6, 18-16)
       if (isSetTieBreakClosed(target.tbA, target.tbB)) {
         if (target.tbA > target.tbB) {
           target.a = 7;
@@ -426,7 +420,7 @@ export function stepLiveScoreboard(prevScore, action) {
     }
 
     case 'STB_DELTA': {
-      const { side, delta } = action; // Super Tie-Break 3er set (a 10+, dif >= 2 SIN TECHO)
+      const { side, delta } = action;
       const target = base.set3;
       if (!target) return base;
       const evBefore = evaluateMatchScore(base);
@@ -437,7 +431,6 @@ export function stepLiveScoreboard(prevScore, action) {
       const nextVal = Math.max(0, (Number(target[field]) || 0) + delta);
       target[field] = nextVal;
 
-      // Solo se cierra automáticamente si >= 10 Y diferencia >= 2 (10-9 NO cierra; 12-10 SÍ cierra)
       if (isSuperTieBreakClosed(target.a, target.b)) {
         target.locked = true;
       } else {
@@ -450,7 +443,6 @@ export function stepLiveScoreboard(prevScore, action) {
       const { setKey } = action;
       if (base[setKey]) {
         base[setKey].locked = false;
-        // Si desbloquea un set 7-6 o 6-7, devolver a 6-6 para poder corregir el último punto del Tie-Break
         if ((setKey === 'set1' || setKey === 'set2') && Math.max(base[setKey].a, base[setKey].b) === 7 && Math.min(base[setKey].a, base[setKey].b) === 6) {
           base[setKey].a = 6;
           base[setKey].b = 6;
@@ -466,11 +458,7 @@ export function stepLiveScoreboard(prevScore, action) {
 }
 
 /* ==========================================================================
-   4. MOTOR ELO DE LAS 3 JAULAS FINITAS (100 % FIEL AL CUADERNO)
-   - Escala 0–5,000+ · Divisor D = 2,200 (74% entre categorías vecinas)
-   - K_calib = 480 (1-5 partidos) · K = 300 (consolidados) + auto-escalado >150
-   - Jaula 1 (Sets 6-0..7-5), Jaula 2 (TB 6 difs 2..7), Jaula 3 (STB 9 difs 2..10)
-   - Ganador cobra 70%–100% de su techo · Perdedor resta 38%–100% de su techo
+   4. MOTOR ELO DE LAS 3 JAULAS FINITAS
    ========================================================================== */
 export function getExpectedProbability(ratingA, ratingB) {
   const rA = Number(ratingA) || 0;
@@ -483,7 +471,6 @@ export function getAdaptiveK(player, totalActivePlayers = 130) {
   const isCalibrating = played < ELO_CONFIG.CALIBRATION_MATCHES;
   const baseK = isCalibrating ? ELO_CONFIG.K_CALIBRATION : ELO_CONFIG.K_CONSOLIDATED;
 
-  // Auto-ajuste demográfico suave si el circuito crece por encima de 150 jugadores activos
   if (totalActivePlayers > ELO_CONFIG.DEMOGRAPHIC_THRESHOLD) {
     const scaleFactor = Math.max(0.72, Math.sqrt(ELO_CONFIG.DEMOGRAPHIC_THRESHOLD / totalActivePlayers));
     return Math.round(baseK * scaleFactor);
@@ -493,7 +480,7 @@ export function getAdaptiveK(player, totalActivePlayers = 130) {
 
 export function getMondayStartOfWeek(refDate = new Date()) {
   const d = new Date(refDate);
-  const day = d.getDay(); // 0=Dom, 1=Lun...
+  const day = d.getDay();
   const diffToMonday = day === 0 ? -6 : 1 - day;
   d.setDate(d.getDate() + diffToMonday);
   d.setHours(0, 0, 0, 0);
@@ -517,47 +504,31 @@ export function getWeeklyRematchMultiplier(challenges = [], playerAId, playerBId
   return { multiplier: 0.5, matchIndexThisWeek: matchesThisWeek + 1, label: '3er+ duelo semanal (50%)' };
 }
 
-/**
- * Jaula 1 (set regular) + Jaula 2 (Tie-Break 6 diferencias finitas: 2 a 7)
- * Devuelve la contribución normalizada (0..1) de un set ganado por el vencedor del partido.
- */
 function scoreSingleSetDominance(setEval) {
   if (!setEval || !setEval.finished) return { winShare: 0.38, lossShare: 0.34 };
 
-  // Jaula 2: Tie-Break de set (7-6) -> 6 diferencias finitas (2, 3, 4, 5, 6, 7)
-  // Cualquier alargue (8-6, 10-8, 18-16) cae en diff = 2 (máxima paridad)
   if (setEval.isTieBreakSet) {
     const finiteTbDiff = Math.min(7, Math.max(2, Number(setEval.tbDiff) || 2));
-    // Mapeo lineal exacto para 1 set ganado en Tie-Break:
-    // diff=2 -> 37.5% win / 29.0% loss; diff=7 (7-0) -> 39.0% win / 32.5% loss
-    const t = (finiteTbDiff - 2) / 5; // 0..1
+    const t = (finiteTbDiff - 2) / 5;
     return {
       winShare: 0.375 + t * 0.015,
       lossShare: 0.29 + t * 0.035,
     };
   }
 
-  // Jaula 1: Set regular (6-0, 6-1, 6-2, 6-3, 6-4, 7-5)
   const diff = Number(setEval.gameDiff) || 2;
   const maxG = Math.max(Number(setEval.label?.split('-')[0]) || 6, Number(setEval.label?.split('-')[1]) || 0);
-  if (maxG === 7) return { winShare: 0.39, lossShare: 0.34 }; // 7-5
+  if (maxG === 7) return { winShare: 0.39, lossShare: 0.34 };
   const regularTable = {
-    6: { winShare: 0.5, lossShare: 0.5 }, // 6-0 -> 50% por set (6-0, 6-0 = 100%)
-    5: { winShare: 0.48, lossShare: 0.47 }, // 6-1
-    4: { winShare: 0.455, lossShare: 0.435 }, // 6-2
-    3: { winShare: 0.425, lossShare: 0.395 }, // 6-3
-    2: { winShare: 0.4, lossShare: 0.355 }, // 6-4
+    6: { winShare: 0.5, lossShare: 0.5 },
+    5: { winShare: 0.48, lossShare: 0.47 },
+    4: { winShare: 0.455, lossShare: 0.435 },
+    3: { winShare: 0.425, lossShare: 0.395 },
+    2: { winShare: 0.4, lossShare: 0.355 },
   };
   return regularTable[diff] || { winShare: 0.4, lossShare: 0.355 };
 }
 
-/**
- * Motor de las 3 Jaulas Finitas:
- * - Victoria 2-0: Ganador cobra 75%–100% de su techo; Perdedor resta 58%–100%
- * - Victoria 2-1 (Jaula 3 Super Tie-Break 9 difs finitas 2..10):
- *   Ganador cobra 70%–74% (+ hasta 1.5% por margen de games en sets 1-2);
- *   Perdedor resta 38%–50% (premiando dar pelea hasta el desempate).
- */
 export function computeFiniteCagePercentages(matchEval) {
   if (!matchEval || !matchEval.finished) {
     return { winPct: 0.8, lossPct: 0.72, cageLabel: 'Estándar', isSevereBlowout: false };
@@ -565,14 +536,12 @@ export function computeFiniteCagePercentages(matchEval) {
 
   const { set1, set2, set3 } = matchEval.setDetails;
 
-  // Caso A: Victoria en 2 sets corridos (Jaula 1 y Jaula 2)
   if (!set3) {
     const s1 = scoreSingleSetDominance(set1);
     const s2 = scoreSingleSetDominance(set2);
     const winPct = Math.min(1.0, Math.max(0.75, Number((s1.winShare + s2.winShare).toFixed(4))));
     const lossPct = Math.min(1.0, Math.max(0.58, Number((s1.lossShare + s2.lossShare).toFixed(4))));
 
-    // Detectar paliza severa en calibración (6-0, 6-0 o 6-0, 6-1)
     const loserGamesTotal =
       Math.min(Number(set1.label?.split('-')[0]) || 0, Number(set1.label?.split('-')[1]) || 0) +
       Math.min(Number(set2.label?.split('-')[0]) || 0, Number(set2.label?.split('-')[1]) || 0);
@@ -586,12 +555,9 @@ export function computeFiniteCagePercentages(matchEval) {
     };
   }
 
-  // Caso B: Empate 1-1 + Jaula 3 (Super Tie-Break a 10+ con diferencia >= 2 sin techo)
-  // 9 diferencias finitas posibles: 2 (10-8, 12-10, 42-40...), 3 (10-7), ..., 10 (10-0)
   const finiteStbDiff = Math.min(10, Math.max(2, Number(set3.diff) || 2));
-  const t = (finiteStbDiff - 2) / 8; // 0 (dif 2) -> 1 (dif 10)
+  const t = (finiteStbDiff - 2) / 8;
 
-  // Ajuste fino por margen de games en los 2 primeros sets (ej. 6-0, 6-7, [10-8])
   const winnerSide = matchEval.winnerSide;
   const gA1 = Number(set1.label?.split('-')[0]) || 0;
   const gB1 = Number(set1.label?.split('-')[1]) || 0;
@@ -600,8 +566,8 @@ export function computeFiniteCagePercentages(matchEval) {
   const winnerGamesNet = winnerSide === 'A' ? gA1 + gA2 - (gB1 + gB2) : gB1 + gB2 - (gA1 + gA2);
   const netGameBonus = winnerGamesNet > 0 ? Math.min(0.015, winnerGamesNet * 0.0025) : 0;
 
-  const winPct = Number((0.7 + t * 0.04 + netGameBonus).toFixed(4)); // 70% a 74% (+1.5%)
-  const lossPct = Number((0.38 + t * 0.12).toFixed(4)); // 38% (dif 2) a 50% (10-0)
+  const winPct = Number((0.7 + t * 0.04 + netGameBonus).toFixed(4));
+  const lossPct = Number((0.38 + t * 0.12).toFixed(4));
 
   return {
     winPct,
@@ -611,10 +577,6 @@ export function computeFiniteCagePercentages(matchEval) {
   };
 }
 
-/**
- * Pronóstico Pre-Partido: muestra los techos máximos (6-0, 6-0) y rangos dinámicos
- * independientes para cada tenista antes de retar, sin promesas falsas fijas.
- */
 export function getPreMatchForecast(playerA, playerB, challenges = [], totalActivePlayers = 130) {
   const pA = Number(playerA?.points) || 0;
   const pB = Number(playerB?.points) || 0;
@@ -648,10 +610,6 @@ export function getPreMatchForecast(playerA, playerB, challenges = [], totalActi
   };
 }
 
-/**
- * Cálculo Oficial de Puntos ELO al cerrar un partido (incluye calibración 1.25x,
- * racha x1.25 anti-caza-novatos, revancha semanal y Walkover).
- */
 export function calculateOfficialMatchElo({
   playerA,
   playerB,
@@ -743,7 +701,6 @@ export function calculateOfficialMatchElo({
 
 /* ==========================================================================
    5. TABLA ESTÁTICA INAMOVIBLE DE 4 TEMPORADAS (CARRERA AL TORNEO DE MAESTROS)
-   PROHIBIDO tocar o resetear el Ranking ELO: solo se exporta y congela a 00:00.
    ========================================================================== */
 export function exportSeasonSnapshot(seasonSnapshots, players = [], seasonNumber) {
   const frozenScores = {};
@@ -803,7 +760,6 @@ export function computeMasterTop8Race(seasonSnapshots, players = [], divisionFil
     .map((p) => {
       const seasonValues = seasons.map((s) => {
         if (s.locked) return Number(s.scores?.[p.id]) || 0;
-        // Para la temporada en curso (aún abierta), se muestra su proyección actual sin alterar las pasadas
         return s.number === seasonSnapshots.currentSeason ? Number(p.points) || 0 : 0;
       });
       const totalAnnual = seasonValues.reduce((acc, v) => acc + v, 0);
@@ -824,19 +780,68 @@ export function computeMasterTop8Race(seasonSnapshots, players = [], divisionFil
 }
 
 /* ==========================================================================
-   6. PERMISOS ESTRICTOS POR JUGADOR, JUEZ EN CANCHA Y REGLA 24 HORAS
+   6. PASO 8F · MECÁNICA ESTRICTA DE RETOS, ÁRBITRO, 24H / 6H Y VITRINA 72H
+   --------------------------------------------------------------------------
+   - >= 24h antes: "Cambiar hora" con doble acuerdo (1 vez por partido).
+   - < 24h y > 0 min antes: se reemplaza por "Designar Árbitro" (solo 2 jugadores).
+   - Árbitro designado: Modo Árbitro exclusivo en vivo; al cerrar pasa a EN REVISIÓN
+     (ambos jugadores deben confirmar el marcador).
+   - Sin Árbitro: límite 6h desde la hora programada para subir resultado.
+     Pasadas las 6h sin resultado -> expira sin penalidad y desaparece de Retos.
+   - Resultados confirmados: visibles en Retos durante 72h (3 días).
    ========================================================================== */
-export function getMatchPermissions(challenge, currentUser, isAdmin = false) {
+export function isChallengeExpiredWithoutResult(challenge, nowMs = Date.now()) {
+  if (!challenge) return false;
+  if (challenge.status === 'EXPIRED_NO_RESULT') return true;
+  if (challenge.status !== 'SCHEDULED' && challenge.status !== 'IN_PLAY') return false;
+  // Con Árbitro designado no aplica el vencimiento automático de 6h mientras el árbitro gestiona
+  if (challenge.judgeId) return false;
+  const schedTs = new Date(challenge.scheduledIso || challenge.scheduledAt || 0).getTime();
+  if (!schedTs || Number.isNaN(schedTs)) return false;
+  const hoursSinceStart = (nowMs - schedTs) / (1000 * 60 * 60);
+  return hoursSinceStart > ELO_CONFIG.MAX_HOURS_UPLOAD_WITHOUT_JUDGE;
+}
+
+export function isChallengeVisibleInRetosBoard(challenge, nowMs = Date.now()) {
+  if (!challenge) return false;
+  if (challenge.status === 'DECLINED' || challenge.status === 'EXPIRED_NO_RESULT') {
+    return false;
+  }
+  if (isChallengeExpiredWithoutResult(challenge, nowMs)) {
+    return false;
+  }
+  if (challenge.status === 'FINISHED') {
+    const finTs = new Date(challenge.finishedAt || challenge.scheduledIso || 0).getTime();
+    if (!finTs || Number.isNaN(finTs)) return true;
+    const hoursSinceFinish = (nowMs - finTs) / (1000 * 60 * 60);
+    return hoursSinceFinish <= ELO_CONFIG.FINISHED_SHOWCASE_HOURS;
+  }
+  return true;
+}
+
+export function getMatchPermissions(challenge, currentUser, isAdmin = false, nowMs = Date.now()) {
   if (!challenge) {
     return {
       isParticipant: false,
+      isPlayerA: false,
+      isPlayerB: false,
       isJudge: false,
       canEditScore: false,
+      canJudgeLiveScore: false,
       canAssignJudge: false,
       canConfirmOfficial: false,
       canReschedule: false,
+      canProposeReschedule: false,
+      canRespondReschedule: false,
+      hasPendingReschedule: false,
       rescheduleMode: 'HIDDEN',
+      isExpiredNoResult: false,
+      isUploadWindowOpen: false,
+      uploadHoursLeft: 0,
       hoursUntilMatch: 0,
+      hoursSinceStart: 0,
+      needsMyScoreConfirmation: false,
+      roleLabel: 'Solo lectura',
     };
   }
 
@@ -846,46 +851,126 @@ export function getMatchPermissions(challenge, currentUser, isAdmin = false) {
   const isParticipant = isPlayerA || isPlayerB;
   const isJudge = Boolean(uid && challenge.judgeId && challenge.judgeId === uid);
 
-  const isInPlay = challenge.status === 'IN_PLAY';
-  const isFinished = challenge.status === 'FINISHED';
-  const scheduledTs = new Date(challenge.scheduledIso || Date.now()).getTime();
-  const hoursUntilMatch = Number(((scheduledTs - Date.now()) / (1000 * 60 * 60)).toFixed(1));
+  const status = challenge.status || 'PENDING';
+  const isScheduled = status === 'SCHEDULED';
+  const isInPlay = status === 'IN_PLAY';
+  const isProposed = status === 'SCORE_PROPOSED';
+  const isFinished = status === 'FINISHED' || status === 'DECLINED' || status === 'EXPIRED_NO_RESULT';
+
+  const scheduledTs = new Date(challenge.scheduledIso || challenge.scheduledAt || nowMs).getTime();
+  const hoursUntilMatch = Number(((scheduledTs - nowMs) / (1000 * 60 * 60)).toFixed(2));
+  const hoursSinceStart = Number((-hoursUntilMatch).toFixed(2));
   const usedReschedules = Number(challenge.rescheduleCount) || 0;
 
+  const pendingResched = challenge.pendingReschedule || challenge.liveScore?._meta?.pendingReschedule || null;
+  const hasPendingReschedule = Boolean(pendingResched && pendingResched.newIso);
+
+  const isExpiredNoResult = isChallengeExpiredWithoutResult(challenge, nowMs);
+
+  // Regla 24h: Cambio de hora con doble acuerdo SOLO cuando faltan >= 24h
   let rescheduleMode = 'HIDDEN';
-  if (!isFinished && !isInPlay && (isParticipant || isAdmin)) {
-    if (usedReschedules < ELO_CONFIG.MAX_RESCHEDULES_ORDINARY && hoursUntilMatch >= ELO_CONFIG.MIN_HOURS_ORDINARY_RESCHEDULE) {
+  let canProposeReschedule = false;
+  let canRespondReschedule = false;
+
+  if (isScheduled && !isFinished && (isParticipant || isAdmin)) {
+    if (hasPendingReschedule) {
+      rescheduleMode = 'PENDING_AGREEMENT';
+      canRespondReschedule = Boolean(
+        isAdmin || (isParticipant && pendingResched.proposedBy && pendingResched.proposedBy !== uid)
+      );
+    } else if (
+      usedReschedules < ELO_CONFIG.MAX_RESCHEDULES_ORDINARY &&
+      hoursUntilMatch >= ELO_CONFIG.MIN_HOURS_ORDINARY_RESCHEDULE
+    ) {
       rescheduleMode = 'ORDINARY_ALLOWED';
-    } else {
-      rescheduleMode = 'CLIMATE_OR_EMERGENCY_ONLY';
+      canProposeReschedule = true;
+    } else if (hoursUntilMatch > 0 && hoursUntilMatch < ELO_CONFIG.MIN_HOURS_ORDINARY_RESCHEDULE) {
+      rescheduleMode = 'REFEREE_WINDOW';
     }
   }
+
+  // Regla 24h a 1 min antes: botón "Designar Árbitro" visible SOLO para los 2 jugadores (o Admin)
+  const inRefereeAssignWindow =
+    hoursUntilMatch > 0 && hoursUntilMatch < ELO_CONFIG.MIN_HOURS_ORDINARY_RESCHEDULE;
+  const canAssignJudge = Boolean(
+    isScheduled && !isFinished && inRefereeAssignWindow && (isParticipant || isAdmin)
+  );
+
+  // Ventana de carga de marcador sin Árbitro: hasta 6h tras la hora pactada
+  const hasJudge = Boolean(challenge.judgeId);
+  const uploadHoursLeft = hasJudge
+    ? 99
+    : Math.max(0, Number((ELO_CONFIG.MAX_HOURS_UPLOAD_WITHOUT_JUDGE - Math.max(0, hoursSinceStart)).toFixed(1)));
+  const isUploadWindowOpen = Boolean(
+    !isFinished &&
+      !isExpiredNoResult &&
+      (hasJudge || hoursSinceStart <= ELO_CONFIG.MAX_HOURS_UPLOAD_WITHOUT_JUDGE)
+  );
+
+  // Modo Árbitro exclusivo para el tercero designado
+  const canJudgeLiveScore = Boolean(
+    !isFinished && !isProposed && (isJudge || isAdmin) && (isScheduled || isInPlay)
+  );
+
+  // Confirmación pendiente para ambos jugadores cuando cerró el Árbitro (o para el rival si propuso un jugador)
+  const meta = challenge.liveScore?._meta || {};
+  const judgeSubmitted = Boolean(meta.judgeSubmitted);
+  const confirmations = meta.confirmations || { a: false, b: false };
+  let needsMyScoreConfirmation = false;
+  if (isProposed && isParticipant) {
+    if (judgeSubmitted) {
+      needsMyScoreConfirmation = (isPlayerA && !confirmations.a) || (isPlayerB && !confirmations.b);
+    } else {
+      needsMyScoreConfirmation = Boolean(challenge.proposedBy && challenge.proposedBy !== uid);
+    }
+  }
+
+  // Permisos de carga de marcador:
+  // - Si hay Árbitro designado y no ha cerrado todavía, el Árbitro lleva el en vivo; los jugadores suben solo si no hay árbitro o es Admin.
+  const canEditScore = Boolean(
+    isUploadWindowOpen &&
+      (isAdmin || isJudge || (isParticipant && !hasJudge))
+  );
+
+  const canConfirmOfficial = Boolean(
+    !isFinished && !isExpiredNoResult && (isAdmin || isParticipant || isJudge)
+  );
 
   return {
     isPlayerA,
     isPlayerB,
     isParticipant,
     isJudge,
-    // Solo los 2 protagonistas o el Juez asignado por ellos (o Admin) editan el marcador
-    canEditScore: !isFinished && (isParticipant || isJudge || isAdmin),
-    canConfirmOfficial: !isFinished && (isParticipant || isAdmin),
-    canAssignJudge: !isFinished && (isParticipant || isAdmin),
-    canReschedule: rescheduleMode !== 'HIDDEN',
+    canEditScore,
+    canJudgeLiveScore,
+    canConfirmOfficial,
+    canAssignJudge,
+    canReschedule: canProposeReschedule || canRespondReschedule,
+    canProposeReschedule,
+    canRespondReschedule,
+    hasPendingReschedule,
+    pendingReschedule: pendingResched,
     rescheduleMode,
+    isExpiredNoResult,
+    isUploadWindowOpen,
+    uploadHoursLeft,
     hoursUntilMatch,
+    hoursSinceStart,
+    needsMyScoreConfirmation,
+    judgeSubmitted,
+    confirmations,
     roleLabel: isAdmin
       ? 'Administrador'
+      : isJudge
+      ? 'Árbitro Oficial Designado'
       : isParticipant
       ? 'Jugador del partido'
-      : isJudge
-      ? 'Juez en Cancha designado'
       : 'En vivo · Solo lectura',
   };
 }
 
 /* ==========================================================================
    7. CLIMA REAL EN SEDE (OPEN-METEO $0) Y NOTICIERO REAL ATP / WTA EN VIVO ($0)
-   Regla Rectora #5: Jamás mostrar noticias falsas ni fotos viejas si no hay red.
    ========================================================================== */
 export async function fetchLiveClubWeather(lat = -12.0651, lng = -75.2049) {
   try {
@@ -982,7 +1067,6 @@ export async function fetchLiveRealTennisNews() {
     }
   }
 
-  // Regla Rectora #5: NUNCA devolver noticias inventadas ni fotos viejas si no hay señal
   return {
     ok: false,
     items: [],
@@ -1055,7 +1139,6 @@ export function exportPlayersToExcelCsv(players = [], seasonSnapshots = null, fi
     ].map(escapeCsv).join(',');
   });
 
-  // BOM UTF-8 (\uFEFF) para que Microsoft Excel lea tildes y ñ sin errores
   const csvContent = `\uFEFF${headers.join(',')}\n${rows.join('\n')}`;
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
@@ -1068,12 +1151,9 @@ export function exportPlayersToExcelCsv(players = [], seasonSnapshots = null, fi
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-/**
- * Captcha Matemático Numérico Nativo (0 KB de librerías externas en GitHub)
- */
 export function generateMathCaptcha() {
-  const a = Math.floor(Math.random() * 14) + 5; // 5..18
-  const b = Math.floor(Math.random() * 9) + 2; // 2..10
+  const a = Math.floor(Math.random() * 14) + 5;
+  const b = Math.floor(Math.random() * 9) + 2;
   return {
     question: `¿Cuánto es ${a} + ${b}?`,
     answer: String(a + b),
