@@ -16,7 +16,28 @@ import {
   ANNUAL_MASTER_TOP8_REWARDS,
   SEASON_QUARTERLY_REWARDS,
 } from '../data/storeAndTournamentsData';
-import { ELO_CONFIG, computeMasterTop8Race } from '../utils/tenisEngine';
+import * as TenisEngine from '../utils/tenisEngine';
+
+const { ELO_CONFIG, computeMasterTop8Race } = TenisEngine;
+
+/* Helpers compatibles con tenisEngine.js (regla estricta >= 5 partidos oficiales) */
+function getOfficialMatchesPlayed(player) {
+  if (typeof TenisEngine.getPlayerOfficialMatches === 'function') {
+    return TenisEngine.getPlayerOfficialMatches(player);
+  }
+  if (!player) return 0;
+  const fromRecord = (Number(player.wins) || 0) + (Number(player.losses) || 0);
+  const fromCalib = Number(player.calibrationPlayed) || 0;
+  return Math.max(fromRecord, fromCalib);
+}
+
+function isPlayerOfficiallyRanked(player) {
+  if (typeof TenisEngine.isOfficiallyRankedPlayer === 'function') {
+    return TenisEngine.isOfficiallyRankedPlayer(player);
+  }
+  if (!player || player.isPaused || player.isTutorOnly) return false;
+  return getOfficialMatchesPlayed(player) >= (ELO_CONFIG?.CALIBRATION_MATCHES || 5);
+}
 
 /* ==========================================================================
    PALETAS EDITORIALES SOBRIAS POR DIVISIÓN (MODO OSCURO Y MODO CLARO)
@@ -351,7 +372,7 @@ function LaurelWreathAvatar({ rank = 1, player, club, size = 64 }) {
 
 /* ==========================================================================
    TOP 3 HORIZONTAL ESCALONADO (#1 GRANDE → #2 MEDIANO → #3 INTERMEDIO)
-   Conserva Liquid Glass, laureles, animaciones FLIP y acciones rápidas.
+   Solo jugadores con >= 5 partidos oficiales jugados.
    ========================================================================== */
 function TopThreeHorizontalRow({
   player,
@@ -372,7 +393,7 @@ function TopThreeHorizontalRow({
   const played = wins + losses;
   const eff = played > 0 ? Math.round((wins / played) * 100) : 0;
   const streak = Number(player.streak) || 0;
-  const hasQuorum = played >= ELO_CONFIG.MIN_MATCHES_SEASON_TROPHY;
+  const hasQuorum = getOfficialMatchesPlayed(player) >= ELO_CONFIG.MIN_MATCHES_SEASON_TROPHY;
 
   const avatarSize = rank === 1 ? 64 : rank === 2 ? 54 : 48;
   const moveCls =
@@ -407,12 +428,10 @@ function TopThreeHorizontalRow({
     >
       {rank === 1 && <span className="tt-top3-sheen" aria-hidden="true" />}
 
-      {/* Izquierda: Corona de Laureles con escala progresiva */}
       <div className="tt-top3-left">
         <LaurelWreathAvatar rank={rank} player={player} club={club} size={avatarSize} />
       </div>
 
-      {/* Centro: Identidad + Métricas limpias */}
       <div className="tt-top3-mid">
         <div className="tt-top3-badge-line">
           <span className="tt-top3-tier-pill">{medal.label}</span>
@@ -437,18 +456,15 @@ function TopThreeHorizontalRow({
         </div>
 
         <div className="tt-top3-meta">
-          <span>
-            {played > 0 ? `${wins}V–${losses}D · ${eff}%` : 'Sin partidos aún'}
-          </span>
+          <span>{played > 0 ? `${wins}V–${losses}D · ${eff}%` : 'Oficial'}</span>
           <span>·</span>
           <span className={hasQuorum ? 'is-quorum-ok' : ''}>
-            {hasQuorum ? 'Apto premio' : `${played}/${ELO_CONFIG.MIN_MATCHES_SEASON_TROPHY} PJ`}
+            {hasQuorum ? 'Apto premio' : `${getOfficialMatchesPlayed(player)}/${ELO_CONFIG.MIN_MATCHES_SEASON_TROPHY} PJ`}
           </span>
           {wins > 0 && streak >= 2 && <span className="tt-streak-clean">+{streak}</span>}
         </div>
       </div>
 
-      {/* Derecha: Puntos grandes + Retar / H2H Liquid Glass */}
       <div className="tt-top3-right">
         <div className="tt-top3-pts-box">
           <strong>{Number(player.points || 0).toLocaleString('es-PE')}</strong>
@@ -491,7 +507,7 @@ function TopThreeHorizontalRow({
 }
 
 /* ==========================================================================
-   FILA ESTÁNDAR (#4 EN ADELANTE) CON RETRATO VERTICAL + SOPORTE FLIP APPLE
+   FILA ESTÁNDAR OFICIAL (#4 EN ADELANTE) CON RETRATO VERTICAL + FLIP APPLE
    ========================================================================== */
 function RankingPlayerRow({
   player,
@@ -510,9 +526,6 @@ function RankingPlayerRow({
   const wins = Number(player.wins) || 0;
   const losses = Number(player.losses) || 0;
   const played = wins + losses;
-  const calibPlayed =
-    player.calibrationPlayed !== undefined ? Number(player.calibrationPlayed) : played;
-  const isCalibrating = calibPlayed < ELO_CONFIG.CALIBRATION_MATCHES;
   const streak = Number(player.streak) || 0;
   const eff = played > 0 ? Math.round((wins / played) * 100) : null;
   const trend = Number(player.rankTrend || 0);
@@ -625,17 +638,9 @@ function RankingPlayerRow({
         </div>
 
         <div className="tt-rk-metrics-line">
-          {isCalibrating ? (
-            <span className="tt-calib-pill">
-              Prueba {calibPlayed}/{ELO_CONFIG.CALIBRATION_MATCHES}
-            </span>
-          ) : eff !== null && eff > 0 ? (
-            <span className="tt-eff-label">
-              {wins}V – {losses}D · {eff}%
-            </span>
-          ) : (
-            <span className="tt-eff-label">Listo para debutar</span>
-          )}
+          <span className="tt-eff-label">
+            {eff !== null ? `${wins}V – ${losses}D · ${eff}%` : `${getOfficialMatchesPlayed(player)} PJ oficiales`}
+          </span>
 
           {wins > 0 && streak >= 2 && <span className="tt-streak-clean">Racha +{streak}</span>}
         </div>
@@ -667,7 +672,138 @@ function RankingPlayerRow({
 }
 
 /* ==========================================================================
-   VISTA PRINCIPAL: RankingView (TOP 3 HORIZONTAL ESCALONADO + APPLE FLIP)
+   FILA DE JUGADOR EN CALIBRACIÓN (< 5 PJ · SIN NÚMERO DE PUESTO NI #1)
+   Muestra etiqueta notoria PROVISIONAL · X/5 PJ + ELO Provisional + Retar
+   ========================================================================== */
+function CalibratingPlayerRow({
+  player,
+  club,
+  isCurrentUser,
+  onOpenProfile,
+  onQuickChallenge,
+  onOpenHeadToHead,
+}) {
+  const cat = getCategoryByPoints(player.points);
+  const required = ELO_CONFIG.CALIBRATION_MATCHES || 5;
+  const played = Math.min(required, getOfficialMatchesPlayed(player));
+  const remaining = Math.max(1, required - played);
+  const progressPct = Math.round((played / required) * 100);
+  const wins = Number(player.wins) || 0;
+  const losses = Number(player.losses) || 0;
+
+  return (
+    <div
+      id={isCurrentUser ? 'tt-my-calib-row' : undefined}
+      role="button"
+      tabIndex={0}
+      className={`tt-rk-row is-calib-row ${isCurrentUser ? 'is-me-halo' : ''}`}
+      onClick={() => {
+        triggerHaptic('light');
+        if (onOpenProfile) onOpenProfile(player);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          if (onOpenProfile) onOpenProfile(player);
+        }
+      }}
+    >
+      {/* SIN NÚMERO DE PUESTO (#1): insignia clara PROV. + X/5 */}
+      <div className="tt-calib-status-col">
+        <span className="tt-calib-badge-main">PROV.</span>
+        <strong className="tt-calib-ratio">
+          {played}/{required}
+        </strong>
+      </div>
+
+      <div className="tt-rk-portrait-wrap">
+        <div className="tt-rk-portrait-frame is-calib-frame">
+          <SmartImage
+            src={player.fullBodyPhoto || player.avatar}
+            alt={player.name}
+            initials={player.name}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              objectPosition: 'center top',
+            }}
+          />
+        </div>
+      </div>
+
+      <div className="tt-rk-info-col">
+        <div className="tt-rk-name-line">
+          <strong className="tt-rk-name">{player.name}</strong>
+          {player.isVip && <span className="tt-vip-subtle-tag">VIP</span>}
+          {player.isTutelado && <span className="tt-tutela-mini">Tutelada</span>}
+          {isCurrentUser && <span className="tt-me-micro-pill">TÚ</span>}
+        </div>
+
+        <div className="tt-rk-sub-line">
+          <span className="tt-rk-cat-pill">
+            <i className="tt-rk-cat-dot" style={{ backgroundColor: cat.color }} />
+            Ref. {cat.name}
+          </span>
+          <span className="tt-rk-club-chip">{club ? club.shortName : 'Independiente'}</span>
+        </div>
+
+        <div className="tt-calib-progress-wrap">
+          <div className="tt-calib-progress-bar">
+            <span style={{ width: `${Math.max(8, progressPct)}%` }} />
+          </div>
+          <small className="tt-calib-progress-txt">
+            {played > 0 ? `${wins}V–${losses}D · ` : ''}
+            Faltan {remaining} {remaining === 1 ? 'partido' : 'partidos'} para Oficial
+          </small>
+        </div>
+      </div>
+
+      <div className="tt-rk-points-col">
+        <strong className="tt-rk-points-val is-prov-pts">
+          {Number(player.points || 0).toLocaleString('es-PE')}
+        </strong>
+        <span className="tt-rk-points-unit is-prov-unit">ELO PROV.</span>
+
+        {!isCurrentUser && (
+          <div className="tt-calib-row-btns">
+            {onQuickChallenge && (
+              <button
+                type="button"
+                className="tt-top3-reto-btn tt-rk-press"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  triggerHaptic('medium');
+                  onQuickChallenge(player);
+                }}
+              >
+                Retar
+              </button>
+            )}
+            {onOpenHeadToHead && (
+              <button
+                type="button"
+                className="tt-rk-h2h-mini tt-rk-press"
+                aria-label={`Comparar cara a cara contra ${player.name}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  triggerHaptic('light');
+                  onOpenHeadToHead(player);
+                }}
+              >
+                H2H
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ==========================================================================
+   VISTA PRINCIPAL: RankingView
+   (RANKING OFICIAL >= 5 PJ | CALIBRÁNDOSE < 5 PJ SIN #1 | TEMPORADAS | CLUBES)
    ========================================================================== */
 export default function RankingView({
   players = [],
@@ -680,7 +816,7 @@ export default function RankingView({
   onQuickChallenge,
   onGoToTournaments,
 }) {
-  const [activeSubTab, setActiveSubTab] = useState('oficial');
+  const [activeSubTab, setActiveSubTab] = useState('oficial'); // 'oficial' | 'calibrando' | 'temporadas' | 'clubes'
   const [divisionFilter, setDivisionFilter] = useState('ALL');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
@@ -737,32 +873,56 @@ export default function RankingView({
     [safeSnapshots]
   );
 
+  const matchesCommonFilters = (p, q) => {
+    if (p.isPaused || p.isTutorOnly) return false;
+    if (divisionFilter === 'Varones' && p.division !== 'Varones') return false;
+    if (divisionFilter === 'Damas' && p.division !== 'Damas') return false;
+    if (divisionFilter === 'SENIOR_40' && (Number(p.age) || 0) < 40) return false;
+
+    if (categoryFilter !== 'ALL' && divisionFilter !== 'SENIOR_40') {
+      if (getCategoryByPoints(p.points).id !== categoryFilter) return false;
+    }
+
+    if (q) {
+      const hay = `${p.name || ''} ${p.clubName || ''} ${p.credentialId || ''}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  };
+
+  /* 1. RANKING OFICIAL: ESTRICTAMENTE >= 5 PARTIDOS OFICIALES JUGADOS */
   const rankedPlayers = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-
     return [...(players || [])]
-      .filter((p) => {
-        if (p.isTutorOnly) return false;
-        if (divisionFilter === 'Varones' && p.division !== 'Varones') return false;
-        if (divisionFilter === 'Damas' && p.division !== 'Damas') return false;
-        if (divisionFilter === 'SENIOR_40' && (Number(p.age) || 0) < 40) return false;
-
-        if (categoryFilter !== 'ALL' && divisionFilter !== 'SENIOR_40') {
-          if (getCategoryByPoints(p.points).id !== categoryFilter) return false;
-        }
-
-        if (q) {
-          const hay = `${p.name || ''} ${p.clubName || ''} ${p.credentialId || ''}`.toLowerCase();
-          if (!hay.includes(q)) return false;
-        }
-        return true;
-      })
+      .filter((p) => isPlayerOfficiallyRanked(p) && matchesCommonFilters(p, q))
       .sort((a, b) => {
         const diffPts = (Number(b.points) || 0) - (Number(a.points) || 0);
         if (diffPts !== 0) return diffPts;
         return (Number(b.wins) || 0) - (Number(a.wins) || 0);
       });
   }, [players, divisionFilter, categoryFilter, searchQuery]);
+
+  /* 2. CALIBRÁNDOSE (PROVISIONAL): < 5 PARTIDOS OFICIALES · SIN PUESTO # */
+  const calibratingPlayers = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return [...(players || [])]
+      .filter((p) => !isPlayerOfficiallyRanked(p) && matchesCommonFilters(p, q))
+      .sort((a, b) => {
+        const diffMatches = getOfficialMatchesPlayed(b) - getOfficialMatchesPlayed(a);
+        if (diffMatches !== 0) return diffMatches;
+        return (Number(b.points) || 0) - (Number(a.points) || 0);
+      });
+  }, [players, divisionFilter, categoryFilter, searchQuery]);
+
+  const totalCalibratingCount = useMemo(
+    () => (players || []).filter((p) => !p.isPaused && !p.isTutorOnly && !isPlayerOfficiallyRanked(p)).length,
+    [players]
+  );
+
+  const currentUserIsCalibrating = useMemo(
+    () => Boolean(currentUser && !currentUser.isTutorOnly && !isPlayerOfficiallyRanked(currentUser)),
+    [currentUser]
+  );
 
   const currentOrderSignature = useMemo(
     () => rankedPlayers.map((p) => p.id).join(','),
@@ -968,7 +1128,8 @@ export default function RankingView({
   const masterTop8Rows = useMemo(() => {
     const engineDiv =
       divisionFilter === 'Varones' || divisionFilter === 'Damas' ? divisionFilter : 'ALL';
-    let rows = computeMasterTop8Race(safeSnapshots, players, engineDiv, categoryFilter);
+    const officialOnly = (players || []).filter((p) => isPlayerOfficiallyRanked(p));
+    let rows = computeMasterTop8Race(safeSnapshots, officialOnly, engineDiv, categoryFilter);
 
     if (divisionFilter === 'SENIOR_40') {
       rows = rows
@@ -985,10 +1146,13 @@ export default function RankingView({
     return rows;
   }, [safeSnapshots, players, divisionFilter, categoryFilter, searchQuery]);
 
+  /* Ranking de Clubes: solo considera jugadores oficialmente rankeados (>= 5 PJ) */
   const clubsStandings = useMemo(() => {
     return (clubs || [])
       .map((club) => {
-        const members = (players || []).filter((p) => p.clubId === club.id && !p.isTutorOnly);
+        const members = (players || []).filter(
+          (p) => p.clubId === club.id && isPlayerOfficiallyRanked(p)
+        );
         const totalPoints = members.reduce((sum, p) => sum + (Number(p.points) || 0), 0);
         const avgPoints = members.length > 0 ? Math.round(totalPoints / members.length) : 0;
         const totalWins = members.reduce((sum, p) => sum + (Number(p.wins) || 0), 0);
@@ -1027,7 +1191,16 @@ export default function RankingView({
 
   const isLight = theme === 'light';
   const activeCategoryObj = CATEGORIES_SCALE.find((c) => c.id === categoryFilter) || null;
-  const activeTabIdx = activeSubTab === 'oficial' ? 0 : activeSubTab === 'temporadas' ? 1 : 2;
+  const subTabs = [
+    { id: 'oficial', label: 'Oficial' },
+    { id: 'calibrando', label: 'Calibrando', count: totalCalibratingCount },
+    { id: 'temporadas', label: 'Temporadas' },
+    { id: 'clubes', label: 'Clubes' },
+  ];
+  const activeTabIdx = Math.max(
+    0,
+    subTabs.findIndex((t) => t.id === activeSubTab)
+  );
 
   const dynamicVars = {
     '--rk-accent': isLight ? divisionTheme.accentLight : divisionTheme.accentDark,
@@ -1045,18 +1218,14 @@ export default function RankingView({
       style={dynamicVars}
       aria-label="Clasificación Oficial TOTAL TENIS"
     >
-      {/* 1. BARRA SUPERIOR LIQUID GLASS */}
+      {/* 1. BARRA SUPERIOR LIQUID GLASS (4 PESTAÑAS: OFICIAL | CALIBRANDO | TEMPORADAS | CLUBES) */}
       <div className="tt-rk-subtabs" role="tablist" aria-label="Vistas del Ranking">
         <span
           className="tt-rk-subtab-slider"
           aria-hidden="true"
           style={{ transform: `translateX(${activeTabIdx * 100}%)` }}
         />
-        {[
-          { id: 'oficial', label: 'Clasificación' },
-          { id: 'temporadas', label: 'Temporadas' },
-          { id: 'clubes', label: 'Clubes' },
-        ].map((tab) => (
+        {subTabs.map((tab) => (
           <button
             key={tab.id}
             type="button"
@@ -1068,7 +1237,10 @@ export default function RankingView({
               setActiveSubTab(tab.id);
             }}
           >
-            {tab.label}
+            <span>{tab.label}</span>
+            {tab.count > 0 && (
+              <span className="tt-rk-tab-badge">{tab.count}</span>
+            )}
           </button>
         ))}
       </div>
@@ -1083,7 +1255,11 @@ export default function RankingView({
                 type="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Buscar jugador o club..."
+                placeholder={
+                  activeSubTab === 'calibrando'
+                    ? 'Buscar jugador en calibración...'
+                    : 'Buscar jugador o club...'
+                }
                 aria-label="Buscar en la clasificación"
               />
               {searchQuery && (
@@ -1107,6 +1283,23 @@ export default function RankingView({
               >
                 <small>MI PUESTO</small>
                 <strong>#{myRankInCurrentView}</strong>
+              </button>
+            )}
+
+            {currentUserIsCalibrating && activeSubTab === 'oficial' && (
+              <button
+                type="button"
+                className="tt-rk-mypos-chip is-prov-chip tt-rk-press"
+                onClick={() => {
+                  triggerHaptic('light');
+                  setActiveSubTab('calibrando');
+                }}
+                title="Ver mi estado en Calibrando"
+              >
+                <small>PROV.</small>
+                <strong>
+                  {getOfficialMatchesPlayed(currentUser)}/{ELO_CONFIG.CALIBRATION_MATCHES}
+                </strong>
               </button>
             )}
           </div>
@@ -1187,37 +1380,65 @@ export default function RankingView({
       )}
 
       {/* ====================================================================
-          VISTA A: CLASIFICACIÓN (TOP 3 HORIZONTAL ESCALONADO + #4+ FLIP)
+          VISTA A: RANKING OFICIAL (ESTRICTAMENTE >= 5 PARTIDOS JUGADOS)
           ==================================================================== */}
       {activeSubTab === 'oficial' && (
         <div
           key={`of-${divisionFilter}-${categoryFilter}`}
           className="tt-rk-content-stack tt-rk-panel-morph"
         >
+          {currentUserIsCalibrating && (
+            <div className="tt-calib-self-banner">
+              <TTIcon name="shield" size={18} style={{ color: '#38BDF8', flexShrink: 0 }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <strong>
+                  Tu perfil está en Calibración ({getOfficialMatchesPlayed(currentUser)}/
+                  {ELO_CONFIG.CALIBRATION_MATCHES} partidos)
+                </strong>
+                <p>
+                  El Ranking Oficial muestra solo jugadores con {ELO_CONFIG.CALIBRATION_MATCHES}+
+                  partidos confirmados. Tu ELO provisional ({Number(currentUser?.points || 0).toLocaleString('es-PE')}) sirve para pactar retos parejos hasta entrar aquí.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="tt-calib-switch-btn tt-rk-press"
+                onClick={() => {
+                  triggerHaptic('light');
+                  setActiveSubTab('calibrando');
+                }}
+              >
+                Ver Calibrando →
+              </button>
+            </div>
+          )}
+
           {displayedRankedPlayers.length === 0 ? (
             <EmptyStateCard
               theme={theme}
-              title="Sin jugadores en este filtro todavía"
-              description={`No hay jugadores registrados en ${divisionTheme.label}${
+              title="Aún sin jugadores oficiales en este filtro"
+              description={`Solo figuran aquí los jugadores con ${ELO_CONFIG.CALIBRATION_MATCHES} o más partidos oficiales en ${divisionTheme.label}${
                 activeCategoryObj ? ` · ${activeCategoryObj.name}` : ''
               }.`}
-              actionLabel="Ver clasificación completa"
-              onAction={handleResetFilters}
+              actionLabel={totalCalibratingCount > 0 ? 'Ver jugadores Calibrando' : 'Ver clasificación completa'}
+              onAction={() => {
+                if (totalCalibratingCount > 0) setActiveSubTab('calibrando');
+                else handleResetFilters();
+              }}
             />
           ) : (
             <>
-              {/* TOP 3 HORIZONTAL CON ESCALA PROGRESIVA (#1 GRANDE → #2 → #3) */}
               {showTop3Horizontal && top3Players.length > 0 && (
                 <div className="tt-top3-stack-wrap">
                   <div className="tt-top3-stage-head">
                     <span className="tt-podium-kicker">
-                      TOP 3 ·{' '}
+                      TOP 3 OFICIAL ·{' '}
                       {activeCategoryObj
                         ? `${divisionTheme.label.toUpperCase()} · ${activeCategoryObj.name.toUpperCase()}`
                         : divisionTheme.shortTag}
                     </span>
                     <span className="tt-podium-quorum-note">
-                      Mín. {ELO_CONFIG.MIN_MATCHES_SEASON_TROPHY} PJ premio
+                      Solo jugadores con {ELO_CONFIG.CALIBRATION_MATCHES}+ PJ
                     </span>
                   </div>
 
@@ -1241,12 +1462,11 @@ export default function RankingView({
                 </div>
               )}
 
-              {/* TABLA DEL #4 EN ADELANTE (TAMAÑO ESTÁNDAR + FLIP) */}
               {listPlayers.length > 0 && (
                 <div className="tt-rk-table-shell">
                   <div className="tt-rk-table-head">
                     <span className="col-pos">#</span>
-                    <span className="col-player">JUGADOR & CATEGORÍA</span>
+                    <span className="col-player">JUGADOR OFICIAL & CATEGORÍA</span>
                     <span className="col-pts">PUNTOS</span>
                   </div>
 
@@ -1294,7 +1514,63 @@ export default function RankingView({
       )}
 
       {/* ====================================================================
-          VISTA B: TEMPORADAS + RELOJ SPLIT-FLAP + ACORDEÓN
+          VISTA B: CALIBRÁNDOSE (PROVISIONAL < 5 PJ · SIN PODIO NI #1)
+          ==================================================================== */}
+      {activeSubTab === 'calibrando' && (
+        <div
+          key={`cal-${divisionFilter}-${categoryFilter}`}
+          className="tt-rk-content-stack tt-rk-panel-morph"
+        >
+          <div className="tt-calib-hero-card">
+            <IconBadge name="shield" variant="emerald" size={38} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <span className="tt-calib-kicker">LISTA PROVISIONAL · SIN PUESTO OFICIAL</span>
+              <h3>Jugadores Calibrándose (&lt; {ELO_CONFIG.CALIBRATION_MATCHES} PJ)</h3>
+              <p>
+                Aquí aparecen los perfiles nuevos con su <b>ELO provisional</b> de referencia para
+                medirse y pactar retos. No existe puesto #1 ni podio aquí: al completar{' '}
+                <b>{ELO_CONFIG.CALIBRATION_MATCHES} partidos oficiales</b> pasan automáticamente al{' '}
+                <b>Ranking Oficial</b>.
+              </p>
+            </div>
+          </div>
+
+          {calibratingPlayers.length === 0 ? (
+            <EmptyStateCard
+              theme={theme}
+              title="No hay jugadores en calibración en este filtro"
+              description="Todos los jugadores de este filtro ya completaron sus 5 partidos oficiales o están en otra categoría."
+              actionLabel="Ver Ranking Oficial"
+              onAction={() => setActiveSubTab('oficial')}
+            />
+          ) : (
+            <div className="tt-rk-table-shell is-calib-shell">
+              <div className="tt-rk-table-head is-calib-head">
+                <span className="col-pos">PROV.</span>
+                <span className="col-player">JUGADOR EN CALIBRACIÓN</span>
+                <span className="col-pts">ELO PROV.</span>
+              </div>
+
+              <div className="tt-rk-rows-stack">
+                {calibratingPlayers.map((player) => (
+                  <CalibratingPlayerRow
+                    key={player.id}
+                    player={player}
+                    club={getClubById(clubs, player.clubId)}
+                    isCurrentUser={Boolean(currentUser && currentUser.id === player.id)}
+                    onOpenProfile={onOpenPlayerProfile}
+                    onQuickChallenge={onQuickChallenge}
+                    onOpenHeadToHead={onOpenHeadToHead}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ====================================================================
+          VISTA C: TEMPORADAS + RELOJ SPLIT-FLAP + ACORDEÓN (SOLO OFICIALES)
           ==================================================================== */}
       {activeSubTab === 'temporadas' && (
         <div
@@ -1398,8 +1674,8 @@ export default function RankingView({
           {masterTop8Rows.length === 0 ? (
             <EmptyStateCard
               theme={theme}
-              title="Sin jugadores en este filtro"
-              description="Cambia la rama o categoría para consultar los puntos del año."
+              title="Sin jugadores oficiales en este filtro"
+              description="Solo compiten en la carrera anual al Master Top 8 quienes ya completaron sus 5 partidos oficiales."
               actionLabel="Ver todos"
               onAction={handleResetFilters}
             />
@@ -1514,7 +1790,7 @@ export default function RankingView({
       )}
 
       {/* ====================================================================
-          VISTA C: RANKING DE CLUBES
+          VISTA D: RANKING DE CLUBES (SOLO JUGADORES OFICIALES >= 5 PJ)
           ==================================================================== */}
       {activeSubTab === 'clubes' && (
         <div className="tt-rk-content-stack tt-rk-panel-morph">
@@ -1560,7 +1836,7 @@ export default function RankingView({
                   </div>
 
                   <div className="tt-club-metrics-row">
-                    <div><span>Jugadores</span><strong>{item.membersCount}</strong></div>
+                    <div><span>Oficiales</span><strong>{item.membersCount}</strong></div>
                     <div><span>Puntos</span><strong>{item.totalPoints.toLocaleString('es-PE')}</strong></div>
                     <div><span>Victorias</span><strong>{item.winRate}%</strong></div>
                   </div>
@@ -1581,7 +1857,7 @@ export default function RankingView({
                         style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', objectPosition: 'center top', border: '1.5px solid #00DC7D' }}
                       />
                       <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
-                        <small>Líder de la sede</small>
+                        <small>Líder oficial de la sede</small>
                         <strong>{item.topPlayer.name}</strong>
                       </div>
                       <span className="tt-club-rep-pts">
@@ -1602,23 +1878,35 @@ export default function RankingView({
         .tt-rk-press { transition: transform 170ms cubic-bezier(0.22, 1.38, 0.36, 1), box-shadow 200ms ease, border-color 180ms ease !important; }
         .tt-rk-press:active { transform: scale(0.95) !important; }
 
-        /* 1. SUB-TABS LIQUID GLASS */
+        /* 1. SUB-TABS LIQUID GLASS (4 PESTAÑAS) */
         .tt-rk-subtabs {
-          position: relative; display: grid; grid-template-columns: repeat(3, 1fr);
+          position: relative; display: grid; grid-template-columns: repeat(4, 1fr);
           padding: 4px; border-radius: 18px; background: var(--tt-surface-2);
           border: 1px solid var(--tt-border);
           box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
           backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
         }
         .tt-rk-subtab-slider {
-          position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc((100% - 8px) / 3);
+          position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc((100% - 8px) / 4);
           border-radius: 13px; background: var(--rk-pill-grad);
           box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.38), 0 6px 16px var(--rk-glow);
           transition: transform 320ms cubic-bezier(0.22, 1.24, 0.36, 1), background 300ms ease;
           pointer-events: none; z-index: 0;
         }
-        .tt-rk-subtab { position: relative; z-index: 1; min-height: 41px; border-radius: 13px; font-size: 0.79rem; font-weight: 800; color: var(--tt-text-muted); transition: color 200ms ease; }
+        .tt-rk-subtab {
+          position: relative; z-index: 1; min-height: 41px; padding: 0 4px;
+          border-radius: 13px; font-size: 0.72rem; font-weight: 800; color: var(--tt-text-muted);
+          display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+          white-space: nowrap; transition: color 200ms ease;
+        }
         .tt-rk-subtab.is-active { color: var(--rk-accent-on-fill); font-weight: 900; }
+        .tt-rk-tab-badge {
+          min-width: 17px; height: 17px; padding: 0 4px; border-radius: 999px;
+          background: rgba(56, 189, 248, 0.22); color: #7DD3FC;
+          font-size: 0.58rem; font-weight: 900; display: inline-flex; align-items: center; justify-content: center;
+        }
+        .tt-ranking-view.is-light .tt-rk-tab-badge { background: rgba(3, 105, 161, 0.14); color: #0369A1; }
+        .tt-rk-subtab.is-active .tt-rk-tab-badge { background: rgba(16, 2, 30, 0.22); color: inherit; }
 
         /* 2. BUSCADOR + FILTROS LIQUID GLASS */
         .tt-rk-filters-wrap { display: flex; flex-direction: column; gap: 9px; }
@@ -1638,6 +1926,12 @@ export default function RankingView({
           border: 1px solid var(--rk-soft-border); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
           color: var(--tt-text); display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0;
         }
+        .tt-rk-mypos-chip.is-prov-chip {
+          background: rgba(56, 189, 248, 0.14);
+          border-color: rgba(56, 189, 248, 0.45);
+        }
+        .tt-rk-mypos-chip.is-prov-chip strong { color: #38BDF8; }
+        .tt-ranking-view.is-light .tt-rk-mypos-chip.is-prov-chip strong { color: #0369A1; }
         .tt-rk-mypos-chip small { font-size: 0.5rem; font-weight: 900; letter-spacing: 0.08em; opacity: 0.74; }
         .tt-rk-mypos-chip strong { font-family: var(--tt-font-display); font-size: 1.06rem; line-height: 1; color: var(--rk-accent); }
 
@@ -1664,6 +1958,76 @@ export default function RankingView({
         .tt-rk-content-stack { display: flex; flex-direction: column; gap: 13px; }
         .tt-rk-panel-morph { animation: ttRkMorph 320ms cubic-bezier(0.22, 1, 0.36, 1) both; }
         @keyframes ttRkMorph { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* BANNER CALIBRACIÓN PROPIA + SECCIÓN CALIBRÁNDOSE */
+        .tt-calib-self-banner {
+          display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+          padding: 12px 13px; border-radius: 17px;
+          background: rgba(56, 189, 248, 0.13); border: 1.5px solid rgba(56, 189, 248, 0.45);
+          font-size: 0.74rem;
+        }
+        .tt-ranking-view.is-light .tt-calib-self-banner {
+          background: #E8F6FE; border-color: rgba(14, 138, 198, 0.42);
+        }
+        .tt-calib-self-banner strong { display: block; font-size: 0.8rem; color: var(--tt-text); }
+        .tt-calib-self-banner p { margin: 2px 0 0; color: var(--tt-text-muted); line-height: 1.38; }
+        .tt-calib-switch-btn {
+          padding: 7px 12px; border-radius: 11px;
+          background: linear-gradient(180deg, #38BDF8 0%, #0284C7 100%);
+          color: #08121E; font-size: 0.72rem; font-weight: 900; white-space: nowrap;
+        }
+
+        .tt-calib-hero-card {
+          display: flex; align-items: flex-start; gap: 12px;
+          padding: 14px; border-radius: 20px;
+          background: var(--tt-surface); border: 1.5px solid rgba(56, 189, 248, 0.45);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), var(--tt-shadow-sm);
+        }
+        .tt-calib-kicker {
+          display: block; font-size: 0.6rem; font-weight: 900; letter-spacing: 0.09em; color: #38BDF8;
+        }
+        .tt-ranking-view.is-light .tt-calib-kicker { color: #0369A1; }
+        .tt-calib-hero-card h3 {
+          margin: 2px 0 0; font-family: var(--tt-font-display); font-size: 1.18rem; line-height: 1.08;
+        }
+        .tt-calib-hero-card p {
+          margin: 4px 0 0; font-size: 0.75rem; line-height: 1.42; color: var(--tt-text-muted);
+        }
+
+        .tt-rk-table-shell.is-calib-shell { border-color: rgba(56, 189, 248, 0.35); }
+        .tt-rk-table-head.is-calib-head { grid-template-columns: 46px 1fr 84px; }
+        .tt-rk-row.is-calib-row { grid-template-columns: 46px 54px 1fr auto; }
+        .tt-calib-status-col {
+          display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+        }
+        .tt-calib-badge-main {
+          padding: 2px 5px; border-radius: 6px;
+          background: rgba(56, 189, 248, 0.2); border: 1px solid rgba(125, 211, 252, 0.5);
+          color: #7DD3FC; font-size: 0.52rem; font-weight: 900; letter-spacing: 0.05em;
+        }
+        .tt-ranking-view.is-light .tt-calib-badge-main {
+          background: #E0F2FE; border-color: #38BDF8; color: #0369A1;
+        }
+        .tt-calib-ratio {
+          font-family: var(--tt-font-display); font-size: 0.98rem; font-weight: 900; color: var(--tt-text);
+          line-height: 1;
+        }
+        .tt-rk-portrait-frame.is-calib-frame { border-color: rgba(56, 189, 248, 0.62); }
+        .tt-calib-progress-wrap { display: flex; flex-direction: column; gap: 3px; margin-top: 1px; }
+        .tt-calib-progress-bar {
+          height: 5px; width: 100%; max-width: 150px; border-radius: 999px;
+          background: rgba(56, 189, 248, 0.16); overflow: hidden;
+        }
+        .tt-calib-progress-bar span {
+          display: block; height: 100%; border-radius: 999px;
+          background: linear-gradient(90deg, #38BDF8 0%, #00DC7D 100%);
+        }
+        .tt-calib-progress-txt { font-size: 0.64rem; font-weight: 700; color: var(--tt-text-muted); }
+        .tt-rk-points-val.is-prov-pts { color: #7DD3FC; }
+        .tt-ranking-view.is-light .tt-rk-points-val.is-prov-pts { color: #0369A1; }
+        .tt-rk-points-unit.is-prov-unit { color: #38BDF8; opacity: 0.9; }
+        .tt-ranking-view.is-light .tt-rk-points-unit.is-prov-unit { color: #0369A1; }
+        .tt-calib-row-btns { display: flex; align-items: center; gap: 5px; margin-top: 3px; }
 
         /* ==================================================================
            3. TOP 3 HORIZONTAL CON ESCALA PROGRESIVA (#1 GRANDE → #2 → #3)
@@ -1692,7 +2056,6 @@ export default function RankingView({
         }
         .tt-top3-hcard:active { transform: scale(0.975); }
 
-        /* Escala #1 (Más grande · Oro Champán) */
         .tt-top3-hcard.is-tier-1 {
           padding: 15px 14px;
           border-radius: 24px;
@@ -1704,7 +2067,6 @@ export default function RankingView({
           box-shadow: inset 0 1px 0 #FFFFFF, 0 12px 28px rgba(154, 107, 22, 0.14);
         }
 
-        /* Escala #2 (Mediano · Plata Cepillada) */
         .tt-top3-hcard.is-tier-2 {
           padding: 13px 14px;
           border-radius: 21px;
@@ -1716,7 +2078,6 @@ export default function RankingView({
           box-shadow: inset 0 1px 0 #FFFFFF, 0 8px 20px rgba(71, 85, 105, 0.1);
         }
 
-        /* Escala #3 (Intermedio · Bronce Noble, un nivel arriba del #4+) */
         .tt-top3-hcard.is-tier-3 {
           padding: 11px 14px;
           border-radius: 19px;
@@ -1848,8 +2209,6 @@ export default function RankingView({
 
         .tt-rk-metrics-line { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
         .tt-eff-label { font-size: 0.67rem; font-weight: 700; color: var(--tt-text-muted); }
-        .tt-calib-pill { padding: 2px 7px; border-radius: 999px; background: rgba(56, 189, 248, 0.14); color: #38BDF8; font-size: 0.62rem; font-weight: 800; }
-        .tt-ranking-view.is-light .tt-calib-pill { color: #0369A1; }
         .tt-streak-clean { padding: 2px 7px; border-radius: 999px; background: var(--rk-soft-bg); color: var(--rk-accent); font-size: 0.61rem; font-weight: 800; }
 
         .tt-rk-points-col { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
