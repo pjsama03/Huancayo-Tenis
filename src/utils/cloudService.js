@@ -506,7 +506,9 @@ export function dbToChallenge(row) {
     winnerId: row.winner_id || '',
     eloDeltaA: Number(row.elo_delta_a) || 0,
     eloDeltaB: Number(row.elo_delta_b) || 0,
-    disputeNote: row.dispute_note || '',
+    disputeNote: row.dispute_note || meta.dispute?.reasonText || '',
+    disputeInfo: meta.dispute || null,
+    adminResolutionNote: meta.adminResolutionNote || '',
     createdAt: row.created_at,
     finishedAt: row.finished_at || null,
   };
@@ -535,7 +537,9 @@ export function challengeToDb(c) {
     c.confirmations !== undefined ||
     c.pendingReschedule !== undefined ||
     c.ballsAgreement !== undefined ||
-    c.rescheduleCount !== undefined
+    c.rescheduleCount !== undefined ||
+    c.disputeInfo !== undefined ||
+    c.adminResolutionNote !== undefined
   ) {
     const baseLive = c.liveScore && typeof c.liveScore === 'object' ? { ...c.liveScore } : {};
     const nextMeta = { ...(baseLive._meta || {}) };
@@ -547,6 +551,8 @@ export function challengeToDb(c) {
     if (c.pendingReschedule !== undefined) nextMeta.pendingReschedule = c.pendingReschedule;
     if (c.ballsAgreement !== undefined) nextMeta.ballsAgreement = c.ballsAgreement;
     if (c.rescheduleCount !== undefined) nextMeta.rescheduleCount = Number(c.rescheduleCount) || 0;
+    if (c.disputeInfo !== undefined) nextMeta.dispute = c.disputeInfo;
+    if (c.adminResolutionNote !== undefined) nextMeta.adminResolutionNote = c.adminResolutionNote;
     baseLive._meta = nextMeta;
     out.live_score = baseLive;
   }
