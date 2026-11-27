@@ -53,7 +53,7 @@ import {
   TTIcon,
   triggerHaptic,
 } from './components/AppIcons';
-import { calculateMatchVictoryGems } from './components/RetosParts';
+import { RetosDisputeModal, calculateMatchVictoryGems } from './components/RetosParts';
 import {
   SponsorInterstitialModal,
   normalizeSponsorsConfig,
@@ -480,6 +480,8 @@ export default function App() {
   const [inspectPlayerId, setInspectPlayerId] = useState(null);
   const [dismissedIncomingIds, setDismissedIncomingIds] = useState([]);
   const [dismissedScoreIds, setDismissedScoreIds] = useState([]);
+  const [disputeModalTarget, setDisputeModalTarget] = useState(null);
+  const [isSubmittingDispute, setIsSubmittingDispute] = useState(false);
   const [busyActionId, setBusyActionId] = useState(null);
   const [toast, setToast] = useState(null);
 
@@ -1068,9 +1070,9 @@ export default function App() {
     const scrollToTarget = () => {
       if (typeof document === 'undefined') return;
       if (newRank && newRank <= 3) {
-        const podium = document.querySelector('.tt-podium-stage');
-        if (podium && typeof podium.scrollIntoView === 'function') {
-          podium.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const top3 = document.querySelector('.tt-top3-stack-wrap');
+        if (top3 && typeof top3.scrollIntoView === 'function') {
+          top3.scrollIntoView({ behavior: 'smooth', block: 'start' });
           return;
         }
       }
@@ -1080,8 +1082,7 @@ export default function App() {
       }
     };
 
-    window.setTimeout(scrollToTarget, 220);
-    window.setTimeout(scrollToTarget, 1520);
+    window.setTimeout(scrollToTarget, 180);
   }, []);
 
   const handleSelectTab = useCallback(
@@ -1540,8 +1541,9 @@ export default function App() {
         if (
           autoJumpToRanking &&
           isOfficial &&
-          currentUserId &&
-          (challenge.playerAId === currentUserId || challenge.playerBId === currentUserId)
+          (effectiveIsAdmin ||
+            (currentUserId &&
+              (challenge.playerAId === currentUserId || challenge.playerBId === currentUserId)))
         ) {
           const postOrdered = sortPlayersForOfficialRanking(nextPlayersList);
           const oldRank = preRankMap[currentUserId];
@@ -1575,7 +1577,7 @@ export default function App() {
         showToast('Ya estamos procesando este marcador, espera un segundo...', 'info');
       }
     },
-    [appendGemLedger, currentUserId, focusMyPositionInRanking, showToast]
+    [appendGemLedger, currentUserId, effectiveIsAdmin, focusMyPositionInRanking, showToast]
   );
 
   // Paso 8F: soporta cierre por Árbitro (pasa a EN REVISIÓN para ambos jugadores)
@@ -1762,33 +1764,92 @@ export default function App() {
   );
 
   const handleDisputeProposedScore = useCallback(
-    async (ch) => {
+    (ch) => {
       if (!requireAuth('impugnar un marcador')) return;
       if (!ch) return;
-      await runWithLock(`dispute-score-${ch.id}`, async () => {
-        const updated = {
-          ...ch,
-          status: 'DISPUTED',
-          disputeNote: `Impugnado por ${currentUser?.name || 'el rival'} el ${formatPeruDate(
-            new Date(),
-            true
-          )}`,
-        };
-        setChallenges((prev) => prev.map((c) => (c.id === ch.id ? updated : c)));
-        setDismissedScoreIds((prev) => [...prev, ch.id]);
-        await upsertCloudChallenge(updated);
+      if (ch.status === 'DISPUTED') {
+        showToast('Este partido ya está congelado en revisión por el Comité.', 'info');
+        return;
+      }
+      setDismissedScoreIds((prev) => Array.from(new Set([...prev, ch.id])));
+      setDisputeModalTarget(ch);
+    },
+    [requireAuth, showToast]
+  );
 
-        const otherId =
-          currentUser?.id === ch.playerAId ? ch.playerBId : ch.playerAId;
-        sendPushNotification({
-          targetPlayerIds: resolvePushRecipients([otherId], playersRef.current),
-          title: 'Marcador en revisión',
-          message: `${currentUser?.name || 'Tu rival'} observó el resultado ${ch.scoreSummary}. El Comité revisará el caso.`,
-          path: '/',
+  const handleSubmitDisputeWithReason = useCallback(
+    async ({ challenge: ch, reasonCategory, reasonText, claimedScore }) => {
+      if (!requireAuth('impugnar un marcador')) return;
+      if (!ch) return;
+      setIsSubmittingDispute(true);
+      try {
+        await runWithLock(`dispute-score-${ch.id}`, async () => {
+          const disputedAt = new Date().toISOString();
+          const disputedByName = currentUser?.name || 'Jugador';
+          const disputeInfo = {
+            reasonCategory: reasonCategory || 'Marcador equivocado',
+            reasonText: String(reasonText || '').trim(),
+            claimedScore: String(claimedScore || '').trim(),
+            disputedById: currentUser?.id || '',
+            disputedByName,
+            disputedAt,
+            proposedById: ch.proposedBy || '',
+            proposedScore: ch.scoreSummary || '',
+          };
+          const formattedNote = `[${disputeInfo.reasonCategory}] ${disputeInfo.reasonText}${
+            disputeInfo.claimedScore ? ` · Marcador reclamado: ${disputeInfo.claimedScore}` : ''
+          } — Impugnado por ${disputedByName} (${formatPeruDate(disputedAt, true)})`;
+
+          const updated = {
+            ...ch,
+            status: 'DISPUTED',
+            disputeNote: formattedNote,
+            disputeInfo,
+            liveScore: {
+              ...(ch.liveScore || {}),
+              _meta: {
+                ...(ch.liveScore?._meta || {}),
+                dispute: disputeInfo,
+              },
+            },
+          };
+
+          setChallenges((prev) => prev.map((c) => (c.id === ch.id ? updated : c)));
+          setDismissedScoreIds((prev) => Array.from(new Set([...prev, ch.id])));
+          await upsertCloudChallenge(updated);
+
+          const otherId =
+            currentUser?.id === ch.playerAId ? ch.playerBId : ch.playerAId;
+          const adminIds = playersRef.current
+            .filter((p) => p.isAdmin && p.id !== currentUser?.id)
+            .map((p) => p.id);
+
+          sendPushNotification({
+            targetPlayerIds: resolvePushRecipients([otherId], playersRef.current),
+            title: '⚠️ Marcador impugnado · En revisión',
+            message: `${disputedByName} impugnó el ${ch.scoreSummary || 'marcador'} ("${disputeInfo.reasonCategory}"). El Administrador revisará con ambos jugadores.`,
+            path: '/',
+          });
+
+          if (adminIds.length > 0) {
+            sendPushNotification({
+              targetPlayerIds: adminIds,
+              title: '⚖️ Nueva disputa en Suite Maestra',
+              message: `${disputedByName} impugnó ${ch.scoreSummary || 'un partido'}: "${disputeInfo.reasonText.slice(0, 90)}"`,
+              path: '/',
+            });
+          }
+
+          triggerHaptic('warning');
+          setDisputeModalTarget(null);
+          showToast(
+            'Impugnación enviada con tu motivo. El partido quedó congelado en revisión por el Comité.',
+            'warning'
+          );
         });
-
-        showToast('Marcador impugnado. El Comité revisará el partido sin mover tus puntos.', 'warning');
-      });
+      } finally {
+        setIsSubmittingDispute(false);
+      }
     },
     [requireAuth, currentUser, showToast]
   );
@@ -2202,6 +2263,8 @@ export default function App() {
                 onCreateChallenge={handleCreateChallenge}
                 onUpdateChallenge={handleUpdateChallenge}
                 onFinalizeMatch={handleFinalizeMatch}
+                onConfirmProposedScore={handleConfirmProposedScore}
+                onDisputeProposedScore={handleDisputeProposedScore}
                 onOpenPlayerProfile={(p) => setInspectPlayerId(p.id)}
                 onOpenStoriesWithMatch={(payload) => setStoriesModal({ open: true, payload })}
                 onOpenAuth={openAuthSheet}
@@ -2639,6 +2702,29 @@ export default function App() {
         )}
       </ModalPortal>
 
+      {/* MODAL DE IMPUGNACIÓN CON MOTIVO OBLIGATORIO (CONGELA EN REVISIÓN) */}
+      <RetosDisputeModal
+        challenge={disputeModalTarget}
+        playerA={
+          disputeModalTarget
+            ? players.find((p) => p.id === disputeModalTarget.playerAId)
+            : null
+        }
+        playerB={
+          disputeModalTarget
+            ? players.find((p) => p.id === disputeModalTarget.playerBId)
+            : null
+        }
+        proposerName={
+          disputeModalTarget
+            ? players.find((p) => p.id === disputeModalTarget.proposedBy)?.name || ''
+            : ''
+        }
+        isSubmitting={isSubmittingDispute}
+        onSubmitDispute={handleSubmitDisputeWithReason}
+        onClose={() => setDisputeModalTarget(null)}
+      />
+
       {/* LOS 10 MODALES GLOBALES */}
       <ProShopAndGemsModal
         isOpen={proShopModal.open}
@@ -2839,14 +2925,155 @@ export default function App() {
           }
         }}
         onAdminResetFloorPoints={handleAdminResetFloorPoints}
-        onAdminResolveDispute={async (chId, action) => {
+        onAdminResolveDispute={async (chId, action, payload = {}) => {
           const target = challenges.find((c) => c.id === chId);
           if (!target) return;
-          if (action === 'CANCEL') {
-            await handleUpdateChallenge(chId, { status: 'DECLINED' });
-            showToast('Encuentro anulado sin impacto en puntos.', 'info');
-          } else if (action === 'CONFIRM') {
-            await handleConfirmProposedScore({ ...target, status: 'SCORE_PROPOSED' });
+          const resolutionNote = String(payload?.adminNote || '').trim();
+
+          if (action === 'CANCEL' || action === 'DISMISS') {
+            await handleUpdateChallenge(chId, {
+              status: 'DECLINED',
+              adminResolutionNote:
+                resolutionNote || 'Marcador desestimado y encuentro anulado por el Comité.',
+            });
+            sendPushNotification({
+              targetPlayerIds: resolvePushRecipients(
+                [target.playerAId, target.playerBId],
+                playersRef.current
+              ),
+              title: 'Resolución del Comité · Partido anulado',
+              message:
+                resolutionNote ||
+                `El Comité desestimó la disputa del encuentro en ${target.clubName} sin impacto en puntos.`,
+              path: '/',
+            });
+            showToast('Marcador desestimado. Partido anulado sin impacto en puntos.', 'info');
+            return;
+          }
+
+          if (action === 'REOPEN') {
+            await handleUpdateChallenge(chId, {
+              status: 'SCHEDULED',
+              disputeNote: '',
+              disputeInfo: null,
+              proposedBy: '',
+              scoreSummary: '',
+              winnerId: null,
+              liveScore: Engine.createEmptyLiveScore(),
+              adminResolutionNote: resolutionNote || 'Reabierto como Programado por el Comité.',
+            });
+            sendPushNotification({
+              targetPlayerIds: resolvePushRecipients(
+                [target.playerAId, target.playerBId],
+                playersRef.current
+              ),
+              title: 'Partido reabierto por el Comité',
+              message: `El partido en ${target.clubName} volvió a estado PROGRAMADO para cargar el resultado acordado.`,
+              path: '/',
+            });
+            showToast('Partido reabierto en estado Programado.', 'success');
+            return;
+          }
+
+          if (action === 'CORRECT') {
+            const pA = playersRef.current.find((p) => p.id === target.playerAId);
+            const pB = playersRef.current.find((p) => p.id === target.playerBId);
+            if (!pA || !pB) return;
+
+            const isOfficial = target.mode !== 'Amistoso';
+            const isWalkover = Boolean(payload?.isWalkover);
+            const walkoverWinnerSide = payload?.walkoverWinnerSide || null;
+            const correctedScore = payload?.liveScore || Engine.createEmptyLiveScore();
+
+            let eloRes;
+            if (isOfficial) {
+              eloRes = Engine.calculateOfficialMatchElo({
+                playerA: pA,
+                playerB: pB,
+                liveScore: correctedScore,
+                challenges,
+                totalActivePlayers: Math.max(playersRef.current.length, 130),
+                isWalkover,
+                walkoverWinnerSide,
+              });
+              if (!eloRes.ok) {
+                showToast(eloRes.error || 'Marcador corregido inválido.', 'warning');
+                return;
+              }
+            } else {
+              const ev = Engine.evaluateMatchScore(correctedScore);
+              if (!isWalkover && (!ev.valid || !ev.finished)) {
+                showToast(ev.error || 'Marcador corregido inválido.', 'warning');
+                return;
+              }
+              eloRes = {
+                ok: true,
+                winnerSide: isWalkover ? walkoverWinnerSide : ev.winnerSide,
+                summary: isWalkover ? 'W.O.' : ev.summary,
+                deltaA: 0,
+                deltaB: 0,
+                newPointsA: pA.points,
+                newPointsB: pB.points,
+              };
+            }
+
+            await applyOfficialMatchResult({
+              challenge: {
+                ...target,
+                adminResolutionNote:
+                  resolutionNote || `Marcador corregido por el Comité (${eloRes.summary}).`,
+              },
+              winnerSide: eloRes.winnerSide,
+              summary: eloRes.summary,
+              deltaA: eloRes.deltaA,
+              deltaB: eloRes.deltaB,
+              newPointsA: eloRes.newPointsA,
+              newPointsB: eloRes.newPointsB,
+              liveScore: {
+                ...correctedScore,
+                _meta: {
+                  ...(target.liveScore?._meta || {}),
+                  adminResolutionNote:
+                    resolutionNote || `Marcador corregido por el Comité (${eloRes.summary}).`,
+                },
+              },
+              isWalkover,
+              autoJumpToRanking: false,
+            });
+            showToast(
+              `Disputa resuelta con marcador oficial corregido: ${eloRes.summary}.`,
+              'success'
+            );
+            return;
+          }
+
+          if (action === 'CONFIRM') {
+            const meta = target.liveScore?._meta || {};
+            const winnerSide = meta.winnerSide || (target.winnerId === target.playerAId ? 'A' : 'B');
+            await applyOfficialMatchResult({
+              challenge: {
+                ...target,
+                adminResolutionNote:
+                  resolutionNote || 'Marcador propuesto confirmado por el Comité.',
+              },
+              winnerSide,
+              summary: target.scoreSummary,
+              deltaA: target.eloDeltaA,
+              deltaB: target.eloDeltaB,
+              newPointsA: meta.newPointsA,
+              newPointsB: meta.newPointsB,
+              liveScore: {
+                ...(target.liveScore || {}),
+                _meta: {
+                  ...meta,
+                  adminResolutionNote:
+                    resolutionNote || 'Marcador propuesto confirmado por el Comité.',
+                },
+              },
+              isWalkover: Boolean(meta.isWalkover),
+              autoJumpToRanking: false,
+            });
+            showToast('Marcador propuesto confirmado oficialmente por el Comité.', 'success');
           }
         }}
         onAdminToggleClubActive={async (clubId, nextActive) => {
@@ -2927,6 +3154,7 @@ export default function App() {
             partnerModalOpen ||
             popupChallenge ||
             scoreConfirmChallenge ||
+            disputeModalTarget ||
             tutorialOpen
         )}
         previewCampaign={previewSponsorCampaign}
