@@ -3,7 +3,7 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 
 /* ==========================================================================
-   SIMULADOR MULTI-BOT E2E TOTAL ("TODO ES TODO") · v4.2 · TOTAL TENIS
+   SIMULADOR MULTI-BOT E2E TOTAL ("TODO ES TODO") · v4.3 · TOTAL TENIS
    Fix v4.1:
    - Todos los clics dentro de modales apuntan a [role="dialog"].last() para
      evitar que .first() intente pulsar un botón detrás del popup abierto.
@@ -323,7 +323,7 @@ async function acceptIncomingChallengeOnB(pageB, challengerFirstName) {
 }
 
 async function runFullSuite() {
-  console.log(`🤖 Iniciando Simulador E2E TOTAL ("TODO ES TODO" v4.2) contra: ${TARGET_URL}`);
+  console.log(`🤖 Iniciando Simulador E2E TOTAL ("TODO ES TODO" v4.3) contra: ${TARGET_URL}`);
   const browser = await chromium.launch({ headless: true });
 
   const botA = await createBotContext(browser, 'Bot-A');
@@ -634,24 +634,34 @@ async function runFullSuite() {
         await botC.page.reload({ waitUntil: 'domcontentloaded' });
         await clickDockTab(botC.page, /Retos/i);
         await clickRetosSubTab(botC.page, 'Tus Desafíos');
-        const refBtn = botC.page
-          .locator('button:has-text("Abrir Modo Árbitro"), button:has-text("Llevar Marcador (Árbitro)")')
-          .first();
+        // Priorizar siempre el partido recién asignado ("Abrir Modo Árbitro") antes que partidos antiguos IN_PLAY
+        let refBtn = botC.page.locator('button:has-text("Abrir Modo Árbitro")').first();
+        if (!(await refBtn.isVisible().catch(() => false))) {
+          refBtn = botC.page.locator('button:has-text("Llevar Marcador (Árbitro)")').first();
+        }
         if (await refBtn.isVisible().catch(() => false)) {
           await refBtn.click({ timeout: 5000 });
-          await botC.page.waitForTimeout(500);
+          await botC.page.waitForTimeout(550);
           const refDlg = botC.page.locator('[role="dialog"]').last();
-          for (let g = 0; g < 6; g += 1) {
-            await refDlg.locator('.tt-step-plus').first().click({ timeout: 4000 });
-            await botC.page.waitForTimeout(160);
+          const closeRefBtn = refDlg
+            .locator('button:has-text("Cerrar Marcador y Enviar a Revisión"), button:has-text("Confirmar Resultado Oficial")')
+            .first();
+
+          // Sumar games dinámicamente y frenar apenas el partido llegue a 6-0, 6-0 (sin colgarse si ya tenía games)
+          for (let g = 0; g < 16; g += 1) {
+            if (await closeRefBtn.isVisible().catch(() => false)) break;
+            const plusBtn = refDlg.locator('.tt-step-plus:not([disabled])').first();
+            if (!(await plusBtn.isVisible().catch(() => false))) {
+              await botC.page.waitForTimeout(300);
+              if (await closeRefBtn.isVisible().catch(() => false)) break;
+              continue;
+            }
+            await plusBtn.click({ timeout: 4000 });
+            await botC.page.waitForTimeout(170);
           }
-          await botC.page.waitForTimeout(350);
-          for (let g = 0; g < 6; g += 1) {
-            await refDlg.locator('.tt-step-plus').first().click({ timeout: 4000 });
-            await botC.page.waitForTimeout(160);
-          }
+
           await botC.page.waitForTimeout(450);
-          const closeRefBtn = refDlg.locator('button:has-text("Cerrar Marcador y Enviar a Revisión")').first();
+          await takeShot(botC.page, '06-modo-arbitro.png');
           if (await closeRefBtn.isVisible().catch(() => false)) {
             await closeRefBtn.click({ timeout: 5000 });
             await botC.page.waitForTimeout(1400);
@@ -755,8 +765,11 @@ async function runFullSuite() {
           .locator('[role="dialog"][aria-label*="Estudio de Foto"]')
           .isVisible()
           .catch(() => false));
+        const avatarSrcAfter =
+          (await botA.page.locator('.tt-pf-avatar-wrap img').first().getAttribute('src').catch(() => '')) || '';
+        const avatarUpdatedCloud = Boolean(avatarSrcAfter && (avatarSrcAfter.includes('supabase') || avatarSrcAfter.includes('/avatars/') || avatarSrcAfter.startsWith('http')));
         photoStudioOk = hasFileInput && slidersCount >= 4 && canSave && modalClosed;
-        photoDetail = `SubidaPNG=${hasFileInput}, Sliders=${slidersCount}/4, GuardadoEnNube=${modalClosed}`;
+        photoDetail = `SubidaPNG=${hasFileInput}, Sliders=${slidersCount}/4, GuardadoEnNube=${modalClosed}, AvatarActivo=${avatarUpdatedCloud}`;
       } else {
         photoDetail = 'No se encontró el botón de Estudio de Foto y Fondos en Perfil.';
       }
@@ -898,13 +911,14 @@ async function runFullSuite() {
         .first();
       let forgotScreenVisible = false;
       if (await forgotBtn.isVisible().catch(() => false)) {
+        await forgotBtn.scrollIntoViewIfNeeded().catch(() => {});
         await forgotBtn.click({ timeout: 5000 });
         await guest.page.waitForTimeout(550);
-        forgotScreenVisible = await authDlg
-          .locator('input, button:has-text("Enviar"), text=/Recuperar|Restablecer|correo|celular/i')
-          .first()
-          .isVisible()
-          .catch(() => false);
+        const forgotDlgText = await authDlg.innerText().catch(() => '');
+        const hasForgotInput = await authDlg.locator('input').first().isVisible().catch(() => false);
+        forgotScreenVisible = Boolean(
+          hasForgotInput && /recuperar|restablecer|correo|celular|enlace|clave/i.test(forgotDlgText)
+        );
         await takeShot(guest.page, '11-recuperar-contrasena-form.png');
       }
 
@@ -1078,7 +1092,7 @@ async function runFullSuite() {
   const healthPct = totalCount > 0 ? Math.round((passedCount / totalCount) * 100) : 0;
 
   const mdLines = [
-    `# 🤖 Reporte Simulador Multi-Bot E2E TOTAL ("TODO ES TODO" v4.2) · TOTAL TENIS`,
+    `# 🤖 Reporte Simulador Multi-Bot E2E TOTAL ("TODO ES TODO" v4.3) · TOTAL TENIS`,
     `- **URL probada:** ${TARGET_URL}`,
     `- **Salud E2E Global:** **${passedCount}/${totalCount} pruebas aprobadas (${healthPct}%)**`,
     `- **Errores JS (pageerror):** ${pageErrors.length}`,
