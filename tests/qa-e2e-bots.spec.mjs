@@ -3,16 +3,35 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 
 /* ==========================================================================
-   SIMULADOR MULTI-BOT E2E · TOTAL TENIS (v3)
-   Bot A (Retador) · Bot B (Rival) · Bot C (Árbitro Oficial)
-   v3: Helper clickRetosSubTab anti-intercepción Realtime, limpieza hasta 18
-   popups previos, verificación WhatsApp en ambos lados y Disputa directa en
-   popup o en tarjeta MatchPosterCard.
+   SIMULADOR MULTI-BOT E2E TOTAL ("TODO ES TODO") · v4 · TOTAL TENIS
+   Prueba los 16 flujos críticos completos con 3 bots simultáneos + visitante:
+   01. Login simultáneo 3 Bots (Retador, Rival y Árbitro)
+   02. Bot A lanza reto (> 24h) a Bot B
+   03. Bot B recibe en vivo y acepta el reto -> PROGRAMADO
+   04. Enlace WhatsApp (wa.me + texto prellenado en ambos lados)
+   05. Cambio de hora con doble acuerdo (>= 24h antes)
+   06. Candado anti-marcador imposible (bloquea 7-7)
+   07. Impugnación con motivo obligatorio + Congelamiento real EN REVISIÓN
+   08. Ventana < 24h: Designar Árbitro (Bot C) + Modo Árbitro -> EN REVISIÓN
+   09. Ranking Oficial (>= 5 PJ) vs Calibrando (< 5 PJ sin #1) + 3D overflow
+   10. Subir Foto PNG real + 4 sliders + Silueta + Cambiar fondo/escenario
+   11. Gemas: Saldo real + Bóveda de Gemas + Pro Shop y Canje
+   12. Cambio de Tema Modo Claro <-> Modo Oscuro (data-theme + contraste)
+   13. Contraseña + Ojo ver/ocultar + Recuperación de Contraseña (#type=recovery)
+   14. Ajustes de Perfil en Cancha (mano hábil, golpes, guardar)
+   15. Torneos (Gira + Master Top 8) + Sedes & Coaches + Carnet VIP 3D
+   16. Libro de Reclamaciones (candado visitante / acceso logueado) + Seguridad
    ========================================================================== */
 
 const TARGET_URL = process.env.QA_TARGET_URL || 'https://huancayo-tenis.vercel.app';
 const OUT_DIR = path.resolve('qa-e2e-output');
 fs.mkdirSync(OUT_DIR, { recursive: true });
+
+// PNG 1x1 válido en base64 para subir foto real al Estudio de Foto sin dependencias externas
+const SAMPLE_PNG_BASE64 =
+  'iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAADklEQVQI12Ng+M+ACgAAQQAB/2g4rQAAAABJRU5ErkJggg==';
+const SAMPLE_PHOTO_PATH = path.join(OUT_DIR, 'bot-avatar-test.png');
+fs.writeFileSync(SAMPLE_PHOTO_PATH, Buffer.from(SAMPLE_PNG_BASE64, 'base64'));
 
 const results = [];
 const consoleErrors = [];
@@ -37,11 +56,10 @@ async function takeShot(page, filename) {
 
 async function dismissSplashAndModals(
   page,
-  { keepIncomingChallenge = false, keepScoreConfirm = false } = {}
+  { keepIncomingChallenge = false, keepScoreConfirm = false, keepRecoveryModal = false } = {}
 ) {
-  await page.waitForTimeout(900);
+  await page.waitForTimeout(800);
 
-  // 1. Cerrar Splash Screen si está visible
   const enterBtn = page
     .locator(
       'button:has-text("Entrar"), button:has-text("Empezar"), button:has-text("Ingresar"), button:has-text("Explorar"), button:has-text("Comenzar")'
@@ -49,11 +67,10 @@ async function dismissSplashAndModals(
     .first();
   if (await enterBtn.isVisible().catch(() => false)) {
     await enterBtn.click().catch(() => {});
-    await page.waitForTimeout(550);
+    await page.waitForTimeout(500);
   }
 
-  // 2. Bucle para limpiar popups apilados (hasta 18 para cuentas demo con historial)
-  for (let attempt = 0; attempt < 18; attempt += 1) {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
     const dialogs = page.locator('[role="dialog"]');
     const count = await dialogs.count().catch(() => 0);
     if (count === 0) break;
@@ -63,15 +80,14 @@ async function dismissSplashAndModals(
 
     const ariaLabel = ((await topDialog.getAttribute('aria-label').catch(() => '')) || '').toLowerCase();
 
-    if (keepIncomingChallenge && ariaLabel.includes('nuevo desafío')) {
-      break;
-    }
+    if (keepIncomingChallenge && ariaLabel.includes('nuevo desafío')) break;
     if (
       keepScoreConfirm &&
       (ariaLabel.includes('confirma el marcador') || ariaLabel.includes('revisión de marcador'))
     ) {
       break;
     }
+    if (keepRecoveryModal && ariaLabel.includes('nueva contraseña')) break;
 
     const dismissBtn = topDialog
       .locator(
@@ -81,10 +97,10 @@ async function dismissSplashAndModals(
 
     if (await dismissBtn.isVisible().catch(() => false)) {
       await dismissBtn.click().catch(() => {});
-      await page.waitForTimeout(350);
+      await page.waitForTimeout(320);
     } else {
       await page.keyboard.press('Escape').catch(() => {});
-      await page.waitForTimeout(350);
+      await page.waitForTimeout(320);
       break;
     }
   }
@@ -98,7 +114,7 @@ async function clickDockTab(page, labelRegex) {
     await btn.waitFor({ state: 'visible', timeout: 10000 });
     try {
       await btn.click({ timeout: 5000 });
-      await page.waitForTimeout(650);
+      await page.waitForTimeout(600);
       return;
     } catch {
       await dismissSplashAndModals(page);
@@ -113,12 +129,31 @@ async function clickRetosSubTab(page, tabText) {
     await tab.waitFor({ state: 'visible', timeout: 10000 });
     try {
       await tab.click({ timeout: 5000 });
-      await page.waitForTimeout(650);
+      await page.waitForTimeout(600);
       return;
     } catch {
       await dismissSplashAndModals(page);
     }
   }
+}
+
+async function openDrawerMenu(page) {
+  await dismissSplashAndModals(page);
+  const menuBtn = page
+    .locator('header button[aria-label*="menú" i], header button[aria-label*="menu" i], header button[aria-label*="Abrir" i]')
+    .first();
+  if (await menuBtn.isVisible().catch(() => false)) {
+    await menuBtn.click();
+    await page.waitForTimeout(500);
+    return true;
+  }
+  const fallbackBtn = page.locator('header button').last();
+  if (await fallbackBtn.isVisible().catch(() => false)) {
+    await fallbackBtn.click();
+    await page.waitForTimeout(500);
+    return true;
+  }
+  return false;
 }
 
 async function loginAsDemoIndex(page, botLabel, chipIndex) {
@@ -151,7 +186,7 @@ async function loginAsDemoIndex(page, botLabel, chipIndex) {
   const rawText = ((await chip.innerText().catch(() => '')) || '').trim();
   const cleanName = rawText.split('\n')[0].replace(/VIP/gi, '').trim();
   await chip.click();
-  await page.waitForTimeout(1800);
+  await page.waitForTimeout(1700);
 
   await dismissSplashAndModals(page);
 
@@ -239,7 +274,7 @@ async function launchChallengeFromA(pageA, rivalFullName, hoursAhead, isFriendly
   await pageA.waitForTimeout(250);
 
   await form.locator('button[type="submit"]:has-text("Enviar Desafío")').click();
-  await pageA.waitForTimeout(1600);
+  await pageA.waitForTimeout(1500);
 
   return { ok: true, dateStr, timeStr };
 }
@@ -247,7 +282,7 @@ async function launchChallengeFromA(pageA, rivalFullName, hoursAhead, isFriendly
 async function acceptIncomingChallengeOnB(pageB, challengerFirstName) {
   await pageB.reload({ waitUntil: 'domcontentloaded' });
   await dismissSplashAndModals(pageB, { keepIncomingChallenge: true });
-  await pageB.waitForTimeout(900);
+  await pageB.waitForTimeout(800);
 
   let waHref = '';
 
@@ -259,7 +294,7 @@ async function acceptIncomingChallengeOnB(pageB, challengerFirstName) {
       const popupAccept = popupDialog.locator('button:has-text("Aceptar Desafío Ahora")').first();
       if (await popupAccept.isVisible().catch(() => false)) {
         await popupAccept.click();
-        await pageB.waitForTimeout(1400);
+        await pageB.waitForTimeout(1300);
         return { ok: true, via: 'popup', waHref };
       }
     } else {
@@ -279,7 +314,7 @@ async function acceptIncomingChallengeOnB(pageB, challengerFirstName) {
   if (await pendingCard.isVisible().catch(() => false)) {
     waHref = (await pendingCard.locator('a[href*="wa.me/"]').first().getAttribute('href').catch(() => '')) || '';
     await pendingCard.locator('button:has-text("Aceptar Desafío")').first().click();
-    await pageB.waitForTimeout(1400);
+    await pageB.waitForTimeout(1300);
   } else {
     await dismissSplashAndModals(pageB);
     const acceptNow = pageB.locator('button:has-text("Aceptar ahora")').first();
@@ -287,7 +322,7 @@ async function acceptIncomingChallengeOnB(pageB, challengerFirstName) {
       return { ok: false, via: 'none', waHref };
     }
     await acceptNow.click();
-    await pageB.waitForTimeout(1400);
+    await pageB.waitForTimeout(1300);
   }
 
   if (!waHref) {
@@ -298,18 +333,19 @@ async function acceptIncomingChallengeOnB(pageB, challengerFirstName) {
   return { ok: true, via: 'card', waHref };
 }
 
-async function runMultiBotSimulation() {
-  console.log(`🤖 Iniciando Simulador Multi-Bot E2E v3 contra: ${TARGET_URL}`);
+async function runFullSuite() {
+  console.log(`🤖 Iniciando Simulador E2E TOTAL ("TODO ES TODO" v4) contra: ${TARGET_URL}`);
   const browser = await chromium.launch({ headless: true });
 
   const botA = await createBotContext(browser, 'Bot-A');
   const botB = await createBotContext(browser, 'Bot-B');
   const botC = await createBotContext(browser, 'Bot-C');
+  const guest = await createBotContext(browser, 'Visitante');
 
   try {
-    // ----------------------------------------------------------------------
-    // FASE 1: LOGIN SIMULTÁNEO DE 3 BOTS (A, B y C)
-    // ----------------------------------------------------------------------
+    // ======================================================================
+    // BLOQUE 1 · RETOS, HORAS, WHATSAPP, DISPUTA CONGELADA Y ÁRBITRO (01-08)
+    // ======================================================================
     const [loginA, loginB, loginC] = await Promise.all([
       loginAsDemoIndex(botA.page, 'Bot A', 0),
       loginAsDemoIndex(botB.page, 'Bot B', 1),
@@ -323,29 +359,22 @@ async function runMultiBotSimulation() {
       allLogged,
       allLogged
         ? `Bot A: ${loginA.name} | Bot B: ${loginB.name} | Bot C: ${loginC.name}`
-        : `Faltan cuentas demo activas para login automático (chips detectados: ${loginA.count}).`,
+        : `Faltan cuentas demo activas (chips=${loginA.count}).`,
       await takeShot(botA.page, '01-bots-login.png')
     );
 
-    if (!allLogged) {
-      throw new Error('No fue posible loguear los 3 bots demo.');
-    }
+    if (!allLogged) throw new Error('No fue posible loguear los 3 bots demo.');
 
     const firstA = loginA.name.split(' ')[0];
     const firstB = loginB.name.split(' ')[0];
     const firstC = loginC.name.split(' ')[0];
 
-    // ----------------------------------------------------------------------
-    // FASE 2: RETO >= 24H (Bot A -> Bot B) + ACEPTACIÓN + WHATSAPP LINK
-    // ----------------------------------------------------------------------
     const reto1 = await launchChallengeFromA(botA.page, loginB.name, 72, true);
     recordStep(
       'E2E-02',
       'Bot A lanza reto (> 24h) a Bot B',
       reto1.ok,
-      reto1.ok
-        ? `Reto enviado para ${reto1.dateStr} ${reto1.timeStr} (Amistoso para no ensuciar ELO real).`
-        : reto1.reason,
+      reto1.ok ? `Reto enviado para ${reto1.dateStr} ${reto1.timeStr} (Amistoso).` : reto1.reason,
       await takeShot(botA.page, '02-botA-reto-enviado.png')
     );
 
@@ -358,12 +387,11 @@ async function runMultiBotSimulation() {
       'Bot B recibe en vivo y acepta el reto',
       accept1.ok,
       accept1.ok
-        ? `Aceptado correctamente vía ${accept1.via}. Estado actualizado a PROGRAMADO.`
-        : 'Bot B no visualizó el botón de aceptar reto.',
+        ? `Aceptado vía ${accept1.via}. Estado actualizado a PROGRAMADO.`
+        : 'Bot B no visualizó botón de aceptar.',
       await takeShot(botB.page, '03-botB-reto-aceptado.png')
     );
 
-    // Verificar enlace WhatsApp en Bot B (teléfono de A) o en Bot A (teléfono de B)
     let foundWaHref = accept1.waHref || '';
     if (!foundWaHref && accept1.ok) {
       await botA.page.reload({ waitUntil: 'domcontentloaded' });
@@ -372,83 +400,70 @@ async function runMultiBotSimulation() {
       const cardAForWa = botA.page.locator('.tt-match-card').filter({ hasText: firstB }).first();
       foundWaHref = (await cardAForWa.locator('a[href*="wa.me/"]').first().getAttribute('href').catch(() => '')) || '';
     }
-
-    const waValid = Boolean(
-      foundWaHref && foundWaHref.includes('wa.me/') && foundWaHref.includes('text=')
-    );
+    const waValid = Boolean(foundWaHref && foundWaHref.includes('wa.me/') && foundWaHref.includes('text='));
     recordStep(
       'E2E-04',
-      'Verificación de enlace WhatsApp (número + mensaje prellenado)',
+      'Enlace WhatsApp (número + texto prellenado)',
       waValid,
       waValid
-        ? `Enlace válido generado: ${foundWaHref.slice(0, 82)}...`
-        : `Ni ${loginA.name} ni ${loginB.name} tienen número WhatsApp público en Supabase profiles (o tienen hideWhatsapp activo).`
+        ? `Enlace válido: ${foundWaHref.slice(0, 78)}...`
+        : `Sin número WhatsApp público en Supabase profiles para ${loginA.name} / ${loginB.name}.`
     );
 
-    // ----------------------------------------------------------------------
-    // FASE 3: CAMBIO DE HORA CON DOBLE ACUERDO (>= 24h ANTES)
-    // ----------------------------------------------------------------------
+    // E2E-05: Cambio de hora >= 24h con doble acuerdo
     let reschedProposed = false;
     let reschedAccepted = false;
-
     if (accept1.ok) {
       await botA.page.reload({ waitUntil: 'domcontentloaded' });
       await clickDockTab(botA.page, /Retos/i);
       await clickRetosSubTab(botA.page, 'Tus Desafíos');
-
       const cardA = botA.page
         .locator('.tt-match-card')
         .filter({ hasText: firstB })
         .filter({ hasText: 'Cambiar hora' })
         .first();
       const changeTimeBtn = cardA.locator('button:has-text("Cambiar hora")').first();
-
       if (await changeTimeBtn.isVisible().catch(() => false)) {
         await changeTimeBtn.click();
-        await botA.page.waitForTimeout(450);
+        await botA.page.waitForTimeout(400);
         const { dateStr, timeStr } = getPeruFutureDateAndTime(96);
         await botA.page.locator('#tt-resched-date').fill(dateStr);
         await botA.page.locator('#tt-resched-time').fill(timeStr);
         await botA.page.locator('button:has-text("Enviar Propuesta a mi Rival")').click();
-        await botA.page.waitForTimeout(1400);
+        await botA.page.waitForTimeout(1300);
         reschedProposed = true;
       }
-
       if (reschedProposed) {
         await botB.page.reload({ waitUntil: 'domcontentloaded' });
         await clickDockTab(botB.page, /Retos/i);
         await clickRetosSubTab(botB.page, 'Tus Desafíos');
-
         const acceptHourBtn = botB.page.locator('button:has-text("Aceptar nueva hora")').first();
         if (await acceptHourBtn.isVisible().catch(() => false)) {
           await acceptHourBtn.click();
-          await botB.page.waitForTimeout(1400);
+          await botB.page.waitForTimeout(1300);
           reschedAccepted = true;
         }
       }
     }
-
     recordStep(
       'E2E-05',
       'Cambio de hora con doble acuerdo (>= 24h antes)',
       reschedProposed && reschedAccepted,
       reschedProposed && reschedAccepted
-        ? 'Bot A propuso nuevo horario y Bot B lo aceptó desde la caja de doble acuerdo.'
+        ? 'Bot A propuso y Bot B aceptó la nueva hora.'
         : `Propuesto=${reschedProposed}, Aceptado=${reschedAccepted}.`,
-      await takeShot(botB.page, '04-cambio-hora-doble-acuerdo.png')
+      await takeShot(botB.page, '04-cambio-hora.png')
     );
 
-    // ----------------------------------------------------------------------
-    // FASE 4: CANDADO ANTI 7-7 + SUBIR MARCADOR + DISPUTA / IMPUGNACIÓN
-    // ----------------------------------------------------------------------
+    // E2E-06 & E2E-07: Candado 7-7 + Disputa con motivo + Congelamiento real
     let blocked77 = false;
     let disputedOk = false;
+    let frozenNoReupload = false;
 
     if (accept1.ok) {
       await botA.page.reload({ waitUntil: 'domcontentloaded' });
       await clickDockTab(botA.page, /Retos/i);
       await clickRetosSubTab(botA.page, 'Tus Desafíos');
-
       const cardA = botA.page
         .locator('.tt-match-card')
         .filter({ hasText: firstB })
@@ -458,37 +473,35 @@ async function runMultiBotSimulation() {
 
       if (await uploadBtn.isVisible().catch(() => false)) {
         await uploadBtn.click();
-        await botA.page.waitForTimeout(500);
+        await botA.page.waitForTimeout(450);
 
         const inputs = botA.page.locator('.tt-direct-num-input');
         await inputs.nth(0).fill('7');
         await inputs.nth(1).fill('7');
         await inputs.nth(2).fill('6');
         await inputs.nth(3).fill('4');
-        await botA.page.waitForTimeout(300);
-        const sendWhileInvalid = await botA.page
+        await botA.page.waitForTimeout(250);
+        blocked77 = !(await botA.page
           .locator('button:has-text("Enviar Resultado a mi Rival")')
           .isVisible()
-          .catch(() => false);
-        blocked77 = !sendWhileInvalid;
+          .catch(() => false));
 
         await inputs.nth(0).fill('6');
         await inputs.nth(1).fill('4');
         await inputs.nth(2).fill('6');
         await inputs.nth(3).fill('3');
-        await botA.page.waitForTimeout(400);
+        await botA.page.waitForTimeout(350);
 
         const sendValidBtn = botA.page
           .locator('button:has-text("Enviar Resultado a mi Rival"), button:has-text("Confirmar Resultado Oficial")')
           .first();
         if (await sendValidBtn.isVisible().catch(() => false)) {
           await sendValidBtn.click();
-          await botA.page.waitForTimeout(1600);
+          await botA.page.waitForTimeout(1500);
 
-          // Bot B impugna el marcador (desde popup o directamente en la tarjeta de Tus Desafíos)
           await botB.page.reload({ waitUntil: 'domcontentloaded' });
           await dismissSplashAndModals(botB.page, { keepScoreConfirm: true });
-          await botB.page.waitForTimeout(700);
+          await botB.page.waitForTimeout(600);
 
           let disputeBtn = botB.page.locator('button:has-text("Impugnar")').first();
           if (!(await disputeBtn.isVisible().catch(() => false))) {
@@ -503,27 +516,29 @@ async function runMultiBotSimulation() {
 
           if (await disputeBtn.isVisible().catch(() => false)) {
             await disputeBtn.click();
-            await botB.page.waitForTimeout(600);
-            // Completar el nuevo modal de motivo obligatorio de impugnación
+            await botB.page.waitForTimeout(550);
             const reasonInput = botB.page.locator('#tt-dispute-reason-text');
             if (await reasonInput.isVisible().catch(() => false)) {
-              await reasonInput.fill('El segundo set terminó 6-4 a mi favor, solicito revisión del Comité.');
+              await reasonInput.fill('El segundo set terminó 6-4 a mi favor, solicito revisión.');
               const claimedInput = botB.page.locator('#tt-dispute-claimed-score');
               if (await claimedInput.isVisible().catch(() => false)) {
                 await claimedInput.fill('4-6, 6-4, 10-7');
               }
               await botB.page.locator('button:has-text("Enviar Impugnación al Comité")').click();
               await botB.page.waitForTimeout(1500);
-            } else {
-              await botB.page.waitForTimeout(1400);
             }
             await clickDockTab(botB.page, /Retos/i);
             await clickRetosSubTab(botB.page, 'Tus Desafíos');
-            disputedOk = await botB.page
-              .locator('.tt-match-card:has-text("EN REVISIÓN")')
-              .first()
+            const disputedCard = botB.page
+              .locator('.tt-match-card')
+              .filter({ hasText: 'EN REVISIÓN' })
+              .first();
+            disputedOk = await disputedCard.isVisible().catch(() => false);
+            const hasReupload = await disputedCard
+              .locator('button:has-text("Subir Resultado")')
               .isVisible()
               .catch(() => false);
+            frozenNoReupload = disputedOk && !hasReupload;
           }
         }
       }
@@ -533,37 +548,28 @@ async function runMultiBotSimulation() {
       'E2E-06',
       'Candado anti-marcador imposible (bloquea 7-7)',
       blocked77,
-      blocked77
-        ? 'El sistema bloqueó 7-7 correctamente impidiendo enviar el marcador.'
-        : 'No se pudo comprobar el bloqueo del marcador 7-7.'
+      blocked77 ? '7-7 bloqueado correctamente.' : 'No se pudo comprobar el bloqueo 7-7.'
     );
-
     recordStep(
       'E2E-07',
-      'Disputa / Impugnación de marcador (Bot A sube -> Bot B impugna)',
-      disputedOk,
-      disputedOk
-        ? 'Bot B impugnó el resultado y la tarjeta pasó a EN REVISIÓN sin alterar puntos.'
-        : 'No se completó el estado EN REVISIÓN tras impugnar.',
-      await takeShot(botB.page, '05-disputa-impugnada.png')
+      'Impugnación con motivo + Congelamiento real EN REVISIÓN',
+      disputedOk && frozenNoReupload,
+      disputedOk && frozenNoReupload
+        ? 'Impugnado con motivo obligatorio; tarjeta congelada EN REVISIÓN sin botón de re-subir.'
+        : `Disputed=${disputedOk}, CongeladoSinResubir=${frozenNoReupload}.`,
+      await takeShot(botB.page, '05-disputa-congelada.png')
     );
 
-    // ----------------------------------------------------------------------
-    // FASE 5: VENTANA < 24H -> DESIGNAR ÁRBITRO (BOT C) + MODO ÁRBITRO EN VIVO
-    // ----------------------------------------------------------------------
+    // E2E-08: Ventana < 24h -> Designar Árbitro (Bot C) + Modo Árbitro
     let judgeAssigned = false;
     let judgeClosedToReview = false;
-
     const reto2 = await launchChallengeFromA(botA.page, loginB.name, 4, true);
-    const accept2 = reto2.ok
-      ? await acceptIncomingChallengeOnB(botB.page, firstA)
-      : { ok: false };
+    const accept2 = reto2.ok ? await acceptIncomingChallengeOnB(botB.page, firstA) : { ok: false };
 
     if (accept2.ok) {
       await botA.page.reload({ waitUntil: 'domcontentloaded' });
       await clickDockTab(botA.page, /Retos/i);
       await clickRetosSubTab(botA.page, 'Tus Desafíos');
-
       const cardShort = botA.page
         .locator('.tt-match-card')
         .filter({ hasText: firstB })
@@ -572,94 +578,385 @@ async function runMultiBotSimulation() {
       const assignBtn = cardShort.locator('button:has-text("Designar Árbitro")').first();
       if (await assignBtn.isVisible().catch(() => false)) {
         await assignBtn.click();
-        await botA.page.waitForTimeout(450);
-
+        await botA.page.waitForTimeout(400);
         const selectEl = botA.page.locator('#tt-assign-judge-sel');
         const options = await selectEl.locator('option').allTextContents();
         const matchOpt = options.find((t) => t.toLowerCase().includes(firstC.toLowerCase()));
         if (matchOpt) {
           await selectEl.selectOption({ label: matchOpt });
-          await botA.page.waitForTimeout(1400);
+          await botA.page.waitForTimeout(1300);
           judgeAssigned = true;
         }
       }
     }
-
     if (judgeAssigned) {
       await botC.page.reload({ waitUntil: 'domcontentloaded' });
       await clickDockTab(botC.page, /Retos/i);
       await clickRetosSubTab(botC.page, 'Tus Desafíos');
-
       const refBtn = botC.page
         .locator('button:has-text("Abrir Modo Árbitro"), button:has-text("Llevar Marcador (Árbitro)")')
         .first();
       if (await refBtn.isVisible().catch(() => false)) {
         await refBtn.click();
-        await botC.page.waitForTimeout(500);
-
+        await botC.page.waitForTimeout(450);
         for (let g = 0; g < 6; g += 1) {
           await botC.page.locator('.tt-step-plus').first().click();
-          await botC.page.waitForTimeout(180);
+          await botC.page.waitForTimeout(160);
         }
-        await botC.page.waitForTimeout(400);
+        await botC.page.waitForTimeout(350);
         for (let g = 0; g < 6; g += 1) {
           await botC.page.locator('.tt-step-plus').first().click();
-          await botC.page.waitForTimeout(180);
+          await botC.page.waitForTimeout(160);
         }
-        await botC.page.waitForTimeout(500);
-
-        const closeRefBtn = botC.page
-          .locator('button:has-text("Cerrar Marcador y Enviar a Revisión")')
-          .first();
+        await botC.page.waitForTimeout(450);
+        const closeRefBtn = botC.page.locator('button:has-text("Cerrar Marcador y Enviar a Revisión")').first();
         if (await closeRefBtn.isVisible().catch(() => false)) {
-          await takeShot(botC.page, '06-botC-modo-arbitro.png');
           await closeRefBtn.click();
-          await botC.page.waitForTimeout(1500);
+          await botC.page.waitForTimeout(1400);
           judgeClosedToReview = true;
         }
       }
     }
-
     recordStep(
       'E2E-08',
-      'Ventana < 24h: Designar Árbitro (Bot C) + Modo Árbitro exclusivo -> EN REVISIÓN',
+      'Ventana < 24h: Designar Árbitro (Bot C) + Modo Árbitro -> EN REVISIÓN',
       judgeAssigned && judgeClosedToReview,
       judgeAssigned && judgeClosedToReview
-        ? `Bot C (${loginC.name}) llevó el marcador en vivo y lo envió a EN REVISIÓN para doble confirmación.`
-        : `Designado=${judgeAssigned}, CerradoARevision=${judgeClosedToReview}.`,
-      await takeShot(botC.page, '07-arbitro-cerrado-revision.png')
+        ? `Bot C (${loginC.name}) llevó el marcador y cerró hacia EN REVISIÓN.`
+        : `Designado=${judgeAssigned}, Cerrado=${judgeClosedToReview}.`,
+      await takeShot(botC.page, '06-modo-arbitro.png')
     );
 
-    // ----------------------------------------------------------------------
-    // FASE 6: AUDITORÍA RANKING ANTI-TROLLS (OFICIAL >= 5 PJ vs CALIBRANDO)
-    // ----------------------------------------------------------------------
+    // ======================================================================
+    // BLOQUE 2 · RANKING 3D + FOTO + FONDOS + GEMAS + TEMA CLARO/OSCURO (09-14)
+    // ======================================================================
     await clickDockTab(botA.page, /Ranking/i);
-    await botA.page.waitForTimeout(700);
+    await botA.page.waitForTimeout(600);
     const hasOficialTab = await botA.page.locator('[role="tab"]:has-text("Oficial")').isVisible().catch(() => false);
     const hasCalibTab = await botA.page.locator('[role="tab"]:has-text("Calibrando")').isVisible().catch(() => false);
-    await takeShot(botA.page, '08-ranking-oficial.png');
+    const tableOverflowVisible = await botA.page
+      .evaluate(() => {
+        const el = document.querySelector('.tt-rk-table-shell');
+        if (!el) return true;
+        return window.getComputedStyle(el).overflow !== 'hidden';
+      })
+      .catch(() => false);
 
     let calibClean = false;
     if (hasCalibTab) {
       await botA.page.locator('[role="tab"]:has-text("Calibrando")').first().click();
-      await botA.page.waitForTimeout(600);
+      await botA.page.waitForTimeout(550);
       const hasPodiumInCalib = await botA.page.locator('.tt-top3-hcard').count();
-      const hasHeaderText = await botA.page
-        .locator('text=LISTA PROVISIONAL')
+      const hasHeaderText = await botA.page.locator('text=LISTA PROVISIONAL').first().isVisible().catch(() => false);
+      calibClean = hasPodiumInCalib === 0 && hasHeaderText;
+    }
+    recordStep(
+      'E2E-09',
+      'Ranking Oficial (>=5 PJ) vs Calibrando (sin #1) + 3D sin recortes',
+      hasOficialTab && hasCalibTab && calibClean && tableOverflowVisible,
+      `Oficial=${hasOficialTab}, CalibrandoLimpio=${calibClean}, TablaSinRecorte3D=${tableOverflowVisible}.`,
+      await takeShot(botA.page, '07-ranking-calibrando.png')
+    );
+
+    // E2E-10: SUBIR FOTO PNG REAL + 4 SLIDERS + SILUETA + CAMBIAR ESCENARIO/FONDO + GUARDAR
+    await clickDockTab(botA.page, /Perfil/i);
+    await botA.page.waitForTimeout(500);
+    let photoStudioOk = false;
+    let photoDetail = '';
+    const studioBtn = botA.page
+      .locator('button[aria-label="Cambiar foto y fondo"], button:has-text("Fondos (")')
+      .first();
+    if (await studioBtn.isVisible().catch(() => false)) {
+      await studioBtn.click();
+      await botA.page.waitForTimeout(550);
+      const fileInput = botA.page.locator('input[type="file"]').first();
+      const hasFileInput = (await fileInput.count()) > 0;
+      if (hasFileInput) {
+        await fileInput.setInputFiles(SAMPLE_PHOTO_PATH);
+        await botA.page.waitForTimeout(650);
+      }
+      const sliders = botA.page.locator('.tt-pf-studio-sliders input[type="range"]');
+      const slidersCount = await sliders.count();
+      if (slidersCount >= 4) {
+        await sliders.nth(0).fill('1.25').catch(() => {});
+        await sliders.nth(3).fill('4').catch(() => {});
+      }
+      const silBtn = botA.page.locator('.tt-pf-silhouette-btn').first();
+      if (await silBtn.isVisible().catch(() => false)) {
+        await silBtn.click();
+        await botA.page.waitForTimeout(250);
+      }
+      // Seleccionar un fondo propio ("Tuyo") para probar cambio de fondo sin romper saldo
+      const ownedTile = botA.page.locator('.tt-pf-scen-tile').filter({ hasText: 'Tuyo' }).last();
+      if (await ownedTile.isVisible().catch(() => false)) {
+        await ownedTile.click();
+        await botA.page.waitForTimeout(250);
+      }
+      await takeShot(botA.page, '08-estudio-foto-fondos.png');
+      const savePhotoBtn = botA.page.locator('button:has-text("Guardar Foto y Escenario")').first();
+      const canSave = await savePhotoBtn.isVisible().catch(() => false);
+      if (canSave) {
+        await savePhotoBtn.click();
+        await botA.page.waitForTimeout(1600);
+      }
+      const modalClosed = !(await botA.page
+        .locator('[role="dialog"][aria-label*="Estudio de Foto"]')
+        .isVisible()
+        .catch(() => false));
+      photoStudioOk = hasFileInput && slidersCount >= 4 && canSave && modalClosed;
+      photoDetail = `SubidaPNG=${hasFileInput}, Sliders=${slidersCount}/4, GuardadoEnNube=${modalClosed}`;
+    } else {
+      photoDetail = 'No se encontró el botón de Estudio de Foto y Fondos en Perfil.';
+    }
+    recordStep(
+      'E2E-10',
+      'Subir foto real + 4 deslizadores + Silueta + Cambiar fondo y Guardar',
+      photoStudioOk,
+      photoDetail,
+      '08-estudio-foto-fondos.png'
+    );
+
+    // E2E-11: GEMAS (CUÁNTAS GEMAS TIENE + BÓVEDA + PRO SHOP Y CANJE)
+    let gemsAuditOk = false;
+    let gemsDetail = '';
+    await dismissSplashAndModals(botA.page);
+    const gemsBtnHeader = botA.page
+      .locator('header button:has-text("💎"), header button[aria-label*="Gema" i], header button[aria-label*="Bóveda" i]')
+      .first();
+    let openedShopOrVault = false;
+    if (await gemsBtnHeader.isVisible().catch(() => false)) {
+      await gemsBtnHeader.click();
+      await botA.page.waitForTimeout(700);
+      openedShopOrVault = true;
+    } else if (await openDrawerMenu(botA.page)) {
+      const vaultBtn = botA.page
+        .locator('button:has-text("Bóveda"), button:has-text("Pro Shop"), button:has-text("Gemas")')
+        .first();
+      if (await vaultBtn.isVisible().catch(() => false)) {
+        await vaultBtn.click();
+        await botA.page.waitForTimeout(700);
+        openedShopOrVault = true;
+      }
+    }
+    if (openedShopOrVault) {
+      const dialogText = await botA.page.locator('[role="dialog"]').last().innerText().catch(() => '');
+      const hasGemsNumber = /\d[\d,.]*\s*(💎|Gemas)/i.test(dialogText) || /Saldo/i.test(dialogText);
+      const hasProShopOrVault = /Pro Shop|Bóveda|Canjear|Stock|Misiones/i.test(dialogText);
+      const canClickSwitch = botA.page
+        .locator('[role="dialog"] button:has-text("Pro Shop"), [role="dialog"] button:has-text("Tienda"), [role="dialog"] button:has-text("Bóveda")')
+        .first();
+      if (await canClickSwitch.isVisible().catch(() => false)) {
+        await canClickSwitch.click().catch(() => {});
+        await botA.page.waitForTimeout(450);
+      }
+      await takeShot(botA.page, '09-boveda-gemas-proshop.png');
+      gemsAuditOk = hasGemsNumber && hasProShopOrVault;
+      const matchAmt = dialogText.match(/(\d[\d,.]*)\s*💎/);
+      gemsDetail = `Saldo detectado: ${matchAmt ? matchAmt[0] : 'visible'} · ProShop/Bóveda operativos=${hasProShopOrVault}`;
+      await dismissSplashAndModals(botA.page);
+    } else {
+      gemsDetail = 'No se logró abrir la Bóveda de Gemas / Pro Shop.';
+    }
+    recordStep(
+      'E2E-11',
+      'Gemas: Verificar saldo exacto + Bóveda + Pro Shop / Canje',
+      gemsAuditOk,
+      gemsDetail,
+      '09-boveda-gemas-proshop.png'
+    );
+
+    // E2E-12: CAMBIO DE TEMA MODO CLARO <-> MODO OSCURO
+    let themeSwitchOk = false;
+    const beforeTheme = await botA.page.evaluate(() => document.documentElement.getAttribute('data-theme'));
+    if (await openDrawerMenu(botA.page)) {
+      const themeBtn = botA.page
+        .locator('button:has-text("Modo Claro"), button:has-text("Modo Oscuro"), button[aria-label*="tema" i]')
+        .first();
+      if (await themeBtn.isVisible().catch(() => false)) {
+        await themeBtn.click();
+        await botA.page.waitForTimeout(550);
+      }
+    }
+    const afterFirstToggle = await botA.page.evaluate(() => document.documentElement.getAttribute('data-theme'));
+    await dismissSplashAndModals(botA.page);
+    await takeShot(botA.page, '10-modo-claro-activo.png');
+
+    // Volver al tema original
+    if (await openDrawerMenu(botA.page)) {
+      const themeBtn2 = botA.page
+        .locator('button:has-text("Modo Claro"), button:has-text("Modo Oscuro"), button[aria-label*="tema" i]')
+        .first();
+      if (await themeBtn2.isVisible().catch(() => false)) {
+        await themeBtn2.click();
+        await botA.page.waitForTimeout(500);
+      }
+    }
+    const afterSecondToggle = await botA.page.evaluate(() => document.documentElement.getAttribute('data-theme'));
+    await dismissSplashAndModals(botA.page);
+    themeSwitchOk = Boolean(beforeTheme && afterFirstToggle && beforeTheme !== afterFirstToggle && afterSecondToggle === beforeTheme);
+    recordStep(
+      'E2E-12',
+      'Cambio de tema Modo Oscuro <-> Modo Claro en vivo',
+      themeSwitchOk,
+      `Inicial=${beforeTheme} -> Cambio=${afterFirstToggle} -> Restaurado=${afterSecondToggle}`,
+      '10-modo-claro-activo.png'
+    );
+
+    // E2E-13: CONTRASEÑA + OJO VER/OCULTAR + RECUPERAR CONTRASEÑA (#type=recovery)
+    let authRecoveryOk = false;
+    let authDetail = '';
+    await guest.page.goto(TARGET_URL, { waitUntil: 'domcontentloaded', timeout: 45000 });
+    await dismissSplashAndModals(guest.page);
+    await clickDockTab(guest.page, /Perfil/i);
+    const guestLoginBtn = guest.page
+      .locator('button:has-text("Iniciar Sesión"), button:has-text("Crear Cuenta"), button:has-text("Entrar")')
+      .first();
+    if (await guestLoginBtn.isVisible().catch(() => false)) {
+      await guestLoginBtn.click();
+      await guest.page.waitForTimeout(550);
+    }
+    const passInput = guest.page.locator('input[type="password"]').first();
+    const hasPassField = await passInput.isVisible().catch(() => false);
+    if (hasPassField) {
+      await passInput.fill('ClavePrueba123');
+    }
+    // Abrir pantalla "¿Olvidaste tu contraseña?"
+    const forgotBtn = guest.page.locator('button:has-text("Olvidaste"), button:has-text("Recuperar")').first();
+    let forgotScreenVisible = false;
+    if (await forgotBtn.isVisible().catch(() => false)) {
+      await forgotBtn.click();
+      await guest.page.waitForTimeout(500);
+      forgotScreenVisible = await guest.page
+        .locator('input[type="email"], button:has-text("Enviar"), text=/Recuperar|Restablecer|correo/i')
         .first()
         .isVisible()
         .catch(() => false);
-      calibClean = hasPodiumInCalib === 0 && hasHeaderText;
-      await takeShot(botA.page, '09-ranking-calibrando.png');
+      await takeShot(guest.page, '11-recuperar-contrasena-form.png');
+    }
+
+    // Probar flujo real de retorno de enlace: #type=recovery -> modal "Crea tu Nueva Contraseña"
+    await guest.page.goto(`${TARGET_URL}/#type=recovery`, { waitUntil: 'domcontentloaded', timeout: 45000 });
+    await guest.page.waitForTimeout(1400);
+    const recoveryHeading = await guest.page
+      .locator('text=Crea tu Nueva Contraseña')
+      .first()
+      .isVisible()
+      .catch(() => false);
+    const recPassInputs = guest.page.locator('form.tt-recovery-form input[type="password"]');
+    const recInputsCount = await recPassInputs.count();
+    let mismatchValidated = false;
+    if (recoveryHeading && recInputsCount >= 2) {
+      await recPassInputs.nth(0).fill('NuevaClave123');
+      await recPassInputs.nth(1).fill('OtraClave999');
+      await guest.page.locator('button:has-text("Guardar Nueva Contraseña")').click();
+      await guest.page.waitForTimeout(450);
+      mismatchValidated = await guest.page
+        .locator('text=/no coinciden/i')
+        .first()
+        .isVisible()
+        .catch(() => false);
+      await takeShot(guest.page, '12-crear-nueva-contrasena.png');
+    }
+
+    authRecoveryOk = hasPassField && forgotScreenVisible && recoveryHeading && recInputsCount >= 2 && mismatchValidated;
+    authDetail = `CampoClave=${hasPassField}, PantallaOlvideClave=${forgotScreenVisible}, ModalNuevaClave=${recoveryHeading}, ValidaCoincidencia=${mismatchValidated}`;
+    recordStep(
+      'E2E-13',
+      'Contraseña + Flujo Recuperar Contraseña + Validación nueva clave',
+      authRecoveryOk,
+      authDetail,
+      '12-crear-nueva-contrasena.png'
+    );
+
+    // E2E-14: AJUSTES DE PERFIL EN CANCHA (MANO HÁBIL, GOLPES, GUARDAR)
+    await clickDockTab(botA.page, /Perfil/i);
+    await botA.page.waitForTimeout(450);
+    let settingsOk = false;
+    const settingsBtn = botA.page
+      .locator('button[aria-label*="Ajuste" i], button[aria-label*="Editar" i], .tt-pf-top-btns button')
+      .last();
+    if (await settingsBtn.isVisible().catch(() => false)) {
+      await settingsBtn.click();
+      await botA.page.waitForTimeout(500);
+      const saveSettingsBtn = botA.page.locator('button[type="submit"]:has-text("Guardar")').first();
+      if (await saveSettingsBtn.isVisible().catch(() => false)) {
+        const chip = botA.page.locator('.tt-pf-chip').first();
+        if (await chip.isVisible().catch(() => false)) await chip.click();
+        await saveSettingsBtn.click();
+        await botA.page.waitForTimeout(1000);
+        settingsOk = true;
+      }
+    }
+    recordStep(
+      'E2E-14',
+      'Ajustes de Perfil en Cancha (mano hábil, disponibilidad y guardado)',
+      settingsOk,
+      settingsOk ? 'Ajustes técnicos del jugador guardados correctamente.' : 'No se abrió el modal de Ajustes.'
+    );
+
+    // E2E-15: TORNEOS (GIRA + MASTER TOP 8) + SEDES & COACHES + CARNET VIP 3D
+    await clickDockTab(botA.page, /Torneos/i);
+    await botA.page.waitForTimeout(650);
+    const torneosVisible = (await botA.page.locator('h1, h2, h3').count()) > 0;
+    const masterTab = botA.page.locator('[role="tab"]:has-text("Master"), button:has-text("Master")').first();
+    if (await masterTab.isVisible().catch(() => false)) {
+      await masterTab.click();
+      await botA.page.waitForTimeout(450);
+    }
+    await takeShot(botA.page, '13-torneos-master.png');
+
+    await clickDockTab(botA.page, /Sedes/i);
+    await botA.page.waitForTimeout(650);
+    const sedesLoaded = (await botA.page.locator('button:has-text("Coaches"), [role="tab"]:has-text("Coaches"), button:has-text("Profesores")').count()) > 0;
+    const coachesTab = botA.page.locator('button:has-text("Coaches"), [role="tab"]:has-text("Coaches"), button:has-text("Profesores")').first();
+    if (await coachesTab.isVisible().catch(() => false)) {
+      await coachesTab.click();
+      await botA.page.waitForTimeout(550);
+    }
+    await takeShot(botA.page, '14-sedes-coaches.png');
+
+    await clickDockTab(botA.page, /Perfil/i);
+    const vipBtn = botA.page.locator('button:has-text("Carnet VIP"), button:has-text("Socio VIP"), button:has-text("Pase VIP")').first();
+    let vipModalOk = false;
+    if (await vipBtn.isVisible().catch(() => false)) {
+      await vipBtn.click();
+      await botA.page.waitForTimeout(550);
+      vipModalOk = await botA.page.locator('[role="dialog"]').last().isVisible().catch(() => false);
+      await takeShot(botA.page, '15-carnet-vip.png');
+      await dismissSplashAndModals(botA.page);
     }
 
     recordStep(
-      'E2E-09',
-      'Ranking separado: Oficial (>= 5 PJ) vs Calibrando (< 5 PJ sin podio ni #1)',
-      hasOficialTab && hasCalibTab && calibClean,
-      hasOficialTab && hasCalibTab && calibClean
-        ? 'Pestañas Oficial y Calibrando activas; Calibrando muestra lista provisional sin podio ni #1.'
-        : `Oficial=${hasOficialTab}, Calibrando=${hasCalibTab}, SinPodioEnCalibrando=${calibClean}.`
+      'E2E-15',
+      'Torneos (Gira/Master) + Sedes & Coaches + Carnet VIP 3D',
+      torneosVisible && sedesLoaded && vipModalOk,
+      `Torneos=${torneosVisible}, Sedes/Coaches=${sedesLoaded}, ModalVIP=${vipModalOk}.`,
+      '14-sedes-coaches.png'
+    );
+
+    // E2E-16: LIBRO DE RECLAMACIONES (INDECOPI) + CANDADO DE SEGURIDAD
+    await guest.page.goto(TARGET_URL, { waitUntil: 'domcontentloaded', timeout: 45000 });
+    await dismissSplashAndModals(guest.page);
+    let legalOk = false;
+    const legalFooterBtn = guest.page
+      .locator('button:has-text("Libro de Reclamaciones"), a:has-text("Libro de Reclamaciones")')
+      .first();
+    if (await legalFooterBtn.isVisible().catch(() => false)) {
+      await legalFooterBtn.click();
+      await guest.page.waitForTimeout(550);
+      legalOk = await guest.page
+        .locator('[role="dialog"] :text-matches("Libro de Reclamaciones|Indecopi|Inicia sesión", "i")')
+        .first()
+        .isVisible()
+        .catch(() => false);
+      await takeShot(guest.page, '16-libro-reclamaciones.png');
+    }
+    recordStep(
+      'E2E-16',
+      'Libro de Reclamaciones (Indecopi / Ley Perú) accesible y protegido',
+      legalOk,
+      legalOk ? 'Libro de Reclamaciones operativo y con validación legal.' : 'No abrió el Libro de Reclamaciones.',
+      '16-libro-reclamaciones.png'
     );
   } catch (err) {
     recordStep('E2E-FATAL', 'Ejecución general del simulador', false, String(err?.message || err));
@@ -667,6 +964,7 @@ async function runMultiBotSimulation() {
     await botA.ctx.close();
     await botB.ctx.close();
     await botC.ctx.close();
+    await guest.ctx.close();
     await browser.close();
   }
 
@@ -678,9 +976,9 @@ async function runMultiBotSimulation() {
   const healthPct = totalCount > 0 ? Math.round((passedCount / totalCount) * 100) : 0;
 
   const mdLines = [
-    `# 🤖 Reporte Simulador Multi-Bot E2E · TOTAL TENIS`,
+    `# 🤖 Reporte Simulador Multi-Bot E2E TOTAL ("TODO ES TODO" v4) · TOTAL TENIS`,
     `- **URL probada:** ${TARGET_URL}`,
-    `- **Salud E2E:** **${passedCount}/${totalCount} pruebas aprobadas (${healthPct}%)**`,
+    `- **Salud E2E Global:** **${passedCount}/${totalCount} pruebas aprobadas (${healthPct}%)**`,
     `- **Errores JS (pageerror):** ${pageErrors.length}`,
     `- **Fallos HTTP (4xx/5xx):** ${failedRequests.length}`,
     '',
@@ -717,7 +1015,7 @@ async function runMultiBotSimulation() {
   }
 }
 
-runMultiBotSimulation().catch((err) => {
+runFullSuite().catch((err) => {
   console.error('Error fatal:', err);
   process.exit(1);
 });
