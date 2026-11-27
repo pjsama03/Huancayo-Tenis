@@ -14,6 +14,7 @@ import {
   getCategoryFloorPoints,
 } from '../utils/cloudService';
 import { AdminSponsorsManager } from '../components/SponsorPlacements';
+import AdminDisputesPanel from '../components/AdminDisputesPanel';
 
 /* ==========================================================================
    CONFIGURACIÓN DEL PANEL ADMIN (SIN PIN EN FRONTEND · SE VALIDA EN SERVIDOR)
@@ -31,6 +32,7 @@ export const ADMIN_SUITE_EDITABLE_CONFIG = {
 
 const ADMIN_TABS = [
   { id: 'pagos', label: 'Pagos & VIP' },
+  { id: 'disputas', label: 'Disputas' },
   { id: 'cuentas', label: 'Cuentas & Auth' },
   { id: 'temporadas', label: 'Temporadas' },
   { id: 'clubshop', label: 'Club & Shop' },
@@ -270,7 +272,7 @@ function downloadExcelCsv(filename, headers, rows) {
 
 /* ==========================================================================
    COMPONENTE PRINCIPAL: AdminSuiteModal
-   (PIN BLINDADO EN SERVIDOR + CENTRO AUTH + SPONSORS 3 NIVELES + 3D TÁCTIL)
+   (PIN SERVIDOR + CENTRO DISPUTAS HUMANO + CENTRO AUTH + SPONSORS + 3D)
    ========================================================================== */
 export default function AdminSuiteModal({
   isOpen = false,
@@ -487,7 +489,13 @@ export default function AdminSuiteModal({
   }, [isOpen, isUnlocked, activeTab, fetchR2LiveStats]);
 
   useEffect(() => {
-    if (isOpen && isUnlocked && activeTab === 'cuentas' && verifiedPin && !authDirectory.synced) {
+    if (
+      isOpen &&
+      isUnlocked &&
+      (activeTab === 'cuentas' || activeTab === 'disputas') &&
+      verifiedPin &&
+      !authDirectory.synced
+    ) {
       fetchAuthDirectory(verifiedPin);
     }
   }, [isOpen, isUnlocked, activeTab, verifiedPin, authDirectory.synced, fetchAuthDirectory]);
@@ -550,11 +558,13 @@ export default function AdminSuiteModal({
     return rows;
   }, [tournaments, playersMap]);
 
-  const disputedChallenges = useMemo(
-    () =>
-      (challenges || []).filter(
-        (c) => c.status === 'DISPUTED' || c.status === 'SCORE_PROPOSED' || c.status === 'IN_PLAY'
-      ),
+  const activeDisputesCount = useMemo(
+    () => (challenges || []).filter((c) => c.status === 'DISPUTED').length,
+    [challenges]
+  );
+
+  const pendingScoreReviewCount = useMemo(
+    () => (challenges || []).filter((c) => c.status === 'SCORE_PROPOSED').length,
     [challenges]
   );
 
@@ -1068,6 +1078,7 @@ export default function AdminSuiteModal({
     : r2MB >= 5120
     ? { label: 'ALERTA > 5 GB', cls: 'is-gold' }
     : { label: 'SEGURO · S/ 0.00', cls: 'is-emerald' };
+
   return (
     <ModalPortal
       isOpen={isOpen}
@@ -1086,8 +1097,8 @@ export default function AdminSuiteModal({
             </div>
             <h3>Acceso Restringido del Organizador</h3>
             <p>
-              Ingresa tu PIN maestro privado (validado en servidor) para aprobar pagos, recuperar
-              cuentas, controlar temporadas y exportar respaldos.
+              Ingresa tu PIN maestro privado (validado en servidor) para aprobar pagos, resolver
+              disputas, recuperar cuentas, controlar temporadas y exportar respaldos.
             </p>
             <input
               type="password"
@@ -1127,10 +1138,10 @@ export default function AdminSuiteModal({
                 <strong>{players.filter((p) => p.isVip).length}</strong>
                 <small>{pendingVipPlayers.length} pendientes</small>
               </div>
-              <div className="is-emerald">
-                <span>PAGOS TORNEO</span>
-                <strong>{pendingTournamentRequests.length}</strong>
-                <small>en revisión</small>
+              <div className={activeDisputesCount > 0 ? 'is-danger' : 'is-emerald'}>
+                <span>DISPUTAS</span>
+                <strong>{activeDisputesCount}</strong>
+                <small>{pendingScoreReviewCount} por confirmar</small>
               </div>
               <div>
                 <span>TEMPORADA</span>
@@ -1139,22 +1150,58 @@ export default function AdminSuiteModal({
               </div>
             </div>
 
+            {activeDisputesCount > 0 && activeTab !== 'disputas' && (
+              <button
+                type="button"
+                className="tt-adm-dispute-banner"
+                onClick={() => {
+                  triggerHaptic('medium');
+                  setActiveTab('disputas');
+                }}
+              >
+                <span>
+                  ⚖️ Tienes <b>{activeDisputesCount}</b>{' '}
+                  {activeDisputesCount === 1
+                    ? 'partido impugnado en revisión'
+                    : 'partidos impugnados en revisión'}
+                </span>
+                <strong>Resolver ahora →</strong>
+              </button>
+            )}
+
             <div className="tt-adm-tabs" role="tablist">
-              {ADMIN_TABS.map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === tab.id}
-                  className={`tt-adm-tab ${activeTab === tab.id ? 'is-active' : ''}`}
-                  onClick={() => {
-                    triggerHaptic('light');
-                    setActiveTab(tab.id);
-                  }}
-                >
-                  {tab.label}
-                </button>
-              ))}
+              {ADMIN_TABS.map((tab) => {
+                const badgeCount =
+                  tab.id === 'disputas'
+                    ? activeDisputesCount
+                    : tab.id === 'pagos'
+                    ? pendingVipPlayers.length + pendingTournamentRequests.length
+                    : 0;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === tab.id}
+                    className={`tt-adm-tab ${activeTab === tab.id ? 'is-active' : ''}`}
+                    onClick={() => {
+                      triggerHaptic('light');
+                      setActiveTab(tab.id);
+                    }}
+                  >
+                    <span>{tab.label}</span>
+                    {badgeCount > 0 && (
+                      <span
+                        className={`tt-adm-tab-badge ${
+                          tab.id === 'disputas' ? 'is-danger' : 'is-gold'
+                        }`}
+                      >
+                        {badgeCount}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
 
             {/* 1. PAGOS & VIP */}
@@ -1263,7 +1310,18 @@ export default function AdminSuiteModal({
               </div>
             )}
 
-            {/* 2. CUENTAS, DIRECTORIO REAL DE CORREOS AUTH & RECUPERACIÓN */}
+            {/* 2. CENTRO DE DISPUTAS Y VALIDACIÓN HUMANA */}
+            {activeTab === 'disputas' && (
+              <AdminDisputesPanel
+                challenges={challenges}
+                players={players}
+                authByIdMap={authByIdMap}
+                onResolveDispute={onAdminResolveDispute}
+                onNotify={onNotify}
+              />
+            )}
+
+            {/* 3. CUENTAS, DIRECTORIO REAL DE CORREOS AUTH & RECUPERACIÓN */}
             {activeTab === 'cuentas' && (
               <div className="tt-adm-stack">
                 {!verifiedPin ? (
@@ -1638,7 +1696,7 @@ export default function AdminSuiteModal({
               </div>
             )}
 
-            {/* 3. TEMPORADAS AUTÓNOMAS 00:00 + RESET AL PISO + EXCEPCIONES */}
+            {/* 4. TEMPORADAS AUTÓNOMAS 00:00 + RESET AL PISO + EXCEPCIONES */}
             {activeTab === 'temporadas' && (
               <div className="tt-adm-stack">
                 <form
@@ -1920,51 +1978,40 @@ export default function AdminSuiteModal({
                 </div>
 
                 <div className="tt-adm-panel">
-                  <span className="tt-adm-kicker">DISPUTAS Y MARCADORES EN CURSO</span>
-                  {disputedChallenges.length === 0 ? (
-                    <p className="tt-adm-empty">Sin disputas abiertas.</p>
-                  ) : (
-                    <div className="tt-adm-list">
-                      {disputedChallenges.map((ch) => (
-                        <div key={ch.id} className="tt-adm-row">
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <strong>
-                              {playersMap[ch.playerAId]?.name || 'A'} vs.{' '}
-                              {playersMap[ch.playerBId]?.name || 'B'}
-                            </strong>
-                            <small>
-                              {ch.clubName} · {ch.scoreSummary || ch.status}
-                            </small>
-                          </div>
-                          {onAdminResolveDispute && (
-                            <div style={{ display: 'flex', gap: 5 }}>
-                              {(ch.status === 'DISPUTED' || ch.status === 'SCORE_PROPOSED') && (
-                                <button
-                                  type="button"
-                                  className="tt-adm-chip is-emerald"
-                                  onClick={() => onAdminResolveDispute(ch.id, 'CONFIRM')}
-                                >
-                                  Validar
-                                </button>
-                              )}
-                              <button
-                                type="button"
-                                className="tt-adm-chip is-danger"
-                                onClick={() => onAdminResolveDispute(ch.id, 'CANCEL')}
-                              >
-                                Anular
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      ))}
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: 8,
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <div>
+                      <span className="tt-adm-kicker" style={{ margin: 0 }}>
+                        CENTRO DE DISPUTAS Y VALIDACIÓN HUMANA
+                      </span>
+                      <p className="tt-adm-subcopy" style={{ marginTop: 3 }}>
+                        {activeDisputesCount} impugnado{activeDisputesCount === 1 ? '' : 's'} en
+                        revisión · {pendingScoreReviewCount} esperando firma del rival.
+                      </p>
                     </div>
-                  )}
+                    <button
+                      type="button"
+                      className="tt-adm-btn-gold is-sm"
+                      onClick={() => {
+                        triggerHaptic('light');
+                        setActiveTab('disputas');
+                      }}
+                    >
+                      Abrir Disputas →
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
 
-            {/* 4. CLUBES ON/OFF */}
+            {/* 5. CLUBES ON/OFF */}
             {activeTab === 'clubshop' && (
               <div className="tt-adm-stack">
                 <div className="tt-adm-panel">
@@ -2013,7 +2060,7 @@ export default function AdminSuiteModal({
               </div>
             )}
 
-            {/* 5. MOTOR COMERCIAL DE PATROCINADORES (3 NIVELES + MÉTRICAS) */}
+            {/* 6. MOTOR COMERCIAL DE PATROCINADORES (3 NIVELES + MÉTRICAS) */}
             {activeTab === 'sponsors' && (
               <AdminSponsorsManager
                 sponsorsConfig={sponsorsConfig || sponsors}
@@ -2038,7 +2085,7 @@ export default function AdminSuiteModal({
               />
             )}
 
-            {/* 6. LIBRO DE RECLAMACIONES */}
+            {/* 7. LIBRO DE RECLAMACIONES */}
             {activeTab === 'reclamaciones' && (
               <div className="tt-adm-panel">
                 <span className="tt-adm-kicker">
@@ -2121,7 +2168,7 @@ export default function AdminSuiteModal({
               </div>
             )}
 
-            {/* 7. MONITOR DEL ECOSISTEMA (R2 EN VIVO) + RESPALDO EXCEL + PURGA DEMO */}
+            {/* 8. MONITOR DEL ECOSISTEMA (R2 EN VIVO) + RESPALDO EXCEL + PURGA DEMO */}
             {activeTab === 'respaldo' && (
               <div className="tt-adm-stack">
                 <div
@@ -2418,9 +2465,35 @@ export default function AdminSuiteModal({
         .tt-adm-kpi-grid .is-emerald strong {
           color: #22F397;
         }
+        .tt-adm-kpi-grid .is-danger {
+          border-color: rgba(248, 113, 113, 0.65);
+          background: linear-gradient(180deg, rgba(239, 68, 68, 0.25) 0%, #24071B 100%);
+        }
+        .tt-adm-kpi-grid .is-danger strong {
+          color: #FCA5A5;
+        }
         .tt-adm-kpi-grid small {
           font-size: 0.64rem;
           color: rgba(250, 249, 245, 0.7);
+        }
+        .tt-adm-dispute-banner {
+          width: 100%;
+          padding: 10px 13px;
+          border-radius: 14px;
+          background: linear-gradient(135deg, rgba(239, 68, 68, 0.26) 0%, rgba(185, 28, 28, 0.18) 100%);
+          border: 1.5px solid rgba(248, 113, 113, 0.65);
+          color: #FEE2E2;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          font-size: 0.77rem;
+          cursor: pointer;
+          text-align: left;
+        }
+        .tt-adm-dispute-banner strong {
+          color: #FCA5A5;
+          white-space: nowrap;
         }
         .tt-adm-tabs {
           display: flex;
@@ -2437,6 +2510,9 @@ export default function AdminSuiteModal({
           min-height: 38px;
           padding: 0 13px;
           border-radius: 12px;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
           background: linear-gradient(180deg, #321357 0%, #20093B 100%);
           border: 1.5px solid rgba(255, 255, 255, 0.16);
           color: rgba(250, 249, 245, 0.86);
@@ -2458,6 +2534,25 @@ export default function AdminSuiteModal({
             inset 0 1px 0 rgba(255, 255, 255, 0.72),
             0 3px 0 #007540,
             0 6px 14px rgba(0, 220, 125, 0.28);
+        }
+        .tt-adm-tab-badge {
+          min-width: 18px;
+          height: 18px;
+          padding: 0 5px;
+          border-radius: 999px;
+          font-size: 0.62rem;
+          font-weight: 900;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .tt-adm-tab-badge.is-danger {
+          background: #EF4444;
+          color: #FFFFFF;
+        }
+        .tt-adm-tab-badge.is-gold {
+          background: #E5C16C;
+          color: #1A1002;
         }
         .tt-adm-panel {
           padding: 14px;
