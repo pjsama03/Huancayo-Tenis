@@ -490,30 +490,75 @@ export function getAdaptiveK(player, totalActivePlayers = 130) {
   return baseK;
 }
 
+const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+const PERU_OFFSET_MS = -5 * 60 * 60 * 1000;
+
 export function getMondayStartOfWeek(refDate = new Date()) {
-  const d = new Date(refDate);
-  const day = d.getDay();
-  const diffToMonday = day === 0 ? -6 : 1 - day;
-  d.setDate(d.getDate() + diffToMonday);
-  d.setHours(0, 0, 0, 0);
-  return d.getTime();
+  const rawTs = refDate instanceof Date ? refDate.getTime() : new Date(refDate || Date.now()).getTime();
+  const safeTs = Number.isNaN(rawTs) ? Date.now() : rawTs;
+  // Convertir a hora local de Perú (UTC-5 fijo, sin horario de verano)
+  const peruShifted = new Date(safeTs + PERU_OFFSET_MS);
+  const utcDay = peruShifted.getUTCDay(); // 0=Dom, 1=Lun ... 6=Sáb
+  const diffToMonday = utcDay === 0 ? -6 : 1 - utcDay;
+  const mondayPeruUtcMs = Date.UTC(
+    peruShifted.getUTCFullYear(),
+    peruShifted.getUTCMonth(),
+    peruShifted.getUTCDate() + diffToMonday,
+    0,
+    0,
+    0,
+    0
+  );
+  // Volver de hora Perú (UTC-5) a timestamp UTC real (00:00 Perú = 05:00 UTC)
+  return mondayPeruUtcMs - PERU_OFFSET_MS;
 }
 
-export function getWeeklyRematchMultiplier(challenges = [], playerAId, playerBId, refDate = new Date()) {
+export function getWeeklyRematchMultiplier(
+  challenges = [],
+  playerAId,
+  playerBId,
+  refDate = new Date(),
+  excludeChallengeId = null
+) {
   const mondayTs = getMondayStartOfWeek(refDate);
-  const matchesThisWeek = (challenges || []).filter((ch) => {
-    if (ch.status !== 'FINISHED' || ch.mode === 'Amistoso') return false;
+  const nextMondayTs = mondayTs + ONE_WEEK_MS;
+
+  const matchesInTargetWeek = (challenges || []).filter((ch) => {
+    if (!ch || ch.status !== 'FINISHED' || ch.mode === 'Amistoso') return false;
+    if (excludeChallengeId && ch.id === excludeChallengeId) return false;
     const samePair =
       (ch.playerAId === playerAId && ch.playerBId === playerBId) ||
       (ch.playerAId === playerBId && ch.playerBId === playerAId);
     if (!samePair) return false;
-    const ts = new Date(ch.finishedAt || ch.scheduledIso || 0).getTime();
-    return ts >= mondayTs;
+    const ts = new Date(ch.scheduledIso || ch.scheduledAt || ch.finishedAt || 0).getTime();
+    return Number.isFinite(ts) && ts >= mondayTs && ts < nextMondayTs;
   }).length;
 
-  if (matchesThisWeek === 0) return { multiplier: 1.0, matchIndexThisWeek: 1, label: '1er duelo semanal (100%)' };
-  if (matchesThisWeek === 1) return { multiplier: 0.75, matchIndexThisWeek: 2, label: 'Revancha semanal (75%)' };
-  return { multiplier: 0.5, matchIndexThisWeek: matchesThisWeek + 1, label: '3er+ duelo semanal (50%)' };
+  if (matchesInTargetWeek === 0) {
+    return {
+      multiplier: 1.0,
+      matchIndexThisWeek: 1,
+      label: '1er duelo de esa semana (100%)',
+      weekStartTs: mondayTs,
+      weekEndTs: nextMondayTs,
+    };
+  }
+  if (matchesInTargetWeek === 1) {
+    return {
+      multiplier: 0.75,
+      matchIndexThisWeek: 2,
+      label: 'Revancha misma semana (75%)',
+      weekStartTs: mondayTs,
+      weekEndTs: nextMondayTs,
+    };
+  }
+  return {
+    multiplier: 0.5,
+    matchIndexThisWeek: matchesInTargetWeek + 1,
+    label: '3er+ duelo misma semana (50%)',
+    weekStartTs: mondayTs,
+    weekEndTs: nextMondayTs,
+  };
 }
 
 function scoreSingleSetDominance(setEval) {
@@ -589,7 +634,14 @@ export function computeFiniteCagePercentages(matchEval) {
   };
 }
 
-export function getPreMatchForecast(playerA, playerB, challenges = [], totalActivePlayers = 130) {
+export function getPreMatchForecast(
+  playerA,
+  playerB,
+  challenges = [],
+  totalActivePlayers = 130,
+  refDate = new Date(),
+  excludeChallengeId = null
+) {
   const pA = Number(playerA?.points) || 0;
   const pB = Number(playerB?.points) || 0;
   const expA = getExpectedProbability(pA, pB);
@@ -597,7 +649,13 @@ export function getPreMatchForecast(playerA, playerB, challenges = [], totalActi
 
   const kA = getAdaptiveK(playerA, totalActivePlayers);
   const kB = getAdaptiveK(playerB, totalActivePlayers);
-  const rematch = getWeeklyRematchMultiplier(challenges, playerA?.id, playerB?.id);
+  const rematch = getWeeklyRematchMultiplier(
+    challenges,
+    playerA?.id,
+    playerB?.id,
+    refDate,
+    excludeChallengeId
+  );
 
   const ceilingWinA = Math.max(8, Math.round(kA * (1 - expA) * rematch.multiplier));
   const ceilingLossA = -Math.max(8, Math.round(kA * expA * rematch.multiplier));
@@ -630,10 +688,19 @@ export function calculateOfficialMatchElo({
   totalActivePlayers = 130,
   isWalkover = false,
   walkoverWinnerSide = null,
+  refDate = null,
+  challengeId = null,
 }) {
   const rA = Number(playerA?.points) || 0;
   const rB = Number(playerB?.points) || 0;
-  const forecast = getPreMatchForecast(playerA, playerB, challenges, totalActivePlayers);
+  const forecast = getPreMatchForecast(
+    playerA,
+    playerB,
+    challenges,
+    totalActivePlayers,
+    refDate || new Date(),
+    challengeId
+  );
 
   let winnerSide = walkoverWinnerSide;
   let winPct = ELO_CONFIG.WALKOVER_WIN_PCT;
@@ -803,6 +870,75 @@ export function computeMasterTop8Race(seasonSnapshots, players = [], divisionFil
      Pasadas las 6h sin resultado -> expira sin penalidad y desaparece de Retos.
    - Resultados confirmados: visibles en Retos durante 72h (3 días).
    ========================================================================== */
+
+export const DEFAULT_MATCH_BLOCK_MINUTES = 90;
+
+export function validateChallengeScheduleDate(targetIso, nowMs = Date.now(), minAheadMinutes = 5) {
+  const ts = new Date(targetIso || 0).getTime();
+  if (!Number.isFinite(ts) || ts <= 0) {
+    return { ok: false, reason: 'Fecha u hora inválida. Selecciona un horario válido.' };
+  }
+  if (ts < nowMs + minAheadMinutes * 60 * 1000) {
+    return {
+      ok: false,
+      reason: 'No puedes pactar ni mover un partido a una fecha u hora que ya pasó.',
+    };
+  }
+  return { ok: true, timestamp: ts };
+}
+
+/**
+ * Detecta choques de horario (por defecto ±90 min) para evitar que un jugador
+ * tenga dos partidos a la misma hora o superpuestos el mismo día.
+ * - Para `challengerId` (quien crea/acepta/mueve): bloquea contra PENDING (salvo que
+ *   `onlyConfirmedForSelf` sea true), SCHEDULED e IN_PLAY.
+ * - Para `rivalId`: bloquea contra SCHEDULED e IN_PLAY (así nadie bloquea su agenda con
+ *   retos PENDING sin aceptar, pero sí protege sus partidos ya confirmados).
+ */
+export function findScheduleConflict(
+  challenges = [],
+  {
+    challengerId = null,
+    rivalId = null,
+    targetIso,
+    excludeChallengeId = null,
+    blockMinutes = DEFAULT_MATCH_BLOCK_MINUTES,
+    onlyConfirmedForSelf = false,
+    nowMs = Date.now(),
+  } = {}
+) {
+  const targetTs = new Date(targetIso || 0).getTime();
+  if (!Number.isFinite(targetTs) || targetTs <= 0) return { conflict: false };
+  const windowMs = Math.max(30, Number(blockMinutes) || DEFAULT_MATCH_BLOCK_MINUTES) * 60 * 1000;
+
+  for (const ch of challenges || []) {
+    if (!ch || ch.id === excludeChallengeId) continue;
+    const st = ch.status || 'PENDING';
+    if (st !== 'PENDING' && st !== 'SCHEDULED' && st !== 'IN_PLAY') continue;
+    if (isChallengeExpiredWithoutResult(ch, nowMs)) continue;
+
+    const chTs = new Date(ch.scheduledIso || ch.scheduledAt || 0).getTime();
+    if (!Number.isFinite(chTs) || chTs <= 0) continue;
+    if (Math.abs(chTs - targetTs) >= windowMs) continue;
+
+    const involvesSelf = Boolean(
+      challengerId && (ch.playerAId === challengerId || ch.playerBId === challengerId)
+    );
+    const involvesRival = Boolean(
+      rivalId && (ch.playerAId === rivalId || ch.playerBId === rivalId)
+    );
+
+    if (involvesSelf && (!onlyConfirmedForSelf || st !== 'PENDING')) {
+      return { conflict: true, who: 'self', playerId: challengerId, challenge: ch };
+    }
+    if (involvesRival && (st === 'SCHEDULED' || st === 'IN_PLAY')) {
+      return { conflict: true, who: 'rival', playerId: rivalId, challenge: ch };
+    }
+  }
+
+  return { conflict: false };
+}
+
 export function isChallengeExpiredWithoutResult(challenge, nowMs = Date.now()) {
   if (!challenge) return false;
   if (challenge.status === 'EXPIRED_NO_RESULT') return true;
