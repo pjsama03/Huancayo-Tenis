@@ -35,11 +35,13 @@ import {
   canIncrementRegularGame,
   createEmptyLiveScore,
   evaluateMatchScore,
+  findScheduleConflict,
   getMatchPermissions,
   getPreMatchForecast,
   isChallengeExpiredWithoutResult,
   isChallengeVisibleInRetosBoard,
   stepLiveScoreboard,
+  validateChallengeScheduleDate,
 } from '../utils/tenisEngine';
 import {
   SponsorStaticBanner,
@@ -437,6 +439,31 @@ export default function RetosView({
     }
 
     const scheduledIso = new Date(`${formDate}T${formTime}:00-05:00`).toISOString();
+
+    const dateCheck = validateChallengeScheduleDate(scheduledIso);
+    if (!dateCheck.ok) {
+      triggerHaptic('warning');
+      if (onNotify) onNotify(dateCheck.reason, 'warning');
+      return;
+    }
+
+    const schedConflict = findScheduleConflict(challenges, {
+      challengerId: currentUser.id,
+      rivalId: challengeTarget.id,
+      targetIso: scheduledIso,
+      blockMinutes: 90,
+    });
+    if (schedConflict.conflict) {
+      triggerHaptic('warning');
+      const c = schedConflict.challenge;
+      const msg =
+        schedConflict.who === 'self'
+          ? `Ya tienes otro partido pactado cerca de esa hora (${c.dateLabel} · ${c.timeLabel}). Deja al menos 90 min entre encuentros.`
+          : `${challengeTarget.name} ya tiene un partido programado en ese horario (${c.dateLabel} · ${c.timeLabel}). Elige otra hora.`;
+      if (onNotify) onNotify(msg, 'warning');
+      return;
+    }
+
     const { dateText, timeText } = formatDynamicDateAndTime(scheduledIso);
 
     const newChallenge = {
@@ -475,7 +502,34 @@ export default function RetosView({
   };
 
   const handleAcceptChallenge = (ch) => {
-    if (!onUpdateChallenge) return;
+    if (!ch || !onUpdateChallenge) return;
+    const targetIso = ch.scheduledIso || ch.scheduledAt;
+    if (isChallengeExpiredWithoutResult(ch)) {
+      triggerHaptic('warning');
+      if (onNotify) {
+        onNotify('La fecha y hora de este desafío ya vencieron. Coordina un nuevo reto.', 'warning');
+      }
+      return;
+    }
+    const rivalId = currentUser?.id === ch.playerAId ? ch.playerBId : ch.playerAId;
+    const schedConflict = findScheduleConflict(challenges, {
+      challengerId: currentUser?.id,
+      rivalId,
+      targetIso,
+      excludeChallengeId: ch.id,
+      blockMinutes: 90,
+      onlyConfirmedForSelf: true,
+    });
+    if (schedConflict.conflict) {
+      triggerHaptic('warning');
+      const c = schedConflict.challenge;
+      const msg =
+        schedConflict.who === 'self'
+          ? `No puedes aceptar: ya tienes un partido programado a esa hora (${c.dateLabel} · ${c.timeLabel}).`
+          : `Tu rival ya tiene otro partido confirmado a esa hora (${c.dateLabel} · ${c.timeLabel}).`;
+      if (onNotify) onNotify(msg, 'warning');
+      return;
+    }
     onUpdateChallenge(ch.id, { status: 'SCHEDULED' });
     if (onNotify) onNotify('¡Desafío confirmado! Ya aparece en la Cartelera.', 'success');
   };
@@ -555,6 +609,8 @@ export default function RetosView({
         totalActivePlayers: Math.max(players.length, 130),
         isWalkover,
         walkoverWinnerSide,
+        refDate: activeScoreboardChallenge.scheduledIso || activeScoreboardChallenge.scheduledAt,
+        challengeId: activeScoreboardChallenge.id,
       });
       if (!eloResult.ok) {
         triggerHaptic('warning');
@@ -661,6 +717,38 @@ export default function RetosView({
     }
 
     const newIso = new Date(`${reschedDate}T${reschedTime}:00-05:00`).toISOString();
+    const dateCheck = validateChallengeScheduleDate(newIso);
+    if (!dateCheck.ok) {
+      triggerHaptic('warning');
+      if (onNotify) onNotify(dateCheck.reason, 'warning');
+      return;
+    }
+
+    const otherId =
+      currentUser?.id === rescheduleTarget.playerAId
+        ? rescheduleTarget.playerBId
+        : rescheduleTarget.playerAId;
+    const schedConflict = findScheduleConflict(challenges, {
+      challengerId: currentUser?.id,
+      rivalId: otherId,
+      targetIso: newIso,
+      excludeChallengeId: rescheduleTarget.id,
+      blockMinutes: 90,
+    });
+    if (schedConflict.conflict) {
+      triggerHaptic('warning');
+      const c = schedConflict.challenge;
+      if (onNotify) {
+        onNotify(
+          schedConflict.who === 'self'
+            ? `Ese horario choca con otro partido tuyo (${c.dateLabel} · ${c.timeLabel}).`
+            : `Tu rival ya tiene otro partido programado en ese horario (${c.dateLabel} · ${c.timeLabel}).`,
+          'warning'
+        );
+      }
+      return;
+    }
+
     const { dateText, timeText } = formatDynamicDateAndTime(newIso);
 
     onUpdateChallenge(rescheduleTarget.id, {
@@ -690,6 +778,32 @@ export default function RetosView({
     if (!pr?.newIso) return;
 
     if (accept) {
+      const dateCheck = validateChallengeScheduleDate(pr.newIso);
+      if (!dateCheck.ok) {
+        triggerHaptic('warning');
+        if (onNotify) onNotify('La hora propuesta ya pasó. Propón un horario futuro.', 'warning');
+        return;
+      }
+      const otherId = currentUser?.id === ch.playerAId ? ch.playerBId : ch.playerAId;
+      const schedConflict = findScheduleConflict(challenges, {
+        challengerId: currentUser?.id,
+        rivalId: otherId,
+        targetIso: pr.newIso,
+        excludeChallengeId: ch.id,
+        blockMinutes: 90,
+        onlyConfirmedForSelf: true,
+      });
+      if (schedConflict.conflict) {
+        triggerHaptic('warning');
+        const c = schedConflict.challenge;
+        if (onNotify) {
+          onNotify(
+            `No se puede mover a ese horario: choca con otro partido (${c.dateLabel} · ${c.timeLabel}).`,
+            'warning'
+          );
+        }
+        return;
+      }
       onUpdateChallenge(ch.id, {
         scheduledIso: pr.newIso,
         dateLabel: pr.dateLabel,
@@ -710,13 +824,16 @@ export default function RetosView({
 
   const preMatchForecast = useMemo(() => {
     if (!currentUser || !challengeTarget) return null;
+    const targetRefDate =
+      formDate && formTime ? new Date(`${formDate}T${formTime}:00-05:00`) : new Date();
     return getPreMatchForecast(
       currentUser,
       challengeTarget,
       challenges,
-      Math.max(players.length, 130)
+      Math.max(players.length, 130),
+      targetRefDate
     );
-  }, [currentUser, challengeTarget, challenges, players.length]);
+  }, [currentUser, challengeTarget, challenges, players.length, formDate, formTime]);
 
   const directBuilt = useMemo(
     () => buildLiveScoreFromDirectDraft(directDraft),
@@ -749,6 +866,8 @@ export default function RetosView({
             liveScore: effectiveScore,
             challenges,
             totalActivePlayers: Math.max(players.length, 130),
+            refDate: activeScoreboardChallenge.scheduledIso || activeScoreboardChallenge.scheduledAt,
+            challengeId: activeScoreboardChallenge.id,
           })
         : null;
 
