@@ -16,20 +16,40 @@ jobs:
       - name: Descargar repositorio
         uses: actions/checkout@v4
 
-      - name: Configurar Node.js 20
+      - name: Configurar Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Instalar Playwright (sin tocar package.json)
         run: |
           npm install --no-save playwright
           npx playwright install --with-deps chromium
 
-      - name: Ejecutar Simulador de 3 Bots (Retos, Horas, Disputas, Árbitro y Ranking)
+      - name: Ejecutar Simulador de 3 Bots (auto-detección de ruta + log)
         env:
           QA_TARGET_URL: ${{ github.event.inputs.target_url || 'https://huancayo-tenis.vercel.app' }}
-        run: node tests/qa-e2e-bots.spec.mjs
+        run: |
+          mkdir -p qa-e2e-output
+          SCRIPT_PATH=""
+          if [ -f "tests/qa-e2e-bots.spec.mjs" ]; then
+            SCRIPT_PATH="tests/qa-e2e-bots.spec.mjs"
+          elif [ -f "qa-e2e-bots.spec.mjs" ]; then
+            SCRIPT_PATH="qa-e2e-bots.spec.mjs"
+          else
+            SCRIPT_PATH="$(find . -maxdepth 3 -name 'qa-e2e-bots*.mjs' | head -n 1)"
+          fi
+
+          if [ -z "$SCRIPT_PATH" ]; then
+            echo "ERROR: No se encontro qa-e2e-bots.spec.mjs en el repositorio." | tee qa-e2e-output/run.log
+            ls -la tests 2>&1 | tee -a qa-e2e-output/run.log || true
+            echo "### ❌ Falta subir \`tests/qa-e2e-bots.spec.mjs\`" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          echo "Ejecutando script en: $SCRIPT_PATH" | tee qa-e2e-output/run.log
+          set -o pipefail
+          node "$SCRIPT_PATH" 2>&1 | tee -a qa-e2e-output/run.log
 
       - name: Subir reporte y capturas E2E
         if: always()
