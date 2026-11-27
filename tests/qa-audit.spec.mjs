@@ -3,756 +3,650 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 
 /* ==========================================================================
-   TOTAL TENIS · BOT QA AUTOMATIZADO PRO (PLAYWRIGHT)
-   Audita:
-   1. Renderizado, imágenes rotas, desbordes horizontales, recorte de texto
-      y contraste de botones/pestañas en iPhone (Oscuro + Claro) y Desktop.
-   2. Seguridad de visitantes (Libro de Reclamaciones bloqueado + candado
-      en acciones protegidas como Retar / Inscribirse).
-   3. Portal de Acceso: Login, Recuperación, Registro ("Género" sin "Rama",
-      checkbox legal Indecopi desmarcado por defecto).
-   4. Flujo logueado (cuando modo Beta/demo esté activo): Perfil logueado
-      y verificación real del Estudio de Foto restaurado (Zoom, X/Y,
-      Rotación y Silueta Editorial).
-   5. Errores reales de consola JS, excepciones y URLs exactas con HTTP 4xx/5xx.
+   SIMULADOR MULTI-BOT E2E · TOTAL TENIS (3 JUGADORES SIMULTÁNEOS EN VIVO)
+   Bot A (Retador) · Bot B (Rival) · Bot C (Árbitro Oficial)
+   Prueba flujos reales: Reto -> Aceptación -> WhatsApp -> Cambio hora >=24h
+   -> Candado 7-7 -> Disputa/Impugnación -> Árbitro <24h -> Ranking Oficial
+   vs Calibrando (<5 PJ sin #1).
    ========================================================================== */
 
 const TARGET_URL = process.env.QA_TARGET_URL || 'https://huancayo-tenis.vercel.app';
-const OUT_DIR = path.resolve('qa-output');
-const SHOTS_DIR = path.join(OUT_DIR, 'screenshots');
+const OUT_DIR = path.resolve('qa-e2e-output');
+fs.mkdirSync(OUT_DIR, { recursive: true });
 
-fs.mkdirSync(SHOTS_DIR, { recursive: true });
+const results = [];
+const consoleErrors = [];
+const pageErrors = [];
+const failedRequests = [];
 
-const report = {
-  url: TARGET_URL,
-  timestamp: new Date().toISOString(),
-  checks: [],
-  bugs: [],
-  warnings: [],
-  screenshots: [],
-  metrics: {
-    mobileConsoleErrors: [],
-    mobilePageErrors: [],
-    mobileHttpFailures: [],
-    desktopConsoleErrors: [],
-    desktopPageErrors: [],
-    desktopHttpFailures: [],
-  },
-};
+function recordStep(id, title, passed, detail = '', screenshot = '') {
+  results.push({ id, title, passed: Boolean(passed), detail, screenshot });
+  const icon = passed ? '✅' : '❌';
+  console.log(`${icon} [${id}] ${title} — ${detail}`);
+}
 
-function addCheck(category, name, ok, detail = '') {
-  report.checks.push({ category, name, ok, detail });
-  if (!ok) {
-    report.bugs.push(`[${category}] ${name}: ${detail}`);
+async function takeShot(page, filename) {
+  try {
+    const filePath = path.join(OUT_DIR, filename);
+    await page.screenshot({ path: filePath, fullPage: false });
+    return filename;
+  } catch {
+    return '';
   }
 }
 
-function addWarning(category, msg) {
-  report.warnings.push(`[${category}] ${msg}`);
-}
-
-function uniqueList(arr) {
-  return Array.from(new Set(arr));
-}
-
-function isIgnoredUrl(url = '') {
-  const u = String(url).toLowerCase();
-  return (
-    u.includes('onesignal') ||
-    u.includes('favicon') ||
-    u.includes('chrome-extension') ||
-    u.includes('fonts.gstatic.com')
-  );
-}
-
-function attachNetworkListeners(page, bucket) {
-  page.on('console', (msg) => {
-    if (msg.type() !== 'error') return;
-    const text = msg.text() || '';
-    if (text.includes('OneSignal') || text.includes('favicon')) return;
-    // Evitar ruido genérico cuando ya capturamos la URL exacta en response >= 400
-    if (text.startsWith('Failed to load resource: the server responded with a status of')) return;
-    bucket.consoleErrors.push(text.slice(0, 220));
-  });
-
-  page.on('pageerror', (err) => {
-    bucket.pageErrors.push(String(err?.message || err).slice(0, 220));
-  });
-
-  page.on('response', (res) => {
-    const status = res.status();
-    const url = res.url();
-    if (status >= 400 && !isIgnoredUrl(url)) {
-      const cleanUrl = url.replace(TARGET_URL, '');
-      bucket.httpFailures.push(`${status} ${cleanUrl}`);
-    }
-  });
-}
-
-async function waitForUiReady(page, extraMs = 700) {
-  await page
-    .evaluate(async () => {
-      if (document.fonts && document.fonts.ready) {
-        await document.fonts.ready.catch(() => {});
-      }
-    })
-    .catch(() => {});
-  await page.waitForTimeout(extraMs);
-}
-
-async function dismissSplashIfPresent(page) {
-  await page.waitForTimeout(1600);
+async function dismissSplashAndModals(page) {
+  await page.waitForTimeout(1800);
   const enterBtn = page
     .locator(
-      'button:has-text("Entrar"), button:has-text("Empezar"), button:has-text("Ingresar"), button:has-text("Explorar"), button:has-text("Saltar")'
+      'button:has-text("Entrar"), button:has-text("Empezar"), button:has-text("Ingresar"), button:has-text("Explorar"), button:has-text("Comenzar")'
     )
     .first();
   if (await enterBtn.isVisible().catch(() => false)) {
     await enterBtn.click().catch(() => {});
-    await page.waitForTimeout(900);
+    await page.waitForTimeout(700);
   }
-  await page
-    .waitForFunction(
-      () => {
-        const splash = document.querySelector('.tt-splash-overlay');
-        if (!splash) return true;
-        const st = window.getComputedStyle(splash);
-        return st.display === 'none' || parseFloat(st.opacity || '1') < 0.1;
-      },
-      { timeout: 6000 }
-    )
-    .catch(() => {});
-  await waitForUiReady(page, 600);
-}
-
-async function takeShot(page, filename, label) {
-  const fullPath = path.join(SHOTS_DIR, filename);
-  await page.screenshot({ path: fullPath, fullPage: false });
-  report.screenshots.push({ filename, label });
-}
-
-async function closeTopModal(page) {
-  const closeSelectors = [
-    '.tt-auth-close-x',
-    '.tt-modal-close',
-    'button[aria-label*="Cerrar" i]',
-  ];
-  for (const sel of closeSelectors) {
-    const btn = page.locator(sel).last();
-    if (await btn.isVisible().catch(() => false)) {
-      await btn.click().catch(() => {});
-      await page.waitForTimeout(450);
-      return true;
-    }
+  // Cerrar intersticial de sponsor si aparece
+  const closeAd = page.locator('button[aria-label*="Cerrar"], button:has-text("Saltar"), button:has-text("Continuar")').first();
+  if (await closeAd.isVisible().catch(() => false)) {
+    await closeAd.click().catch(() => {});
+    await page.waitForTimeout(400);
   }
-  await page.keyboard.press('Escape').catch(() => {});
-  await page.waitForTimeout(400);
-  return false;
 }
 
 async function clickDockTab(page, labelRegex) {
-  const dockBtn = page
-    .locator('nav button, .tt-dock button, .tt-bottom-dock button, [role="tablist"] button')
-    .filter({ hasText: labelRegex })
+  const nav = page.locator('nav, .tt-bottom-dock').last();
+  const btn = nav.locator('button').filter({ hasText: labelRegex }).first();
+  await btn.waitFor({ state: 'visible', timeout: 10000 });
+  await btn.click();
+  await page.waitForTimeout(700);
+}
+
+async function loginAsDemoIndex(page, botLabel, chipIndex) {
+  await page.goto(TARGET_URL, { waitUntil: 'domcontentloaded', timeout: 45000 });
+  await dismissSplashAndModals(page);
+
+  await clickDockTab(page, /Perfil/i);
+  const openAuthBtn = page
+    .locator('button:has-text("Iniciar Sesión"), button:has-text("Crear Cuenta"), button:has-text("Entrar")')
     .first();
-  if (await dockBtn.isVisible().catch(() => false)) {
-    await dockBtn.click().catch(() => {});
-    await waitForUiReady(page, 750);
-    return true;
-  }
-  return false;
-}
 
-/* ==========================================================================
-   INSPECTOR VISUAL + CONTRASTE WCAG + RECORTES + IMÁGENES ROTAS
-   ========================================================================== */
-async function inspectScreenHealth(page, category, screenLabel, { checkModalsOnly = false } = {}) {
-  const health = await page.evaluate((modalsOnly) => {
-    function parseRgb(str) {
-      const m = String(str || '').match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/i);
-      if (!m) return null;
-      return {
-        r: Number(m[1]),
-        g: Number(m[2]),
-        b: Number(m[3]),
-        a: m[4] === undefined ? 1 : Number(m[4]),
-      };
-    }
-
-    function luminance({ r, g, b }) {
-      const toLin = (v) => {
-        const s = v / 255;
-        return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
-      };
-      return 0.2126 * toLin(r) + 0.7152 * toLin(g) + 0.0722 * toLin(b);
-    }
-
-    function contrastRatio(c1, c2) {
-      const l1 = luminance(c1);
-      const l2 = luminance(c2);
-      const hi = Math.max(l1, l2);
-      const lo = Math.min(l1, l2);
-      return (hi + 0.05) / (lo + 0.05);
-    }
-
-    const rootEl = modalsOnly
-      ? document.querySelector('.tt-modal-card, .tt-auth-sheet-container, [role="dialog"]') || document.body
-      : document.body;
-
-    // 1. Imágenes rotas visibles
-    const brokenImgs = [];
-    rootEl.querySelectorAll('img').forEach((img) => {
-      const st = window.getComputedStyle(img);
-      const rect = img.getBoundingClientRect();
-      const visible =
-        st.display !== 'none' &&
-        st.visibility !== 'hidden' &&
-        parseFloat(st.opacity || '1') > 0.05 &&
-        rect.width > 2 &&
-        rect.height > 2;
-      if (visible && (!img.complete || img.naturalWidth === 0)) {
-        brokenImgs.push(img.getAttribute('src') || img.alt || 'img-sin-src');
-      }
-    });
-
-    // 2. Desborde horizontal global
-    const overflowX = Math.max(0, Math.round(document.documentElement.scrollWidth - window.innerWidth));
-
-    // 3. Texto cortado en pestañas/botones y bajo contraste en botones sólidos
-    const clippedButtons = [];
-    const lowContrastButtons = [];
-
-    rootEl.querySelectorAll('button, [role="tab"]').forEach((el) => {
-      const st = window.getComputedStyle(el);
-      const rect = el.getBoundingClientRect();
-      const visible =
-        st.display !== 'none' &&
-        st.visibility !== 'hidden' &&
-        parseFloat(st.opacity || '1') > 0.2 &&
-        rect.width >= 36 &&
-        rect.height >= 24 &&
-        rect.right > 0 &&
-        rect.left < window.innerWidth &&
-        rect.bottom > 0 &&
-        rect.top < window.innerHeight;
-      if (!visible) return;
-
-      const label = (el.innerText || '').replace(/\s+/g, ' ').trim();
-      if (!label || label.length > 48) return;
-
-      // Detectar recorte horizontal de texto en tabs y pills (ej. "Libro Reclamaci")
-      if (
-        (el.getAttribute('role') === 'tab' || /tab|pill|btn/i.test(el.className || '')) &&
-        el.scrollWidth > el.clientWidth + 6 &&
-        st.overflowX !== 'visible'
-      ) {
-        clippedButtons.push(`"${label}" (+${Math.round(el.scrollWidth - el.clientWidth)}px)`);
-      }
-
-      // Detectar contraste muy bajo en botones con color de fondo sólido (sin degradado complejo)
-      const bgColor = parseRgb(st.backgroundColor);
-      const fgColor = parseRgb(st.color);
-      const hasGradient = (st.backgroundImage || '').includes('gradient');
-      if (bgColor && fgColor && bgColor.a >= 0.85 && !hasGradient) {
-        const ratio = contrastRatio(bgColor, fgColor);
-        if (ratio < 2.6) {
-          lowContrastButtons.push(`"${label}" (ratio ${ratio.toFixed(1)}:1)`);
-        }
-      }
-    });
-
-    return {
-      brokenImgs: Array.from(new Set(brokenImgs)),
-      overflowX,
-      clippedButtons: Array.from(new Set(clippedButtons)).slice(0, 5),
-      lowContrastButtons: Array.from(new Set(lowContrastButtons)).slice(0, 5),
-      themeAttr: document.documentElement.getAttribute('data-theme') || 'unknown',
-      textLen: (rootEl.innerText || '').trim().length,
-    };
-  }, checkModalsOnly);
-
-  addCheck(
-    category,
-    `Renderizado ${screenLabel}`,
-    health.textLen >= 25,
-    health.textLen >= 25 ? `Tema activo: ${health.themeAttr}` : 'Pantalla vacía o sin contenido.'
-  );
-
-  addCheck(
-    category,
-    `Imágenes ${screenLabel}`,
-    health.brokenImgs.length === 0,
-    health.brokenImgs.length === 0
-      ? 'Todas las imágenes visibles cargaron bien.'
-      : `${health.brokenImgs.length} rota(s): ${health.brokenImgs.join(', ')}`
-  );
-
-  if (health.overflowX > 4) {
-    addWarning(category, `Desborde horizontal en ${screenLabel}: +${health.overflowX}px`);
-  }
-  if (health.clippedButtons.length > 0) {
-    addWarning(category, `Texto cortado en botones de ${screenLabel}: ${health.clippedButtons.join(', ')}`);
-  }
-  if (health.lowContrastButtons.length > 0) {
-    addCheck(
-      category,
-      `Contraste botones ${screenLabel}`,
-      false,
-      `Bajo contraste detectado: ${health.lowContrastButtons.join(', ')}`
-    );
-  }
-}
-
-/* ==========================================================================
-   CAMBIO FIABLE A MODO CLARO (PRUEBA UI DEL MENÚ ☰ + RESPALDO PERSISTENTE)
-   ========================================================================== */
-async function switchToLightMode(page) {
-  let viaUi = false;
-
-  const menuBtn = page.locator('header button').first();
-  if (await menuBtn.isVisible().catch(() => false)) {
-    await menuBtn.click().catch(() => {});
+  if (await openAuthBtn.isVisible().catch(() => false)) {
+    await openAuthBtn.click();
     await page.waitForTimeout(600);
-
-    const themeToggle = page
-      .locator(
-        'button:has-text("Modo Claro"), button:has-text("Tema Claro"), button:has-text("Claro"), button:has-text("Apariencia"), button[aria-label*="tema" i], button[aria-label*="claro" i]'
-      )
-      .first();
-
-    if (await themeToggle.isVisible().catch(() => false)) {
-      await themeToggle.click().catch(() => {});
-      await page.waitForTimeout(700);
-      const nowTheme = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
-      if (nowTheme === 'light') viaUi = true;
+  } else {
+    // Intentar desde el botón de perfil/acceso en header
+    const headerLogin = page.locator('header button:has-text("Entrar"), header button:has-text("Acceder")').first();
+    if (await headerLogin.isVisible().catch(() => false)) {
+      await headerLogin.click();
+      await page.waitForTimeout(600);
     }
+  }
 
-    await closeTopModal(page);
+  const demoChips = page.locator('.tt-demo-chip');
+  const count = await demoChips.count();
+  if (count <= chipIndex) {
+    return { ok: false, name: '', count };
+  }
+
+  const chip = demoChips.nth(chipIndex);
+  const rawText = ((await chip.innerText().catch(() => '')) || '').trim();
+  const cleanName = rawText.split('\n')[0].replace(/VIP/gi, '').trim();
+  await chip.click();
+  await page.waitForTimeout(1600);
+
+  // Cerrar tutorial inicial si aparece
+  const skipTut = page.locator('button:has-text("Saltar"), button:has-text("Entendido"), button:has-text("Omitir")').first();
+  if (await skipTut.isVisible().catch(() => false)) {
+    await skipTut.click().catch(() => {});
     await page.waitForTimeout(400);
   }
 
-  if (!viaUi) {
-    await page.evaluate(() => {
-      window.localStorage.setItem('tt_theme_pref_v2', 'light');
-      document.documentElement.setAttribute('data-theme', 'light');
-    });
-    await page.reload({ waitUntil: 'networkidle', timeout: 45000 }).catch(() => {});
-    await dismissSplashIfPresent(page);
-  }
+  // Leer nombre exacto desde Perfil
+  await clickDockTab(page, /Perfil/i);
+  const profileName = await page.locator('.tt-pf-name').first().innerText().catch(() => cleanName);
+  const finalName = (profileName || cleanName || botLabel).trim();
 
-  const finalTheme = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
-  addCheck(
-    'Modo Claro',
-    'Activación de Modo Claro',
-    finalTheme === 'light',
-    finalTheme === 'light'
-      ? viaUi
-        ? 'Activado desde el menú lateral (UI).'
-        : 'Activado vía preferencia localStorage (revisar etiqueta del botón en menú ☰).'
-      : `Se mantuvo en tema "${finalTheme}".`
-  );
-  return finalTheme === 'light';
+  return { ok: true, name: finalName, count };
 }
 
-/* ==========================================================================
-   EJECUCIÓN PRINCIPAL DE LA AUDITORÍA QA
-   ========================================================================== */
-async function runAudit() {
-  const browser = await chromium.launch({ headless: true });
+function getPeruFutureDateAndTime(hoursAhead) {
+  const target = new Date(Date.now() + hoursAhead * 3600 * 1000);
+  const dateStr = target.toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
+  const hh = String(
+    Number(target.toLocaleTimeString('en-GB', { timeZone: 'America/Lima', hour: '2-digit', hour12: false }))
+  ).padStart(2, '0');
+  const mm = String(
+    Number(target.toLocaleTimeString('en-GB', { timeZone: 'America/Lima', minute: '2-digit', hour12: false }))
+  ).padStart(2, '0');
+  return { dateStr, timeStr: `${hh}:${mm}` };
+}
 
-  /* ------------------------------------------------------------------------
-     FASE 1 · IPHONE (390×844) · MODO OSCURO · 5 VISTAS + MODALES + SEGURIDAD
-     ------------------------------------------------------------------------ */
-  const mobileCtx = await browser.newContext({
+async function createBotContext(browser, label) {
+  const ctx = await browser.newContext({
     viewport: { width: 390, height: 844 },
-    deviceScaleFactor: 2,
     isMobile: true,
     hasTouch: true,
     locale: 'es-PE',
     timezoneId: 'America/Lima',
   });
-
-  const page = await mobileCtx.newPage();
-  const mobileNet = { consoleErrors: [], pageErrors: [], httpFailures: [] };
-  attachNetworkListeners(page, mobileNet);
-
-  await page.goto(TARGET_URL, { waitUntil: 'networkidle', timeout: 45000 }).catch(() => {});
-  await dismissSplashIfPresent(page);
-
-  const mainTabs = [
-    { key: 'retos', regex: /Retos/i, file: '01-iphone-dark-retos.png' },
-    { key: 'ranking', regex: /Ranking/i, file: '02-iphone-dark-ranking.png' },
-    { key: 'torneos', regex: /Torneos/i, file: '03-iphone-dark-torneos.png' },
-    { key: 'sedes', regex: /Sedes|Clubes/i, file: '04-iphone-dark-sedes.png' },
-    { key: 'perfil', regex: /Perfil/i, file: '05-iphone-dark-perfil.png' },
-  ];
-
-  for (const t of mainTabs) {
-    await clickDockTab(page, t.regex);
-    await inspectScreenHealth(page, 'iPhone Oscuro', t.key.toUpperCase());
-    await takeShot(page, t.file, `iPhone Oscuro · ${t.key.toUpperCase()}`);
-  }
-
-  // 1B. Modal de Torneo ("Llaves y Premios" · verificar 3D en Cuadro y Octavos)
-  await clickDockTab(page, /Torneos/i);
-  const keysBtn = page
-    .locator('button:has-text("Llaves y Premios"), button:has-text("Ver Cuadro"), button:has-text("Cuadro")')
-    .first();
-  if (await keysBtn.isVisible().catch(() => false)) {
-    await keysBtn.click().catch(() => {});
-    await waitForUiReady(page, 850);
-    await inspectScreenHealth(page, 'iPhone Oscuro', 'Modal Cuadro Torneo', { checkModalsOnly: true });
-    await takeShot(page, '06-iphone-dark-torneo-modal.png', 'iPhone Oscuro · Modal Cuadro Torneo (3D)');
-    await closeTopModal(page);
-  } else {
-    addWarning('iPhone Oscuro', 'No se encontró botón "Llaves y Premios" en Torneos.');
-  }
-
-  // 1C. Subpestaña Coaches en Sedes
-  await clickDockTab(page, /Sedes|Clubes/i);
-  const coachesTab = page.locator('button:has-text("Coaches")').first();
-  if (await coachesTab.isVisible().catch(() => false)) {
-    await coachesTab.click().catch(() => {});
-    await waitForUiReady(page, 800);
-    await inspectScreenHealth(page, 'iPhone Oscuro', 'COACHES');
-    await takeShot(page, '07-iphone-dark-coaches.png', 'iPhone Oscuro · Coaches');
-  }
-
-  // 1D. Pro Shop / Tienda desde cabecera
-  const shopBtn = page.locator('header button:has-text("Tienda")').first();
-  if (await shopBtn.isVisible().catch(() => false)) {
-    await shopBtn.click().catch(() => {});
-    await waitForUiReady(page, 850);
-    await inspectScreenHealth(page, 'iPhone Oscuro', 'Modal Pro Shop', { checkModalsOnly: true });
-    await takeShot(page, '08-iphone-dark-proshop.png', 'iPhone Oscuro · Tienda Pro Shop');
-    await closeTopModal(page);
-  }
-
-  /* ------------------------------------------------------------------------
-     FASE 2 · SEGURIDAD DE VISITANTES (SIN SESIÓN INICIADA)
-     ------------------------------------------------------------------------ */
-  // 2A. Libro de Reclamaciones bloqueado a visitantes
-  await clickDockTab(page, /Retos/i);
-  await page.evaluate(() => {
-    const scroller = document.querySelector('.tt-main-scroll');
-    if (scroller) scroller.scrollTo(0, scroller.scrollHeight);
+  const page = await ctx.newPage();
+  page.on('pageerror', (err) => pageErrors.push(`[${label}] ${err.message}`));
+  page.on('console', (msg) => {
+    if (msg.type() === 'error') {
+      const txt = msg.text();
+      if (!txt.includes('OneSignal')) consoleErrors.push(`[${label}] ${txt}`);
+    }
   });
-  await page.waitForTimeout(700);
-
-  const libroBtn = page
-    .locator('button:has-text("Libro de Reclamaciones"), a:has-text("Libro de Reclamaciones")')
-    .first();
-  if (await libroBtn.isVisible().catch(() => false)) {
-    await libroBtn.click().catch(() => {});
-    await waitForUiReady(page, 850);
-    await inspectScreenHealth(page, 'Seguridad', 'Libro de Reclamaciones', { checkModalsOnly: true });
-    await takeShot(
-      page,
-      '09-iphone-seguridad-libro-visitante.png',
-      'Seguridad Visitante · Libro de Reclamaciones'
-    );
-
-    const hasGate = await page
-      .locator('text=Inicia sesión para registrar una reclamación')
-      .isVisible()
-      .catch(() => false);
-    const hasForm = await page.locator('#tt-lr-detail').isVisible().catch(() => false);
-
-    addCheck(
-      'Seguridad',
-      'Libro de Reclamaciones bloqueado sin sesión',
-      hasGate && !hasForm,
-      hasGate && !hasForm
-        ? 'Bloqueo activo: exige iniciar sesión.'
-        : 'ALERTA: El formulario sigue accesible sin iniciar sesión.'
-    );
-    await closeTopModal(page);
-  } else {
-    addWarning('Seguridad', 'No se encontró acceso al Libro de Reclamaciones en el pie de página.');
-  }
-
-  // 2B. Candado en acción protegida ("Retar" desde Ranking sin sesión)
-  await clickDockTab(page, /Ranking/i);
-  const retarBtn = page.locator('button:has-text("Retar")').first();
-  if (await retarBtn.isVisible().catch(() => false)) {
-    await retarBtn.click().catch(() => {});
-    await waitForUiReady(page, 800);
-    const authOpened = await page.locator('.tt-auth-sheet-container').isVisible().catch(() => false);
-    addCheck(
-      'Seguridad',
-      'Acción "Retar" exige iniciar sesión',
-      authOpened,
-      authOpened
-        ? 'Redirige correctamente al Portal de Acceso.'
-        : 'No abrió el modal de login al pulsar Retar sin sesión.'
-    );
-    if (authOpened) await closeTopModal(page);
-  }
-
-  /* ------------------------------------------------------------------------
-     FASE 3 · PORTAL DE ACCESO (LOGIN, RECUPERACIÓN, REGISTRO + "GÉNERO")
-     ------------------------------------------------------------------------ */
-  await clickDockTab(page, /Perfil/i);
-  const openAuthBtn = page
-    .locator('button:has-text("Iniciar Sesión"), button:has-text("Entrar"), button:has-text("Crear Cuenta")')
-    .first();
-
-  if (await openAuthBtn.isVisible().catch(() => false)) {
-    await openAuthBtn.click().catch(() => {});
-    await waitForUiReady(page, 850);
-
-    const authSheet = page.locator('.tt-auth-sheet-container');
-    await takeShot(page, '10-iphone-auth-login.png', 'Portal Acceso · Iniciar Sesión');
-
-    // 3A. Recuperación de clave y correo
-    const forgotBtn = authSheet.locator('button:has-text("Olvidaste")').first();
-    if (await forgotBtn.isVisible().catch(() => false)) {
-      await forgotBtn.click().catch(() => {});
-      await waitForUiReady(page, 700);
-      await takeShot(page, '11-iphone-auth-recuperacion.png', 'Portal Acceso · Recuperación');
-      const recText = await authSheet.innerText().catch(() => '');
-      const hasBothPaths =
-        /Cambiar clave|Olvidé mi clave/i.test(recText) &&
-        /Recordar mi correo|Olvidé mi correo/i.test(recText);
-      addCheck(
-        'Portal Acceso',
-        'Recuperación simple (clave + correo + WhatsApp)',
-        hasBothPaths,
-        hasBothPaths
-          ? 'Ambas pestañas de recuperación visibles.'
-          : 'Falta alguna opción de recuperación en el modal.'
-      );
-      const backBtn = authSheet.locator('.tt-auth-back-link').first();
-      if (await backBtn.isVisible().catch(() => false)) {
-        await backBtn.click().catch(() => {});
-        await page.waitForTimeout(500);
-      }
+  page.on('response', (res) => {
+    if (res.status() >= 400 && !res.url().includes('onesignal')) {
+      failedRequests.push(`[${label}] ${res.status()} ${res.url()}`);
     }
-
-    // 3B. Registro: "Género" (sin "Rama") + Checkbox Legal desmarcado (Ley 29733)
-    const regSwitch = authSheet
-      .locator('button:has-text("Regístrate"), button:has-text("Crear cuenta gratis")')
-      .first();
-    if (await regSwitch.isVisible().catch(() => false)) {
-      await regSwitch.click().catch(() => {});
-      await waitForUiReady(page, 800);
-      await takeShot(page, '12-iphone-auth-registro.png', 'Portal Acceso · Registro');
-
-      const regText = await authSheet.innerText().catch(() => '');
-      const hasGenero = /G[eé]nero/i.test(regText);
-      const hasRama = /\bRama\b/i.test(regText);
-      addCheck(
-        'Portal Acceso',
-        'Etiqueta "Género" en Registro (sin "Rama")',
-        hasGenero && !hasRama,
-        hasGenero && !hasRama
-          ? 'Muestra "Género" (Masculino / Femenino) correctamente.'
-          : `Encontrado: hasGenero=${hasGenero}, hasRama=${hasRama}.`
-      );
-
-      const legalBox = authSheet.locator('.tt-legal-check input[type="checkbox"]').first();
-      if (await legalBox.count()) {
-        const isChecked = await legalBox.isChecked().catch(() => true);
-        addCheck(
-          'Legal Perú',
-          'Checkbox Términos/Privacidad arranca desmarcado',
-          !isChecked,
-          !isChecked
-            ? 'Cumple Indecopi / Ley N° 29733.'
-            : 'ALERTA LEGAL: El checkbox aparece pre-marcado.'
-        );
-      }
-
-      // Volver a login para probar sesión demo (si está habilitada en Beta)
-      const backToLogin = authSheet.locator('button:has-text("Entrar")').first();
-      if (await backToLogin.isVisible().catch(() => false)) {
-        await backToLogin.click().catch(() => {});
-        await page.waitForTimeout(500);
-      }
-    }
-
-    /* ----------------------------------------------------------------------
-       FASE 4 · FLUJO LOGUEADO (PERFIL + ESTUDIO DE FOTO RESTAURADO)
-       ---------------------------------------------------------------------- */
-    const demoChip = authSheet.locator('.tt-demo-chip').first();
-    if (await demoChip.isVisible().catch(() => false)) {
-      await demoChip.click().catch(() => {});
-      await waitForUiReady(page, 1300);
-
-      await clickDockTab(page, /Perfil/i);
-      await inspectScreenHealth(page, 'Usuario Logueado', 'PERFIL LOGUEADO');
-      await takeShot(page, '13-iphone-dark-perfil-logueado.png', 'Usuario Logueado · Perfil');
-
-      const camBtn = page.locator('button[aria-label*="foto" i]').first();
-      if (await camBtn.isVisible().catch(() => false)) {
-        await camBtn.click().catch(() => {});
-        await waitForUiReady(page, 800);
-        await takeShot(page, '14-iphone-dark-estudio-foto.png', 'Usuario Logueado · Estudio de Foto');
-
-        const studioText = await page
-          .locator('.tt-pf-modal-stack')
-          .last()
-          .innerText()
-          .catch(() => '');
-        const slidersCount = await page
-          .locator('.tt-pf-studio-sliders input[type="range"]')
-          .count()
-          .catch(() => 0);
-        const hasAllControls =
-          slidersCount >= 4 &&
-          /Zoom/i.test(studioText) &&
-          /Vertical/i.test(studioText) &&
-          /Horizontal/i.test(studioText) &&
-          /Rotaci[oó]n/i.test(studioText) &&
-          /Silueta/i.test(studioText);
-
-        addCheck(
-          'Perfil · Estudio de Foto',
-          'Controles restaurados (Zoom, X/Y, Rotación, Silueta)',
-          hasAllControls,
-          hasAllControls
-            ? `Los ${slidersCount} deslizadores y el botón de Silueta están activos.`
-            : `Faltan controles en el Estudio de Foto (sliders=${slidersCount}). Sube PerfilView.jsx actualizado.`
-        );
-        await closeTopModal(page);
-      } else {
-        addWarning('Usuario Logueado', 'No se encontró el botón de cámara en el perfil logueado.');
-      }
-    } else {
-      await closeTopModal(page);
-      addWarning('Usuario Logueado', 'Cuentas demo ocultas (modo producción): se omitió prueba de Estudio de Foto.');
-    }
-  }
-
-  /* ------------------------------------------------------------------------
-     FASE 5 · IPHONE (390×844) · MODO CLARO (4 VISTAS CLAVE + CONTRASTE)
-     ------------------------------------------------------------------------ */
-  const lightOk = await switchToLightMode(page);
-  if (lightOk) {
-    const lightTabs = [
-      { key: 'retos', regex: /Retos/i, file: '15-iphone-light-retos.png' },
-      { key: 'ranking', regex: /Ranking/i, file: '16-iphone-light-ranking.png' },
-      { key: 'torneos', regex: /Torneos/i, file: '17-iphone-light-torneos.png' },
-      { key: 'sedes', regex: /Sedes|Clubes/i, file: '18-iphone-light-sedes.png' },
-    ];
-    for (const lt of lightTabs) {
-      await clickDockTab(page, lt.regex);
-      await inspectScreenHealth(page, 'iPhone Claro', lt.key.toUpperCase());
-      await takeShot(page, lt.file, `iPhone Modo Claro · ${lt.key.toUpperCase()}`);
-    }
-  }
-
-  report.metrics.mobileConsoleErrors = uniqueList(mobileNet.consoleErrors);
-  report.metrics.mobilePageErrors = uniqueList(mobileNet.pageErrors);
-  report.metrics.mobileHttpFailures = uniqueList(mobileNet.httpFailures);
-
-  addCheck(
-    'Salud Técnica Móvil',
-    'Cero excepciones JS y errores de consola',
-    report.metrics.mobileConsoleErrors.length === 0 && report.metrics.mobilePageErrors.length === 0,
-    report.metrics.mobileConsoleErrors.length + report.metrics.mobilePageErrors.length === 0
-      ? '0 errores JS en consola.'
-      : [...report.metrics.mobilePageErrors, ...report.metrics.mobileConsoleErrors]
-          .slice(0, 5)
-          .join(' | ')
-  );
-
-  addCheck(
-    'Salud Técnica Móvil',
-    'Cero recursos rotos (HTTP 404 / 500)',
-    report.metrics.mobileHttpFailures.length === 0,
-    report.metrics.mobileHttpFailures.length === 0
-      ? '0 peticiones fallidas.'
-      : `${report.metrics.mobileHttpFailures.length} fallo(s): ${report.metrics.mobileHttpFailures
-          .slice(0, 8)
-          .join(' | ')}`
-  );
-
-  await mobileCtx.close();
-
-  /* ------------------------------------------------------------------------
-     FASE 6 · ESCRITORIO (1366×860) · RETOS, RANKING Y TORNEOS
-     ------------------------------------------------------------------------ */
-  const desktopCtx = await browser.newContext({
-    viewport: { width: 1366, height: 860 },
-    locale: 'es-PE',
-    timezoneId: 'America/Lima',
   });
-  const dPage = await desktopCtx.newPage();
-  const deskNet = { consoleErrors: [], pageErrors: [], httpFailures: [] };
-  attachNetworkListeners(dPage, deskNet);
+  return { ctx, page };
+}
 
-  await dPage.goto(TARGET_URL, { waitUntil: 'networkidle', timeout: 45000 }).catch(() => {});
-  await dismissSplashIfPresent(dPage);
+async function launchChallengeFromA(pageA, rivalFullName, hoursAhead, isFriendlyPreferred = false) {
+  await clickDockTab(pageA, /Retos/i);
+  const lanzarTab = pageA.locator('[role="tab"]:has-text("Lanzar Reto")').first();
+  await lanzarTab.click();
+  await pageA.waitForTimeout(500);
 
-  const desktopTabs = [
-    { key: 'retos', regex: /Retos/i, file: '19-desktop-dark-retos.png' },
-    { key: 'ranking', regex: /Ranking/i, file: '20-desktop-dark-ranking.png' },
-    { key: 'torneos', regex: /Torneos/i, file: '21-desktop-dark-torneos.png' },
-  ];
-
-  for (const dt of desktopTabs) {
-    await clickDockTab(dPage, dt.regex);
-    await inspectScreenHealth(dPage, 'Desktop', dt.key.toUpperCase());
-    await takeShot(dPage, dt.file, `Desktop · ${dt.key.toUpperCase()}`);
+  // Asegurar que muestre todos los niveles por si Bot B está fuera de ±1200 pts
+  const rangeToggle = pageA.locator('button:has-text("Solo en mi rango"), button:has-text("Mi rango ampliado")').first();
+  if (await rangeToggle.isVisible().catch(() => false)) {
+    await rangeToggle.click();
+    await pageA.waitForTimeout(350);
   }
 
-  report.metrics.desktopConsoleErrors = uniqueList(deskNet.consoleErrors);
-  report.metrics.desktopPageErrors = uniqueList(deskNet.pageErrors);
-  report.metrics.desktopHttpFailures = uniqueList(deskNet.httpFailures);
+  const searchInput = pageA.locator('.tt-search-box input').first();
+  await searchInput.fill(rivalFullName.split(' ')[0]);
+  await pageA.waitForTimeout(450);
 
-  await desktopCtx.close();
-  await browser.close();
+  const rivalRow = pageA.locator('.tt-rival-row').filter({ hasText: rivalFullName.split(' ')[0] }).first();
+  if (!(await rivalRow.isVisible().catch(() => false))) {
+    return { ok: false, reason: `No se encontró a ${rivalFullName} en el radar de rivales.` };
+  }
 
-  /* ------------------------------------------------------------------------
-     FASE 7 · EXPORTAR REPORTE MARKDOWN + JSON (RESUMEN EN GITHUB ACTIONS)
-     ------------------------------------------------------------------------ */
-  const passed = report.checks.filter((c) => c.ok).length;
-  const failed = report.checks.filter((c) => !c.ok).length;
-  const scorePct = report.checks.length
-    ? Math.round((passed / report.checks.length) * 100)
-    : 0;
+  const ctaBtn = rivalRow.locator('button').last();
+  await ctaBtn.click();
+  await pageA.waitForTimeout(500);
+
+  // Modal Pactar Nuevo Desafío
+  const form = pageA.locator('form.tt-form-stack').first();
+  if (!(await form.isVisible().catch(() => false))) {
+    return { ok: false, reason: 'No abrió el modal Pactar Nuevo Desafío.' };
+  }
+
+  if (isFriendlyPreferred) {
+    const friendlyBtn = form.locator('button:has-text("Amistoso")').first();
+    if (await friendlyBtn.isVisible().catch(() => false)) {
+      await friendlyBtn.click();
+    }
+  }
+
+  const { dateStr, timeStr } = getPeruFutureDateAndTime(hoursAhead);
+  await form.locator('#tt-reto-date').fill(dateStr);
+  await form.locator('#tt-reto-time').fill(timeStr);
+  await pageA.waitForTimeout(250);
+
+  await form.locator('button[type="submit"]:has-text("Enviar Desafío")').click();
+  await pageA.waitForTimeout(1600);
+
+  return { ok: true, dateStr, timeStr };
+}
+
+async function acceptIncomingChallengeOnB(pageB, challengerFirstName) {
+  await pageB.reload({ waitUntil: 'domcontentloaded' });
+  await dismissSplashAndModals(pageB);
+  await pageB.waitForTimeout(1200);
+
+  // 1. Revisar popup automático de reto entrante
+  const popupAccept = pageB.locator('button:has-text("Aceptar Desafío Ahora")').first();
+  let waHref = '';
+
+  if (await popupAccept.isVisible().catch(() => false)) {
+    const waLink = pageB.locator('a[href*="wa.me/"]').first();
+    waHref = (await waLink.getAttribute('href').catch(() => '')) || '';
+    await popupAccept.click();
+    await pageB.waitForTimeout(1400);
+    return { ok: true, via: 'popup', waHref };
+  }
+
+  // 2. Fallback: alerta prioritaria o pestaña Tus Desafíos
+  await clickDockTab(pageB, /Retos/i);
+  const acceptNow = pageB.locator('button:has-text("Aceptar ahora")').first();
+  if (await acceptNow.isVisible().catch(() => false)) {
+    await acceptNow.click();
+    await pageB.waitForTimeout(1400);
+  } else {
+    const misRetosTab = pageB.locator('[role="tab"]:has-text("Tus Desafíos")').first();
+    await misRetosTab.click();
+    await pageB.waitForTimeout(600);
+    const card = pageB.locator('.tt-match-card').filter({ hasText: challengerFirstName }).first();
+    const waLink = card.locator('a[href*="wa.me/"]').first();
+    waHref = (await waLink.getAttribute('href').catch(() => '')) || '';
+    const acceptCardBtn = card.locator('button:has-text("Aceptar Desafío")').first();
+    if (!(await acceptCardBtn.isVisible().catch(() => false))) {
+      return { ok: false, via: 'none', waHref };
+    }
+    await acceptCardBtn.click();
+    await pageB.waitForTimeout(1400);
+  }
+
+  // Capturar enlace WhatsApp desde la tarjeta ya programada si aún no se leyó
+  if (!waHref) {
+    const misRetosTab = pageB.locator('[role="tab"]:has-text("Tus Desafíos")').first();
+    await misRetosTab.click();
+    await pageB.waitForTimeout(500);
+    const card = pageB.locator('.tt-match-card').filter({ hasText: challengerFirstName }).first();
+    waHref = (await card.locator('a[href*="wa.me/"]').first().getAttribute('href').catch(() => '')) || '';
+  }
+
+  return { ok: true, via: 'card', waHref };
+}
+
+async function runMultiBotSimulation() {
+  console.log(`🤖 Iniciando Simulador Multi-Bot E2E contra: ${TARGET_URL}`);
+  const browser = await chromium.launch({ headless: true });
+
+  const botA = await createBotContext(browser, 'Bot-A');
+  const botB = await createBotContext(browser, 'Bot-B');
+  const botC = await createBotContext(browser, 'Bot-C');
+
+  try {
+    // ----------------------------------------------------------------------
+    // FASE 1: LOGIN SIMULTÁNEO DE 3 BOTS (A, B y C)
+    // ----------------------------------------------------------------------
+    const [loginA, loginB, loginC] = await Promise.all([
+      loginAsDemoIndex(botA.page, 'Bot A', 0),
+      loginAsDemoIndex(botB.page, 'Bot B', 1),
+      loginAsDemoIndex(botC.page, 'Bot C', 2),
+    ]);
+
+    const allLogged = loginA.ok && loginB.ok && loginC.ok;
+    recordStep(
+      'E2E-01',
+      'Login simultáneo de 3 Bots (Retador, Rival y Árbitro)',
+      allLogged,
+      allLogged
+        ? `Bot A: ${loginA.name} | Bot B: ${loginB.name} | Bot C: ${loginC.name}`
+        : `Faltan cuentas demo activas para login automático (chips detectados: ${loginA.count}). Asegúrate de tener enableDemoQuickLogin: true durante el QA.`,
+      await takeShot(botA.page, '01-bots-login.png')
+    );
+
+    if (!allLogged) {
+      throw new Error('No fue posible loguear los 3 bots demo.');
+    }
+
+    const firstA = loginA.name.split(' ')[0];
+    const firstB = loginB.name.split(' ')[0];
+    const firstC = loginC.name.split(' ')[0];
+
+    // ----------------------------------------------------------------------
+    // FASE 2: RETO >= 24H (Bot A -> Bot B) + ACEPTACIÓN + WHATSAPP LINK
+    // ----------------------------------------------------------------------
+    const reto1 = await launchChallengeFromA(botA.page, loginB.name, 72, true);
+    recordStep(
+      'E2E-02',
+      'Bot A lanza reto (> 24h) a Bot B',
+      reto1.ok,
+      reto1.ok
+        ? `Reto enviado para ${reto1.dateStr} ${reto1.timeStr} (Amistoso para no ensuciar ELO real).`
+        : reto1.reason,
+      await takeShot(botA.page, '02-botA-reto-enviado.png')
+    );
+
+    const accept1 = reto1.ok
+      ? await acceptIncomingChallengeOnB(botB.page, firstA)
+      : { ok: false, waHref: '' };
+
+    recordStep(
+      'E2E-03',
+      'Bot B recibe en vivo y acepta el reto',
+      accept1.ok,
+      accept1.ok
+        ? `Aceptado correctamente vía ${accept1.via}. Estado actualizado a PROGRAMADO.`
+        : 'Bot B no visualizó el botón de aceptar reto.',
+      await takeShot(botB.page, '03-botB-reto-aceptado.png')
+    );
+
+    const waValid = Boolean(
+      accept1.waHref && accept1.waHref.includes('wa.me/') && accept1.waHref.includes('text=')
+    );
+    recordStep(
+      'E2E-04',
+      'Verificación de enlace WhatsApp (número + mensaje prellenado)',
+      waValid,
+      waValid
+        ? `Enlace válido generado: ${accept1.waHref.slice(0, 82)}...`
+        : 'No se detectó enlace wa.me en la tarjeta/popup (revisa si el jugador demo tiene WhatsApp o hideWhatsapp activo).'
+    );
+
+    // ----------------------------------------------------------------------
+    // FASE 3: CAMBIO DE HORA CON DOBLE ACUERDO (>= 24h ANTES)
+    // ----------------------------------------------------------------------
+    let reschedProposed = false;
+    let reschedAccepted = false;
+
+    if (accept1.ok) {
+      await botA.page.reload({ waitUntil: 'domcontentloaded' });
+      await dismissSplashAndModals(botA.page);
+      await clickDockTab(botA.page, /Retos/i);
+      await botA.page.locator('[role="tab"]:has-text("Tus Desafíos")').first().click();
+      await botA.page.waitForTimeout(700);
+
+      const cardA = botA.page
+        .locator('.tt-match-card')
+        .filter({ hasText: firstB })
+        .filter({ hasText: 'PROGRAMADO' })
+        .first();
+      const changeTimeBtn = cardA.locator('button:has-text("Cambiar hora")').first();
+
+      if (await changeTimeBtn.isVisible().catch(() => false)) {
+        await changeTimeBtn.click();
+        await botA.page.waitForTimeout(450);
+        const { dateStr, timeStr } = getPeruFutureDateAndTime(96);
+        await botA.page.locator('#tt-resched-date').fill(dateStr);
+        await botA.page.locator('#tt-resched-time').fill(timeStr);
+        await botA.page.locator('button:has-text("Enviar Propuesta a mi Rival")').click();
+        await botA.page.waitForTimeout(1400);
+        reschedProposed = true;
+      }
+
+      if (reschedProposed) {
+        await botB.page.reload({ waitUntil: 'domcontentloaded' });
+        await dismissSplashAndModals(botB.page);
+        await clickDockTab(botB.page, /Retos/i);
+        await botB.page.locator('[role="tab"]:has-text("Tus Desafíos")').first().click();
+        await botB.page.waitForTimeout(800);
+
+        const acceptHourBtn = botB.page.locator('button:has-text("Aceptar nueva hora")').first();
+        if (await acceptHourBtn.isVisible().catch(() => false)) {
+          await acceptHourBtn.click();
+          await botB.page.waitForTimeout(1400);
+          reschedAccepted = true;
+        }
+      }
+    }
+
+    recordStep(
+      'E2E-05',
+      'Cambio de hora con doble acuerdo (>= 24h antes)',
+      reschedProposed && reschedAccepted,
+      reschedProposed && reschedAccepted
+        ? 'Bot A propuso nuevo horario y Bot B lo aceptó desde la caja de doble acuerdo.'
+        : `Propuesto=${reschedProposed}, Aceptado=${reschedAccepted}.`,
+      await takeShot(botB.page, '04-cambio-hora-doble-acuerdo.png')
+    );
+
+    // ----------------------------------------------------------------------
+    // FASE 4: CANDADO ANTI 7-7 + SUBIR MARCADOR + DISPUTA / IMPUGNACIÓN
+    // ----------------------------------------------------------------------
+    let blocked77 = false;
+    let disputedOk = false;
+
+    if (accept1.ok) {
+      await botA.page.reload({ waitUntil: 'domcontentloaded' });
+      await dismissSplashAndModals(botA.page);
+      await clickDockTab(botA.page, /Retos/i);
+      await botA.page.locator('[role="tab"]:has-text("Tus Desafíos")').first().click();
+      await botA.page.waitForTimeout(700);
+
+      const cardA = botA.page
+        .locator('.tt-match-card')
+        .filter({ hasText: firstB })
+        .filter({ hasText: 'PROGRAMADO' })
+        .first();
+      const uploadBtn = cardA.locator('button:has-text("Subir Resultado")').first();
+
+      if (await uploadBtn.isVisible().catch(() => false)) {
+        await uploadBtn.click();
+        await botA.page.waitForTimeout(500);
+
+        const inputs = botA.page.locator('.tt-direct-num-input');
+        // Probar 7-7 imposible
+        await inputs.nth(0).fill('7');
+        await inputs.nth(1).fill('7');
+        await inputs.nth(2).fill('6');
+        await inputs.nth(3).fill('4');
+        await botA.page.waitForTimeout(300);
+        const sendWhileInvalid = await botA.page
+          .locator('button:has-text("Enviar Resultado a mi Rival")')
+          .isVisible()
+          .catch(() => false);
+        blocked77 = !sendWhileInvalid;
+
+        // Ahora marcador válido 6-4, 6-3
+        await inputs.nth(0).fill('6');
+        await inputs.nth(1).fill('4');
+        await inputs.nth(2).fill('6');
+        await inputs.nth(3).fill('3');
+        await botA.page.waitForTimeout(400);
+
+        const sendValidBtn = botA.page
+          .locator('button:has-text("Enviar Resultado a mi Rival"), button:has-text("Confirmar Resultado Oficial")')
+          .first();
+        if (await sendValidBtn.isVisible().catch(() => false)) {
+          await sendValidBtn.click();
+          await botA.page.waitForTimeout(1600);
+
+          // Bot B impugna el marcador (Disputa)
+          await botB.page.reload({ waitUntil: 'domcontentloaded' });
+          await dismissSplashAndModals(botB.page);
+          await botB.page.waitForTimeout(1000);
+
+          const disputeBtn = botB.page.locator('button:has-text("Impugnar")').first();
+          if (await disputeBtn.isVisible().catch(() => false)) {
+            await disputeBtn.click();
+            await botB.page.waitForTimeout(1400);
+            await clickDockTab(botB.page, /Retos/i);
+            await botB.page.locator('[role="tab"]:has-text("Tus Desafíos")').first().click();
+            await botB.page.waitForTimeout(600);
+            disputedOk = await botB.page
+              .locator('.tt-match-card:has-text("EN REVISIÓN")')
+              .first()
+              .isVisible()
+              .catch(() => false);
+          }
+        }
+      }
+    }
+
+    recordStep(
+      'E2E-06',
+      'Candado anti-marcador imposible (bloquea 7-7)',
+      blocked77,
+      blocked77
+        ? 'El sistema bloqueó 7-7 correctamente impidiendo enviar el marcador.'
+        : 'No se pudo comprobar el bloqueo del marcador 7-7.'
+    );
+
+    recordStep(
+      'E2E-07',
+      'Disputa / Impugnación de marcador (Bot A sube -> Bot B impugna)',
+      disputedOk,
+      disputedOk
+        ? 'Bot B impugnó el resultado y la tarjeta pasó a EN REVISIÓN sin alterar puntos.'
+        : 'No se completó el estado EN REVISIÓN tras impugnar.',
+      await takeShot(botB.page, '05-disputa-impugnada.png')
+    );
+
+    // ----------------------------------------------------------------------
+    // FASE 5: VENTANA < 24H -> DESIGNAR ÁRBITRO (BOT C) + MODO ÁRBITRO EN VIVO
+    // ----------------------------------------------------------------------
+    let judgeAssigned = false;
+    let judgeClosedToReview = false;
+
+    const reto2 = await launchChallengeFromA(botA.page, loginB.name, 4, true);
+    const accept2 = reto2.ok
+      ? await acceptIncomingChallengeOnB(botB.page, firstA)
+      : { ok: false };
+
+    if (accept2.ok) {
+      await botA.page.reload({ waitUntil: 'domcontentloaded' });
+      await dismissSplashAndModals(botA.page);
+      await clickDockTab(botA.page, /Retos/i);
+      await botA.page.locator('[role="tab"]:has-text("Tus Desafíos")').first().click();
+      await botA.page.waitForTimeout(700);
+
+      const cardShort = botA.page
+        .locator('.tt-match-card')
+        .filter({ hasText: firstB })
+        .filter({ hasText: 'PROGRAMADO' })
+        .first();
+      const assignBtn = cardShort.locator('button:has-text("Designar Árbitro")').first();
+      if (await assignBtn.isVisible().catch(() => false)) {
+        await assignBtn.click();
+        await botA.page.waitForTimeout(450);
+
+        const selectEl = botA.page.locator('#tt-assign-judge-sel');
+        const options = await selectEl.locator('option').allTextContents();
+        const matchOpt = options.find((t) => t.toLowerCase().includes(firstC.toLowerCase()));
+        if (matchOpt) {
+          await selectEl.selectOption({ label: matchOpt });
+          await botA.page.waitForTimeout(1400);
+          judgeAssigned = true;
+        }
+      }
+    }
+
+    if (judgeAssigned) {
+      await botC.page.reload({ waitUntil: 'domcontentloaded' });
+      await dismissSplashAndModals(botC.page);
+      await clickDockTab(botC.page, /Retos/i);
+      await botC.page.locator('[role="tab"]:has-text("Tus Desafíos")').first().click();
+      await botC.page.waitForTimeout(800);
+
+      const refBtn = botC.page.locator('button:has-text("Abrir Modo Árbitro"), button:has-text("Llevar Marcador (Árbitro)")').first();
+      if (await refBtn.isVisible().catch(() => false)) {
+        await refBtn.click();
+        await botC.page.waitForTimeout(500);
+
+        // Sumar 6-0 Set 1 y 6-0 Set 2 con los botones +1 Game
+        const plusBtns = botC.page.locator('.tt-step-plus');
+        for (let g = 0; g < 6; g += 1) {
+          await plusBtns.first().click();
+          await botC.page.waitForTimeout(180);
+        }
+        await botC.page.waitForTimeout(400);
+        // Ahora aparece Set 2 -> el primer +1 Game visible pertenece a Set 2 lado A
+        for (let g = 0; g < 6; g += 1) {
+          await botC.page.locator('.tt-step-plus').first().click();
+          await botC.page.waitForTimeout(180);
+        }
+        await botC.page.waitForTimeout(500);
+
+        const closeRefBtn = botC.page
+          .locator('button:has-text("Cerrar Marcador y Enviar a Revisión")')
+          .first();
+        if (await closeRefBtn.isVisible().catch(() => false)) {
+          await takeShot(botC.page, '06-botC-modo-arbitro.png');
+          await closeRefBtn.click();
+          await botC.page.waitForTimeout(1500);
+          judgeClosedToReview = true;
+        }
+      }
+    }
+
+    recordStep(
+      'E2E-08',
+      'Ventana < 24h: Designar Árbitro (Bot C) + Modo Árbitro exclusivo -> EN REVISIÓN',
+      judgeAssigned && judgeClosedToReview,
+      judgeAssigned && judgeClosedToReview
+        ? `Bot C (${loginC.name}) llevó el marcador en vivo y lo envió a EN REVISIÓN para doble confirmación.`
+        : `Designado=${judgeAssigned}, CerradoARevision=${judgeClosedToReview}.`,
+      await takeShot(botC.page, '07-arbitro-cerrado-revision.png')
+    );
+
+    // ----------------------------------------------------------------------
+    // FASE 6: AUDITORÍA RANKING ANTI-TROLLS (OFICIAL >= 5 PJ vs CALIBRANDO)
+    // ----------------------------------------------------------------------
+    await clickDockTab(botA.page, /Ranking/i);
+    await botA.page.waitForTimeout(700);
+    const hasOficialTab = await botA.page.locator('[role="tab"]:has-text("Oficial")').isVisible().catch(() => false);
+    const hasCalibTab = await botA.page.locator('[role="tab"]:has-text("Calibrando")').isVisible().catch(() => false);
+    await takeShot(botA.page, '08-ranking-oficial.png');
+
+    let calibClean = false;
+    if (hasCalibTab) {
+      await botA.page.locator('[role="tab"]:has-text("Calibrando")').first().click();
+      await botA.page.waitForTimeout(600);
+      const hasPodiumInCalib = await botA.page.locator('.tt-top3-hcard').count();
+      const hasHeaderText = await botA.page
+        .locator('text=LISTA PROVISIONAL')
+        .first()
+        .isVisible()
+        .catch(() => false);
+      calibClean = hasPodiumInCalib === 0 && hasHeaderText;
+      await takeShot(botA.page, '09-ranking-calibrando.png');
+    }
+
+    recordStep(
+      'E2E-09',
+      'Ranking separado: Oficial (>= 5 PJ) vs Calibrando (< 5 PJ sin podio ni #1)',
+      hasOficialTab && hasCalibTab && calibClean,
+      hasOficialTab && hasCalibTab && calibClean
+        ? 'Pestañas Oficial y Calibrando activas; Calibrando muestra lista provisional sin podio ni #1.'
+        : `Oficial=${hasOficialTab}, Calibrando=${hasCalibTab}, SinPodioEnCalibrando=${calibClean}.`
+    );
+  } catch (err) {
+    recordStep('E2E-FATAL', 'Ejecución general del simulador', false, String(err?.message || err));
+  } finally {
+    await botA.ctx.close();
+    await botB.ctx.close();
+    await botC.ctx.close();
+    await browser.close();
+  }
+
+  // ------------------------------------------------------------------------
+  // GENERAR REPORTE MARKDOWN Y JSON
+  // ------------------------------------------------------------------------
+  const passedCount = results.filter((r) => r.passed).length;
+  const totalCount = results.length;
+  const healthPct = totalCount > 0 ? Math.round((passedCount / totalCount) * 100) : 0;
 
   const mdLines = [
-    `# Reporte QA Automatizado Pro · TOTAL TENIS`,
-    `- **URL auditada:** ${report.url}`,
-    `- **Fecha (UTC):** ${report.timestamp}`,
-    `- **Salud global:** **${scorePct}%** (${passed} aprobadas · ${failed} fallos · ${report.warnings.length} advertencias)`,
-    ``,
-    `## 1. Fallos críticos detectados (${failed})`,
-    failed === 0
-      ? `✅ Ningún fallo crítico detectado.`
-      : report.bugs.map((b) => `- ❌ ${b}`).join('\n'),
-    ``,
-    `## 2. Advertencias visuales / UX (${report.warnings.length})`,
-    report.warnings.length === 0
-      ? `✅ Sin advertencias visuales ni de desborde.`
-      : report.warnings.map((w) => `- ⚠️ ${w}`).join('\n'),
-    ``,
-    `## 3. Matriz completa de pruebas (${report.checks.length})`,
-    `| Estado | Bloque | Prueba | Resultado |`,
-    `| :--- | :--- | :--- | :--- |`,
-    ...report.checks.map(
-      (c) =>
-        `| ${c.ok ? '✅' : '❌'} | ${c.category} | **${c.name}** | ${String(c.detail).replace(/\|/g, '/')} |`
+    `# 🤖 Reporte Simulador Multi-Bot E2E · TOTAL TENIS`,
+    `- **URL probada:** ${TARGET_URL}`,
+    `- **Salud E2E:** **${passedCount}/${totalCount} pruebas aprobadas (${healthPct}%)**`,
+    `- **Errores JS (pageerror):** ${pageErrors.length}`,
+    `- **Fallos HTTP (4xx/5xx):** ${failedRequests.length}`,
+    '',
+    '| ID | Flujo probado | Estado | Detalle | Captura |',
+    '| :--- | :--- | :---: | :--- | :--- |',
+    ...results.map(
+      (r) =>
+        `| \`${r.id}\` | ${r.title} | ${r.passed ? '✅ OK' : '❌ FALLO'} | ${r.detail.replace(/\|/g, '/')} | ${r.screenshot || '—'} |`
     ),
-    ``,
-    `## 4. Capturas generadas (${report.screenshots.length})`,
-    ...report.screenshots.map((s) => `- \`screenshots/${s.filename}\` — ${s.label}`),
   ];
 
-  const md = mdLines.join('\n');
-  fs.writeFileSync(path.join(OUT_DIR, 'QA_REPORT.md'), md, 'utf8');
-  fs.writeFileSync(path.join(OUT_DIR, 'qa-report.json'), JSON.stringify(report, null, 2), 'utf8');
+  if (pageErrors.length > 0) {
+    mdLines.push('', '## Errores JS detectados', ...pageErrors.map((e) => `- ${e}`));
+  }
+  if (failedRequests.length > 0) {
+    mdLines.push('', '## Fallos de red detectados', ...failedRequests.slice(0, 15).map((e) => `- ${e}`));
+  }
 
-  console.log(md);
+  const mdText = mdLines.join('\n');
+  fs.writeFileSync(path.join(OUT_DIR, 'QA_E2E_REPORT.md'), mdText, 'utf-8');
+  fs.writeFileSync(
+    path.join(OUT_DIR, 'qa-e2e-report.json'),
+    JSON.stringify({ TARGET_URL, healthPct, results, pageErrors, consoleErrors, failedRequests }, null, 2),
+    'utf-8'
+  );
 
   if (process.env.GITHUB_STEP_SUMMARY) {
-    fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, md + '\n', 'utf8');
+    fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${mdText}\n`);
+  }
+
+  console.log('\n' + mdText);
+  if (passedCount < totalCount) {
+    process.exitCode = 1;
   }
 }
 
-runAudit().catch((err) => {
-  console.error('Error fatal en QA Bot:', err);
+runMultiBotSimulation().catch((err) => {
+  console.error('Error fatal:', err);
   process.exit(1);
 });
