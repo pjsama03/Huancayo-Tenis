@@ -62,6 +62,8 @@ export default function RetosView({
   onCreateChallenge,
   onUpdateChallenge,
   onFinalizeMatch,
+  onConfirmProposedScore,
+  onDisputeProposedScore,
   onOpenPlayerProfile,
   onOpenStoriesWithMatch,
   onOpenAuth,
@@ -228,6 +230,16 @@ export default function RetosView({
   const openScoreModal = useCallback(
     (ch, preferredMode = 'direct') => {
       if (!ch) return;
+      if (ch.status === 'DISPUTED' && !isAdmin) {
+        triggerHaptic('warning');
+        if (onNotify) {
+          onNotify(
+            'Este partido está impugnado y congelado en revisión por el Comité Administrador.',
+            'warning'
+          );
+        }
+        return;
+      }
       const perms = getMatchPermissions(ch, currentUser, isAdmin);
       if (perms.isExpiredNoResult && !isAdmin) {
         triggerHaptic('warning');
@@ -1018,6 +1030,8 @@ export default function RetosView({
                   }}
                   onRespondReschedule={handleRespondReschedule}
                   onOpenAssignJudge={(item) => setAssignJudgeTarget(item)}
+                  onConfirmProposedScore={onConfirmProposedScore}
+                  onDisputeProposedScore={onDisputeProposedScore}
                   onOpenPlayerProfile={onOpenPlayerProfile}
                   onOpenStories={onOpenStoriesWithMatch}
                 />
@@ -1075,6 +1089,8 @@ export default function RetosView({
                   }}
                   onRespondReschedule={handleRespondReschedule}
                   onOpenAssignJudge={(item) => setAssignJudgeTarget(item)}
+                  onConfirmProposedScore={onConfirmProposedScore}
+                  onDisputeProposedScore={onDisputeProposedScore}
                   onOpenPlayerProfile={onOpenPlayerProfile}
                   onOpenStories={onOpenStoriesWithMatch}
                 />
@@ -2426,6 +2442,39 @@ export default function RetosView({
         }
         .tt-retos-view.is-light {
           color: #1E0734;
+        }
+        .tt-disputed-freeze-box {
+          flex: 1 1 100%;
+          padding: 11px 12px;
+          border-radius: 14px;
+          background: linear-gradient(180deg, rgba(239, 68, 68, 0.2) 0%, rgba(127, 29, 29, 0.14) 100%);
+          border: 1.5px solid rgba(248, 113, 113, 0.56);
+          color: #FECACA;
+          display: flex;
+          flex-direction: column;
+          gap: 5px;
+        }
+        .tt-retos-view.is-light .tt-disputed-freeze-box {
+          background: linear-gradient(180deg, #FFF5F5 0%, #FEE2E2 100%);
+          border-color: rgba(220, 38, 38, 0.45);
+          color: #991B1B;
+        }
+        .tt-disputed-freeze-head {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          font-size: 0.77rem;
+        }
+        .tt-disputed-freeze-reason {
+          margin: 0;
+          font-size: 0.73rem;
+          line-height: 1.4;
+          opacity: 0.94;
+        }
+        .tt-disputed-freeze-foot {
+          font-size: 0.68rem;
+          opacity: 0.82;
+          font-weight: 700;
         }
         .tt-resched-proposal-box {
           padding: 11px 12px;
