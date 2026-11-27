@@ -119,13 +119,19 @@ function readSavedLocalSession() {
       userId: String(parsed.userId),
       tutorParentId: parsed.tutorParentId ? String(parsed.tutorParentId) : null,
       isAdmin: Boolean(parsed.isAdmin),
+      sandboxEmulating: Boolean(parsed.sandboxEmulating),
     };
   } catch {
     return null;
   }
 }
 
-function writeSavedLocalSession({ userId, tutorParentId = null, isAdmin = false }) {
+function writeSavedLocalSession({
+  userId,
+  tutorParentId = null,
+  isAdmin = false,
+  sandboxEmulating = false,
+}) {
   try {
     if (!userId) return;
     window.localStorage.setItem(
@@ -134,6 +140,7 @@ function writeSavedLocalSession({ userId, tutorParentId = null, isAdmin = false 
         userId: String(userId),
         tutorParentId: tutorParentId ? String(tutorParentId) : null,
         isAdmin: Boolean(isAdmin),
+        sandboxEmulating: Boolean(sandboxEmulating),
       })
     );
   } catch {
@@ -493,6 +500,9 @@ export default function App() {
   const activeRevealChallengeIdRef = useRef(null);
 
   const [isAdminSession, setIsAdminSession] = useState(() => Boolean(initialSavedSession?.isAdmin));
+  const [sandboxEmulating, setSandboxEmulating] = useState(() =>
+    Boolean(initialSavedSession?.sandboxEmulating)
+  );
   const [activePartner, setActivePartner] = useState(null);
 
   const [proShopModal, setProShopModal] = useState({ open: false, mode: 'shop' });
@@ -563,9 +573,10 @@ export default function App() {
         userId: currentUserId,
         tutorParentId,
         isAdmin: isAdminSession,
+        sandboxEmulating,
       });
     }
-  }, [currentUserId, tutorParentId, isAdminSession]);
+  }, [currentUserId, tutorParentId, isAdminSession, sandboxEmulating]);
 
   const showToast = useCallback((message, type = 'info') => {
     if (!message) return;
@@ -1036,9 +1047,12 @@ export default function App() {
     return players.find((p) => p.id === parentId) || null;
   }, [players, currentUser, tutorParentId]);
 
-  const effectiveIsAdmin = Boolean(
+  // Autoridad real para abrir la Suite Maestra (aunque estés emulando a un jugador)
+  const hasAdminAuthority = Boolean(
     isAdminSession || currentUser?.isAdmin || activeTutorParent?.isAdmin
   );
+  // Permisos en cancha/vistas: si estás emulando a un jugador en Sandbox, ves la app 100% como él (sin atajos admin)
+  const effectiveIsAdmin = Boolean(hasAdminAuthority && !sandboxEmulating);
 
   const activePlayers = useMemo(() => players.filter((p) => !p.isPaused), [players]);
   const activeClubs = useMemo(() => clubs.filter((c) => c.active !== false), [clubs]);
@@ -1295,7 +1309,7 @@ export default function App() {
       const allowed =
         target.id === rootParentId ||
         (target.isTutelado && target.tutorId === rootParentId) ||
-        effectiveIsAdmin;
+        hasAdminAuthority;
 
       if (!allowed) {
         showToast('No tienes permisos para cambiar a esa cuenta.', 'warning');
@@ -2399,6 +2413,7 @@ export default function App() {
     setCurrentUserId(null);
     setTutorParentId(null);
     setIsAdminSession(false);
+    setSandboxEmulating(false);
     setActivePartner(null);
     setQuickChallengeRival(null);
     setGemLedger([]);
@@ -2827,6 +2842,31 @@ export default function App() {
                 type="button"
                 className="tt-btn tt-btn-primary"
                 onClick={() => {
+                  if (Engine.isChallengeExpiredWithoutResult(popupChallenge)) {
+                    triggerHaptic('warning');
+                    showToast('La hora de este desafío ya venció. Coordina un nuevo reto.', 'warning');
+                    setDismissedIncomingIds((prev) => [...prev, popupChallenge.id]);
+                    return;
+                  }
+                  const conflict = Engine.findScheduleConflict(challenges, {
+                    challengerId: currentUser?.id,
+                    rivalId: popupChallenge.playerAId,
+                    targetIso: popupChallenge.scheduledIso || popupChallenge.scheduledAt,
+                    excludeChallengeId: popupChallenge.id,
+                    blockMinutes: 90,
+                    onlyConfirmedForSelf: true,
+                  });
+                  if (conflict.conflict) {
+                    triggerHaptic('warning');
+                    const c = conflict.challenge;
+                    showToast(
+                      conflict.who === 'self'
+                        ? `No puedes aceptar: ya tienes un partido programado a esa hora (${c.dateLabel} · ${c.timeLabel}).`
+                        : `Tu rival ya tiene otro partido confirmado a esa hora (${c.dateLabel} · ${c.timeLabel}).`,
+                      'warning'
+                    );
+                    return;
+                  }
                   triggerHaptic('success');
                   handleUpdateChallenge(popupChallenge.id, { status: 'SCHEDULED' });
                   setDismissedIncomingIds((prev) => [...prev, popupChallenge.id]);
@@ -3107,7 +3147,7 @@ export default function App() {
       <AdminSuiteModal
         isOpen={adminModalOpen}
         onClose={() => setAdminModalOpen(false)}
-        isUnlockedInitially={effectiveIsAdmin}
+        isUnlockedInitially={hasAdminAuthority}
         players={players}
         clubs={clubs}
         challenges={challenges}
@@ -3115,11 +3155,23 @@ export default function App() {
         complaints={complaints}
         seasonSnapshots={seasonSnapshots}
         sponsorsConfig={sponsorsConfig}
-        onUnlockAdminSession={(val) => setIsAdminSession(Boolean(val))}
+        onUnlockAdminSession={(val) => {
+          setIsAdminSession(Boolean(val));
+          if (!val) setSandboxEmulating(false);
+        }}
         onSwitchSandboxUser={(p) => {
           setCurrentUserId(p.id);
           setTutorParentId(p.isTutelado ? p.tutorId : p.id);
-          showToast(`Modo pruebas activo: viendo la app como ${p.name}.`, 'info');
+          const emulateRealPlayer = !Boolean(p.isAdmin);
+          setSandboxEmulating(emulateRealPlayer);
+          setDismissedIncomingIds([]);
+          setDismissedScoreIds([]);
+          showToast(
+            emulateRealPlayer
+              ? `Vista Jugador Real activa: viendo la app exactamente como ${p.name} (sin privilegios Admin).`
+              : `Volviste a tu cuenta Administradora (${p.name}).`,
+            'info'
+          );
         }}
         onAdminUpdatePlayer={handleUpdatePlayer}
         onAdminDeletePlayer={async (pid) => {
@@ -3233,6 +3285,8 @@ export default function App() {
                 totalActivePlayers: Math.max(playersRef.current.length, 130),
                 isWalkover,
                 walkoverWinnerSide,
+                refDate: target.scheduledIso || target.scheduledAt,
+                challengeId: target.id,
               });
               if (!eloRes.ok) {
                 showToast(eloRes.error || 'Marcador corregido inválido.', 'warning');
@@ -3367,6 +3421,7 @@ export default function App() {
           setCurrentUserId(p.id);
           setTutorParentId(p.isTutelado ? p.tutorId : p.id);
           setIsAdminSession(Boolean(p.isAdmin));
+          setSandboxEmulating(false);
           linkOneSignalUser(p.id);
           requestPushPermission();
         }}
@@ -3412,6 +3467,37 @@ export default function App() {
         >
           <span className="tt-toast-dot" aria-hidden="true" />
           <span>{toast.message}</span>
+        </div>
+      )}
+
+
+      {sandboxEmulating && hasAdminAuthority && currentUser && (
+        <div className="tt-sandbox-emul-pill" role="status">
+          <span className="tt-sandbox-dot" aria-hidden="true" />
+          <span className="tt-sandbox-txt">
+            Vista real: <b>{currentUser.name.split(' ')[0]}</b>
+          </span>
+          <button
+            type="button"
+            className="tt-sandbox-btn"
+            onClick={() => {
+              triggerHaptic('light');
+              setAdminModalOpen(true);
+            }}
+          >
+            Suite
+          </button>
+          <button
+            type="button"
+            className="tt-sandbox-btn is-exit"
+            onClick={() => {
+              triggerHaptic('medium');
+              setSandboxEmulating(false);
+              showToast('Saliste de Vista Jugador Real. Privilegios Admin restaurados.', 'info');
+            }}
+          >
+            Salir
+          </button>
         </div>
       )}
 
@@ -3617,6 +3703,50 @@ export default function App() {
           background: #00DC7D;
           flex-shrink: 0;
         }
+
+        .tt-sandbox-emul-pill {
+          position: fixed;
+          left: 12px;
+          bottom: calc(env(safe-area-inset-bottom, 0px) + 86px);
+          z-index: 65;
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          padding: 5px 8px 5px 10px;
+          border-radius: 999px;
+          background: rgba(18, 4, 34, 0.92);
+          border: 1px solid rgba(56, 189, 248, 0.62);
+          box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+          backdrop-filter: blur(14px);
+          -webkit-backdrop-filter: blur(14px);
+          color: #E0F2FE;
+          font-size: 0.68rem;
+          font-weight: 700;
+        }
+        .tt-sandbox-dot {
+          width: 7px;
+          height: 7px;
+          border-radius: 50%;
+          background: #38BDF8;
+          flex-shrink: 0;
+        }
+        .tt-sandbox-txt b { color: #FFFFFF; font-weight: 900; }
+        .tt-sandbox-btn {
+          padding: 3px 8px;
+          border-radius: 999px;
+          background: rgba(56, 189, 248, 0.2);
+          border: 1px solid rgba(56, 189, 248, 0.45);
+          color: #BAE6FD;
+          font-size: 0.64rem;
+          font-weight: 900;
+          cursor: pointer;
+        }
+        .tt-sandbox-btn.is-exit {
+          background: rgba(239, 68, 68, 0.2);
+          border-color: rgba(248, 113, 113, 0.5);
+          color: #FECACA;
+        }
+
         .tt-cloud-sync-pill {
           position: fixed;
           right: 12px;
