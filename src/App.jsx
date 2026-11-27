@@ -399,6 +399,7 @@ export default function App() {
   const playersRef = useRef([]);
   const challengesRef = useRef([]);
   const seasonAutoCloseKeyRef = useRef('');
+  const liveScoreSyncTimersRef = useRef(new Map());
 
   const defaultSeeds = useMemo(() => {
     const seededPlayers = buildInitialPlayers();
@@ -567,6 +568,37 @@ export default function App() {
     );
     setAuthModal({ open: true, mode: 'forgot' });
   }, [initialAuthUrlError, showToast]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const onHashChange = () => {
+      if (hasRecoveryFlagInUrl()) {
+        setShowSplash(false);
+        setAuthModal({ open: false, mode: 'login' });
+        setPasswordRecoveryOpen(true);
+        return;
+      }
+      const errObj = readAuthErrorFromUrl();
+      if (errObj) {
+        if (window.history?.replaceState) {
+          window.history.replaceState(null, '', window.location.pathname);
+        }
+        const isOtpExpired =
+          errObj.code === 'otp_expired' ||
+          String(errObj.desc || '').toLowerCase().includes('expired');
+        showToast(
+          isOtpExpired
+            ? 'El enlace de correo expiró o ya fue consumido. Solicita uno nuevo ahora.'
+            : 'El enlace de acceso no es válido. Solicita uno nuevo.',
+          'warning'
+        );
+        setShowSplash(false);
+        setAuthModal({ open: true, mode: 'forgot' });
+      }
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, [showToast]);
 
   const requireAuth = useCallback(
     (actionLabel = 'realizar esta acción') => {
@@ -1294,7 +1326,7 @@ export default function App() {
     async (challengeId, patch) => {
       if (!requireAuth('modificar un encuentro')) return;
       if (!challengeId || !patch) return;
-      const current = challenges.find((c) => c.id === challengeId);
+      const current = challengesRef.current.find((c) => c.id === challengeId);
       if (!current) return;
 
       const isParticipant =
@@ -1308,8 +1340,41 @@ export default function App() {
       }
 
       const updated = { ...current, ...patch };
+      const isFastLiveScoreTap = Boolean(
+        patch.liveScore &&
+          !patch.judgeId &&
+          !patch.pendingReschedule &&
+          patch.status !== 'DECLINED' &&
+          patch.status !== 'SCHEDULED' &&
+          patch.status !== 'FINISHED' &&
+          patch.status !== 'DISPUTED'
+      );
+
+      // Actualización optimista inmediata para Modo Árbitro (cero toques perdidos en ráfaga)
+      if (isFastLiveScoreTap) {
+        challengesRef.current = challengesRef.current.map((c) =>
+          c.id === challengeId ? updated : c
+        );
+        setChallenges(challengesRef.current);
+
+        const prevTimer = liveScoreSyncTimersRef.current.get(challengeId);
+        if (prevTimer) window.clearTimeout(prevTimer);
+        const timerId = window.setTimeout(() => {
+          liveScoreSyncTimersRef.current.delete(challengeId);
+          const latest = challengesRef.current.find((c) => c.id === challengeId) || updated;
+          upsertCloudChallenge(latest).catch((err) => {
+            console.error('[TOTAL TENIS] Error sincronizando marcador en vivo:', err);
+          });
+        }, 260);
+        liveScoreSyncTimersRef.current.set(challengeId, timerId);
+        return;
+      }
+
       await runWithLock(`update-challenge-${challengeId}`, async () => {
-        setChallenges((prev) => prev.map((c) => (c.id === challengeId ? updated : c)));
+        challengesRef.current = challengesRef.current.map((c) =>
+          c.id === challengeId ? updated : c
+        );
+        setChallenges(challengesRef.current);
         try {
           await upsertCloudChallenge(updated);
         } catch (err) {
@@ -1585,6 +1650,11 @@ export default function App() {
     async ({ challenge, eloResult, liveScore, isWalkover = false, submittedByJudge = false }) => {
       if (!requireAuth('registrar resultados')) return;
       if (!challenge || !eloResult?.ok) return;
+      const pendingScoreTimer = liveScoreSyncTimersRef.current.get(challenge.id);
+      if (pendingScoreTimer) {
+        window.clearTimeout(pendingScoreTimer);
+        liveScoreSyncTimersRef.current.delete(challenge.id);
+      }
 
       const isParticipant =
         currentUser?.id &&
