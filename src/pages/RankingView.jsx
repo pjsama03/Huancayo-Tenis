@@ -370,6 +370,51 @@ function LaurelWreathAvatar({ rank = 1, player, club, size = 64 }) {
   );
 }
 
+
+/* ==========================================================================
+   ODÓMETRO DE PUNTOS ESTILO APPLE (ROLL SUAVE CON EASE-OUT EXPO)
+   ========================================================================== */
+function AnimatedPointsValue({ value, fromValue = null, phase = 'idle', duration = 1850 }) {
+  const targetNum = Number(value) || 0;
+  const startNum = fromValue !== null && fromValue !== undefined ? Number(fromValue) : targetNum;
+  const [displayVal, setDisplayVal] = useState(
+    phase === 'anticipation' ? startNum : targetNum
+  );
+
+  useEffect(() => {
+    if (phase === 'anticipation') {
+      setDisplayVal(startNum);
+      return undefined;
+    }
+    if (phase !== 'gliding' || startNum === targetNum) {
+      setDisplayVal(targetNum);
+      return undefined;
+    }
+
+    let rafId = 0;
+    const t0 = performance.now();
+    const diff = targetNum - startNum;
+
+    const tick = (now) => {
+      const elapsed = now - t0;
+      const progress = Math.min(1, elapsed / duration);
+      // Curva Apple easeOutExpo para un frenado sedoso al aterrizar
+      const eased = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
+      setDisplayVal(Math.round(startNum + diff * eased));
+      if (progress < 1) {
+        rafId = window.requestAnimationFrame(tick);
+      }
+    };
+
+    rafId = window.requestAnimationFrame(tick);
+    return () => {
+      if (rafId) window.cancelAnimationFrame(rafId);
+    };
+  }, [targetNum, startNum, phase, duration]);
+
+  return <>{Number(displayVal || 0).toLocaleString('es-PE')}</>;
+}
+
 /* ==========================================================================
    TOP 3 HORIZONTAL ESCALONADO (#1 GRANDE → #2 MEDIANO → #3 INTERMEDIO)
    Solo jugadores con >= 5 partidos oficiales jugados.
@@ -381,6 +426,7 @@ function TopThreeHorizontalRow({
   isCurrentUser,
   isLight,
   moveHighlight = null,
+  pointsReveal = null,
   registerRowRef,
   onOpenProfile,
   onQuickChallenge,
@@ -396,12 +442,25 @@ function TopThreeHorizontalRow({
   const hasQuorum = getOfficialMatchesPlayed(player) >= ELO_CONFIG.MIN_MATCHES_SEASON_TROPHY;
 
   const avatarSize = rank === 1 ? 64 : rank === 2 ? 54 : 48;
-  const moveCls =
-    moveHighlight?.dir === 'up'
-      ? 'is-rank-climb'
-      : moveHighlight?.dir === 'down'
-      ? 'is-rank-drop'
-      : '';
+  const moveCls = pointsReveal?.isFocus
+    ? pointsReveal.delta >= 0
+      ? 'is-rank-climb is-rank-climb-focus'
+      : 'is-rank-drop is-rank-drop-focus'
+    : pointsReveal?.isOvertaker
+    ? 'is-rank-overtaker'
+    : pointsReveal?.isDisplaced
+    ? 'is-rank-displaced'
+    : moveHighlight?.dir === 'up'
+    ? 'is-rank-climb'
+    : moveHighlight?.dir === 'down'
+    ? 'is-rank-drop'
+    : '';
+  const showTouchdownSheen = Boolean(pointsReveal?.isFocus && pointsReveal?.phase === 'settled');
+  const showPtsDelta = Boolean(
+    pointsReveal &&
+      pointsReveal.delta !== 0 &&
+      (pointsReveal.phase === 'gliding' || pointsReveal.phase === 'settled')
+  );
 
   return (
     <article
@@ -427,6 +486,12 @@ function TopThreeHorizontalRow({
       }}
     >
       {rank === 1 && <span className="tt-top3-sheen" aria-hidden="true" />}
+      {showTouchdownSheen && (
+        <span
+          className={`tt-rk-touchdown-sheen ${pointsReveal.delta >= 0 ? 'is-gain' : 'is-loss'}`}
+          aria-hidden="true"
+        />
+      )}
 
       <div className="tt-top3-left">
         <LaurelWreathAvatar rank={rank} player={player} club={club} size={avatarSize} />
@@ -467,7 +532,18 @@ function TopThreeHorizontalRow({
 
       <div className="tt-top3-right">
         <div className="tt-top3-pts-box">
-          <strong>{Number(player.points || 0).toLocaleString('es-PE')}</strong>
+          {showPtsDelta && (
+            <span className={`tt-rk-pts-delta ${pointsReveal.delta > 0 ? 'is-gain' : 'is-loss'}`}>
+              {pointsReveal.delta > 0 ? `+${pointsReveal.delta}` : pointsReveal.delta} PTS
+            </span>
+          )}
+          <strong>
+            <AnimatedPointsValue
+              value={pointsReveal ? pointsReveal.newPoints : player.points}
+              fromValue={pointsReveal ? pointsReveal.oldPoints : null}
+              phase={pointsReveal ? pointsReveal.phase : 'idle'}
+            />
+          </strong>
           <span>PTS</span>
         </div>
 
@@ -517,6 +593,7 @@ function RankingPlayerRow({
   showLaurelMini = false,
   divisionTheme,
   moveHighlight = null,
+  pointsReveal = null,
   registerRowRef,
   onOpenProfile,
   onQuickChallenge,
@@ -531,12 +608,25 @@ function RankingPlayerRow({
   const trend = Number(player.rankTrend || 0);
   const medal = showLaurelMini && rank <= 3 ? MEDAL_PALETTE[rank] : null;
 
-  const moveCls =
-    moveHighlight?.dir === 'up'
-      ? 'is-rank-climb'
-      : moveHighlight?.dir === 'down'
-      ? 'is-rank-drop'
-      : '';
+  const moveCls = pointsReveal?.isFocus
+    ? pointsReveal.delta >= 0
+      ? 'is-rank-climb is-rank-climb-focus'
+      : 'is-rank-drop is-rank-drop-focus'
+    : pointsReveal?.isOvertaker
+    ? 'is-rank-overtaker'
+    : pointsReveal?.isDisplaced
+    ? 'is-rank-displaced'
+    : moveHighlight?.dir === 'up'
+    ? 'is-rank-climb'
+    : moveHighlight?.dir === 'down'
+    ? 'is-rank-drop'
+    : '';
+  const showTouchdownSheen = Boolean(pointsReveal?.isFocus && pointsReveal?.phase === 'settled');
+  const showPtsDelta = Boolean(
+    pointsReveal &&
+      pointsReveal.delta !== 0 &&
+      (pointsReveal.phase === 'gliding' || pointsReveal.phase === 'settled')
+  );
 
   return (
     <div
@@ -556,6 +646,13 @@ function RankingPlayerRow({
         }
       }}
     >
+      {showTouchdownSheen && (
+        <span
+          className={`tt-rk-touchdown-sheen ${pointsReveal.delta >= 0 ? 'is-gain' : 'is-loss'}`}
+          aria-hidden="true"
+        />
+      )}
+
       <div className="tt-rk-rank-col">
         <span className="tt-rk-rank-num" style={medal ? { color: medal.primary } : undefined}>
           {rank}
@@ -647,8 +744,17 @@ function RankingPlayerRow({
       </div>
 
       <div className="tt-rk-points-col">
+        {showPtsDelta && (
+          <span className={`tt-rk-pts-delta ${pointsReveal.delta > 0 ? 'is-gain' : 'is-loss'}`}>
+            {pointsReveal.delta > 0 ? `+${pointsReveal.delta}` : pointsReveal.delta} PTS
+          </span>
+        )}
         <strong className="tt-rk-points-val">
-          {Number(player.points || 0).toLocaleString('es-PE')}
+          <AnimatedPointsValue
+            value={pointsReveal ? pointsReveal.newPoints : player.points}
+            fromValue={pointsReveal ? pointsReveal.oldPoints : null}
+            phase={pointsReveal ? pointsReveal.phase : 'idle'}
+          />
         </strong>
         <span className="tt-rk-points-unit">PTS</span>
 
@@ -679,6 +785,8 @@ function CalibratingPlayerRow({
   player,
   club,
   isCurrentUser,
+  pointsReveal = null,
+  registerRowRef = null,
   onOpenProfile,
   onQuickChallenge,
   onOpenHeadToHead,
@@ -691,12 +799,26 @@ function CalibratingPlayerRow({
   const wins = Number(player.wins) || 0;
   const losses = Number(player.losses) || 0;
 
+  const calMoveCls = pointsReveal?.isFocus
+    ? pointsReveal.delta >= 0
+      ? 'is-rank-climb is-rank-climb-focus'
+      : 'is-rank-drop is-rank-drop-focus'
+    : '';
+  const showCalDelta = Boolean(
+    pointsReveal &&
+      pointsReveal.delta !== 0 &&
+      (pointsReveal.phase === 'gliding' || pointsReveal.phase === 'settled')
+  );
+
   return (
     <div
+      ref={(el) => {
+        if (registerRowRef) registerRowRef(player.id, el);
+      }}
       id={isCurrentUser ? 'tt-my-calib-row' : undefined}
       role="button"
       tabIndex={0}
-      className={`tt-rk-row is-calib-row ${isCurrentUser ? 'is-me-halo' : ''}`}
+      className={`tt-rk-row is-calib-row ${isCurrentUser ? 'is-me-halo' : ''} ${calMoveCls}`}
       onClick={() => {
         triggerHaptic('light');
         if (onOpenProfile) onOpenProfile(player);
@@ -760,8 +882,17 @@ function CalibratingPlayerRow({
       </div>
 
       <div className="tt-rk-points-col">
+        {showCalDelta && (
+          <span className={`tt-rk-pts-delta ${pointsReveal.delta > 0 ? 'is-gain' : 'is-loss'}`}>
+            {pointsReveal.delta > 0 ? `+${pointsReveal.delta}` : pointsReveal.delta} PTS
+          </span>
+        )}
         <strong className="tt-rk-points-val is-prov-pts">
-          {Number(player.points || 0).toLocaleString('es-PE')}
+          <AnimatedPointsValue
+            value={pointsReveal ? pointsReveal.newPoints : player.points}
+            fromValue={pointsReveal ? pointsReveal.oldPoints : null}
+            phase={pointsReveal ? pointsReveal.phase : 'idle'}
+          />
         </strong>
         <span className="tt-rk-points-unit is-prov-unit">ELO PROV.</span>
 
@@ -811,6 +942,8 @@ export default function RankingView({
   seasonSnapshots = null,
   currentUser = null,
   theme = 'dark',
+  pendingRankReveal = null,
+  onRankRevealComplete,
   onOpenPlayerProfile,
   onOpenHeadToHead,
   onQuickChallenge,
@@ -828,8 +961,10 @@ export default function RankingView({
   const activeAnimsRef = useRef(new Map());
   const settleTimerRef = useRef(null);
   const stageTimerRef = useRef(null);
+  const finishRevealTimerRef = useRef(null);
   const lastLiveRanksRef = useRef(null);
   const pendingStagedFlipMovesRef = useRef(null);
+  const handledRevealIdRef = useRef(null);
 
   const registerRowRef = (playerId, el) => {
     if (el) rowRefs.current.set(playerId, el);
@@ -937,149 +1072,283 @@ export default function RankingView({
   );
 
   /* ========================================================================
-     MOTOR 3D DE DESPLAZAMIENTO LENTO (QUIEN SUBE PASA POR DELANTE EN 3D;
-     QUIENES BAJAN SE HUNDEN POR DETRÁS Y CEDEN SU PUESTO UNO A UNO).
-     Inicializa síncronamente en el orden ANTERIOR para evitar salto inverso.
+     MOTOR CINEMATOGRÁFICO 3D ESTILO APPLE (COREOGRAFÍA PERSONAL DE RANKING)
+     - Beat 0 (920 ms): arranca en tu orden y puntaje ANTERIOR (cero salto).
+     - Beat 1 (Lift): tu tarjeta se eleva en 3D (+68px Z) en verde si ganaste,
+       o se ilumina en rojo mientras quienes te superan pasan por delante.
+     - Beat 2 (Glide + Odómetro): deslizamiento lento curvo iOS + conteo
+       animado de puntos + pill flotante (+XX PTS / -XX PTS).
+     - Beat 3 (Touchdown): aterrizaje 3D acolchado + reflejo de luz + háptica.
      ======================================================================== */
+  const computeInitialPersonalReveal = () => {
+    if (!pendingRankReveal?.challengeId) return null;
+    const focusId = pendingRankReveal.focusPlayerId || currentUser?.id || null;
+    const focusInfo = focusId ? pendingRankReveal.players?.[focusId] : null;
+    if (!focusId || !focusInfo) return null;
+
+    const focusIsOfficial = rankedPlayers.some((p) => p.id === focusId);
+    const preIds = Array.isArray(pendingRankReveal.preOrderIds) ? pendingRankReveal.preOrderIds : [];
+    const moves = {};
+
+    if (focusIsOfficial && preIds.length >= 2) {
+      const preRankLookup = {};
+      preIds.forEach((id, idx) => {
+        preRankLookup[id] = idx + 1;
+      });
+      rankedPlayers.forEach((p, idx) => {
+        const newRank = idx + 1;
+        const oldRank = preRankLookup[p.id];
+        if (oldRank && oldRank !== newRank) {
+          moves[p.id] = {
+            dir: newRank < oldRank ? 'up' : 'down',
+            delta: Math.abs(oldRank - newRank),
+            oldRank,
+            newRank,
+          };
+        }
+      });
+    }
+
+    return {
+      challengeId: pendingRankReveal.challengeId,
+      focusId,
+      focusInfo,
+      scoreSummary: pendingRankReveal.scoreSummary || '',
+      isOfficialView: focusIsOfficial,
+      filterKey: 'ALL|ALL',
+      oldOrderIds: focusIsOfficial && preIds.length >= 2 ? preIds : null,
+      moves,
+      phase: 'anticipation', // 'anticipation' | 'gliding' | 'settled'
+      allPlayersMeta: pendingRankReveal.players || {},
+    };
+  };
+
+  const [personalReveal, setPersonalReveal] = useState(() => computeInitialPersonalReveal());
   const [stagedTransition, setStagedTransition] = useState(() => {
-    if (rankedPlayers.length < 2) return null;
-    const filterKey = 'ALL|ALL';
-    const storedAll = readStoredRanks();
-    const prevMap = storedAll[filterKey];
-    if (!prevMap || Object.keys(prevMap).length < 2) return null;
-
-    const detectedMoves = {};
-    rankedPlayers.forEach((p, idx) => {
-      const newRank = idx + 1;
-      const oldRank = prevMap[p.id];
-      if (oldRank && oldRank !== newRank) {
-        detectedMoves[p.id] = {
-          dir: newRank < oldRank ? 'up' : 'down',
-          delta: Math.abs(oldRank - newRank),
-          oldRank,
-          newRank,
-        };
-      }
-    });
-
-    if (Object.keys(detectedMoves).length === 0) return null;
-
-    const oldOrderIds = [...rankedPlayers]
-      .sort((a, b) => (prevMap[a.id] ?? 999) - (prevMap[b.id] ?? 999))
-      .map((p) => p.id);
-
-    return { filterKey, oldOrderIds, moves: detectedMoves };
+    const initPersonal = computeInitialPersonalReveal();
+    if (initPersonal?.oldOrderIds?.length) {
+      return {
+        filterKey: 'ALL|ALL',
+        oldOrderIds: initPersonal.oldOrderIds,
+        moves: initPersonal.moves,
+        focusId: initPersonal.focusId,
+        focusDeltaPts: initPersonal.focusInfo.pointsDelta || 0,
+      };
+    }
+    return null;
   });
 
   const [activeMoves, setActiveMoves] = useState({});
 
-  // Fase 1: si entramos con cambio pendiente (desde Retos o cambio de filtro),
-  // mostramos el orden ANTERIOR ~850ms para que el ojo/video lo lea, luego disparamos el 3D FLIP.
+  const clearAllRevealTimers = () => {
+    window.clearTimeout(stageTimerRef.current);
+    window.clearTimeout(settleTimerRef.current);
+    window.clearTimeout(finishRevealTimerRef.current);
+  };
+
+  const dismissPersonalRevealNow = () => {
+    const chId = personalReveal?.challengeId || pendingRankReveal?.challengeId || null;
+    clearAllRevealTimers();
+    setStagedTransition(null);
+    setActiveMoves({});
+    setPersonalReveal(null);
+    if (chId && onRankRevealComplete) onRankRevealComplete(chId);
+  };
+
+  // Si llega un pendingRankReveal mientras ya estamos en RankingView, inicializa su coreografía
   useEffect(() => {
-    if (activeSubTab !== 'oficial' || searchQuery.trim().length > 0 || rankedPlayers.length < 2) {
-      return undefined;
+    if (!pendingRankReveal?.challengeId) return;
+    if (handledRevealIdRef.current === pendingRankReveal.challengeId) return;
+
+    const focusId = pendingRankReveal.focusPlayerId || currentUser?.id || null;
+    const focusInfo = focusId ? pendingRankReveal.players?.[focusId] : null;
+    if (!focusId || !focusInfo) {
+      if (onRankRevealComplete) onRankRevealComplete(pendingRankReveal.challengeId);
+      return;
     }
 
-    const filterKey = `${divisionFilter}|${categoryFilter}`;
-    const currentRankMap = {};
-    rankedPlayers.forEach((p, idx) => {
-      currentRankMap[p.id] = idx + 1;
-    });
+    handledRevealIdRef.current = pendingRankReveal.challengeId;
 
-    // A) Si ya arrancamos con stagedTransition (desde el primer frame, cero salto inverso)
-    if (stagedTransition && stagedTransition.filterKey === filterKey) {
-      const moves = stagedTransition.moves;
-      const climbers = Object.entries(moves)
-        .filter(([, m]) => m.dir === 'up')
-        .sort((a, b) => b[1].delta - a[1].delta);
-      const focusId =
-        (currentUser?.id && moves[currentUser.id] ? currentUser.id : null) ||
-        climbers[0]?.[0] ||
-        Object.keys(moves)[0] ||
-        null;
+    // Resetear filtros para asegurar visibilidad total de tu tarjeta
+    setDivisionFilter('ALL');
+    setCategoryFilter('ALL');
+    setSearchQuery('');
 
-      window.requestAnimationFrame(() => {
-        if (focusId) {
-          const node = rowRefs.current.get(focusId);
-          if (node && typeof node.scrollIntoView === 'function') {
-            node.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }
-        }
+    const allOfficialNow = [...(players || [])]
+      .filter((p) => isPlayerOfficiallyRanked(p))
+      .sort((a, b) => {
+        const diffPts = (Number(b.points) || 0) - (Number(a.points) || 0);
+        if (diffPts !== 0) return diffPts;
+        return (Number(b.wins) || 0) - (Number(a.wins) || 0);
       });
 
-      const storedAll = readStoredRanks();
-      writeStoredRanks({ ...storedAll, [filterKey]: currentRankMap });
-      lastLiveRanksRef.current = { filterKey, rankMap: currentRankMap };
+    const focusIsOfficial = allOfficialNow.some((p) => p.id === focusId);
+    setActiveSubTab(focusIsOfficial ? 'oficial' : 'calibrando');
 
-      window.clearTimeout(stageTimerRef.current);
-      stageTimerRef.current = window.setTimeout(() => {
-        captureRowRects();
-        pendingStagedFlipMovesRef.current = moves;
-        setActiveMoves(moves);
-        setStagedTransition(null);
-        triggerHaptic(climbers.length > 0 ? 'success' : 'warning');
-
-        const maxDelta = Math.max(1, ...Object.values(moves).map((m) => m.delta || 1));
-        const animMs = Math.min(2900, 1950 + (maxDelta - 1) * 260);
-        window.clearTimeout(settleTimerRef.current);
-        settleTimerRef.current = window.setTimeout(() => {
-          setActiveMoves({});
-        }, animMs + 1650);
-      }, 850);
-
-      return undefined;
+    const preIds = Array.isArray(pendingRankReveal.preOrderIds) ? pendingRankReveal.preOrderIds : [];
+    const moves = {};
+    if (focusIsOfficial && preIds.length >= 2) {
+      const preRankLookup = {};
+      preIds.forEach((id, idx) => {
+        preRankLookup[id] = idx + 1;
+      });
+      allOfficialNow.forEach((p, idx) => {
+        const newRank = idx + 1;
+        const oldRank = preRankLookup[p.id];
+        if (oldRank && oldRank !== newRank) {
+          moves[p.id] = {
+            dir: newRank < oldRank ? 'up' : 'down',
+            delta: Math.abs(oldRank - newRank),
+            oldRank,
+            newRank,
+          };
+        }
+      });
     }
 
-    // B) Si cambió de filtro (Varones / Damas / Categoría), comprobar si hubo cambio guardado en ese filtro
-    if (!lastLiveRanksRef.current || lastLiveRanksRef.current.filterKey !== filterKey) {
-      const storedAll = readStoredRanks();
-      const prevMap = storedAll[filterKey];
-      lastLiveRanksRef.current = { filterKey, rankMap: currentRankMap };
-      writeStoredRanks({ ...storedAll, [filterKey]: currentRankMap });
+    const revObj = {
+      challengeId: pendingRankReveal.challengeId,
+      focusId,
+      focusInfo,
+      scoreSummary: pendingRankReveal.scoreSummary || '',
+      isOfficialView: focusIsOfficial,
+      filterKey: 'ALL|ALL',
+      oldOrderIds: focusIsOfficial && preIds.length >= 2 ? preIds : null,
+      moves,
+      phase: 'anticipation',
+      allPlayersMeta: pendingRankReveal.players || {},
+    };
 
-      if (prevMap && Object.keys(prevMap).length >= 2) {
-        const detectedMoves = {};
-        rankedPlayers.forEach((p, idx) => {
-          const newRank = idx + 1;
-          const oldRank = prevMap[p.id];
-          if (oldRank && oldRank !== newRank) {
-            detectedMoves[p.id] = {
-              dir: newRank < oldRank ? 'up' : 'down',
-              delta: Math.abs(oldRank - newRank),
-              oldRank,
-              newRank,
+    setPersonalReveal(revObj);
+    if (revObj.oldOrderIds) {
+      setStagedTransition({
+        filterKey: 'ALL|ALL',
+        oldOrderIds: revObj.oldOrderIds,
+        moves: revObj.moves,
+        focusId,
+        focusDeltaPts: focusInfo.pointsDelta || 0,
+      });
+    } else {
+      setStagedTransition(null);
+    }
+
+    // Beat 0: centrar suavemente tu tarjeta antes de despegar
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        const node = rowRefs.current.get(focusId);
+        if (node && typeof node.scrollIntoView === 'function') {
+          node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      });
+    });
+
+    // Sincronizar memoria persistente de posiciones
+    const currentRankMap = {};
+    allOfficialNow.forEach((p, idx) => {
+      currentRankMap[p.id] = idx + 1;
+    });
+    const storedAll = readStoredRanks();
+    writeStoredRanks({ ...storedAll, 'ALL|ALL': currentRankMap });
+    lastLiveRanksRef.current = { filterKey: 'ALL|ALL', rankMap: currentRankMap };
+
+    // Beat 1 -> Beat 2: tras 920ms de lectura, disparar el 3D FLIP + Odómetro de puntos
+    clearAllRevealTimers();
+    stageTimerRef.current = window.setTimeout(() => {
+      captureRowRects();
+      pendingStagedFlipMovesRef.current = {
+        moves,
+        focusId,
+        focusWon: Boolean(focusInfo.won || (focusInfo.pointsDelta || 0) >= 0),
+        focusPointsDelta: Number(focusInfo.pointsDelta) || 0,
+      };
+      setActiveMoves(moves);
+      setPersonalReveal((prev) => (prev ? { ...prev, phase: 'gliding' } : null));
+      setStagedTransition(null);
+      triggerHaptic((focusInfo.pointsDelta || 0) >= 0 ? 'medium' : 'warning');
+
+      const focusMove = moves[focusId];
+      const slotsMoved = focusMove?.delta || 1;
+      const glideMs = focusMove
+        ? Math.min(3150, 2150 + (slotsMoved - 1) * 280)
+        : 1850;
+
+      // Si no cambió de fila (mismo puesto o calibrando), animar elevación 3D in-place
+      if (!focusMove) {
+        window.requestAnimationFrame(() => {
+          const focusNode = rowRefs.current.get(focusId);
+          const prefersReduced =
+            typeof window !== 'undefined' &&
+            window.matchMedia &&
+            window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+          if (focusNode && !prefersReduced && typeof focusNode.animate === 'function') {
+            const isGain = (focusInfo.pointsDelta || 0) >= 0;
+            focusNode.style.zIndex = '80';
+            const anim = focusNode.animate(
+              [
+                {
+                  offset: 0,
+                  transform: 'perspective(1200px) translate3d(0, 0, 0px) scale(1)',
+                  easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+                },
+                {
+                  offset: 0.28,
+                  transform: 'perspective(1200px) translate3d(0, -4px, 56px) scale(1.052)',
+                  boxShadow: isGain
+                    ? '0 26px 56px rgba(0,0,0,0.52), 0 0 34px rgba(0,229,130,0.44)'
+                    : '0 24px 48px rgba(0,0,0,0.5), 0 0 30px rgba(239,68,68,0.42)',
+                  easing: 'cubic-bezier(0.32, 0.72, 0, 1)',
+                },
+                {
+                  offset: 0.78,
+                  transform: 'perspective(1200px) translate3d(0, -2px, 50px) scale(1.045)',
+                  easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+                },
+                {
+                  offset: 0.92,
+                  transform: 'perspective(1200px) translate3d(0, 0, 0px) scale(0.993)',
+                },
+                {
+                  offset: 1,
+                  transform: 'perspective(1200px) translate3d(0, 0, 0px) scale(1)',
+                },
+              ],
+              { duration: glideMs, fill: 'none' }
+            );
+            anim.onfinish = () => {
+              focusNode.style.zIndex = '';
             };
           }
         });
-
-        if (Object.keys(detectedMoves).length > 0) {
-          const oldOrderIds = [...rankedPlayers]
-            .sort((a, b) => (prevMap[a.id] ?? 999) - (prevMap[b.id] ?? 999))
-            .map((p) => p.id);
-          setStagedTransition({ filterKey, oldOrderIds, moves: detectedMoves });
-        }
       }
-      return undefined;
-    }
 
-    // C) Cambio en vivo estando ya dentro de Ranking: sincronizar memoria persistente
-    const storedAll = readStoredRanks();
-    writeStoredRanks({ ...storedAll, [filterKey]: currentRankMap });
-    return undefined;
-  }, [
-    stagedTransition,
-    currentOrderSignature,
-    activeSubTab,
-    divisionFilter,
-    categoryFilter,
-    searchQuery,
-    currentUser?.id,
-  ]);
+      // Beat 3: aterrizaje 3D + destello de luz + confirmación háptica
+      settleTimerRef.current = window.setTimeout(() => {
+        setPersonalReveal((prev) => (prev ? { ...prev, phase: 'settled' } : null));
+        triggerHaptic((focusInfo.pointsDelta || 0) >= 0 ? 'success' : 'light');
 
+        // Re-centrar suavemente si el salto fue largo (ej. #6 -> #1)
+        const landedNode = rowRefs.current.get(focusId);
+        if (landedNode && typeof landedNode.scrollIntoView === 'function') {
+          landedNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        // Mantener resultado visible ~2.5s antes de disolver a reposo y marcar como visto
+        finishRevealTimerRef.current = window.setTimeout(() => {
+          setActiveMoves({});
+          setPersonalReveal(null);
+          if (onRankRevealComplete) onRankRevealComplete(pendingRankReveal.challengeId);
+        }, 2500);
+      }, glideMs);
+    }, 920);
+  }, [pendingRankReveal, currentUser?.id, players, onRankRevealComplete]);
+
+  // Limpiar timers y marcar como visto si el usuario sale manualmente de la pestaña durante el reveal
   useEffect(() => {
     return () => {
-      window.clearTimeout(stageTimerRef.current);
-      window.clearTimeout(settleTimerRef.current);
+      clearAllRevealTimers();
+      if (handledRevealIdRef.current && onRankRevealComplete) {
+        onRankRevealComplete(handledRevealIdRef.current);
+      }
       activeAnimsRef.current.forEach((anim) => {
         try {
           anim.cancel();
@@ -1089,7 +1358,22 @@ export default function RankingView({
       });
       activeAnimsRef.current.clear();
     };
-  }, []);
+  }, [onRankRevealComplete]);
+
+  // Memoria de orden normal cuando navegas filtros (sin pendingRankReveal)
+  useEffect(() => {
+    if (personalReveal || activeSubTab !== 'oficial' || searchQuery.trim().length > 0 || rankedPlayers.length < 2) {
+      return;
+    }
+    const filterKey = `${divisionFilter}|${categoryFilter}`;
+    const currentRankMap = {};
+    rankedPlayers.forEach((p, idx) => {
+      currentRankMap[p.id] = idx + 1;
+    });
+    lastLiveRanksRef.current = { filterKey, rankMap: currentRankMap };
+    const storedAll = readStoredRanks();
+    writeStoredRanks({ ...storedAll, [filterKey]: currentRankMap });
+  }, [personalReveal, currentOrderSignature, activeSubTab, divisionFilter, categoryFilter, searchQuery]);
 
   const displayedRankedPlayers = useMemo(() => {
     if (!stagedTransition?.oldOrderIds?.length) return rankedPlayers;
@@ -1107,62 +1391,17 @@ export default function RankingView({
     : displayedRankedPlayers;
   const listStartRank = showTop3Horizontal ? 4 : 1;
 
-  // Fase 2: FLIP 3D síncrono ANTES de pintar el frame (sube por delante, baja por detrás, lento y suave)
+  // Fase 2: Motor FLIP 3D Apple síncrono ANTES de pintar el frame
   useLayoutEffect(() => {
     if (activeSubTab !== 'oficial') return;
 
-    // Si estamos mostrando el estado previo (staged), solo capturar sus posiciones sin animar
     if (stagedTransition) {
       captureRowRects();
       return;
     }
 
-    const filterKey = `${divisionFilter}|${categoryFilter}`;
-    const currentRankMap = {};
-    displayedRankedPlayers.forEach((p, idx) => {
-      currentRankMap[p.id] = idx + 1;
-    });
-
-    // Determinar movimientos síncronos (desde stagedTransition o desde cambio en vivo)
-    let movesToAnimate = pendingStagedFlipMovesRef.current;
+    const pendingFlip = pendingStagedFlipMovesRef.current;
     pendingStagedFlipMovesRef.current = null;
-
-    if (
-      !movesToAnimate &&
-      searchQuery.trim().length === 0 &&
-      lastLiveRanksRef.current &&
-      lastLiveRanksRef.current.filterKey === filterKey
-    ) {
-      const prevLiveMap = lastLiveRanksRef.current.rankMap || {};
-      const liveMoves = {};
-      displayedRankedPlayers.forEach((p, idx) => {
-        const newRank = idx + 1;
-        const oldRank = prevLiveMap[p.id];
-        if (oldRank && oldRank !== newRank) {
-          liveMoves[p.id] = {
-            dir: newRank < oldRank ? 'up' : 'down',
-            delta: Math.abs(oldRank - newRank),
-            oldRank,
-            newRank,
-          };
-        }
-      });
-
-      if (Object.keys(liveMoves).length > 0) {
-        movesToAnimate = liveMoves;
-        lastLiveRanksRef.current = { filterKey, rankMap: currentRankMap };
-        setActiveMoves(liveMoves);
-        const hasClimber = Object.values(liveMoves).some((m) => m.dir === 'up');
-        triggerHaptic(hasClimber ? 'success' : 'warning');
-
-        const maxDelta = Math.max(1, ...Object.values(liveMoves).map((m) => m.delta || 1));
-        const animMs = Math.min(2900, 1950 + (maxDelta - 1) * 260);
-        window.clearTimeout(settleTimerRef.current);
-        settleTimerRef.current = window.setTimeout(() => {
-          setActiveMoves({});
-        }, animMs + 1650);
-      }
-    }
 
     const prefersReduced =
       typeof window !== 'undefined' &&
@@ -1172,7 +1411,17 @@ export default function RankingView({
     const prevRects = prevRectsRef.current;
     const scrollY = getScrollOffsetY();
 
-    if (!prefersReduced && prevRects.size > 0 && movesToAnimate && Object.keys(movesToAnimate).length > 0) {
+    if (
+      !prefersReduced &&
+      prevRects.size > 0 &&
+      pendingFlip &&
+      pendingFlip.moves &&
+      Object.keys(pendingFlip.moves).length > 0
+    ) {
+      const { moves, focusId, focusPointsDelta } = pendingFlip;
+      const focusMove = focusId ? moves[focusId] : null;
+      const focusDirection = focusMove?.dir || (focusPointsDelta >= 0 ? 'up' : 'down');
+
       rowRefs.current.forEach((node, id) => {
         const oldAbsTop = prevRects.get(id);
         if (oldAbsTop === undefined) return;
@@ -1181,12 +1430,19 @@ export default function RankingView({
 
         if (Math.abs(deltaY) < 2) return;
 
-        const move = movesToAnimate[id];
+        const move = moves[id];
         const isUp = move ? move.dir === 'up' : deltaY > 0;
+        const isFocus = id === focusId;
         const slotsMoved = move?.delta || Math.max(1, Math.round(Math.abs(deltaY) / 84));
-        const duration = isUp
-          ? Math.min(2900, 1950 + (slotsMoved - 1) * 260)
-          : Math.min(2750, 1850 + (slotsMoved - 1) * 220);
+
+        // Quien pasa POR DELANTE en 3D:
+        // - Si tú ganaste y subiste: TU tarjeta pasa por delante (z=90), los adelantados se hunden detrás (z=3).
+        // - Si tú perdiste y bajaste: los rivales que te superan se elevan y pasan por delante (z=75),
+        //   mientras tu tarjeta en rojo desciende por detrás (z=6) hacia su nueva posición.
+        const isFrontPlane = isFocus ? isUp : isUp && focusDirection === 'down';
+        const duration = isFrontPlane
+          ? Math.min(3150, 2150 + (slotsMoved - 1) * 280)
+          : Math.min(2950, 2000 + (slotsMoved - 1) * 240);
 
         const prevAnim = activeAnimsRef.current.get(id);
         if (prevAnim) {
@@ -1197,65 +1453,141 @@ export default function RankingView({
           }
         }
 
-        // Capas de profundidad reales: quien sube pasa POR DELANTE, quienes bajan pasan POR DETRÁS
-        node.style.zIndex = isUp ? String(60 + Math.min(20, slotsMoved)) : '2';
+        node.style.zIndex = isFocus
+          ? isUp
+            ? '90'
+            : '6'
+          : isFrontPlane
+          ? String(72 + Math.min(12, slotsMoved))
+          : '3';
 
         if (typeof node.animate === 'function') {
-          const keyframes = isUp
-            ? [
-                {
-                  offset: 0,
-                  transform: `perspective(1100px) translate3d(0, ${deltaY}px, 0px) scale(1)`,
-                  boxShadow: '0 8px 22px rgba(0, 0, 0, 0.28)',
-                  easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
-                },
-                {
-                  offset: 0.14,
-                  transform: `perspective(1100px) translate3d(0, ${deltaY * 0.94}px, 52px) scale(1.055)`,
-                  boxShadow: '0 26px 56px rgba(0, 0, 0, 0.58), 0 0 32px rgba(0, 220, 125, 0.42)',
-                  easing: 'cubic-bezier(0.24, 0.82, 0.24, 1)',
-                },
-                {
-                  offset: 0.86,
-                  transform: `perspective(1100px) translate3d(0, ${deltaY * 0.03}px, 52px) scale(1.055)`,
-                  boxShadow: '0 22px 48px rgba(0, 0, 0, 0.52), 0 0 28px rgba(0, 220, 125, 0.36)',
-                  easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
-                },
-                {
-                  offset: 1,
-                  transform: 'perspective(1100px) translate3d(0, 0px, 0px) scale(1)',
-                  boxShadow: '0 10px 26px rgba(0, 220, 125, 0.22)',
-                },
-              ]
-            : [
-                {
-                  offset: 0,
-                  transform: `perspective(1100px) translate3d(0, ${deltaY}px, 0px) scale(1)`,
-                  opacity: 1,
-                  filter: 'brightness(1)',
-                  easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
-                },
-                {
-                  offset: 0.16,
-                  transform: `perspective(1100px) translate3d(0, ${deltaY * 0.92}px, -42px) scale(0.945)`,
-                  opacity: 0.72,
-                  filter: 'brightness(0.84) saturate(0.82)',
-                  easing: 'cubic-bezier(0.24, 0.82, 0.24, 1)',
-                },
-                {
-                  offset: 0.84,
-                  transform: `perspective(1100px) translate3d(0, ${deltaY * 0.04}px, -42px) scale(0.945)`,
-                  opacity: 0.72,
-                  filter: 'brightness(0.84) saturate(0.82)',
-                  easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
-                },
-                {
-                  offset: 1,
-                  transform: 'perspective(1100px) translate3d(0, 0px, 0px) scale(1)',
-                  opacity: 1,
-                  filter: 'brightness(1)',
-                },
-              ];
+          let keyframes;
+
+          if (isFocus && isUp) {
+            // TU TARJETA SUBIENDO EN 3D (VERDE ESMERALDA · PLANO FRONTAL · ATERRIZAJE ACOLCHADO)
+            keyframes = [
+              {
+                offset: 0,
+                transform: `perspective(1200px) translate3d(0, ${deltaY}px, 0px) scale(1) rotateX(0deg)`,
+                boxShadow: '0 8px 22px rgba(0, 0, 0, 0.28)',
+                easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+              },
+              {
+                offset: 0.15,
+                transform: `perspective(1200px) translate3d(0, ${deltaY * 0.96}px, 68px) scale(1.068) rotateX(1.8deg)`,
+                boxShadow:
+                  '0 32px 68px rgba(0, 0, 0, 0.62), 0 0 38px rgba(0, 229, 130, 0.48)',
+                easing: 'cubic-bezier(0.32, 0.72, 0, 1)',
+              },
+              {
+                offset: 0.78,
+                transform: `perspective(1200px) translate3d(0, ${deltaY * 0.02}px, 68px) scale(1.068) rotateX(1.2deg)`,
+                boxShadow:
+                  '0 28px 60px rgba(0, 0, 0, 0.56), 0 0 34px rgba(0, 229, 130, 0.42)',
+                easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+              },
+              {
+                offset: 0.91,
+                transform:
+                  'perspective(1200px) translate3d(0, 0px, 0px) scale(0.992) rotateX(-0.6deg)',
+                boxShadow: '0 10px 26px rgba(0, 229, 130, 0.28)',
+                easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+              },
+              {
+                offset: 1,
+                transform: 'perspective(1200px) translate3d(0, 0px, 0px) scale(1) rotateX(0deg)',
+                boxShadow: '0 14px 32px rgba(0, 229, 130, 0.24)',
+              },
+            ];
+          } else if (isFrontPlane) {
+            // RIVAL QUE TE SUPERA ELEVÁNDOSE EN 3D POR DELANTE CUANDO BAJAS
+            keyframes = [
+              {
+                offset: 0,
+                transform: `perspective(1200px) translate3d(0, ${deltaY}px, 0px) scale(1)`,
+                easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+              },
+              {
+                offset: 0.16,
+                transform: `perspective(1200px) translate3d(0, ${deltaY * 0.95}px, 56px) scale(1.048)`,
+                boxShadow: '0 26px 54px rgba(0, 0, 0, 0.56), 0 0 22px rgba(255, 255, 255, 0.14)',
+                easing: 'cubic-bezier(0.32, 0.72, 0, 1)',
+              },
+              {
+                offset: 0.82,
+                transform: `perspective(1200px) translate3d(0, ${deltaY * 0.02}px, 54px) scale(1.045)`,
+                boxShadow: '0 22px 46px rgba(0, 0, 0, 0.5)',
+                easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+              },
+              {
+                offset: 0.93,
+                transform: 'perspective(1200px) translate3d(0, 0px, 0px) scale(0.995)',
+              },
+              {
+                offset: 1,
+                transform: 'perspective(1200px) translate3d(0, 0px, 0px) scale(1)',
+              },
+            ];
+          } else if (isFocus && !isUp) {
+            // TU TARJETA BAJANDO EN ROJO POR DETRÁS HASTA SU NUEVO CASILLERO
+            keyframes = [
+              {
+                offset: 0,
+                transform: `perspective(1200px) translate3d(0, ${deltaY}px, 0px) scale(1)`,
+                opacity: 1,
+                easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+              },
+              {
+                offset: 0.18,
+                transform: `perspective(1200px) translate3d(0, ${deltaY * 0.93}px, -32px) scale(0.958)`,
+                opacity: 0.88,
+                easing: 'cubic-bezier(0.32, 0.72, 0, 1)',
+              },
+              {
+                offset: 0.82,
+                transform: `perspective(1200px) translate3d(0, ${deltaY * 0.04}px, -32px) scale(0.958)`,
+                opacity: 0.88,
+                easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+              },
+              {
+                offset: 1,
+                transform: 'perspective(1200px) translate3d(0, 0px, 0px) scale(1)',
+                opacity: 1,
+              },
+            ];
+          } else {
+            // TARJETAS DESPLAZADAS QUE CEDEN SU PUESTO POR DETRÁS CON SUAVIDAD
+            keyframes = [
+              {
+                offset: 0,
+                transform: `perspective(1200px) translate3d(0, ${deltaY}px, 0px) scale(1)`,
+                opacity: 1,
+                filter: 'brightness(1)',
+                easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+              },
+              {
+                offset: 0.16,
+                transform: `perspective(1200px) translate3d(0, ${deltaY * 0.92}px, -36px) scale(0.962)`,
+                opacity: 0.76,
+                filter: 'brightness(0.86) saturate(0.86)',
+                easing: 'cubic-bezier(0.32, 0.72, 0, 1)',
+              },
+              {
+                offset: 0.84,
+                transform: `perspective(1200px) translate3d(0, ${deltaY * 0.04}px, -36px) scale(0.962)`,
+                opacity: 0.76,
+                filter: 'brightness(0.86) saturate(0.86)',
+                easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+              },
+              {
+                offset: 1,
+                transform: 'perspective(1200px) translate3d(0, 0px, 0px) scale(1)',
+                opacity: 1,
+                filter: 'brightness(1)',
+              },
+            ];
+          }
 
           const anim = node.animate(keyframes, {
             duration,
@@ -1272,13 +1604,12 @@ export default function RankingView({
           anim.onfinish = cleanup;
           anim.oncancel = cleanup;
         } else {
-          // Respaldo CSS para navegadores sin Web Animations API
           node.style.transition = 'none';
-          node.style.transform = isUp
-            ? `translate3d(0, ${deltaY}px, 0) scale(1.045)`
-            : `translate3d(0, ${deltaY}px, 0) scale(0.955)`;
+          node.style.transform = isFrontPlane
+            ? `translate3d(0, ${deltaY}px, 0) scale(1.055)`
+            : `translate3d(0, ${deltaY}px, 0) scale(0.96)`;
           void document.body.offsetHeight;
-          node.style.transition = `transform ${duration}ms cubic-bezier(0.24, 0.82, 0.24, 1)`;
+          node.style.transition = `transform ${duration}ms cubic-bezier(0.32, 0.72, 0, 1)`;
           node.style.transform = 'translate3d(0, 0, 0) scale(1)';
           const onEnd = () => {
             node.style.transition = '';
@@ -1293,6 +1624,43 @@ export default function RankingView({
 
     captureRowRects();
   }, [displayedRankedPlayers, stagedTransition, activeSubTab, divisionFilter, categoryFilter, searchQuery]);
+
+  // Helper para entregar pointsReveal exacto a cada tarjeta durante la coreografía personal
+  const getPointsRevealForPlayer = (playerId) => {
+    if (!personalReveal) return null;
+    const isFocus = personalReveal.focusId === playerId;
+    const pMeta = personalReveal.allPlayersMeta?.[playerId] || null;
+    const move = personalReveal.moves?.[playerId] || null;
+    const focusMove = personalReveal.moves?.[personalReveal.focusId] || null;
+    const focusDropped =
+      focusMove?.dir === 'down' || (!focusMove && (personalReveal.focusInfo?.pointsDelta || 0) < 0);
+
+    if (isFocus) {
+      return {
+        oldPoints: personalReveal.focusInfo.oldPoints,
+        newPoints: personalReveal.focusInfo.newPoints,
+        delta: personalReveal.focusInfo.pointsDelta || 0,
+        phase: personalReveal.phase,
+        isFocus: true,
+        isOvertaker: false,
+        isDisplaced: false,
+      };
+    }
+
+    if (move) {
+      return {
+        oldPoints: pMeta ? pMeta.oldPoints : null,
+        newPoints: pMeta ? pMeta.newPoints : null,
+        delta: pMeta ? pMeta.pointsDelta || 0 : 0,
+        phase: personalReveal.phase,
+        isFocus: false,
+        isOvertaker: Boolean(focusDropped && move.dir === 'up'),
+        isDisplaced: Boolean(!focusDropped && move.dir === 'down'),
+      };
+    }
+
+    return null;
+  };
 
   const myRankInCurrentView = useMemo(() => {
     if (!currentUser?.id) return null;
@@ -1419,6 +1787,63 @@ export default function RankingView({
           </button>
         ))}
       </div>
+
+
+      {/* BANNER FLOTANTE ESTILO APPLE (REVELACIÓN PERSONAL DE RESULTADO OFICIAL) */}
+      {personalReveal && (() => {
+        const fi = personalReveal.focusInfo;
+        const ptsDelta = Number(fi.pointsDelta) || 0;
+        const isGain = ptsDelta >= 0;
+        const focusMove = personalReveal.moves?.[personalReveal.focusId] || null;
+        const hasRankChange = Boolean(focusMove && focusMove.delta > 0);
+        const headline = hasRankChange
+          ? focusMove.dir === 'up'
+            ? `Subiste ${focusMove.delta} ${focusMove.delta === 1 ? 'puesto' : 'puestos'}`
+            : `Bajaste ${focusMove.delta} ${focusMove.delta === 1 ? 'puesto' : 'puestos'}`
+          : personalReveal.isOfficialView
+          ? isGain
+            ? 'Victoria oficial · Mantienes tu puesto'
+            : 'Resultado oficial · Ranking actualizado'
+          : 'Calibración actualizada';
+
+        return (
+          <div
+            className={`tt-rk-reveal-banner ${isGain ? 'is-gain' : 'is-loss'} is-phase-${personalReveal.phase}`}
+            role="status"
+            aria-live="polite"
+          >
+            <div className="tt-rk-rb-left">
+              <span className="tt-rk-rb-kicker">
+                {personalReveal.scoreSummary
+                  ? `RESULTADO OFICIAL · ${personalReveal.scoreSummary}`
+                  : 'ACTUALIZACIÓN DE RANKING'}
+              </span>
+              <strong>{headline}</strong>
+              {hasRankChange && (
+                <small>
+                  #{focusMove.oldRank} → #{focusMove.newRank}
+                  {fi.gemsAwarded > 0 ? ` · +${fi.gemsAwarded} 💎` : ''}
+                </small>
+              )}
+              {!hasRankChange && fi.gemsAwarded > 0 && <small>+{fi.gemsAwarded} 💎 acreditadas</small>}
+            </div>
+
+            <div className="tt-rk-rb-right">
+              <span className={`tt-rk-rb-delta ${isGain ? 'is-gain' : 'is-loss'}`}>
+                {ptsDelta > 0 ? `+${ptsDelta}` : ptsDelta} PTS
+              </span>
+              <button
+                type="button"
+                className="tt-rk-rb-close"
+                aria-label="Cerrar aviso de ranking"
+                onClick={dismissPersonalRevealNow}
+              >
+                <TTIcon name="close" size={13} />
+              </button>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* 2. BUSCADOR + FILTROS INDEPENDIENTES */}
       {activeSubTab !== 'clubes' && (
@@ -1627,6 +2052,7 @@ export default function RankingView({
                         isCurrentUser={Boolean(currentUser && currentUser.id === player.id)}
                         isLight={isLight}
                         moveHighlight={activeMoves[player.id] || null}
+                        pointsReveal={getPointsRevealForPlayer(player.id)}
                         registerRowRef={registerRowRef}
                         onOpenProfile={onOpenPlayerProfile}
                         onQuickChallenge={onQuickChallenge}
@@ -1661,6 +2087,7 @@ export default function RankingView({
                             showLaurelMini={!showTop3Horizontal}
                             divisionTheme={divisionTheme}
                             moveHighlight={activeMoves[player.id] || null}
+                            pointsReveal={getPointsRevealForPlayer(player.id)}
                             registerRowRef={registerRowRef}
                             onOpenProfile={onOpenPlayerProfile}
                             onQuickChallenge={onQuickChallenge}
@@ -1733,6 +2160,8 @@ export default function RankingView({
                     player={player}
                     club={getClubById(clubs, player.clubId)}
                     isCurrentUser={Boolean(currentUser && currentUser.id === player.id)}
+                    pointsReveal={getPointsRevealForPlayer(player.id)}
+                    registerRowRef={registerRowRef}
                     onOpenProfile={onOpenPlayerProfile}
                     onQuickChallenge={onQuickChallenge}
                     onOpenHeadToHead={onOpenHeadToHead}
@@ -2207,12 +2636,12 @@ export default function RankingView({
         /* ==================================================================
            3. TOP 3 HORIZONTAL CON ESCALA PROGRESIVA (#1 GRANDE → #2 → #3)
            ================================================================== */
-        .tt-top3-stack-wrap { display: flex; flex-direction: column; gap: 9px; }
+        .tt-top3-stack-wrap { display: flex; flex-direction: column; gap: 9px; overflow: visible !important; }
         .tt-top3-stage-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 4px; }
         .tt-podium-kicker { font-size: 0.64rem; font-weight: 900; letter-spacing: 0.09em; color: var(--rk-accent); }
         .tt-podium-quorum-note { font-size: 0.65rem; font-weight: 700; color: var(--tt-text-muted); }
 
-        .tt-top3-hlist { display: flex; flex-direction: column; gap: 9px; position: relative; }
+        .tt-top3-hlist { display: flex; flex-direction: column; gap: 9px; position: relative; overflow: visible !important; }
         .tt-top3-hcard {
           position: relative;
           overflow: hidden;
@@ -2515,6 +2944,142 @@ export default function RankingView({
         .tt-club-top-rep small { display: block; font-size: 0.63rem; color: var(--tt-text-muted); }
         .tt-club-top-rep strong { display: block; font-size: 0.81rem; }
         .tt-club-rep-pts { font-size: 0.75rem; font-weight: 800; color: var(--tt-emerald-text); white-space: nowrap; }
+
+
+        /* APPLE-GRADE REVEAL BANNER + POINTS DELTA PILL + 3D DEPTH PLANES */
+        .tt-rk-reveal-banner {
+          display: flex; align-items: center; justify-content: space-between; gap: 10px;
+          padding: 12px 14px; border-radius: 20px;
+          backdrop-filter: blur(22px) saturate(180%);
+          -webkit-backdrop-filter: blur(22px) saturate(180%);
+          animation: ttAppleRibbonIn 460ms cubic-bezier(0.22, 1, 0.36, 1) both;
+          position: relative; overflow: hidden;
+        }
+        @keyframes ttAppleRibbonIn {
+          from { opacity: 0; transform: translateY(-10px) scale(0.97); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .tt-rk-reveal-banner.is-gain {
+          background: linear-gradient(135deg, rgba(0, 229, 130, 0.2) 0%, rgba(20, 8, 38, 0.94) 68%, rgba(0, 229, 130, 0.14) 100%);
+          border: 1.5px solid rgba(0, 229, 130, 0.62);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), 0 16px 36px rgba(0, 220, 125, 0.2);
+        }
+        .tt-ranking-view.is-light .tt-rk-reveal-banner.is-gain {
+          background: linear-gradient(135deg, #E8FBF2 0%, #FFFFFF 68%, #DCF8EA 100%);
+          border-color: rgba(0, 148, 82, 0.55);
+          box-shadow: inset 0 1px 0 #FFFFFF, 0 14px 30px rgba(0, 148, 82, 0.14);
+        }
+        .tt-rk-reveal-banner.is-loss {
+          background: linear-gradient(135deg, rgba(239, 68, 68, 0.22) 0%, rgba(24, 6, 36, 0.95) 68%, rgba(239, 68, 68, 0.14) 100%);
+          border: 1.5px solid rgba(248, 113, 113, 0.62);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 16px 36px rgba(239, 68, 68, 0.2);
+        }
+        .tt-ranking-view.is-light .tt-rk-reveal-banner.is-loss {
+          background: linear-gradient(135deg, #FEF2F2 0%, #FFFFFF 68%, #FEE2E2 100%);
+          border-color: rgba(220, 38, 38, 0.48);
+          box-shadow: inset 0 1px 0 #FFFFFF, 0 14px 30px rgba(220, 38, 38, 0.12);
+        }
+        .tt-rk-rb-left { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+        .tt-rk-rb-kicker { font-size: 0.57rem; font-weight: 900; letter-spacing: 0.09em; opacity: 0.78; }
+        .tt-rk-rb-left strong { font-size: 0.92rem; font-weight: 900; line-height: 1.15; color: var(--tt-text); }
+        .tt-rk-rb-left small { font-size: 0.7rem; font-weight: 800; color: var(--tt-text-muted); }
+        .tt-rk-rb-right { display: flex; align-items: center; gap: 7px; flex-shrink: 0; }
+        .tt-rk-rb-delta {
+          padding: 6px 11px; border-radius: 999px;
+          font-family: var(--tt-font-display); font-size: 0.96rem; font-weight: 900;
+          letter-spacing: 0.02em; font-variant-numeric: tabular-nums;
+        }
+        .tt-rk-rb-delta.is-gain { background: #00E582; color: #0E021C; box-shadow: 0 4px 14px rgba(0, 229, 130, 0.4); }
+        .tt-rk-rb-delta.is-loss { background: #EF4444; color: #FFFFFF; box-shadow: 0 4px 14px rgba(239, 68, 68, 0.38); }
+        .tt-rk-rb-close {
+          width: 26px; height: 26px; border-radius: 50%;
+          background: rgba(255, 255, 255, 0.12); color: var(--tt-text);
+          display: inline-flex; align-items: center; justify-content: center;
+        }
+        .tt-ranking-view.is-light .tt-rk-rb-close { background: rgba(30, 7, 52, 0.08); }
+
+        .tt-rk-pts-delta {
+          display: inline-flex; align-items: center; justify-content: center;
+          padding: 2px 7px; border-radius: 999px; margin-bottom: 3px;
+          font-size: 0.62rem; font-weight: 900; letter-spacing: 0.04em;
+          font-variant-numeric: tabular-nums; white-space: nowrap;
+          animation: ttDeltaPop 420ms cubic-bezier(0.22, 1.4, 0.36, 1) both;
+        }
+        @keyframes ttDeltaPop {
+          0% { opacity: 0; transform: translateY(6px) scale(0.76); }
+          100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .tt-rk-pts-delta.is-gain {
+          background: linear-gradient(180deg, #24F69B 0%, #00C96F 100%);
+          color: #0D0219;
+          box-shadow: 0 4px 14px rgba(0, 229, 130, 0.45);
+        }
+        .tt-rk-pts-delta.is-loss {
+          background: linear-gradient(180deg, #F87171 0%, #DC2626 100%);
+          color: #FFFFFF;
+          box-shadow: 0 4px 14px rgba(239, 68, 68, 0.42);
+        }
+
+        .is-rank-climb-focus {
+          z-index: 90 !important;
+          border-radius: 22px !important;
+          border: 1.5px solid rgba(0, 238, 136, 0.92) !important;
+          background: linear-gradient(135deg, rgba(12, 68, 56, 0.99) 0%, rgba(26, 10, 48, 0.99) 60%, rgba(0, 178, 104, 0.42) 100%) !important;
+          box-shadow: inset 4px 0 0 #00F088, inset 0 1px 0 rgba(255, 255, 255, 0.32), 0 26px 56px rgba(0, 0, 0, 0.58), 0 0 34px rgba(0, 229, 130, 0.4) !important;
+        }
+        .tt-ranking-view.is-light .is-rank-climb-focus {
+          background: linear-gradient(135deg, #E2FBF0 0%, #FFFFFF 60%, #D5F8E7 100%) !important;
+          border-color: #00A85B !important;
+          box-shadow: inset 4px 0 0 #008A4E, inset 0 1px 0 #FFFFFF, 0 24px 48px rgba(0, 138, 78, 0.22) !important;
+        }
+
+        .is-rank-drop-focus {
+          z-index: 6 !important;
+          border-radius: 20px !important;
+          border: 1.5px solid rgba(248, 113, 113, 0.85) !important;
+          background: linear-gradient(135deg, rgba(127, 29, 29, 0.52) 0%, rgba(30, 7, 52, 0.96) 66%, rgba(220, 38, 38, 0.28) 100%) !important;
+          box-shadow: inset 4px 0 0 #EF4444, 0 14px 32px rgba(239, 68, 68, 0.26) !important;
+        }
+        .tt-ranking-view.is-light .is-rank-drop-focus {
+          background: linear-gradient(135deg, #FEE2E2 0%, #FFF8F8 64%, #FECACA 100%) !important;
+          border-color: #DC2626 !important;
+          box-shadow: inset 4px 0 0 #DC2626, 0 14px 30px rgba(220, 38, 38, 0.16) !important;
+        }
+
+        .is-rank-overtaker {
+          z-index: 75 !important;
+          border-radius: 20px !important;
+          border: 1.5px solid rgba(255, 255, 255, 0.34) !important;
+          box-shadow: 0 22px 46px rgba(0, 0, 0, 0.52), inset 0 1px 0 rgba(255, 255, 255, 0.28) !important;
+        }
+        .tt-ranking-view.is-light .is-rank-overtaker {
+          border-color: rgba(30, 7, 52, 0.26) !important;
+          box-shadow: 0 18px 40px rgba(30, 7, 52, 0.18) !important;
+        }
+
+        .is-rank-displaced {
+          z-index: 3 !important;
+        }
+
+        .tt-rk-touchdown-sheen {
+          position: absolute; inset: 0; pointer-events: none; z-index: 8; border-radius: inherit; overflow: hidden;
+        }
+        .tt-rk-touchdown-sheen::after {
+          content: '';
+          position: absolute; top: -30%; bottom: -30%; width: 42%;
+          transform: skewX(-22deg) translateX(-180%);
+          animation: ttTouchdownSweep 880ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+        .tt-rk-touchdown-sheen.is-gain::after {
+          background: linear-gradient(90deg, transparent, rgba(164, 255, 214, 0.42), transparent);
+        }
+        .tt-rk-touchdown-sheen.is-loss::after {
+          background: linear-gradient(90deg, transparent, rgba(254, 202, 202, 0.38), transparent);
+        }
+        @keyframes ttTouchdownSweep {
+          0% { transform: skewX(-22deg) translateX(-180%); }
+          100% { transform: skewX(-22deg) translateX(380%); }
+        }
 
         html[data-tier='lite'] .tt-top3-sheen,
         html[data-tier='lite'] .tt-master-gold-sweep { display: none !important; }
