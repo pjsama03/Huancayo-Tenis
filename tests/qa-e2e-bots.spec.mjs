@@ -3,7 +3,7 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 
 /* ==========================================================================
-   SIMULADOR MULTI-BOT E2E TOTAL ("TODO ES TODO") · v4.1 · TOTAL TENIS
+   SIMULADOR MULTI-BOT E2E TOTAL ("TODO ES TODO") · v4.2 · TOTAL TENIS
    Fix v4.1:
    - Todos los clics dentro de modales apuntan a [role="dialog"].last() para
      evitar que .first() intente pulsar un botón detrás del popup abierto.
@@ -323,7 +323,7 @@ async function acceptIncomingChallengeOnB(pageB, challengerFirstName) {
 }
 
 async function runFullSuite() {
-  console.log(`🤖 Iniciando Simulador E2E TOTAL ("TODO ES TODO" v4.1) contra: ${TARGET_URL}`);
+  console.log(`🤖 Iniciando Simulador E2E TOTAL ("TODO ES TODO" v4.2) contra: ${TARGET_URL}`);
   const browser = await chromium.launch({ headless: true });
 
   const botA = await createBotContext(browser, 'Bot-A');
@@ -891,13 +891,17 @@ async function runFullSuite() {
       if (hasPassField) {
         await passInput.fill('ClavePrueba123');
       }
-      const forgotBtn = authDlg.locator('button:has-text("Olvidaste"), button:has-text("Recuperar")').first();
+      const forgotBtn = authDlg
+        .locator(
+          'button:has-text("Olvid"), button:has-text("Recuperar"), button:has-text("No puedes"), button:has-text("clave"), button:has-text("contraseña")'
+        )
+        .first();
       let forgotScreenVisible = false;
       if (await forgotBtn.isVisible().catch(() => false)) {
         await forgotBtn.click({ timeout: 5000 });
-        await guest.page.waitForTimeout(500);
+        await guest.page.waitForTimeout(550);
         forgotScreenVisible = await authDlg
-          .locator('input[type="email"], button:has-text("Enviar"), text=/Recuperar|Restablecer|correo/i')
+          .locator('input, button:has-text("Enviar"), text=/Recuperar|Restablecer|correo|celular/i')
           .first()
           .isVisible()
           .catch(() => false);
@@ -1074,7 +1078,7 @@ async function runFullSuite() {
   const healthPct = totalCount > 0 ? Math.round((passedCount / totalCount) * 100) : 0;
 
   const mdLines = [
-    `# 🤖 Reporte Simulador Multi-Bot E2E TOTAL ("TODO ES TODO" v4.1) · TOTAL TENIS`,
+    `# 🤖 Reporte Simulador Multi-Bot E2E TOTAL ("TODO ES TODO" v4.2) · TOTAL TENIS`,
     `- **URL probada:** ${TARGET_URL}`,
     `- **Salud E2E Global:** **${passedCount}/${totalCount} pruebas aprobadas (${healthPct}%)**`,
     `- **Errores JS (pageerror):** ${pageErrors.length}`,
