@@ -839,6 +839,7 @@ export function getMatchPermissions(challenge, currentUser, isAdmin = false, now
       isPlayerA: false,
       isPlayerB: false,
       isJudge: false,
+      isDisputed: false,
       canEditScore: false,
       canJudgeLiveScore: false,
       canAssignJudge: false,
@@ -868,6 +869,7 @@ export function getMatchPermissions(challenge, currentUser, isAdmin = false, now
   const isScheduled = status === 'SCHEDULED';
   const isInPlay = status === 'IN_PLAY';
   const isProposed = status === 'SCORE_PROPOSED';
+  const isDisputed = status === 'DISPUTED';
   const isFinished = status === 'FINISHED' || status === 'DECLINED' || status === 'EXPIRED_NO_RESULT';
 
   const scheduledTs = new Date(challenge.scheduledIso || challenge.scheduledAt || nowMs).getTime();
@@ -916,13 +918,14 @@ export function getMatchPermissions(challenge, currentUser, isAdmin = false, now
     : Math.max(0, Number((ELO_CONFIG.MAX_HOURS_UPLOAD_WITHOUT_JUDGE - Math.max(0, hoursSinceStart)).toFixed(1)));
   const isUploadWindowOpen = Boolean(
     !isFinished &&
+      !isDisputed &&
       !isExpiredNoResult &&
       (hasJudge || hoursSinceStart <= ELO_CONFIG.MAX_HOURS_UPLOAD_WITHOUT_JUDGE)
   );
 
   // Modo Árbitro exclusivo para el tercero designado
   const canJudgeLiveScore = Boolean(
-    !isFinished && !isProposed && (isJudge || isAdmin) && (isScheduled || isInPlay)
+    !isFinished && !isProposed && !isDisputed && (isJudge || isAdmin) && (isScheduled || isInPlay)
   );
 
   // Confirmación pendiente para ambos jugadores cuando cerró el Árbitro (o para el rival si propuso un jugador)
@@ -941,12 +944,13 @@ export function getMatchPermissions(challenge, currentUser, isAdmin = false, now
   // Permisos de carga de marcador:
   // - Si hay Árbitro designado y no ha cerrado todavía, el Árbitro lleva el en vivo; los jugadores suben solo si no hay árbitro o es Admin.
   const canEditScore = Boolean(
-    isUploadWindowOpen &&
+    !isDisputed &&
+      isUploadWindowOpen &&
       (isAdmin || isJudge || (isParticipant && !hasJudge))
   );
 
   const canConfirmOfficial = Boolean(
-    !isFinished && !isExpiredNoResult && (isAdmin || isParticipant || isJudge)
+    !isFinished && !isDisputed && !isExpiredNoResult && (isAdmin || isParticipant || isJudge)
   );
 
   return {
@@ -954,6 +958,7 @@ export function getMatchPermissions(challenge, currentUser, isAdmin = false, now
     isPlayerB,
     isParticipant,
     isJudge,
+    isDisputed,
     canEditScore,
     canJudgeLiveScore,
     canConfirmOfficial,
