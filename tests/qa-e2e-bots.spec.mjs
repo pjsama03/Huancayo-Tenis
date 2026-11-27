@@ -5,9 +5,8 @@ import { chromium } from 'playwright';
 /* ==========================================================================
    SIMULADOR MULTI-BOT E2E · TOTAL TENIS (3 JUGADORES SIMULTÁNEOS EN VIVO)
    Bot A (Retador) · Bot B (Rival) · Bot C (Árbitro Oficial)
-   Prueba flujos reales: Reto -> Aceptación -> WhatsApp -> Cambio hora >=24h
-   -> Candado 7-7 -> Disputa/Impugnación -> Árbitro <24h -> Ranking Oficial
-   vs Calibrando (<5 PJ sin #1).
+   v2: Auto-descarta popups previos ("¡Tienes un Nuevo Desafío!",
+   "Confirma el Marcador", Tutorial y Sponsor) para no bloquear el dock.
    ========================================================================== */
 
 const TARGET_URL = process.env.QA_TARGET_URL || 'https://huancayo-tenis.vercel.app';
@@ -35,8 +34,13 @@ async function takeShot(page, filename) {
   }
 }
 
-async function dismissSplashAndModals(page) {
-  await page.waitForTimeout(1800);
+async function dismissSplashAndModals(
+  page,
+  { keepIncomingChallenge = false, keepScoreConfirm = false } = {}
+) {
+  await page.waitForTimeout(1200);
+
+  // 1. Cerrar Splash Screen si está visible
   const enterBtn = page
     .locator(
       'button:has-text("Entrar"), button:has-text("Empezar"), button:has-text("Ingresar"), button:has-text("Explorar"), button:has-text("Comenzar")'
@@ -44,17 +48,50 @@ async function dismissSplashAndModals(page) {
     .first();
   if (await enterBtn.isVisible().catch(() => false)) {
     await enterBtn.click().catch(() => {});
-    await page.waitForTimeout(700);
+    await page.waitForTimeout(600);
   }
-  // Cerrar intersticial de sponsor si aparece
-  const closeAd = page.locator('button[aria-label*="Cerrar"], button:has-text("Saltar"), button:has-text("Continuar")').first();
-  if (await closeAd.isVisible().catch(() => false)) {
-    await closeAd.click().catch(() => {});
-    await page.waitForTimeout(400);
+
+  // 2. Bucle para limpiar popups apilados (retos pendientes previos, marcadores previos, tutorial o sponsor)
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const dialogs = page.locator('[role="dialog"]');
+    const count = await dialogs.count().catch(() => 0);
+    if (count === 0) break;
+
+    const topDialog = dialogs.last();
+    if (!(await topDialog.isVisible().catch(() => false))) break;
+
+    const ariaLabel = ((await topDialog.getAttribute('aria-label').catch(() => '')) || '').toLowerCase();
+
+    if (keepIncomingChallenge && ariaLabel.includes('nuevo desafío')) {
+      break;
+    }
+    if (
+      keepScoreConfirm &&
+      (ariaLabel.includes('confirma el marcador') || ariaLabel.includes('revisión de marcador'))
+    ) {
+      break;
+    }
+
+    // Intentar botones suaves de posponer / saltar / cerrar
+    const dismissBtn = topDialog
+      .locator(
+        'button:has-text("Revisar más tarde"), button:has-text("Revisar después"), button:has-text("Saltar"), button:has-text("Omitir"), button:has-text("Entendido"), button:has-text("Continuar"), .tt-modal-close-btn, .tt-modal-close, button[aria-label*="Cerrar" i]'
+      )
+      .first();
+
+    if (await dismissBtn.isVisible().catch(() => false)) {
+      await dismissBtn.click().catch(() => {});
+      await page.waitForTimeout(450);
+    } else {
+      await page.keyboard.press('Escape').catch(() => {});
+      await page.waitForTimeout(400);
+      break;
+    }
   }
 }
 
 async function clickDockTab(page, labelRegex) {
+  await dismissSplashAndModals(page);
   const nav = page.locator('nav, .tt-bottom-dock').last();
   const btn = nav.locator('button').filter({ hasText: labelRegex }).first();
   await btn.waitFor({ state: 'visible', timeout: 10000 });
@@ -75,7 +112,6 @@ async function loginAsDemoIndex(page, botLabel, chipIndex) {
     await openAuthBtn.click();
     await page.waitForTimeout(600);
   } else {
-    // Intentar desde el botón de perfil/acceso en header
     const headerLogin = page.locator('header button:has-text("Entrar"), header button:has-text("Acceder")').first();
     if (await headerLogin.isVisible().catch(() => false)) {
       await headerLogin.click();
@@ -93,14 +129,10 @@ async function loginAsDemoIndex(page, botLabel, chipIndex) {
   const rawText = ((await chip.innerText().catch(() => '')) || '').trim();
   const cleanName = rawText.split('\n')[0].replace(/VIP/gi, '').trim();
   await chip.click();
-  await page.waitForTimeout(1600);
+  await page.waitForTimeout(1800);
 
-  // Cerrar tutorial inicial si aparece
-  const skipTut = page.locator('button:has-text("Saltar"), button:has-text("Entendido"), button:has-text("Omitir")').first();
-  if (await skipTut.isVisible().catch(() => false)) {
-    await skipTut.click().catch(() => {});
-    await page.waitForTimeout(400);
-  }
+  // Cerrar cualquier popup previo de retos/marcadores/tutorial que salte al iniciar sesión
+  await dismissSplashAndModals(page);
 
   // Leer nombre exacto desde Perfil
   await clickDockTab(page, /Perfil/i);
@@ -152,7 +184,6 @@ async function launchChallengeFromA(pageA, rivalFullName, hoursAhead, isFriendly
   await lanzarTab.click();
   await pageA.waitForTimeout(500);
 
-  // Asegurar que muestre todos los niveles por si Bot B está fuera de ±1200 pts
   const rangeToggle = pageA.locator('button:has-text("Solo en mi rango"), button:has-text("Mi rango ampliado")').first();
   if (await rangeToggle.isVisible().catch(() => false)) {
     await rangeToggle.click();
@@ -172,7 +203,6 @@ async function launchChallengeFromA(pageA, rivalFullName, hoursAhead, isFriendly
   await ctaBtn.click();
   await pageA.waitForTimeout(500);
 
-  // Modal Pactar Nuevo Desafío
   const form = pageA.locator('form.tt-form-stack').first();
   if (!(await form.isVisible().catch(() => false))) {
     return { ok: false, reason: 'No abrió el modal Pactar Nuevo Desafío.' };
@@ -198,47 +228,55 @@ async function launchChallengeFromA(pageA, rivalFullName, hoursAhead, isFriendly
 
 async function acceptIncomingChallengeOnB(pageB, challengerFirstName) {
   await pageB.reload({ waitUntil: 'domcontentloaded' });
-  await dismissSplashAndModals(pageB);
-  await pageB.waitForTimeout(1200);
+  await dismissSplashAndModals(pageB, { keepIncomingChallenge: true });
+  await pageB.waitForTimeout(900);
 
-  // 1. Revisar popup automático de reto entrante
-  const popupAccept = pageB.locator('button:has-text("Aceptar Desafío Ahora")').first();
   let waHref = '';
 
-  if (await popupAccept.isVisible().catch(() => false)) {
-    const waLink = pageB.locator('a[href*="wa.me/"]').first();
-    waHref = (await waLink.getAttribute('href').catch(() => '')) || '';
-    await popupAccept.click();
-    await pageB.waitForTimeout(1400);
-    return { ok: true, via: 'popup', waHref };
+  // 1. Revisar popup automático si coincide con Bot A
+  const popupDialog = pageB.locator('[role="dialog"][aria-label*="Nuevo Desafío"]').last();
+  if (await popupDialog.isVisible().catch(() => false)) {
+    const popupText = ((await popupDialog.innerText().catch(() => '')) || '').toLowerCase();
+    if (popupText.includes(challengerFirstName.toLowerCase())) {
+      waHref = (await popupDialog.locator('a[href*="wa.me/"]').first().getAttribute('href').catch(() => '')) || '';
+      const popupAccept = popupDialog.locator('button:has-text("Aceptar Desafío Ahora")').first();
+      if (await popupAccept.isVisible().catch(() => false)) {
+        await popupAccept.click();
+        await pageB.waitForTimeout(1400);
+        return { ok: true, via: 'popup', waHref };
+      }
+    } else {
+      // Era un reto viejo de otro usuario: posponerlo y aceptar el de Bot A en Tus Desafíos
+      await dismissSplashAndModals(pageB);
+    }
   }
 
-  // 2. Fallback: alerta prioritaria o pestaña Tus Desafíos
+  // 2. Fallback: pestaña Tus Desafíos filtrando el reto de Bot A
   await clickDockTab(pageB, /Retos/i);
-  const acceptNow = pageB.locator('button:has-text("Aceptar ahora")').first();
-  if (await acceptNow.isVisible().catch(() => false)) {
-    await acceptNow.click();
+  const misRetosTab = pageB.locator('[role="tab"]:has-text("Tus Desafíos")').first();
+  await misRetosTab.click();
+  await pageB.waitForTimeout(600);
+
+  const pendingCard = pageB
+    .locator('.tt-match-card')
+    .filter({ hasText: challengerFirstName })
+    .filter({ hasText: 'Aceptar Desafío' })
+    .first();
+
+  if (await pendingCard.isVisible().catch(() => false)) {
+    waHref = (await pendingCard.locator('a[href*="wa.me/"]').first().getAttribute('href').catch(() => '')) || '';
+    await pendingCard.locator('button:has-text("Aceptar Desafío")').first().click();
     await pageB.waitForTimeout(1400);
   } else {
-    const misRetosTab = pageB.locator('[role="tab"]:has-text("Tus Desafíos")').first();
-    await misRetosTab.click();
-    await pageB.waitForTimeout(600);
-    const card = pageB.locator('.tt-match-card').filter({ hasText: challengerFirstName }).first();
-    const waLink = card.locator('a[href*="wa.me/"]').first();
-    waHref = (await waLink.getAttribute('href').catch(() => '')) || '';
-    const acceptCardBtn = card.locator('button:has-text("Aceptar Desafío")').first();
-    if (!(await acceptCardBtn.isVisible().catch(() => false))) {
+    const acceptNow = pageB.locator('button:has-text("Aceptar ahora")').first();
+    if (!(await acceptNow.isVisible().catch(() => false))) {
       return { ok: false, via: 'none', waHref };
     }
-    await acceptCardBtn.click();
+    await acceptNow.click();
     await pageB.waitForTimeout(1400);
   }
 
-  // Capturar enlace WhatsApp desde la tarjeta ya programada si aún no se leyó
   if (!waHref) {
-    const misRetosTab = pageB.locator('[role="tab"]:has-text("Tus Desafíos")').first();
-    await misRetosTab.click();
-    await pageB.waitForTimeout(500);
     const card = pageB.locator('.tt-match-card').filter({ hasText: challengerFirstName }).first();
     waHref = (await card.locator('a[href*="wa.me/"]').first().getAttribute('href').catch(() => '')) || '';
   }
@@ -247,7 +285,7 @@ async function acceptIncomingChallengeOnB(pageB, challengerFirstName) {
 }
 
 async function runMultiBotSimulation() {
-  console.log(`🤖 Iniciando Simulador Multi-Bot E2E contra: ${TARGET_URL}`);
+  console.log(`🤖 Iniciando Simulador Multi-Bot E2E v2 contra: ${TARGET_URL}`);
   const browser = await chromium.launch({ headless: true });
 
   const botA = await createBotContext(browser, 'Bot-A');
@@ -271,7 +309,7 @@ async function runMultiBotSimulation() {
       allLogged,
       allLogged
         ? `Bot A: ${loginA.name} | Bot B: ${loginB.name} | Bot C: ${loginC.name}`
-        : `Faltan cuentas demo activas para login automático (chips detectados: ${loginA.count}). Asegúrate de tener enableDemoQuickLogin: true durante el QA.`,
+        : `Faltan cuentas demo activas para login automático (chips detectados: ${loginA.count}).`,
       await takeShot(botA.page, '01-bots-login.png')
     );
 
@@ -339,7 +377,7 @@ async function runMultiBotSimulation() {
       const cardA = botA.page
         .locator('.tt-match-card')
         .filter({ hasText: firstB })
-        .filter({ hasText: 'PROGRAMADO' })
+        .filter({ hasText: 'Cambiar hora' })
         .first();
       const changeTimeBtn = cardA.locator('button:has-text("Cambiar hora")').first();
 
@@ -396,7 +434,7 @@ async function runMultiBotSimulation() {
       const cardA = botA.page
         .locator('.tt-match-card')
         .filter({ hasText: firstB })
-        .filter({ hasText: 'PROGRAMADO' })
+        .filter({ hasText: 'Subir Resultado' })
         .first();
       const uploadBtn = cardA.locator('button:has-text("Subir Resultado")').first();
 
@@ -405,7 +443,6 @@ async function runMultiBotSimulation() {
         await botA.page.waitForTimeout(500);
 
         const inputs = botA.page.locator('.tt-direct-num-input');
-        // Probar 7-7 imposible
         await inputs.nth(0).fill('7');
         await inputs.nth(1).fill('7');
         await inputs.nth(2).fill('6');
@@ -417,7 +454,6 @@ async function runMultiBotSimulation() {
           .catch(() => false);
         blocked77 = !sendWhileInvalid;
 
-        // Ahora marcador válido 6-4, 6-3
         await inputs.nth(0).fill('6');
         await inputs.nth(1).fill('4');
         await inputs.nth(2).fill('6');
@@ -433,8 +469,8 @@ async function runMultiBotSimulation() {
 
           // Bot B impugna el marcador (Disputa)
           await botB.page.reload({ waitUntil: 'domcontentloaded' });
-          await dismissSplashAndModals(botB.page);
-          await botB.page.waitForTimeout(1000);
+          await dismissSplashAndModals(botB.page, { keepScoreConfirm: true });
+          await botB.page.waitForTimeout(900);
 
           const disputeBtn = botB.page.locator('button:has-text("Impugnar")').first();
           if (await disputeBtn.isVisible().catch(() => false)) {
@@ -493,7 +529,7 @@ async function runMultiBotSimulation() {
       const cardShort = botA.page
         .locator('.tt-match-card')
         .filter({ hasText: firstB })
-        .filter({ hasText: 'PROGRAMADO' })
+        .filter({ hasText: 'Designar Árbitro' })
         .first();
       const assignBtn = cardShort.locator('button:has-text("Designar Árbitro")').first();
       if (await assignBtn.isVisible().catch(() => false)) {
@@ -518,19 +554,18 @@ async function runMultiBotSimulation() {
       await botC.page.locator('[role="tab"]:has-text("Tus Desafíos")').first().click();
       await botC.page.waitForTimeout(800);
 
-      const refBtn = botC.page.locator('button:has-text("Abrir Modo Árbitro"), button:has-text("Llevar Marcador (Árbitro)")').first();
+      const refBtn = botC.page
+        .locator('button:has-text("Abrir Modo Árbitro"), button:has-text("Llevar Marcador (Árbitro)")')
+        .first();
       if (await refBtn.isVisible().catch(() => false)) {
         await refBtn.click();
         await botC.page.waitForTimeout(500);
 
-        // Sumar 6-0 Set 1 y 6-0 Set 2 con los botones +1 Game
-        const plusBtns = botC.page.locator('.tt-step-plus');
         for (let g = 0; g < 6; g += 1) {
-          await plusBtns.first().click();
+          await botC.page.locator('.tt-step-plus').first().click();
           await botC.page.waitForTimeout(180);
         }
         await botC.page.waitForTimeout(400);
-        // Ahora aparece Set 2 -> el primer +1 Game visible pertenece a Set 2 lado A
         for (let g = 0; g < 6; g += 1) {
           await botC.page.locator('.tt-step-plus').first().click();
           await botC.page.waitForTimeout(180);
