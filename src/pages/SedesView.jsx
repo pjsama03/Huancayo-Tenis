@@ -9,7 +9,7 @@ import {
   triggerHaptic,
 } from '../components/AppIcons';
 import { APP_CONFIG, INITIAL_CLUBS } from '../data/playersAndClubsData';
-import { buildWhatsappLink } from '../utils/cloudService';
+import { buildWhatsappLink, incrementCoachMetric } from '../utils/cloudService';
 
 /* ==========================================================================
    ESTADOS DE CLIMA EN VIVO (CON TUS 4 ACTIVOS 3D OFICIALES)
@@ -53,6 +53,122 @@ const WEATHER_CONDITIONS = [
   },
 ];
 
+
+/* ==========================================================================
+   FILTROS UNIVERSALES + SELLO DE FRESCURA (CONTRATO EXACTO CON PartnerStudio)
+   ========================================================================== */
+const COACH_LEVEL_FILTERS = [
+  { id: 'ALL', label: 'Todos los niveles' },
+  { id: 'cero', label: 'Desde Cero / 5ª P' },
+  { id: 'intermedio', label: 'Intermedio (5ª B–A)' },
+  { id: 'avanzado', label: 'Avanzado (4ª–2ª)' },
+];
+
+const COACH_AGE_FILTERS = [
+  { id: 'ALL', label: 'Todas las edades' },
+  { id: 'ninos', label: 'Niños (6–12)' },
+  { id: 'juveniles', label: 'Juveniles (13–17)' },
+  { id: 'adultos', label: 'Adultos (+18)' },
+  { id: 'senior', label: 'Senior (+40)' },
+];
+
+const CLUB_VITRINA_FILTERS = [
+  { id: 'ALL', label: 'Todo' },
+  { id: 'bebidas', label: 'Bebidas' },
+  { id: 'alimentos', label: 'Alimentos' },
+  { id: 'alquiler', label: 'Alquiler' },
+  { id: 'tienda', label: 'Pelotas' },
+  { id: 'servicio', label: 'Servicios' },
+];
+
+const LEVEL_LABELS = {
+  todos: 'Todos los niveles',
+  cero: 'Desde Cero / 5ª P',
+  intermedio: 'Intermedio (5ª B–A)',
+  avanzado: 'Avanzado (4ª–2ª)',
+};
+
+const AGE_LABELS = {
+  todas: 'Todas las edades',
+  ninos: 'Niños (6–12)',
+  juveniles: 'Juveniles (13–17)',
+  adultos: 'Adultos (+18)',
+  senior: 'Senior (+40)',
+};
+
+const SRV_CAT_LABELS = {
+  bebidas: 'Agua / Bebidas',
+  alimentos: 'Alimentos / Café',
+  alquiler: 'Alquiler Equipo',
+  tienda: 'Pelotas / Tienda',
+  servicio: 'Servicio en Sede',
+};
+
+function getFreshnessInfo(isoStr) {
+  if (!isoStr) return { text: 'Agenda activa', isToday: false };
+  const dt = new Date(isoStr);
+  if (Number.isNaN(dt.getTime())) return { text: 'Agenda activa', isToday: false };
+  const now = new Date();
+  const todayPeru = now.toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
+  const targetPeru = dt.toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
+  const timeEs = dt.toLocaleTimeString('es-PE', {
+    timeZone: 'America/Lima',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
+  if (todayPeru === targetPeru) {
+    return { text: `Actualizado hoy · ${timeEs}`, isToday: true };
+  }
+  const diffDays = Math.max(1, Math.round((now.getTime() - dt.getTime()) / (24 * 3600 * 1000)));
+  if (diffDays === 1) return { text: 'Actualizado ayer', isToday: false };
+  if (diffDays <= 7) return { text: `Actualizado hace ${diffDays} días`, isToday: false };
+  return { text: 'Agenda verificada', isToday: false };
+}
+
+const DEFAULT_CLUB_VITRINA = [
+  {
+    id: 'srv-agua',
+    category: 'bebidas',
+    title: 'Agua mineral / Isotónico frío',
+    desc: 'Botella helada lista en recepción',
+    price: 5,
+    vipPrice: 4,
+    photoUrl: '',
+    available: true,
+  },
+  {
+    id: 'srv-alquiler',
+    category: 'alquiler',
+    title: 'Alquiler de Raqueta Pro',
+    desc: 'Grip renovado + 3 pelotas de práctica',
+    price: 15,
+    vipPrice: 10,
+    photoUrl: '',
+    available: true,
+  },
+  {
+    id: 'srv-pelotas',
+    category: 'tienda',
+    title: 'Tarro de Pelotas Presurizadas (x3)',
+    desc: 'Bote oficial para arcilla en altura',
+    price: 38,
+    vipPrice: 34,
+    photoUrl: '',
+    available: true,
+  },
+  {
+    id: 'srv-cafe',
+    category: 'alimentos',
+    title: 'Snack deportivo & Café pasado',
+    desc: 'Plátano, barra energética o sándwich en terraza',
+    price: 12,
+    vipPrice: 10,
+    photoUrl: '',
+    available: true,
+  },
+];
+
 /* ==========================================================================
    SEEDS DE ENRIQUECIMIENTO (HIDRATACIÓN ANTI-VACÍOS SI SUPABASE TIENE [])
    Si el club o coach edita algo en Estudio Aliado, sus datos de Supabase ganan.
@@ -73,6 +189,7 @@ const CLUB_ENRICHMENT_MAP = {
     vipNightRate: 38,
     whatsapp: '51964812340',
     bookingUrl: '',
+    freeHoursToday: 'Hoy · 05:00 p. m. y 07:00 p. m.',
     gallery: [
       { url: ASSETS.sedeCountry, caption: 'Cancha Central de Arcilla · Vista Panorámica' },
       { url: ASSETS.torneoApertura, caption: 'Pistas iluminadas para retos nocturnos' },
@@ -139,6 +256,7 @@ const CLUB_ENRICHMENT_MAP = {
     vipNightRate: 34,
     whatsapp: '51964201001',
     bookingUrl: '',
+    freeHoursToday: 'Hoy · 04:00 p. m. – 06:00 p. m.',
     gallery: [
       { url: ASSETS.sedeRomina, caption: 'Canchas de arcilla · Academia Romina Cutipa' },
       { url: ASSETS.portadaTipsSemana, caption: 'Zona de entrenamiento técnico y canastos' },
@@ -205,6 +323,7 @@ const CLUB_ENRICHMENT_MAP = {
     vipNightRate: 36,
     whatsapp: '51964501220',
     bookingUrl: '',
+    freeHoursToday: 'Hoy · 08:00 p. m. (LED)',
     gallery: [
       { url: ASSETS.sedeTauro, caption: 'Canchas competitivas · Club Tauro Tenis' },
       { url: ASSETS.torneoMasterTop8, caption: 'Iluminación nocturna LED de torneo' },
@@ -263,6 +382,7 @@ const CLUB_ENRICHMENT_MAP = {
     vipNightRate: 32,
     whatsapp: '51964708811',
     bookingUrl: '',
+    freeHoursToday: 'Mañana · 07:00 a. m. – 10:00 a. m.',
     gallery: [
       { url: ASSETS.sedeInkas, caption: 'Canchas rodeadas de eucaliptos · Los Inkas' },
       { url: ASSETS.torneoAltura, caption: 'Vista despejada de mañana en San Carlos' },
@@ -318,6 +438,7 @@ const COACH_ENRICHMENT_LIST = [
     clubName: 'Academia Romina Cutipa',
     whatsapp: '51964201001',
     photo: ASSETS.portadaTipsSemana,
+    coverUrl: ASSETS.sedeRomina,
     accent: '#00DC7D',
     experience: '10 años',
     studentsCount: '65+ alumnos',
@@ -356,6 +477,8 @@ const COACH_ENRICHMENT_LIST = [
         type: 'PRIVADA 1 A 1',
         tag: 'MÁS PEDIDA',
         title: 'Sesión Técnica Personalizada (60 min)',
+        level: 'todos',
+        ageGroup: 'adultos',
         desc: 'Diagnóstico + corrección en vivo + video corto de feedback.',
         priceRegular: 60,
         priceVip: 50,
@@ -367,6 +490,8 @@ const COACH_ENRICHMENT_LIST = [
         type: 'GRUPAL',
         tag: '3/4 CUPOS',
         title: 'Entrenamiento Grupal Nivel 5ª A / 4ª',
+        level: 'intermedio',
+        ageGroup: 'adultos',
         desc: 'Peloteo intenso, situaciones de partido y juego de pies.',
         priceRegular: 30,
         priceVip: 25,
@@ -378,6 +503,8 @@ const COACH_ENRICHMENT_LIST = [
         type: 'PACK MENSUAL',
         tag: 'AHORRA S/ 80',
         title: 'Plan Pro 8 Clases Privadas / Mes',
+        level: 'cero',
+        ageGroup: 'ninos',
         desc: 'Seguimiento mensual de ascenso de categoría + video análisis.',
         priceRegular: 400,
         priceVip: 350,
@@ -402,6 +529,7 @@ const COACH_ENRICHMENT_LIST = [
     clubName: 'Country Club Los Huancas',
     whatsapp: '51964202002',
     photo: ASSETS.portadaAcademiaTv,
+    coverUrl: ASSETS.sedeCountry,
     accent: '#E5C16C',
     experience: '8 años',
     studentsCount: '48+ alumnos',
@@ -439,6 +567,8 @@ const COACH_ENRICHMENT_LIST = [
         type: 'SPARRING + COACH',
         tag: 'COMPETITIVO',
         title: 'Sparring Táctico + Corrección (60 min)',
+        level: 'avanzado',
+        ageGroup: 'adultos',
         desc: 'Sets con lectura táctica real para preparar retos oficiales.',
         priceRegular: 65,
         priceVip: 55,
@@ -450,6 +580,8 @@ const COACH_ENRICHMENT_LIST = [
         type: 'CLÍNICA SAQUE',
         tag: '2/4 CUPOS',
         title: 'Clínica Intensiva de Saque y Resto',
+        level: 'intermedio',
+        ageGroup: 'juveniles',
         desc: 'Mecánica de lanzamiento, slice abierto y devolución profunda.',
         priceRegular: 35,
         priceVip: 28,
@@ -461,6 +593,8 @@ const COACH_ENRICHMENT_LIST = [
         type: 'PACK 4 SESIONES',
         tag: 'AHORRA S/ 40',
         title: 'Pack Quincenal Ascenso de Categoría',
+        level: 'avanzado',
+        ageGroup: 'adultos',
         desc: '4 sesiones privadas enfocadas en tu siguiente categoría.',
         priceRegular: 220,
         priceVip: 190,
@@ -484,6 +618,7 @@ const COACH_ENRICHMENT_LIST = [
     clubName: 'Club Tauro Tenis',
     whatsapp: '51964203003',
     photo: ASSETS.sedeTauro,
+    coverUrl: ASSETS.torneoDoblesValle,
     accent: '#DE8566',
     experience: '7 años',
     studentsCount: '52+ alumnos',
@@ -512,6 +647,8 @@ const COACH_ENRICHMENT_LIST = [
         type: 'INICIACIÓN',
         tag: 'NIVEL CERO',
         title: 'Clase Inicial 1 a 1 (Raqueta incluida)',
+        level: 'cero',
+        ageGroup: 'todas',
         desc: 'Te prestamos raqueta y pelotas para que pruebes sin invertir.',
         priceRegular: 50,
         priceVip: 42,
@@ -523,6 +660,8 @@ const COACH_ENRICHMENT_LIST = [
         type: 'GRUPAL MIXTO',
         tag: '3/6 CUPOS',
         title: 'Grupo Recreativo Tardes',
+        level: 'cero',
+        ageGroup: 'adultos',
         desc: 'Ambiente amigable, drills dinámicos y puntos cortos.',
         priceRegular: 25,
         priceVip: 20,
@@ -545,6 +684,7 @@ const COACH_ENRICHMENT_LIST = [
     clubName: 'Club Los Inkas',
     whatsapp: '51964204004',
     photo: ASSETS.sedeInkas,
+    coverUrl: ASSETS.torneoAltura,
     accent: '#60A5FA',
     experience: '6 años',
     studentsCount: '35+ alumnos',
@@ -573,6 +713,8 @@ const COACH_ENRICHMENT_LIST = [
         type: 'TENIS + FÍSICO',
         tag: 'INTEGRAL',
         title: 'Sesión Técnica + Desplazamiento (60 min)',
+        level: 'intermedio',
+        ageGroup: 'senior',
         desc: 'Mejora tu llegada a bolas abiertas y cuida rodillas/hombro.',
         priceRegular: 55,
         priceVip: 45,
@@ -584,6 +726,8 @@ const COACH_ENRICHMENT_LIST = [
         type: 'PACK 6 CLASES',
         tag: 'AHORRA S/ 45',
         title: 'Bono Físico & Cancha (6 sesiones)',
+        level: 'todos',
+        ageGroup: 'adultos',
         desc: 'Ideal para preparar torneos de fin de semana.',
         priceRegular: 285,
         priceVip: 245,
@@ -670,19 +814,51 @@ function enrichClub(raw, idx = 0) {
       ? raw.vipBenefits
       : seed.vipBenefits;
 
+  const rawServices =
+    Array.isArray(raw?.services) && raw.services.length > 0
+      ? raw.services.map((s, i) =>
+          typeof s === 'string'
+            ? {
+                id: `srv-${i}`,
+                category: 'servicio',
+                title: s,
+                desc: 'Disponible en sede',
+                price: 0,
+                vipPrice: 0,
+                photoUrl: '',
+                available: true,
+              }
+            : {
+                id: s.id || `srv-${i}`,
+                category: s.category || 'servicio',
+                title: s.title || s.name || 'Producto / Servicio',
+                desc: s.desc || s.detail || '',
+                price: Number(s.price) || 0,
+                vipPrice: Number(s.vipPrice) || 0,
+                photoUrl: s.photoUrl || s.image || '',
+                available: s.available !== false,
+              }
+        )
+      : DEFAULT_CLUB_VITRINA;
+
   const rates = raw?.rates || raw?.tarifas || {};
-  const dayRate = Number(raw?.dayRate ?? rates.day ?? rates.dia ?? seed.dayRate) || seed.dayRate;
+  const dayRate =
+    Number(raw?.dayRate ?? rates.day ?? rates.diaRegular ?? rates.dia ?? seed.dayRate) ||
+    seed.dayRate;
   const nightRate =
-    Number(raw?.nightRate ?? rates.night ?? rates.noche ?? seed.nightRate) || seed.nightRate;
+    Number(raw?.nightRate ?? rates.night ?? rates.nocheRegular ?? rates.noche ?? seed.nightRate) ||
+    seed.nightRate;
   const vipDayRate =
-    Number(raw?.vipDayRate ?? rates.vipDay ?? rates.vipDia ?? seed.vipDayRate) ||
+    Number(raw?.vipDayRate ?? rates.vipDay ?? rates.diaVip ?? rates.vipDia ?? seed.vipDayRate) ||
     Math.max(15, dayRate - 6);
   const vipNightRate =
-    Number(raw?.vipNightRate ?? rates.vipNight ?? rates.vipNoche ?? seed.vipNightRate) ||
-    Math.max(20, nightRate - 8);
+    Number(
+      raw?.vipNightRate ?? rates.vipNight ?? rates.nocheVip ?? rates.vipNoche ?? seed.vipNightRate
+    ) || Math.max(20, nightRate - 8);
 
   const condKey = raw?.climaBase?.conditionKey || raw?.weatherCondition || raw?.weather || 'seco';
   const weather = getWeatherObj(condKey);
+  const updatedAt = raw?.updatedAt || rates.updatedAt || raw?.climaBase?.updatedAt || null;
 
   const mapsUrl =
     raw?.mapsUrl ||
@@ -700,11 +876,15 @@ function enrichClub(raw, idx = 0) {
     hours: raw?.hours || raw?.schedule || seed.hours,
     surface: raw?.surface || seed.surface,
     courtsCount: Number(raw?.courtsCount) || seed.courtsCount,
-    logo: raw?.logo || raw?.logoUrl || seed.logo,
-    cover: raw?.cover || raw?.coverUrl || raw?.image || seed.cover,
+    logo: raw?.logoUrl || raw?.logo || seed.logo,
+    cover: raw?.coverUrl || raw?.cover || raw?.image || seed.cover,
     whatsapp: raw?.whatsapp || raw?.phone || seed.whatsapp,
     mapsUrl,
-    bookingUrl: raw?.bookingUrl || raw?.externalBookingUrl || seed.bookingUrl || '',
+    bookingUrl:
+      raw?.bookingUrl || rates.bookingUrl || raw?.externalBookingUrl || seed.bookingUrl || '',
+    freeHoursToday: raw?.freeHoursToday ?? rates.freeHoursToday ?? seed.freeHoursToday ?? '',
+    updatedAt,
+    freshness: getFreshnessInfo(updatedAt),
     dayRate,
     nightRate,
     vipDayRate,
@@ -712,6 +892,7 @@ function enrichClub(raw, idx = 0) {
     weather,
     gallery,
     videos,
+    services: rawServices,
     facilities: seed.facilities,
     promos: rawPromos,
     vipBenefits: rawVip,
@@ -732,15 +913,25 @@ function enrichCoach(raw, idx = 0) {
       ? raw.videosEnCancha
       : seed.videos;
 
-  const videos = rawVideos.map((v, i) => ({
-    id: v.id || `${raw?.id || seed.id}-v-${i}`,
-    title: v.title || v.titulo || 'Clip en cancha',
-    duration: v.duration || v.duracion || '0:45',
-    url: v.url || v.videoUrl || seed.videos[0]?.url || ASSETS.videoCoachRomina,
-    poster: v.poster || v.thumbnail || seed.photo,
-    isFree: v.isFree !== false && !(Number(v.gemsCost) > 0),
-    gemsCost: Number(v.gemsCost) || 0,
-  }));
+  const videos = rawVideos
+    .filter((v) => !v.isTextTip)
+    .map((v, i) => ({
+      id: v.id || `${raw?.id || seed.id}-v-${i}`,
+      title: v.title || v.titulo || 'Clip en cancha',
+      duration: v.duration || v.duracion || '0:45',
+      url: v.url || v.src || v.videoUrl || seed.videos[0]?.url || ASSETS.videoCoachRomina,
+      poster: v.poster || v.thumbnail || raw?.coverUrl || seed.photo,
+      isFree: v.isFree !== false && !(Number(v.gemsCost) > 0),
+      gemsCost: Number(v.gemsCost) || 0,
+    }));
+
+  const textTips = rawVideos
+    .filter((v) => v.isTextTip)
+    .map((t, i) => ({
+      id: t.id || `tip-${i}`,
+      title: t.title || 'Tip del Coach',
+      summary: t.summary || '',
+    }));
 
   const rawPackages =
     Array.isArray(raw?.packages) && raw.packages.length > 0
@@ -751,30 +942,55 @@ function enrichCoach(raw, idx = 0) {
       ? raw.programs
       : seed.packages;
 
-  const packages = rawPackages.map((pk, i) => ({
+  const packagesFromDb = rawPackages.map((pk, i) => ({
     id: pk.id || `pk-${i}`,
     type: String(pk.type || pk.tipo || 'SESIÓN').toUpperCase(),
     tag: String(pk.tag || pk.badge || '').toUpperCase(),
     title: pk.title || pk.name || pk.nombre || 'Sesión Técnica',
     desc: pk.desc || pk.description || pk.detalle || 'Entrenamiento práctico en cancha.',
+    level: pk.level || 'todos',
+    ageGroup: pk.ageGroup || 'todas',
+    photoUrl: pk.photoUrl || '',
     priceRegular: Number(pk.priceRegular ?? pk.price ?? pk.precio ?? 60) || 60,
     priceVip:
       Number(
         pk.priceVip ??
+          pk.vipPrice ??
           pk.precioVip ??
           Math.max(20, (Number(pk.priceRegular ?? pk.price ?? 60) || 60) - 10)
       ) || 50,
-    spotsFilled: pk.spotsFilled ?? pk.inscritos ?? null,
-    spotsMax: pk.spotsMax ?? pk.cupos ?? null,
+    spotsFilled: pk.spotsFilled ?? pk.spotsUsed ?? pk.inscritos ?? null,
+    spotsMax: pk.spotsMax ?? pk.spotsTotal ?? pk.cupos ?? null,
   }));
+
+  const groupPackages = (Array.isArray(raw?.groups) ? raw.groups : [])
+    .filter((g) => g && g.label)
+    .map((g, i) => ({
+      id: g.id || `grp-pk-${i}`,
+      type: 'GRUPAL',
+      tag: `${Number(g.spotsUsed ?? g.spotsFilled ?? 0)}/${Number(g.spotsTotal ?? g.spotsMax ?? 4)} CUPOS`,
+      title: g.label,
+      desc: `${g.day || 'Turno semanal'}${g.time ? ` · ${g.time}` : ''}`,
+      level: g.level || 'todos',
+      ageGroup: g.ageGroup || 'todas',
+      photoUrl: g.photoUrl || '',
+      priceRegular: Number(g.price) || 30,
+      priceVip: Number(g.vipPrice) || 25,
+      spotsFilled: Number(g.spotsUsed ?? g.spotsFilled ?? 0),
+      spotsMax: Number(g.spotsTotal ?? g.spotsMax ?? 4),
+    }));
+
+  const existingTitles = new Set(packagesFromDb.map((p) => p.title.toLowerCase()));
+  const packages = [
+    ...packagesFromDb,
+    ...groupPackages.filter((gp) => !existingTitles.has(gp.title.toLowerCase())),
+  ];
 
   const rawSchedule =
     Array.isArray(raw?.schedule) && raw.schedule.length > 0
       ? raw.schedule
       : Array.isArray(raw?.horariosSemanales) && raw.horariosSemanales.length > 0
       ? raw.horariosSemanales
-      : Array.isArray(raw?.groups) && raw.groups.length > 0
-      ? raw.groups
       : seed.schedule;
 
   const schedule = rawSchedule.map((slot, i) => ({
@@ -782,6 +998,9 @@ function enrichCoach(raw, idx = 0) {
     day: slot.day || slot.dia || 'Esta semana',
     time: slot.time || slot.hora || slot.schedule || '06:00 p. m.',
     status: slot.status || 'open',
+    level: slot.level || 'todos',
+    ageGroup: slot.ageGroup || 'todas',
+    updatedAt: slot.updatedAt || null,
   }));
 
   const rawSpecialties =
@@ -797,25 +1016,49 @@ function enrichCoach(raw, idx = 0) {
   const minPrice = Math.min(...packages.map((p) => p.priceRegular));
   const minVipPrice = Math.min(...packages.map((p) => p.priceVip));
 
+  const levelsSet = new Set();
+  const agesSet = new Set();
+  [...packages, ...schedule].forEach((item) => {
+    if (item.level) levelsSet.add(item.level);
+    if (item.ageGroup) agesSet.add(item.ageGroup);
+  });
+  if (levelsSet.size === 0) levelsSet.add('todos');
+  if (agesSet.size === 0) agesSet.add('todas');
+
+  const hasGroups = packages.some((p) => p.spotsMax && p.spotsMax > 1);
+  const updatedAt =
+    raw?.updatedAt ||
+    schedule.find((s) => s.updatedAt)?.updatedAt ||
+    packages.find((p) => p.updatedAt)?.updatedAt ||
+    null;
+
   return {
     id: raw?.id || seed.id,
     name: raw?.name || seed.name,
     role: raw?.role || raw?.title || seed.role,
     clubName: raw?.clubName || raw?.club || seed.clubName,
     whatsapp: raw?.whatsapp || raw?.phone || seed.whatsapp,
-    photo: raw?.photo || raw?.photoUrl || raw?.avatar || seed.photo,
+    photo: raw?.photoUrl || raw?.photo || raw?.avatar || seed.photo,
+    coverUrl: raw?.coverUrl || seed.coverUrl || raw?.photoUrl || raw?.photo || seed.photo,
     accent: raw?.accent || raw?.accentColor || raw?.temaColor || seed.accent,
     experience: raw?.experience || seed.experience,
     studentsCount: raw?.studentsCount || seed.studentsCount,
     rating: raw?.rating || seed.rating,
+    freeSlotToday: raw?.freeSlotToday || '',
     availableToday:
       raw?.availableToday !== undefined ? Boolean(raw.availableToday) : seed.availableToday,
+    updatedAt,
+    freshness: getFreshnessInfo(updatedAt),
     bio: raw?.bio || raw?.description || seed.bio,
     specialties: rawSpecialties,
     gallery: rawGallery,
     videos,
+    textTips,
     packages,
     schedule,
+    levelsCovered: Array.from(levelsSet),
+    agesCovered: Array.from(agesSet),
+    hasGroups,
     minPrice,
     minVipPrice,
   };
@@ -839,11 +1082,19 @@ export default function SedesView({
 }) {
   const [activeTab, setActiveTab] = useState('sedes'); // 'sedes' | 'coaches'
 
+  // Filtros interactivos de Coaches (1 toque: Nivel, Edad, Libre hoy, Grupales)
+  const [coachSearch, setCoachSearch] = useState('');
+  const [coachLevelFilter, setCoachLevelFilter] = useState('ALL');
+  const [coachAgeFilter, setCoachAgeFilter] = useState('ALL');
+  const [coachOnlyToday, setCoachOnlyToday] = useState(false);
+  const [coachOnlyGroups, setCoachOnlyGroups] = useState(false);
+
   // Estado Modal Club
   const [selectedClubId, setSelectedClubId] = useState(null);
   const [clubMediaMode, setClubMediaMode] = useState('photos'); // 'photos' | 'video'
   const [clubSlideIdx, setClubSlideIdx] = useState(0);
-  const [clubInnerTab, setClubInnerTab] = useState('canchas'); // 'canchas' | 'vip' | 'reservar'
+  const [clubInnerTab, setClubInnerTab] = useState('canchas'); // 'canchas' | 'vitrina' | 'vip' | 'reservar'
+  const [clubVitrinaCat, setClubVitrinaCat] = useState('ALL');
 
   // Estado Modal Coach
   const [selectedCoachId, setSelectedCoachId] = useState(null);
@@ -873,6 +1124,50 @@ export default function SedesView({
     return src.map((c, idx) => enrichCoach(c, idx));
   }, [coaches]);
 
+  const filteredCoaches = useMemo(() => {
+    const q = coachSearch.trim().toLowerCase();
+    return enrichedCoaches.filter((c) => {
+      if (coachOnlyToday && !c.availableToday) return false;
+      if (coachOnlyGroups && !c.hasGroups) return false;
+      if (
+        coachLevelFilter !== 'ALL' &&
+        !c.levelsCovered.includes('todos') &&
+        !c.levelsCovered.includes(coachLevelFilter)
+      ) {
+        return false;
+      }
+      if (
+        coachAgeFilter !== 'ALL' &&
+        !c.agesCovered.includes('todas') &&
+        !c.agesCovered.includes(coachAgeFilter)
+      ) {
+        return false;
+      }
+      if (q) {
+        const hay = `${c.name} ${c.clubName} ${c.role} ${c.specialties.join(' ')} ${c.packages
+          .map((p) => p.title)
+          .join(' ')}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [
+    enrichedCoaches,
+    coachSearch,
+    coachLevelFilter,
+    coachAgeFilter,
+    coachOnlyToday,
+    coachOnlyGroups,
+  ]);
+
+  const hasCoachFiltersActive = Boolean(
+    coachSearch.trim() ||
+      coachLevelFilter !== 'ALL' ||
+      coachAgeFilter !== 'ALL' ||
+      coachOnlyToday ||
+      coachOnlyGroups
+  );
+
   const selectedClub = useMemo(
     () => enrichedClubs.find((c) => c.id === selectedClubId) || null,
     [enrichedClubs, selectedClubId]
@@ -886,7 +1181,9 @@ export default function SedesView({
   useEffect(() => {
     if (!selectedCoach) return;
     setSelectedPackId(selectedCoach.packages[0]?.id || null);
-    setSelectedSlotId(selectedCoach.schedule[0]?.id || null);
+    const firstOpen =
+      selectedCoach.schedule.find((s) => s.status !== 'full') || selectedCoach.schedule[0];
+    setSelectedSlotId(firstOpen?.id || null);
     setCoachMediaMode('videos');
     setCoachInnerTab('packs');
     setPlayingVideo(null);
@@ -898,11 +1195,13 @@ export default function SedesView({
     setClubMediaMode('photos');
     setClubSlideIdx(0);
     setClubInnerTab('canchas');
+    setClubVitrinaCat('ALL');
   };
 
   const openCoachModal = (coach) => {
     triggerHaptic('medium');
     setSelectedCoachId(coach.id);
+    if (coach?.id) incrementCoachMetric(coach.id, 'profile_views').catch(() => {});
   };
 
   const handleWeatherTap = (club, condKey) => {
@@ -962,6 +1261,7 @@ export default function SedesView({
 
   const handleReserveCoachClass = () => {
     if (!selectedCoach) return;
+    if (selectedCoach.id) incrementCoachMetric(selectedCoach.id, 'whatsapp_clicks').catch(() => {});
     const pack =
       selectedCoach.packages.find((p) => p.id === selectedPackId) || selectedCoach.packages[0];
     const slot =
@@ -970,12 +1270,14 @@ export default function SedesView({
 
     const lines = [
       `Hola Coach ${selectedCoach.name}, te escribo desde TOTAL TENIS:`,
-      pack ? `• Modalidad: ${pack.title}` : '',
+      pack ? `• Clase / Modalidad: ${pack.title}` : '',
+      pack?.level ? `• Nivel: ${LEVEL_LABELS[pack.level] || pack.level}` : '',
+      pack?.ageGroup ? `• Edad: ${AGE_LABELS[pack.ageGroup] || pack.ageGroup}` : '',
       slot ? `• Horario que me interesa: ${slot.day} · ${slot.time}` : '',
       effectivePrice
         ? `• Tarifa vista en app: S/ ${effectivePrice} (${isVip ? 'Socio VIP' : 'Regular'})`
         : '',
-      currentUser?.name ? `• Jugador: ${currentUser.name}` : '',
+      currentUser?.name ? `• Alumno: ${currentUser.name}` : '',
       '¿Tienes disponibilidad para confirmar?',
     ].filter(Boolean);
 
@@ -993,6 +1295,13 @@ export default function SedesView({
   const activeSlot = selectedCoach
     ? selectedCoach.schedule.find((s) => s.id === selectedSlotId) || selectedCoach.schedule[0]
     : null;
+
+  const filteredClubVitrina = useMemo(() => {
+    if (!selectedClub) return [];
+    const list = selectedClub.services || [];
+    if (clubVitrinaCat === 'ALL') return list;
+    return list.filter((s) => s.category === clubVitrinaCat);
+  }, [selectedClub, clubVitrinaCat]);
 
   return (
     <section
@@ -1094,12 +1403,17 @@ export default function SedesView({
                       </span>
                     </span>
 
-                    {club.videos.length > 0 && (
-                      <span className="tt-cc-video-chip">
-                        <TTIcon name="play" size={12} />
-                        Video Tour
-                      </span>
-                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                      {club.freshness.isToday && (
+                        <span className="tt-fresh-badge is-today">● Hoy</span>
+                      )}
+                      {club.videos.length > 0 && (
+                        <span className="tt-cc-video-chip">
+                          <TTIcon name="play" size={12} />
+                          Video Tour
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="tt-cc-bottom-row">
@@ -1121,6 +1435,14 @@ export default function SedesView({
                 </div>
 
                 <div className="tt-cc-body">
+                  {club.freeHoursToday && (
+                    <div className="tt-cc-free-strip">
+                      <span className="tt-free-dot" />
+                      <strong>Libre:</strong>
+                      <span>{club.freeHoursToday}</span>
+                    </div>
+                  )}
+
                   <div className="tt-cc-rates-strip">
                     <div className="tt-cc-rate-tile">
                       <small>DÍA</small>
@@ -1143,6 +1465,7 @@ export default function SedesView({
                       {club.promos[0]
                         ? `${club.promos[0].tag}: ${club.promos[0].priceText}`
                         : club.hours}
+                      {club.services.length > 0 ? ` · Vitrina (${club.services.length})` : ''}
                     </span>
                     <span className="tt-cc-open-3d">Explorar Sede ›</span>
                   </div>
@@ -1154,78 +1477,219 @@ export default function SedesView({
       )}
 
       {/* ====================================================================
-          3B. VITRINA DE COACHES PRO (TARJETAS 3D CON ACENTO LUMINOSO)
+          3B. VITRINA DE COACHES PRO (FILTROS POR NIVEL/EDAD + TARJETAS 3D)
           ==================================================================== */}
       {activeTab === 'coaches' && (
-        <div key="tab-coaches" className="tt-sd-grid tt-sd-enter">
-          {enrichedCoaches.length === 0 ? (
+        <div key="tab-coaches" className="tt-coaches-wrap tt-sd-enter">
+          <div className="tt-co-filter-panel">
+            <div className="tt-co-search-row">
+              <div className="tt-co-search-box">
+                <TTIcon name="search" size={16} style={{ opacity: 0.65, flexShrink: 0 }} />
+                <input
+                  type="search"
+                  value={coachSearch}
+                  onChange={(e) => setCoachSearch(e.target.value)}
+                  placeholder="Buscar profesor, sede o tipo de clase..."
+                  aria-label="Buscar entrenador"
+                />
+                {coachSearch && (
+                  <button
+                    type="button"
+                    className="tt-co-clear-x"
+                    aria-label="Limpiar búsqueda"
+                    onClick={() => setCoachSearch('')}
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              <button
+                type="button"
+                className={`tt-co-quick-toggle ${coachOnlyToday ? 'is-on' : ''}`}
+                onClick={() => {
+                  triggerHaptic('light');
+                  setCoachOnlyToday((v) => !v);
+                }}
+              >
+                <i />
+                <span>Libre hoy</span>
+              </button>
+
+              <button
+                type="button"
+                className={`tt-co-quick-toggle ${coachOnlyGroups ? 'is-on' : ''}`}
+                onClick={() => {
+                  triggerHaptic('light');
+                  setCoachOnlyGroups((v) => !v);
+                }}
+              >
+                <span>Grupales</span>
+              </button>
+            </div>
+
+            <div className="tt-co-filter-group">
+              <span className="tt-co-filter-lbl">NIVEL:</span>
+              <div className="tt-co-pills-rail">
+                {COACH_LEVEL_FILTERS.map((lv) => (
+                  <button
+                    key={lv.id}
+                    type="button"
+                    className={`tt-co-filter-pill ${coachLevelFilter === lv.id ? 'is-on' : ''}`}
+                    onClick={() => {
+                      triggerHaptic('light');
+                      setCoachLevelFilter(lv.id);
+                    }}
+                  >
+                    {lv.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="tt-co-filter-group">
+              <span className="tt-co-filter-lbl">EDAD:</span>
+              <div className="tt-co-pills-rail">
+                {COACH_AGE_FILTERS.map((ag) => (
+                  <button
+                    key={ag.id}
+                    type="button"
+                    className={`tt-co-filter-pill is-age ${coachAgeFilter === ag.id ? 'is-on' : ''}`}
+                    onClick={() => {
+                      triggerHaptic('light');
+                      setCoachAgeFilter(ag.id);
+                    }}
+                  >
+                    {ag.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {filteredCoaches.length === 0 ? (
             <EmptyStateCard
               theme={theme}
-              title="Sin entrenadores publicados"
-              description="Pronto sumaremos entrenadores oficiales al directorio."
+              title={
+                hasCoachFiltersActive
+                  ? 'Ningún coach coincide con esos filtros'
+                  : 'Sin entrenadores publicados'
+              }
+              description={
+                hasCoachFiltersActive
+                  ? 'Prueba ampliando el nivel o la edad para ver todos los profesores y horarios disponibles.'
+                  : 'Pronto sumaremos entrenadores oficiales al directorio.'
+              }
+              actionLabel={hasCoachFiltersActive ? 'Ver todos los Coaches' : undefined}
+              onAction={
+                hasCoachFiltersActive
+                  ? () => {
+                      setCoachSearch('');
+                      setCoachLevelFilter('ALL');
+                      setCoachAgeFilter('ALL');
+                      setCoachOnlyToday(false);
+                      setCoachOnlyGroups(false);
+                    }
+                  : undefined
+              }
             />
           ) : (
-            enrichedCoaches.map((coach, idx) => (
-              <article
-                key={coach.id}
-                className="tt-coach-card"
-                style={{ '--sd-delay': `${idx * 55}ms`, '--coach-accent': coach.accent }}
-                onClick={() => openCoachModal(coach)}
-              >
-                <div className="tt-co-hero">
-                  <SmartImage
-                    src={coach.photo}
-                    fallbackSrc={ASSETS.portadaTipsSemana}
-                    alt={coach.name}
-                    className="tt-co-bg"
-                  />
-                  <div className="tt-co-scrim" />
+            <div className="tt-sd-grid">
+              {filteredCoaches.map((coach, idx) => (
+                <article
+                  key={coach.id}
+                  className="tt-coach-card"
+                  style={{ '--sd-delay': `${idx * 55}ms`, '--coach-accent': coach.accent }}
+                  onClick={() => openCoachModal(coach)}
+                >
+                  <div className="tt-co-hero">
+                    <SmartImage
+                      src={coach.coverUrl}
+                      fallbackSrc={ASSETS.portadaTipsSemana}
+                      alt={coach.name}
+                      className="tt-co-bg"
+                    />
+                    <div className="tt-co-scrim" />
 
-                  <div className="tt-co-top-row">
-                    {coach.availableToday ? (
-                      <span className="tt-co-avail-pill is-today">
-                        <i />
-                        Libre hoy
-                      </span>
-                    ) : (
-                      <span className="tt-co-avail-pill">Ver horarios</span>
-                    )}
+                    <div className="tt-co-top-row">
+                      {coach.availableToday ? (
+                        <span className="tt-co-avail-pill is-today">
+                          <i />
+                          {coach.freeSlotToday ? coach.freeSlotToday : 'Libre hoy'}
+                        </span>
+                      ) : (
+                        <span className="tt-co-avail-pill">Ver horarios</span>
+                      )}
 
-                    <span className="tt-co-media-pill">
-                      <TTIcon name="video" size={12} />
-                      {coach.videos.length} {coach.videos.length === 1 ? 'video' : 'videos'}
-                    </span>
-                  </div>
-
-                  <div className="tt-co-bottom-row">
-                    <span className="tt-co-role">{coach.role}</span>
-                    <h2 className="tt-co-name">{coach.name}</h2>
-                    <span className="tt-co-club">
-                      <TTIcon name="mapPin" size={12} />
-                      {coach.clubName}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="tt-co-body">
-                  <div className="tt-co-tags-row">
-                    {coach.specialties.slice(0, 3).map((sp) => (
-                      <span key={sp} className="tt-co-tag">
-                        {sp}
-                      </span>
-                    ))}
-                  </div>
-
-                  <div className="tt-co-foot">
-                    <div className="tt-co-price-group">
-                      <small>Desde S/ {coach.minPrice}</small>
-                      <strong>VIP S/ {coach.minVipPrice}</strong>
+                      <div className="tt-co-top-right-group">
+                        <span
+                          className={`tt-fresh-badge ${coach.freshness.isToday ? 'is-today' : ''}`}
+                        >
+                          {coach.freshness.isToday ? '● Actualizado hoy' : coach.freshness.text}
+                        </span>
+                        <span className="tt-co-media-pill">
+                          <TTIcon name="video" size={12} />
+                          {coach.videos.length} {coach.videos.length === 1 ? 'video' : 'videos'}
+                        </span>
+                      </div>
                     </div>
-                    <span className="tt-co-cta-3d">Ver Clases & Videos ›</span>
+
+                    <div className="tt-co-bottom-with-avatar">
+                      <div className="tt-co-avatar-ring">
+                        <SmartImage
+                          src={coach.photo}
+                          fallbackSrc={ASSETS.portadaTipsSemana}
+                          alt={coach.name}
+                          initials={coach.name}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            objectPosition: 'center top',
+                          }}
+                        />
+                      </div>
+                      <div className="tt-co-bottom-row">
+                        <span className="tt-co-role">{coach.role}</span>
+                        <h2 className="tt-co-name">{coach.name}</h2>
+                        <span className="tt-co-club">
+                          <TTIcon name="mapPin" size={12} />
+                          {coach.clubName}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </article>
-            ))
+
+                  <div className="tt-co-body">
+                    <div className="tt-co-tags-row">
+                      {coach.levelsCovered.slice(0, 2).map((lv) => (
+                        <span key={`lv-${lv}`} className="tt-co-tag is-level">
+                          {LEVEL_LABELS[lv] || lv}
+                        </span>
+                      ))}
+                      {coach.agesCovered.slice(0, 2).map((ag) => (
+                        <span key={`ag-${ag}`} className="tt-co-tag is-age">
+                          {AGE_LABELS[ag] || ag}
+                        </span>
+                      ))}
+                      {coach.specialties.slice(0, 2).map((sp) => (
+                        <span key={sp} className="tt-co-tag">
+                          {sp}
+                        </span>
+                      ))}
+                    </div>
+
+                    <div className="tt-co-foot">
+                      <div className="tt-co-price-group">
+                        <small>Desde S/ {coach.minPrice}</small>
+                        <strong>VIP S/ {coach.minVipPrice}</strong>
+                      </div>
+                      <span className="tt-co-cta-3d">Ver Clases & Videos ›</span>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
           )}
         </div>
       )}
@@ -1239,7 +1703,7 @@ export default function SedesView({
         title={selectedClub?.name || 'Sede Oficial'}
         subtitle={
           selectedClub
-            ? `${selectedClub.district} · ${selectedClub.surface} · ${selectedClub.hours}`
+            ? `${selectedClub.district} · ${selectedClub.surface} · ${selectedClub.freshness.text}`
             : ''
         }
         icon={
@@ -1368,9 +1832,10 @@ export default function SedesView({
             </div>
 
             {/* 2. PESTAÑAS INTERNAS 3D TÁCTILES DEL CLUB */}
-            <div className="tt-sd-3d-dock is-three" role="tablist">
+            <div className="tt-sd-3d-dock is-four" role="tablist">
               {[
-                { id: 'canchas', label: 'Canchas & Promos' },
+                { id: 'canchas', label: 'Canchas' },
+                { id: 'vitrina', label: `Vitrina (${selectedClub.services.length})` },
                 { id: 'vip', label: 'VIP & Clima' },
                 { id: 'reservar', label: 'Reservar' },
               ].map((t) => (
@@ -1390,9 +1855,21 @@ export default function SedesView({
               ))}
             </div>
 
-            {/* PESTAÑA A: CANCHAS, TARIFAS 3D, PROMOS LUMINOSAS Y BENTO */}
+            {/* PESTAÑA A: CANCHAS, HORAS LIBRES HOY, TARIFAS 3D, PROMOS LUMINOSAS Y BENTO */}
             {clubInnerTab === 'canchas' && (
               <div key="cm-canchas" className="tt-cm-panel tt-sd-enter">
+                {selectedClub.freeHoursToday && (
+                  <div className="tt-cc-free-strip is-inside">
+                    <span className="tt-free-dot" />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <strong>Horas libres publicadas: {selectedClub.freeHoursToday}</strong>
+                      <small style={{ display: 'block', opacity: 0.78 }}>
+                        {selectedClub.freshness.text}
+                      </small>
+                    </div>
+                  </div>
+                )}
+
                 <div className="tt-rates-showcase">
                   <div className="tt-rate-3d-box">
                     <span>DÍA REGULAR</span>
@@ -1449,6 +1926,92 @@ export default function SedesView({
                     ))}
                   </div>
                 </div>
+              </div>
+            )}
+
+
+            {/* PESTAÑA A2: VITRINA DEL CLUB (BEBIDAS, ALIMENTOS, ALQUILER, PELOTAS Y SERVICIOS) */}
+            {clubInnerTab === 'vitrina' && (
+              <div key="cm-vitrina" className="tt-cm-panel tt-sd-enter">
+                <div className="tt-co-pills-rail">
+                  {CLUB_VITRINA_FILTERS.map((cat) => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      className={`tt-co-filter-pill ${clubVitrinaCat === cat.id ? 'is-on' : ''}`}
+                      onClick={() => {
+                        triggerHaptic('light');
+                        setClubVitrinaCat(cat.id);
+                      }}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+
+                {filteredClubVitrina.length === 0 ? (
+                  <EmptyStateCard
+                    theme={theme}
+                    title="Sin artículos en esta categoría"
+                    description="Prueba tocando «Todo» para ver todo lo disponible en recepción."
+                    actionLabel="Ver toda la vitrina"
+                    onAction={() => setClubVitrinaCat('ALL')}
+                  />
+                ) : (
+                  <div className="tt-vitrina-grid">
+                    {filteredClubVitrina.map((item) => (
+                      <div
+                        key={item.id}
+                        className={`tt-vitrina-card ${item.available === false ? 'is-out' : ''}`}
+                      >
+                        {item.photoUrl && (
+                          <div className="tt-vitrina-photo">
+                            <SmartImage
+                              src={item.photoUrl}
+                              alt={item.title}
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            />
+                          </div>
+                        )}
+                        <div className="tt-vitrina-body">
+                          <div className="tt-pgc-head">
+                            <span className="tt-vitrina-cat-pill">
+                              {SRV_CAT_LABELS[item.category] || 'En sede'}
+                            </span>
+                            {item.available === false && (
+                              <span className="tt-vitrina-out-tag">AGOTADO</span>
+                            )}
+                          </div>
+                          <strong className="tt-vitrina-title">{item.title}</strong>
+                          {item.desc && <small className="tt-vitrina-desc">{item.desc}</small>}
+
+                          <div className="tt-vitrina-foot">
+                            <div className="tt-vitrina-prices">
+                              <strong>{item.price > 0 ? `S/ ${item.price}` : 'Consultar'}</strong>
+                              {item.vipPrice > 0 && <span>VIP S/ {item.vipPrice}</span>}
+                            </div>
+                            <a
+                              href={buildWhatsappLink(
+                                selectedClub.whatsapp,
+                                `Hola ${selectedClub.name}, te escribo desde TOTAL TENIS. Quiero consultar/separar: ${item.title}${
+                                  isVip && item.vipPrice > 0
+                                    ? ` (Socio VIP S/ ${item.vipPrice})`
+                                    : ''
+                                }.`
+                              )}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="tt-vitrina-wa-btn"
+                            >
+                              <TTIcon name="whatsapp" size={14} />
+                              <span>Pedir</span>
+                            </a>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -1675,27 +2238,46 @@ export default function SedesView({
             className={`tt-coach-modal-stack ${modeClass}`}
             style={{ '--coach-accent': selectedCoach.accent || '#00DC7D' }}
           >
-            {/* 1. HERO EDITORIAL DEL COACH + AUTORIDAD */}
+            {/* 1. HERO EDITORIAL DEL COACH + AUTORIDAD + RETRATO SOBRE PORTADA */}
             <div className="tt-chm-hero">
               <SmartImage
-                src={selectedCoach.photo}
+                src={selectedCoach.coverUrl}
                 fallbackSrc={ASSETS.portadaTipsSemana}
-                alt={selectedCoach.name}
+                alt={selectedCoach.clubName}
                 className="tt-chm-bg"
               />
               <div className="tt-chm-scrim" />
 
               <div className="tt-chm-content">
-                <div className="tt-chm-badges">
-                  {selectedCoach.availableToday && (
-                    <span className="tt-co-avail-pill is-today">
-                      <i />
-                      Disponible hoy
-                    </span>
-                  )}
-                  <span className="tt-chm-stat-pill">★ {selectedCoach.rating}</span>
-                  <span className="tt-chm-stat-pill">{selectedCoach.experience}</span>
-                  <span className="tt-chm-stat-pill">{selectedCoach.studentsCount}</span>
+                <div className="tt-chm-top-identity">
+                  <div className="tt-co-avatar-ring is-lg">
+                    <SmartImage
+                      src={selectedCoach.photo}
+                      fallbackSrc={ASSETS.portadaTipsSemana}
+                      alt={selectedCoach.name}
+                      initials={selectedCoach.name}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        objectPosition: 'center top',
+                      }}
+                    />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="tt-chm-badges">
+                      {selectedCoach.availableToday && (
+                        <span className="tt-co-avail-pill is-today">
+                          <i />
+                          {selectedCoach.freeSlotToday || 'Disponible hoy'}
+                        </span>
+                      )}
+                      <span className="tt-chm-stat-pill">★ {selectedCoach.rating}</span>
+                      <span className="tt-chm-stat-pill">{selectedCoach.experience}</span>
+                      <span className="tt-chm-stat-pill">{selectedCoach.studentsCount}</span>
+                    </div>
+                    <small className="tt-chm-fresh-tag">{selectedCoach.freshness.text}</small>
+                  </div>
                 </div>
 
                 <p className="tt-chm-bio">{selectedCoach.bio}</p>
@@ -1750,6 +2332,18 @@ export default function SedesView({
                   >
                     ▶ Videos ({selectedCoach.videos.length})
                   </button>
+                  {selectedCoach.textTips.length > 0 && (
+                    <button
+                      type="button"
+                      className={coachMediaMode === 'tips' ? 'is-on' : ''}
+                      onClick={() => {
+                        triggerHaptic('light');
+                        setCoachMediaMode('tips');
+                      }}
+                    >
+                      Tips ({selectedCoach.textTips.length})
+                    </button>
+                  )}
                   <button
                     type="button"
                     className={coachMediaMode === 'photos' ? 'is-on' : ''}
@@ -1763,7 +2357,16 @@ export default function SedesView({
                 </div>
               </div>
 
-              {coachMediaMode === 'videos' ? (
+              {coachMediaMode === 'tips' ? (
+                <div className="tt-text-tips-stack">
+                  {selectedCoach.textTips.map((tip) => (
+                    <div key={tip.id} className="tt-text-tip-card">
+                      <strong>{tip.title}</strong>
+                      <p>{tip.summary}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : coachMediaMode === 'videos' ? (
                 <div className="tt-reels-rail">
                   {selectedCoach.videos.map((vid) => {
                     const isUnlocked =
@@ -1865,6 +2468,16 @@ export default function SedesView({
                         setSelectedPackId(pk.id);
                       }}
                     >
+                      {pk.photoUrl && (
+                        <div className="tt-pk-photo-banner">
+                          <SmartImage
+                            src={pk.photoUrl}
+                            alt={pk.title}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
+                        </div>
+                      )}
+
                       <div className="tt-pk-top">
                         <div className="tt-pk-badges">
                           <span className="tt-pk-type">{pk.type}</span>
@@ -1878,6 +2491,11 @@ export default function SedesView({
 
                       <h4 className="tt-pk-title">{pk.title}</h4>
                       <p className="tt-pk-desc">{pk.desc}</p>
+
+                      <div className="tt-pk-meta-chips">
+                        <span>{LEVEL_LABELS[pk.level] || 'Todos los niveles'}</span>
+                        <span>{AGE_LABELS[pk.ageGroup] || 'Todas las edades'}</span>
+                      </div>
 
                       {hasSpots && (
                         <div className="tt-pk-spots-row">
@@ -1895,15 +2513,24 @@ export default function SedesView({
               </div>
             ) : (
               <div key="co-slots" className="tt-slots-panel tt-sd-enter">
-                <span className="tt-sd-kicker">ELIGE TU TURNO PREFERIDO PARA COORDINAR</span>
+                <div className="tt-slots-head-row">
+                  <span className="tt-sd-kicker" style={{ margin: 0 }}>
+                    ELIGE TU TURNO PREFERIDO PARA COORDINAR
+                  </span>
+                  <small className="tt-slots-fresh-mini">{selectedCoach.freshness.text}</small>
+                </div>
                 <div className="tt-slots-grid">
                   {selectedCoach.schedule.map((slot) => {
-                    const isPicked = activeSlot?.id === slot.id;
+                    const isFull = slot.status === 'full';
+                    const isPicked = !isFull && activeSlot?.id === slot.id;
                     return (
                       <button
                         key={slot.id}
                         type="button"
-                        className={`tt-slot-3d-tile ${isPicked ? 'is-picked' : ''}`}
+                        disabled={isFull}
+                        className={`tt-slot-3d-tile ${isPicked ? 'is-picked' : ''} ${
+                          isFull ? 'is-full' : ''
+                        }`}
                         onClick={() => {
                           triggerHaptic('light');
                           setSelectedSlotId(slot.id);
@@ -1911,7 +2538,17 @@ export default function SedesView({
                       >
                         <small>{slot.day}</small>
                         <strong>{slot.time}</strong>
-                        <span>{slot.status === 'few' ? 'Último cupo' : 'Disponible'}</span>
+                        <em className="tt-slot-meta-tag">
+                          {LEVEL_LABELS[slot.level]?.split(' ')[0] || 'Todos'} ·{' '}
+                          {AGE_LABELS[slot.ageGroup]?.split(' ')[0] || 'Todas'}
+                        </em>
+                        <span>
+                          {isFull
+                            ? 'Lleno'
+                            : slot.status === 'few'
+                            ? 'Último cupo'
+                            : 'Disponible'}
+                        </span>
                       </button>
                     );
                   })}
@@ -3587,6 +4224,504 @@ export default function SedesView({
           font-weight: 800;
           color: #F4DA92;
           margin-left: 5px;
+        }
+
+
+        /* ==================================================================
+           6. EXTENSIONES ESCAPARATE PRO (FILTROS, VITRINA, FRESCURA Y TIPS)
+           ================================================================== */
+        .tt-sd-3d-dock.is-four {
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 6px;
+        }
+        .tt-sd-3d-dock.is-four .tt-sd-3d-tab.is-compact {
+          font-size: 0.69rem;
+          padding: 0 4px;
+        }
+
+        .tt-fresh-badge {
+          display: inline-flex;
+          align-items: center;
+          padding: 4px 9px;
+          border-radius: 999px;
+          background: rgba(16, 4, 30, 0.78);
+          border: 1px solid rgba(255, 255, 255, 0.24);
+          backdrop-filter: blur(10px);
+          -webkit-backdrop-filter: blur(10px);
+          color: rgba(250, 249, 245, 0.9);
+          font-size: 0.62rem;
+          font-weight: 800;
+          white-space: nowrap;
+        }
+        .tt-fresh-badge.is-today {
+          background: rgba(0, 220, 125, 0.22);
+          border-color: rgba(0, 220, 125, 0.68);
+          color: #86F7C3;
+        }
+
+        .tt-cc-free-strip {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          padding: 8px 11px;
+          border-radius: 13px;
+          background: rgba(0, 220, 125, 0.13);
+          border: 1px solid rgba(0, 220, 125, 0.38);
+          font-size: 0.72rem;
+          color: var(--tt-text);
+        }
+        .tt-sedes-view.is-light .tt-cc-free-strip,
+        .tt-club-modal-stack.is-light .tt-cc-free-strip {
+          background: #EBFCF3;
+          border-color: rgba(0, 138, 78, 0.34);
+          color: #1E0734;
+        }
+        .tt-cc-free-strip.is-inside {
+          padding: 10px 12px;
+          border-radius: 15px;
+        }
+        .tt-free-dot {
+          width: 7px;
+          height: 7px;
+          border-radius: 50%;
+          background: #00DC7D;
+          box-shadow: 0 0 8px rgba(0, 220, 125, 0.85);
+          flex-shrink: 0;
+          animation: ttLivePulse 1.7s infinite;
+        }
+
+        /* FILTROS INTERACTIVOS DE COACHES */
+        .tt-coaches-wrap {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+        .tt-co-filter-panel {
+          padding: 13px;
+          border-radius: 20px;
+          background: linear-gradient(180deg, rgba(44, 17, 74, 0.94) 0%, rgba(25, 7, 45, 0.98) 100%);
+          border: 1.5px solid rgba(255, 255, 255, 0.15);
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.16),
+            0 4px 0 #0F021C,
+            0 10px 22px rgba(0, 0, 0, 0.24);
+          display: flex;
+          flex-direction: column;
+          gap: 9px;
+        }
+        .tt-sedes-view.is-light .tt-co-filter-panel {
+          background: linear-gradient(180deg, #FFFFFF 0%, #F5F1FC 100%);
+          border-color: rgba(30, 7, 52, 0.17);
+          box-shadow:
+            inset 0 1px 0 #FFFFFF,
+            0 4px 0 #D2C8E6,
+            0 8px 18px rgba(30, 7, 52, 0.08);
+        }
+        .tt-co-search-row {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          flex-wrap: wrap;
+        }
+        .tt-co-search-box {
+          flex: 1;
+          min-width: 180px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          min-height: 41px;
+          padding: 0 12px;
+          border-radius: 13px;
+          background: rgba(13, 2, 25, 0.65);
+          border: 1.5px solid rgba(255, 255, 255, 0.14);
+        }
+        .tt-sedes-view.is-light .tt-co-search-box {
+          background: #FFFFFF;
+          border-color: rgba(30, 7, 52, 0.2);
+        }
+        .tt-co-search-box input {
+          width: 100%;
+          border: none;
+          background: transparent;
+          color: var(--tt-text);
+          font-size: 16px;
+          outline: none;
+        }
+        .tt-co-clear-x {
+          width: 22px;
+          height: 22px;
+          border-radius: 50%;
+          background: rgba(255, 255, 255, 0.14);
+          color: var(--tt-text-muted);
+          font-size: 0.68rem;
+          flex-shrink: 0;
+        }
+        .tt-co-quick-toggle {
+          min-height: 41px;
+          padding: 0 12px;
+          border-radius: 13px;
+          background: linear-gradient(180deg, #321357 0%, #20093B 100%);
+          border: 1.5px solid rgba(255, 255, 255, 0.16);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 3px 0 #10021E;
+          color: rgba(250, 249, 245, 0.88);
+          font-size: 0.72rem;
+          font-weight: 800;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          white-space: nowrap;
+          cursor: pointer;
+          transition: transform 110ms ease, box-shadow 110ms ease;
+        }
+        .tt-co-quick-toggle:active {
+          transform: translateY(2px);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 1px 0 #10021E;
+        }
+        .tt-sedes-view.is-light .tt-co-quick-toggle {
+          background: linear-gradient(180deg, #FFFFFF 0%, #F1ECF9 100%);
+          border-color: rgba(30, 7, 52, 0.18);
+          color: #2B1147;
+          box-shadow: inset 0 1px 0 #FFFFFF, 0 3px 0 #C8BDDF;
+        }
+        .tt-co-quick-toggle i {
+          width: 7px;
+          height: 7px;
+          border-radius: 50%;
+          background: #00DC7D;
+          display: inline-block;
+        }
+        .tt-co-quick-toggle.is-on {
+          background: linear-gradient(180deg, #22F397 0%, #00B866 100%);
+          border-color: rgba(168, 255, 218, 0.8);
+          color: #0D0219;
+          font-weight: 900;
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65), 0 3px 0 #007540;
+        }
+        .tt-co-quick-toggle.is-on i {
+          background: #0D0219;
+        }
+        .tt-sedes-view.is-light .tt-co-quick-toggle.is-on {
+          background: linear-gradient(180deg, #35115C 0%, #1E0734 100%);
+          border-color: #1E0734;
+          color: #00E582;
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 3px 0 #0D0218;
+        }
+        .tt-sedes-view.is-light .tt-co-quick-toggle.is-on i {
+          background: #00E582;
+        }
+
+        .tt-co-filter-group {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+        }
+        .tt-co-filter-lbl {
+          font-size: 0.58rem;
+          font-weight: 900;
+          letter-spacing: 0.08em;
+          color: var(--tt-text-muted);
+          flex-shrink: 0;
+          min-width: 38px;
+        }
+        .tt-co-pills-rail {
+          display: flex;
+          gap: 6px;
+          overflow-x: auto;
+          padding-bottom: 3px;
+          scrollbar-width: none;
+          flex: 1;
+        }
+        .tt-co-pills-rail::-webkit-scrollbar {
+          display: none;
+        }
+        .tt-co-filter-pill {
+          flex-shrink: 0;
+          min-height: 32px;
+          padding: 0 12px;
+          border-radius: 999px;
+          background: var(--tt-surface-2);
+          border: 1px solid var(--tt-border);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+          color: var(--tt-text-muted);
+          font-size: 0.7rem;
+          font-weight: 800;
+          white-space: nowrap;
+          cursor: pointer;
+          transition: transform 110ms ease, background 150ms ease, color 150ms ease;
+        }
+        .tt-co-filter-pill:active {
+          transform: scale(0.96);
+        }
+        .tt-co-filter-pill.is-on {
+          background: linear-gradient(180deg, #22F397 0%, #00B866 100%);
+          border-color: rgba(168, 255, 218, 0.78);
+          color: #0D0219;
+          font-weight: 900;
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 3px 8px rgba(0, 220, 125, 0.25);
+        }
+        .tt-sedes-view.is-light .tt-co-filter-pill.is-on,
+        .tt-club-modal-stack.is-light .tt-co-filter-pill.is-on {
+          background: linear-gradient(180deg, #35115C 0%, #1E0734 100%);
+          border-color: #1E0734;
+          color: #00E582;
+        }
+        .tt-co-filter-pill.is-age.is-on {
+          background: linear-gradient(180deg, #FAE9B6 0%, #D4A33D 100%);
+          border-color: rgba(255, 245, 214, 0.8);
+          color: #1A1002;
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 3px 8px rgba(229, 193, 108, 0.28);
+        }
+
+        /* IDENTIDAD SEPARADA COACH (AVATAR SOBRE PORTADA) */
+        .tt-co-top-right-group {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          flex-wrap: wrap;
+          justify-content: flex-end;
+        }
+        .tt-co-bottom-with-avatar {
+          position: relative;
+          z-index: 2;
+          display: flex;
+          align-items: flex-end;
+          gap: 10px;
+        }
+        .tt-co-avatar-ring {
+          width: 54px;
+          height: 54px;
+          border-radius: 50%;
+          overflow: hidden;
+          border: 2.5px solid var(--coach-accent, #00DC7D);
+          background: #140324;
+          flex-shrink: 0;
+          box-shadow: 0 6px 16px rgba(0, 0, 0, 0.48);
+        }
+        .tt-co-avatar-ring.is-lg {
+          width: 62px;
+          height: 62px;
+        }
+        .tt-chm-top-identity {
+          display: flex;
+          align-items: center;
+          gap: 11px;
+        }
+        .tt-chm-fresh-tag {
+          display: block;
+          margin-top: 4px;
+          font-size: 0.68rem;
+          font-weight: 800;
+          color: #86F7C3;
+        }
+        .tt-co-tag.is-level {
+          background: rgba(0, 220, 125, 0.14);
+          border-color: rgba(0, 220, 125, 0.36);
+          color: var(--tt-emerald-text);
+        }
+        .tt-co-tag.is-age {
+          background: rgba(229, 193, 108, 0.16);
+          border-color: rgba(229, 193, 108, 0.42);
+          color: #F4DA92;
+        }
+        .tt-sedes-view.is-light .tt-co-tag.is-age {
+          background: #FBF1D4;
+          border-color: rgba(154, 107, 22, 0.35);
+          color: #805408;
+        }
+
+        /* VITRINA DEL CLUB (PRODUCTOS Y SERVICIOS CON FOTOS) */
+        .tt-vitrina-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 10px;
+        }
+        @media (min-width: 540px) {
+          .tt-vitrina-grid { grid-template-columns: 1fr 1fr; }
+        }
+        .tt-vitrina-card {
+          border-radius: 17px;
+          overflow: hidden;
+          background: linear-gradient(180deg, #2E1150 0%, #1E0838 100%);
+          border: 1.5px solid rgba(255, 255, 255, 0.15);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 4px 0 #10021E;
+          display: flex;
+          flex-direction: column;
+        }
+        .tt-vitrina-card.is-out {
+          opacity: 0.56;
+        }
+        .tt-club-modal-stack.is-light .tt-vitrina-card {
+          background: linear-gradient(180deg, #FFFFFF 0%, #F4F0FA 100%);
+          border-color: rgba(30, 7, 52, 0.16);
+          box-shadow: inset 0 1px 0 #FFFFFF, 0 4px 0 #D2C8E6;
+        }
+        .tt-vitrina-photo {
+          width: 100%;
+          height: 120px;
+          overflow: hidden;
+          background: #140324;
+        }
+        .tt-vitrina-body {
+          padding: 12px;
+          display: flex;
+          flex-direction: column;
+          gap: 5px;
+          flex: 1;
+        }
+        .tt-vitrina-cat-pill {
+          font-size: 0.58rem;
+          font-weight: 900;
+          letter-spacing: 0.06em;
+          color: #00E582;
+          text-transform: uppercase;
+        }
+        .tt-club-modal-stack.is-light .tt-vitrina-cat-pill {
+          color: #007A44;
+        }
+        .tt-vitrina-out-tag {
+          padding: 2px 6px;
+          border-radius: 6px;
+          background: rgba(239, 68, 68, 0.22);
+          border: 1px solid rgba(248, 113, 113, 0.45);
+          color: #FCA5A5;
+          font-size: 0.56rem;
+          font-weight: 900;
+        }
+        .tt-vitrina-title {
+          font-size: 0.88rem;
+          font-weight: 900;
+          color: #FAF9F5;
+        }
+        .tt-club-modal-stack.is-light .tt-vitrina-title {
+          color: #1E0734;
+        }
+        .tt-vitrina-desc {
+          font-size: 0.72rem;
+          opacity: 0.78;
+          line-height: 1.35;
+        }
+        .tt-vitrina-foot {
+          margin-top: auto;
+          padding-top: 8px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          border-top: 1px solid var(--tt-border);
+        }
+        .tt-vitrina-prices strong {
+          display: block;
+          font-family: var(--tt-font-display);
+          font-size: 1.15rem;
+          line-height: 1;
+        }
+        .tt-vitrina-prices span {
+          display: block;
+          font-size: 0.65rem;
+          font-weight: 900;
+          color: #F4DA92;
+        }
+        .tt-club-modal-stack.is-light .tt-vitrina-prices span {
+          color: #805408;
+        }
+        .tt-vitrina-wa-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          padding: 6px 11px;
+          border-radius: 10px;
+          background: linear-gradient(180deg, rgba(0, 220, 125, 0.22) 0%, rgba(0, 220, 125, 0.12) 100%);
+          border: 1px solid rgba(0, 220, 125, 0.48);
+          color: var(--tt-emerald-text);
+          font-size: 0.71rem;
+          font-weight: 900;
+          text-decoration: none;
+          box-shadow: 0 2px 0 rgba(0, 117, 64, 0.35);
+          transition: transform 110ms ease;
+        }
+        .tt-vitrina-wa-btn:active {
+          transform: translateY(2px);
+        }
+
+        /* TIPS ESCRITOS, FOTOS EN PACKS Y METADATOS DE HORARIOS */
+        .tt-text-tips-stack {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+        .tt-text-tip-card {
+          padding: 12px 13px;
+          border-radius: 15px;
+          background: var(--tt-surface-2);
+          border: 1px solid var(--tt-border);
+          border-left: 3.5px solid #00DC7D;
+        }
+        .tt-text-tip-card strong {
+          display: block;
+          font-size: 0.83rem;
+          font-weight: 900;
+        }
+        .tt-text-tip-card p {
+          margin: 4px 0 0;
+          font-size: 0.75rem;
+          color: var(--tt-text-muted);
+          line-height: 1.42;
+        }
+        .tt-pk-photo-banner {
+          width: 100%;
+          height: 114px;
+          border-radius: 12px;
+          overflow: hidden;
+          margin-bottom: 4px;
+          background: #140324;
+        }
+        .tt-pk-meta-chips {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 5px;
+          margin-top: 2px;
+        }
+        .tt-pk-meta-chips span {
+          padding: 2px 8px;
+          border-radius: 999px;
+          background: rgba(255, 255, 255, 0.1);
+          border: 1px solid rgba(255, 255, 255, 0.14);
+          font-size: 0.62rem;
+          font-weight: 800;
+        }
+        .tt-coach-modal-stack.is-light .tt-pk-meta-chips span {
+          background: #F1ECF9;
+          border-color: rgba(30, 7, 52, 0.14);
+          color: #361C54;
+        }
+        .tt-slots-head-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+        .tt-slots-fresh-mini {
+          font-size: 0.67rem;
+          font-weight: 800;
+          color: var(--tt-emerald-text);
+        }
+        .tt-slot-3d-tile.is-full {
+          opacity: 0.45;
+          cursor: not-allowed;
+        }
+        .tt-slot-meta-tag {
+          font-style: normal;
+          font-size: 0.59rem;
+          font-weight: 700;
+          opacity: 0.8;
+        }
+        .tt-slot-3d-tile.is-picked em {
+          color: #0D0219;
+          opacity: 0.88;
+        }
+        .tt-coach-modal-stack.is-light .tt-slot-3d-tile.is-picked em {
+          color: rgba(250, 249, 245, 0.82);
         }
 
         html[data-tier='lite'] .tt-gt-sheen { display: none !important; }
