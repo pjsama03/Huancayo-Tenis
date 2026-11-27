@@ -1,0 +1,40 @@
+name: Simulador Multi-Bot E2E TOTAL TENIS
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: 'URL de la app a simular con 3 bots'
+        required: false
+        default: 'https://huancayo-tenis.vercel.app'
+
+jobs:
+  e2e-bots:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Instalar Playwright (sin tocar package.json)
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+
+      - name: Ejecutar Simulador de 3 Bots (Retos, Horas, Disputas, Árbitro y Ranking)
+        env:
+          QA_TARGET_URL: ${{ github.event.inputs.target_url || 'https://huancayo-tenis.vercel.app' }}
+        run: node tests/qa-e2e-bots.spec.mjs
+
+      - name: Subir reporte y capturas E2E
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-e2e-bots-report
+          path: qa-e2e-output/
+          retention-days: 14
