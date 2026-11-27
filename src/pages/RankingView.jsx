@@ -825,23 +825,30 @@ export default function RankingView({
 
   const rowRefs = useRef(new Map());
   const prevRectsRef = useRef(new Map());
+  const activeAnimsRef = useRef(new Map());
   const settleTimerRef = useRef(null);
   const stageTimerRef = useRef(null);
   const lastLiveRanksRef = useRef(null);
-
-  const [stagedOldOrderIds, setStagedOldOrderIds] = useState(null);
-  const [activeMoves, setActiveMoves] = useState({});
+  const pendingStagedFlipMovesRef = useRef(null);
 
   const registerRowRef = (playerId, el) => {
     if (el) rowRefs.current.set(playerId, el);
     else rowRefs.current.delete(playerId);
   };
 
+  const getScrollOffsetY = () => {
+    if (typeof document === 'undefined') return 0;
+    const scroller = document.querySelector('.tt-main-scroll');
+    if (scroller) return scroller.scrollTop || 0;
+    return window.scrollY || 0;
+  };
+
   const captureRowRects = () => {
     const rects = new Map();
+    const scrollY = getScrollOffsetY();
     rowRefs.current.forEach((node, id) => {
       if (node && typeof node.getBoundingClientRect === 'function') {
-        rects.set(id, node.getBoundingClientRect().top);
+        rects.set(id, node.getBoundingClientRect().top + scrollY);
       }
     });
     prevRectsRef.current = rects;
@@ -929,6 +936,45 @@ export default function RankingView({
     [rankedPlayers]
   );
 
+  /* ========================================================================
+     MOTOR 3D DE DESPLAZAMIENTO LENTO (QUIEN SUBE PASA POR DELANTE EN 3D;
+     QUIENES BAJAN SE HUNDEN POR DETRÁS Y CEDEN SU PUESTO UNO A UNO).
+     Inicializa síncronamente en el orden ANTERIOR para evitar salto inverso.
+     ======================================================================== */
+  const [stagedTransition, setStagedTransition] = useState(() => {
+    if (rankedPlayers.length < 2) return null;
+    const filterKey = 'ALL|ALL';
+    const storedAll = readStoredRanks();
+    const prevMap = storedAll[filterKey];
+    if (!prevMap || Object.keys(prevMap).length < 2) return null;
+
+    const detectedMoves = {};
+    rankedPlayers.forEach((p, idx) => {
+      const newRank = idx + 1;
+      const oldRank = prevMap[p.id];
+      if (oldRank && oldRank !== newRank) {
+        detectedMoves[p.id] = {
+          dir: newRank < oldRank ? 'up' : 'down',
+          delta: Math.abs(oldRank - newRank),
+          oldRank,
+          newRank,
+        };
+      }
+    });
+
+    if (Object.keys(detectedMoves).length === 0) return null;
+
+    const oldOrderIds = [...rankedPlayers]
+      .sort((a, b) => (prevMap[a.id] ?? 999) - (prevMap[b.id] ?? 999))
+      .map((p) => p.id);
+
+    return { filterKey, oldOrderIds, moves: detectedMoves };
+  });
+
+  const [activeMoves, setActiveMoves] = useState({});
+
+  // Fase 1: si entramos con cambio pendiente (desde Retos o cambio de filtro),
+  // mostramos el orden ANTERIOR ~850ms para que el ojo/video lo lea, luego disparamos el 3D FLIP.
   useEffect(() => {
     if (activeSubTab !== 'oficial' || searchQuery.trim().length > 0 || rankedPlayers.length < 2) {
       return undefined;
@@ -940,10 +986,54 @@ export default function RankingView({
       currentRankMap[p.id] = idx + 1;
     });
 
+    // A) Si ya arrancamos con stagedTransition (desde el primer frame, cero salto inverso)
+    if (stagedTransition && stagedTransition.filterKey === filterKey) {
+      const moves = stagedTransition.moves;
+      const climbers = Object.entries(moves)
+        .filter(([, m]) => m.dir === 'up')
+        .sort((a, b) => b[1].delta - a[1].delta);
+      const focusId =
+        (currentUser?.id && moves[currentUser.id] ? currentUser.id : null) ||
+        climbers[0]?.[0] ||
+        Object.keys(moves)[0] ||
+        null;
+
+      window.requestAnimationFrame(() => {
+        if (focusId) {
+          const node = rowRefs.current.get(focusId);
+          if (node && typeof node.scrollIntoView === 'function') {
+            node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }
+      });
+
+      const storedAll = readStoredRanks();
+      writeStoredRanks({ ...storedAll, [filterKey]: currentRankMap });
+      lastLiveRanksRef.current = { filterKey, rankMap: currentRankMap };
+
+      window.clearTimeout(stageTimerRef.current);
+      stageTimerRef.current = window.setTimeout(() => {
+        captureRowRects();
+        pendingStagedFlipMovesRef.current = moves;
+        setActiveMoves(moves);
+        setStagedTransition(null);
+        triggerHaptic(climbers.length > 0 ? 'success' : 'warning');
+
+        const maxDelta = Math.max(1, ...Object.values(moves).map((m) => m.delta || 1));
+        const animMs = Math.min(2900, 1950 + (maxDelta - 1) * 260);
+        window.clearTimeout(settleTimerRef.current);
+        settleTimerRef.current = window.setTimeout(() => {
+          setActiveMoves({});
+        }, animMs + 1650);
+      }, 850);
+
+      return undefined;
+    }
+
+    // B) Si cambió de filtro (Varones / Damas / Categoría), comprobar si hubo cambio guardado en ese filtro
     if (!lastLiveRanksRef.current || lastLiveRanksRef.current.filterKey !== filterKey) {
       const storedAll = readStoredRanks();
       const prevMap = storedAll[filterKey];
-
       lastLiveRanksRef.current = { filterKey, rankMap: currentRankMap };
       writeStoredRanks({ ...storedAll, [filterKey]: currentRankMap });
 
@@ -962,83 +1052,22 @@ export default function RankingView({
           }
         });
 
-        const focusId =
-          currentUser?.id && detectedMoves[currentUser.id]
-            ? currentUser.id
-            : Object.keys(detectedMoves)[0] || null;
-
-        if (focusId) {
-          const oldOrderedIds = [...rankedPlayers]
+        if (Object.keys(detectedMoves).length > 0) {
+          const oldOrderIds = [...rankedPlayers]
             .sort((a, b) => (prevMap[a.id] ?? 999) - (prevMap[b.id] ?? 999))
             .map((p) => p.id);
-
-          setStagedOldOrderIds(oldOrderedIds);
-
-          window.requestAnimationFrame(() => {
-            const targetNode = rowRefs.current.get(focusId);
-            if (targetNode) {
-              targetNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-          });
-
-          window.clearTimeout(stageTimerRef.current);
-          stageTimerRef.current = window.setTimeout(() => {
-            captureRowRects();
-            setActiveMoves(
-              currentUser?.id && detectedMoves[currentUser.id]
-                ? { [currentUser.id]: detectedMoves[currentUser.id] }
-                : detectedMoves
-            );
-            setStagedOldOrderIds(null);
-            triggerHaptic(detectedMoves[focusId].dir === 'up' ? 'success' : 'warning');
-
-            window.clearTimeout(settleTimerRef.current);
-            settleTimerRef.current = window.setTimeout(() => {
-              setActiveMoves({});
-            }, 1750);
-          }, 440);
+          setStagedTransition({ filterKey, oldOrderIds, moves: detectedMoves });
         }
       }
       return undefined;
     }
 
-    const prevLiveMap = lastLiveRanksRef.current.rankMap;
-    const liveMoves = {};
-    rankedPlayers.forEach((p, idx) => {
-      const newRank = idx + 1;
-      const oldRank = prevLiveMap[p.id];
-      if (oldRank && oldRank !== newRank) {
-        liveMoves[p.id] = {
-          dir: newRank < oldRank ? 'up' : 'down',
-          delta: Math.abs(oldRank - newRank),
-          oldRank,
-          newRank,
-        };
-      }
-    });
-
-    lastLiveRanksRef.current = { filterKey, rankMap: currentRankMap };
+    // C) Cambio en vivo estando ya dentro de Ranking: sincronizar memoria persistente
     const storedAll = readStoredRanks();
     writeStoredRanks({ ...storedAll, [filterKey]: currentRankMap });
-
-    if (Object.keys(liveMoves).length > 0) {
-      const focusMove =
-        currentUser?.id && liveMoves[currentUser.id]
-          ? { [currentUser.id]: liveMoves[currentUser.id] }
-          : liveMoves;
-      setActiveMoves(focusMove);
-
-      const focusId = Object.keys(focusMove)[0];
-      if (focusId) triggerHaptic(focusMove[focusId].dir === 'up' ? 'success' : 'warning');
-
-      window.clearTimeout(settleTimerRef.current);
-      settleTimerRef.current = window.setTimeout(() => {
-        setActiveMoves({});
-      }, 1750);
-    }
-
     return undefined;
   }, [
+    stagedTransition,
     currentOrderSignature,
     activeSubTab,
     divisionFilter,
@@ -1051,16 +1080,24 @@ export default function RankingView({
     return () => {
       window.clearTimeout(stageTimerRef.current);
       window.clearTimeout(settleTimerRef.current);
+      activeAnimsRef.current.forEach((anim) => {
+        try {
+          anim.cancel();
+        } catch {
+          // continuar
+        }
+      });
+      activeAnimsRef.current.clear();
     };
   }, []);
 
   const displayedRankedPlayers = useMemo(() => {
-    if (!stagedOldOrderIds || stagedOldOrderIds.length === 0) return rankedPlayers;
+    if (!stagedTransition?.oldOrderIds?.length) return rankedPlayers;
     const byId = new Map(rankedPlayers.map((p) => [p.id, p]));
-    const ordered = stagedOldOrderIds.map((id) => byId.get(id)).filter(Boolean);
-    const extras = rankedPlayers.filter((p) => !stagedOldOrderIds.includes(p.id));
+    const ordered = stagedTransition.oldOrderIds.map((id) => byId.get(id)).filter(Boolean);
+    const extras = rankedPlayers.filter((p) => !stagedTransition.oldOrderIds.includes(p.id));
     return [...ordered, ...extras];
-  }, [rankedPlayers, stagedOldOrderIds]);
+  }, [rankedPlayers, stagedTransition]);
 
   const showTop3Horizontal =
     displayedRankedPlayers.length >= 1 && searchQuery.trim().length === 0;
@@ -1070,41 +1107,179 @@ export default function RankingView({
     : displayedRankedPlayers;
   const listStartRank = showTop3Horizontal ? 4 : 1;
 
+  // Fase 2: FLIP 3D síncrono ANTES de pintar el frame (sube por delante, baja por detrás, lento y suave)
   useLayoutEffect(() => {
     if (activeSubTab !== 'oficial') return;
-    const isLite =
-      typeof document !== 'undefined' && document.documentElement.dataset.tier === 'lite';
 
-    const prevRects = prevRectsRef.current;
-    if (!isLite && prevRects.size > 0) {
-      const animatedNodes = [];
+    // Si estamos mostrando el estado previo (staged), solo capturar sus posiciones sin animar
+    if (stagedTransition) {
+      captureRowRects();
+      return;
+    }
 
-      rowRefs.current.forEach((node, id) => {
-        const oldTop = prevRects.get(id);
-        if (oldTop === undefined) return;
-        const newTop = node.getBoundingClientRect().top;
-        const deltaY = oldTop - newTop;
+    const filterKey = `${divisionFilter}|${categoryFilter}`;
+    const currentRankMap = {};
+    displayedRankedPlayers.forEach((p, idx) => {
+      currentRankMap[p.id] = idx + 1;
+    });
 
-        if (Math.abs(deltaY) >= 2) {
-          const isPrimaryMover = Boolean(activeMoves[id]);
-          node.style.transition = 'none';
-          node.style.transform = isPrimaryMover
-            ? `translate3d(0, ${deltaY}px, 0) scale(1.028)`
-            : `translate3d(0, ${deltaY}px, 0)`;
-          node.style.zIndex = isPrimaryMover ? '15' : '1';
-          animatedNodes.push({ node, isPrimaryMover });
+    // Determinar movimientos síncronos (desde stagedTransition o desde cambio en vivo)
+    let movesToAnimate = pendingStagedFlipMovesRef.current;
+    pendingStagedFlipMovesRef.current = null;
+
+    if (
+      !movesToAnimate &&
+      searchQuery.trim().length === 0 &&
+      lastLiveRanksRef.current &&
+      lastLiveRanksRef.current.filterKey === filterKey
+    ) {
+      const prevLiveMap = lastLiveRanksRef.current.rankMap || {};
+      const liveMoves = {};
+      displayedRankedPlayers.forEach((p, idx) => {
+        const newRank = idx + 1;
+        const oldRank = prevLiveMap[p.id];
+        if (oldRank && oldRank !== newRank) {
+          liveMoves[p.id] = {
+            dir: newRank < oldRank ? 'up' : 'down',
+            delta: Math.abs(oldRank - newRank),
+            oldRank,
+            newRank,
+          };
         }
       });
 
-      if (animatedNodes.length > 0) {
-        void document.body.offsetHeight;
+      if (Object.keys(liveMoves).length > 0) {
+        movesToAnimate = liveMoves;
+        lastLiveRanksRef.current = { filterKey, rankMap: currentRankMap };
+        setActiveMoves(liveMoves);
+        const hasClimber = Object.values(liveMoves).some((m) => m.dir === 'up');
+        triggerHaptic(hasClimber ? 'success' : 'warning');
 
-        animatedNodes.forEach(({ node, isPrimaryMover }) => {
-          node.style.transition = isPrimaryMover
-            ? 'transform 960ms cubic-bezier(0.22, 1, 0.36, 1)'
-            : 'transform 820ms cubic-bezier(0.22, 1, 0.36, 1)';
+        const maxDelta = Math.max(1, ...Object.values(liveMoves).map((m) => m.delta || 1));
+        const animMs = Math.min(2900, 1950 + (maxDelta - 1) * 260);
+        window.clearTimeout(settleTimerRef.current);
+        settleTimerRef.current = window.setTimeout(() => {
+          setActiveMoves({});
+        }, animMs + 1650);
+      }
+    }
+
+    const prefersReduced =
+      typeof window !== 'undefined' &&
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const prevRects = prevRectsRef.current;
+    const scrollY = getScrollOffsetY();
+
+    if (!prefersReduced && prevRects.size > 0 && movesToAnimate && Object.keys(movesToAnimate).length > 0) {
+      rowRefs.current.forEach((node, id) => {
+        const oldAbsTop = prevRects.get(id);
+        if (oldAbsTop === undefined) return;
+        const newAbsTop = node.getBoundingClientRect().top + scrollY;
+        const deltaY = oldAbsTop - newAbsTop;
+
+        if (Math.abs(deltaY) < 2) return;
+
+        const move = movesToAnimate[id];
+        const isUp = move ? move.dir === 'up' : deltaY > 0;
+        const slotsMoved = move?.delta || Math.max(1, Math.round(Math.abs(deltaY) / 84));
+        const duration = isUp
+          ? Math.min(2900, 1950 + (slotsMoved - 1) * 260)
+          : Math.min(2750, 1850 + (slotsMoved - 1) * 220);
+
+        const prevAnim = activeAnimsRef.current.get(id);
+        if (prevAnim) {
+          try {
+            prevAnim.cancel();
+          } catch {
+            // continuar
+          }
+        }
+
+        // Capas de profundidad reales: quien sube pasa POR DELANTE, quienes bajan pasan POR DETRÁS
+        node.style.zIndex = isUp ? String(60 + Math.min(20, slotsMoved)) : '2';
+
+        if (typeof node.animate === 'function') {
+          const keyframes = isUp
+            ? [
+                {
+                  offset: 0,
+                  transform: `perspective(1100px) translate3d(0, ${deltaY}px, 0px) scale(1)`,
+                  boxShadow: '0 8px 22px rgba(0, 0, 0, 0.28)',
+                  easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+                },
+                {
+                  offset: 0.14,
+                  transform: `perspective(1100px) translate3d(0, ${deltaY * 0.94}px, 52px) scale(1.055)`,
+                  boxShadow: '0 26px 56px rgba(0, 0, 0, 0.58), 0 0 32px rgba(0, 220, 125, 0.42)',
+                  easing: 'cubic-bezier(0.24, 0.82, 0.24, 1)',
+                },
+                {
+                  offset: 0.86,
+                  transform: `perspective(1100px) translate3d(0, ${deltaY * 0.03}px, 52px) scale(1.055)`,
+                  boxShadow: '0 22px 48px rgba(0, 0, 0, 0.52), 0 0 28px rgba(0, 220, 125, 0.36)',
+                  easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+                },
+                {
+                  offset: 1,
+                  transform: 'perspective(1100px) translate3d(0, 0px, 0px) scale(1)',
+                  boxShadow: '0 10px 26px rgba(0, 220, 125, 0.22)',
+                },
+              ]
+            : [
+                {
+                  offset: 0,
+                  transform: `perspective(1100px) translate3d(0, ${deltaY}px, 0px) scale(1)`,
+                  opacity: 1,
+                  filter: 'brightness(1)',
+                  easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+                },
+                {
+                  offset: 0.16,
+                  transform: `perspective(1100px) translate3d(0, ${deltaY * 0.92}px, -42px) scale(0.945)`,
+                  opacity: 0.72,
+                  filter: 'brightness(0.84) saturate(0.82)',
+                  easing: 'cubic-bezier(0.24, 0.82, 0.24, 1)',
+                },
+                {
+                  offset: 0.84,
+                  transform: `perspective(1100px) translate3d(0, ${deltaY * 0.04}px, -42px) scale(0.945)`,
+                  opacity: 0.72,
+                  filter: 'brightness(0.84) saturate(0.82)',
+                  easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+                },
+                {
+                  offset: 1,
+                  transform: 'perspective(1100px) translate3d(0, 0px, 0px) scale(1)',
+                  opacity: 1,
+                  filter: 'brightness(1)',
+                },
+              ];
+
+          const anim = node.animate(keyframes, {
+            duration,
+            fill: 'none',
+          });
+          activeAnimsRef.current.set(id, anim);
+
+          const cleanup = () => {
+            if (activeAnimsRef.current.get(id) === anim) {
+              activeAnimsRef.current.delete(id);
+            }
+            node.style.zIndex = '';
+          };
+          anim.onfinish = cleanup;
+          anim.oncancel = cleanup;
+        } else {
+          // Respaldo CSS para navegadores sin Web Animations API
+          node.style.transition = 'none';
+          node.style.transform = isUp
+            ? `translate3d(0, ${deltaY}px, 0) scale(1.045)`
+            : `translate3d(0, ${deltaY}px, 0) scale(0.955)`;
+          void document.body.offsetHeight;
+          node.style.transition = `transform ${duration}ms cubic-bezier(0.24, 0.82, 0.24, 1)`;
           node.style.transform = 'translate3d(0, 0, 0) scale(1)';
-
           const onEnd = () => {
             node.style.transition = '';
             node.style.transform = '';
@@ -1112,12 +1287,12 @@ export default function RankingView({
             node.removeEventListener('transitionend', onEnd);
           };
           node.addEventListener('transitionend', onEnd);
-        });
-      }
+        }
+      });
     }
 
     captureRowRects();
-  }, [displayedRankedPlayers, activeSubTab, activeMoves]);
+  }, [displayedRankedPlayers, stagedTransition, activeSubTab, divisionFilter, categoryFilter, searchQuery]);
 
   const myRankInCurrentView = useMemo(() => {
     if (!currentUser?.id) return null;
@@ -2133,44 +2308,60 @@ export default function RankingView({
           box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 4px 12px var(--rk-glow);
         }
 
-        /* 4. TABLA DEL #4 EN ADELANTE */
+        /* 4. TABLA DEL #4 EN ADELANTE (OVERFLOW VISIBLE PARA CRUCE 3D SIN RECORTES) */
         .tt-rk-table-shell {
           border-radius: 22px; background: var(--tt-surface); border: 1px solid var(--tt-border);
           box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), var(--tt-shadow-sm);
-          overflow: hidden;
+          overflow: visible !important;
         }
         .tt-rk-table-head {
           display: grid; grid-template-columns: 38px 1fr 78px; gap: 12px; padding: 10px 14px;
           background: var(--tt-surface-2); border-bottom: 1px solid var(--tt-border);
+          border-radius: 21px 21px 0 0;
           font-size: 0.63rem; font-weight: 900; letter-spacing: 0.09em; color: var(--tt-text-muted);
         }
         .tt-rk-table-head .col-pos { text-align: center; }
         .tt-rk-table-head .col-pts { text-align: right; }
 
-        .tt-rk-rows-stack { display: flex; flex-direction: column; position: relative; }
+        .tt-rk-rows-stack { display: flex; flex-direction: column; position: relative; overflow: visible; }
         .tt-rk-row {
           display: grid; grid-template-columns: 38px 54px 1fr auto; align-items: center; gap: 11px;
           padding: 10px 14px; border-bottom: 1px solid var(--tt-border); cursor: pointer;
           position: relative; background: var(--tt-surface);
-          transition: background-color 480ms ease, box-shadow 480ms ease, border-color 480ms ease;
-          will-change: transform;
+          transition: background-color 520ms ease, box-shadow 520ms ease, border-color 520ms ease, border-radius 320ms ease;
+          will-change: transform, opacity;
         }
-        .tt-rk-row:last-child { border-bottom: none; }
+        .tt-rk-row:last-child { border-bottom: none; border-radius: 0 0 21px 21px; }
         .tt-rk-row:active { background: var(--tt-surface-2); }
 
         .is-me-halo {
           background: linear-gradient(90deg, var(--rk-soft-bg) 0%, transparent 76%);
           box-shadow: inset 3px 0 0 var(--rk-accent);
         }
+        /* QUIEN SUBE: PLANO FRONTAL 3D OPACO CON HALO ESMERALDA (PASA POR DELANTE) */
         .is-rank-climb {
-          background: linear-gradient(90deg, rgba(0, 220, 125, 0.24) 0%, rgba(0, 220, 125, 0.09) 65%, rgba(0, 220, 125, 0.18) 100%) !important;
-          box-shadow: inset 4px 0 0 #00DC7D, 0 12px 30px rgba(0, 220, 125, 0.28) !important;
-          border-color: rgba(0, 220, 125, 0.65) !important;
+          z-index: 60 !important;
+          border-radius: 20px !important;
+          background: linear-gradient(135deg, rgba(16, 62, 54, 0.98) 0%, rgba(28, 12, 52, 0.99) 62%, rgba(0, 148, 86, 0.38) 100%) !important;
+          box-shadow: inset 4px 0 0 #00E582, 0 22px 46px rgba(0, 0, 0, 0.55), 0 0 26px rgba(0, 220, 125, 0.36) !important;
+          border: 1.5px solid rgba(0, 229, 130, 0.85) !important;
         }
+        .tt-ranking-view.is-light .is-rank-climb {
+          background: linear-gradient(135deg, #E8FBF2 0%, #FFFFFF 64%, #DDF9EB 100%) !important;
+          box-shadow: inset 4px 0 0 #008A4E, 0 20px 42px rgba(30, 7, 52, 0.22), 0 0 20px rgba(0, 138, 78, 0.22) !important;
+          border: 1.5px solid #00A85B !important;
+        }
+        /* QUIEN BAJA: PLANO TRASERO 3D (SE HUNDE POR DETRÁS MIENTRAS CEDE SU PUESTO) */
         .is-rank-drop {
-          background: linear-gradient(90deg, rgba(239, 68, 68, 0.24) 0%, rgba(239, 68, 68, 0.09) 65%, rgba(239, 68, 68, 0.18) 100%) !important;
-          box-shadow: inset 4px 0 0 #EF4444, 0 12px 30px rgba(239, 68, 68, 0.26) !important;
-          border-color: rgba(239, 68, 68, 0.65) !important;
+          z-index: 2 !important;
+          background: linear-gradient(90deg, rgba(239, 68, 68, 0.22) 0%, rgba(30, 7, 52, 0.92) 72%, rgba(239, 68, 68, 0.14) 100%) !important;
+          box-shadow: inset 4px 0 0 #EF4444 !important;
+          border-color: rgba(239, 68, 68, 0.55) !important;
+        }
+        .tt-ranking-view.is-light .is-rank-drop {
+          background: linear-gradient(90deg, #FEE2E2 0%, #FFF7F7 72%, #FEE2E2 100%) !important;
+          box-shadow: inset 4px 0 0 #DC2626 !important;
+          border-color: rgba(220, 38, 38, 0.45) !important;
         }
 
         .tt-rk-move-pill { padding: 2px 5px; border-radius: 999px; font-size: 0.56rem; font-weight: 900; white-space: nowrap; }
