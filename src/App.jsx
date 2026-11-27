@@ -149,6 +149,32 @@ function clearSavedLocalSession() {
   }
 }
 
+
+const SEEN_RANK_REVEALS_PREFIX = 'tt_seen_rank_reveals_v1_';
+
+function readSeenRankReveals(playerId) {
+  if (!playerId || typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(`${SEEN_RANK_REVEALS_PREFIX}${playerId}`);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function markRankRevealSeen(playerId, challengeId) {
+  if (!playerId || !challengeId || typeof window === 'undefined') return;
+  try {
+    const prev = readSeenRankReveals(playerId);
+    if (prev.includes(challengeId)) return;
+    const next = [challengeId, ...prev].slice(0, 50);
+    window.localStorage.setItem(`${SEEN_RANK_REVEALS_PREFIX}${playerId}`, JSON.stringify(next));
+  } catch {
+    // ignorar cuota
+  }
+}
+
 function hasRecoveryFlagInUrl() {
   if (typeof window === 'undefined') return false;
   const hash = String(window.location.hash || '').toLowerCase();
@@ -463,6 +489,8 @@ export default function App() {
   const [activeTab, setActiveTab] = useState(APP_RUNTIME_CONFIG.defaultTab);
   const [torneosInitialSubTab, setTorneosInitialSubTab] = useState('gira');
   const [quickChallengeRival, setQuickChallengeRival] = useState(null);
+  const [pendingRankReveal, setPendingRankReveal] = useState(null);
+  const activeRevealChallengeIdRef = useRef(null);
 
   const [isAdminSession, setIsAdminSession] = useState(() => Boolean(initialSavedSession?.isAdmin));
   const [activePartner, setActivePartner] = useState(null);
@@ -1117,6 +1145,92 @@ export default function App() {
     window.setTimeout(scrollToTarget, 180);
   }, []);
 
+
+  const handleCompleteRankReveal = useCallback(
+    (challengeId) => {
+      if (challengeId && currentUserId) {
+        markRankRevealSeen(currentUserId, challengeId);
+      }
+      if (!challengeId || activeRevealChallengeIdRef.current === challengeId) {
+        activeRevealChallengeIdRef.current = null;
+      }
+      setPendingRankReveal((prev) =>
+        !challengeId || !prev || prev.challengeId === challengeId ? null : prev
+      );
+    },
+    [currentUserId]
+  );
+
+  /* Detector personal de cambios en tu Ranking Oficial:
+     - SOLO escucha tus propios partidos competitivos (mode !== 'Amistoso').
+     - Si tu rival confirmó mientras estabas dentro de la app (Realtime) o mientras
+       estabas desconectado (al volver a abrir la app), te lleva directo al Ranking
+       una sola vez para mostrarte tu ascenso/descenso 3D. */
+  useEffect(() => {
+    if (
+      !cloudSynced ||
+      showSplash ||
+      !currentUserId ||
+      pendingRankReveal ||
+      authModal.open ||
+      passwordRecoveryOpen ||
+      adminModalOpen ||
+      partnerModalOpen ||
+      disputeModalTarget ||
+      popupChallenge ||
+      scoreConfirmChallenge ||
+      tutorialOpen
+    ) {
+      return;
+    }
+
+    const seenIds = readSeenRankReveals(currentUserId);
+    const maxAgeMs = 14 * 24 * 60 * 60 * 1000;
+    const nowMs = Date.now();
+
+    const candidate = [...(challenges || [])]
+      .filter((c) => {
+        if (c.status !== 'FINISHED' || c.mode === 'Amistoso') return false;
+        if (c.playerAId !== currentUserId && c.playerBId !== currentUserId) return false;
+        const rev = c.liveScore?._meta?.rankReveal;
+        if (!rev || !rev.players?.[currentUserId]) return false;
+        if (seenIds.includes(c.id) || activeRevealChallengeIdRef.current === c.id) return false;
+        const finMs = new Date(c.finishedAt || rev.finishedAt || 0).getTime();
+        if (!finMs || Number.isNaN(finMs) || nowMs - finMs > maxAgeMs) return false;
+        return true;
+      })
+      .sort(
+        (a, b) =>
+          new Date(b.finishedAt || b.liveScore?._meta?.rankReveal?.finishedAt || 0).getTime() -
+          new Date(a.finishedAt || a.liveScore?._meta?.rankReveal?.finishedAt || 0).getTime()
+      )[0];
+
+    if (!candidate) return;
+
+    const rev = candidate.liveScore._meta.rankReveal;
+    activeRevealChallengeIdRef.current = candidate.id;
+    setPendingRankReveal({
+      ...rev,
+      challengeId: candidate.id,
+      focusPlayerId: currentUserId,
+    });
+    setActiveTab('ranking');
+  }, [
+    cloudSynced,
+    showSplash,
+    currentUserId,
+    challenges,
+    pendingRankReveal,
+    authModal.open,
+    passwordRecoveryOpen,
+    adminModalOpen,
+    partnerModalOpen,
+    disputeModalTarget,
+    popupChallenge,
+    scoreConfirmChallenge,
+    tutorialOpen,
+  ]);
+
   const handleSelectTab = useCallback(
     (tabId) => {
       setActiveTab(tabId);
@@ -1136,6 +1250,8 @@ export default function App() {
 
   const handleConsumeQuickChallenge = useCallback(() => {
     setQuickChallengeRival(null);
+    setPendingRankReveal(null);
+    activeRevealChallengeIdRef.current = null;
   }, []);
 
   const handleFinishSplash = useCallback(() => {
@@ -1440,11 +1556,14 @@ export default function App() {
       const lockRes = await runWithLock(`apply-result-${challenge.id}`, async () => {
         setBusyActionId(challenge.id);
 
+        const preOrderedList = sortPlayersForOfficialRanking(playersRef.current);
         const preRankMap = snapshotPreMatchRankMap(playersRef.current);
 
         const winnerId = winnerSide === 'A' ? challenge.playerAId : challenge.playerBId;
         const effectiveScore = liveScore || challenge.liveScore || {};
+        // Exclusivamente partidos competitivos/oficiales por puntos (Amistoso nunca mueve ni dispara ranking)
         const isOfficial = challenge.mode !== 'Amistoso';
+        const finishedAtIso = new Date().toISOString();
 
         const finishedChallenge = {
           ...challenge,
@@ -1455,7 +1574,7 @@ export default function App() {
           scoreSummary: summary || challenge.scoreSummary || '',
           eloDeltaA: Number(deltaA) || 0,
           eloDeltaB: Number(deltaB) || 0,
-          finishedAt: new Date().toISOString(),
+          finishedAt: finishedAtIso,
         };
 
         const playerA = playersRef.current.find((p) => p.id === challenge.playerAId);
@@ -1559,13 +1678,70 @@ export default function App() {
           })
           .sort((a, b) => (Number(b.points) || 0) - (Number(a.points) || 0));
 
+        const postOrderedList = sortPlayersForOfficialRanking(nextPlayersList);
+        const postRankMap = {};
+        postOrderedList.forEach((p, idx) => {
+          postRankMap[p.id] = idx + 1;
+        });
+
+        const rankRevealMeta = isOfficial
+          ? {
+              challengeId: challenge.id,
+              finishedAt: finishedAtIso,
+              scoreSummary: finishedChallenge.scoreSummary,
+              winnerId,
+              preOrderIds: preOrderedList.map((p) => p.id),
+              players: {
+                ...(challenge.playerAId
+                  ? {
+                      [challenge.playerAId]: {
+                        oldRank: preRankMap[challenge.playerAId] || null,
+                        newRank: postRankMap[challenge.playerAId] || null,
+                        oldPoints: Number(playerA?.points) || 0,
+                        newPoints: Number(resA?.updated?.points ?? playerA?.points) || 0,
+                        pointsDelta: Number(deltaA) || 0,
+                        gemsAwarded: Number(resA?.totalAwardedGems) || 0,
+                        won: challenge.playerAId === winnerId,
+                      },
+                    }
+                  : {}),
+                ...(challenge.playerBId
+                  ? {
+                      [challenge.playerBId]: {
+                        oldRank: preRankMap[challenge.playerBId] || null,
+                        newRank: postRankMap[challenge.playerBId] || null,
+                        oldPoints: Number(playerB?.points) || 0,
+                        newPoints: Number(resB?.updated?.points ?? playerB?.points) || 0,
+                        pointsDelta: Number(deltaB) || 0,
+                        gemsAwarded: Number(resB?.totalAwardedGems) || 0,
+                        won: challenge.playerBId === winnerId,
+                      },
+                    }
+                  : {}),
+              },
+            }
+          : null;
+
+        const challengeToPersist = rankRevealMeta
+          ? {
+              ...finishedChallenge,
+              liveScore: {
+                ...(finishedChallenge.liveScore || {}),
+                _meta: {
+                  ...(finishedChallenge.liveScore?._meta || {}),
+                  rankReveal: rankRevealMeta,
+                },
+              },
+            }
+          : finishedChallenge;
+
         setChallenges((prev) =>
-          prev.map((c) => (c.id === challenge.id ? finishedChallenge : c))
+          prev.map((c) => (c.id === challenge.id ? challengeToPersist : c))
         );
         setPlayers(nextPlayersList);
 
         await Promise.all([
-          upsertCloudChallenge(finishedChallenge),
+          upsertCloudChallenge(challengeToPersist),
           resA ? upsertCloudPlayer(resA.updated) : Promise.resolve(),
           resB ? upsertCloudPlayer(resB.updated) : Promise.resolve(),
         ]);
@@ -1606,35 +1782,25 @@ export default function App() {
         if (
           autoJumpToRanking &&
           isOfficial &&
+          rankRevealMeta &&
           (effectiveIsAdmin ||
             (currentUserId &&
               (challenge.playerAId === currentUserId || challenge.playerBId === currentUserId)))
         ) {
-          const postOrdered = sortPlayersForOfficialRanking(nextPlayersList);
-          const oldRank = preRankMap[currentUserId];
-          const newRankIdx = postOrdered.findIndex((p) => p.id === currentUserId);
-          const newRank = newRankIdx >= 0 ? newRankIdx + 1 : null;
-          const myRes =
-            resA && resA.updated.id === currentUserId
-              ? resA
-              : resB && resB.updated.id === currentUserId
-                ? resB
-                : null;
-          const gemsSuffix =
-            myRes && myRes.totalAwardedGems > 0 ? ` y sumaste +${myRes.totalAwardedGems} 💎` : '';
+          const isCurrentParticipant = Boolean(
+            currentUserId &&
+              (challenge.playerAId === currentUserId || challenge.playerBId === currentUserId)
+          );
+          const focusPlayerId = isCurrentParticipant ? currentUserId : winnerId;
+          activeRevealChallengeIdRef.current = challenge.id;
 
           window.setTimeout(() => {
+            setPendingRankReveal({
+              ...rankRevealMeta,
+              focusPlayerId,
+            });
             setActiveTab('ranking');
-            focusMyPositionInRanking(newRank);
-
-            if (oldRank && newRank && newRank < oldRank) {
-              showToast(`¡Subiste al puesto #${newRank}${gemsSuffix}!`, 'success');
-            } else if (oldRank && newRank && newRank > oldRank) {
-              showToast(`Tu posición actualizó al puesto #${newRank} en el Ranking.`, 'info');
-            } else if (newRank) {
-              showToast(`Mantienes el puesto #${newRank} en el Ranking${gemsSuffix}.`, 'success');
-            }
-          }, 260);
+          }, 240);
         }
       });
 
@@ -2352,6 +2518,8 @@ export default function App() {
                 currentUser={currentUser}
                 theme={theme}
                 sunlightMode={sunlightMode}
+                pendingRankReveal={pendingRankReveal}
+                onRankRevealComplete={handleCompleteRankReveal}
                 onOpenPlayerProfile={(p) => setInspectPlayerId(p.id)}
                 onOpenHeadToHead={(rival) =>
                   setH2hModal({ open: true, playerA: currentUser, playerB: rival })
