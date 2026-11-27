@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ASSETS,
   IconBadge,
@@ -32,6 +32,15 @@ export const QUICK_TIME_SLOTS = [
   '18:00',
   '19:00',
   '20:00',
+];
+
+
+export const DISPUTE_REASON_PRESETS = [
+  'Marcador equivocado',
+  'Ganador invertido',
+  'Partido suspendido / no terminó',
+  'El partido no se jugó',
+  'Otro motivo',
 ];
 
 export const BALLS_AGREEMENTS = [
@@ -394,6 +403,8 @@ export function MatchPosterCard({
   onOpenReschedule,
   onRespondReschedule,
   onOpenAssignJudge,
+  onConfirmProposedScore,
+  onDisputeProposedScore,
   onOpenPlayerProfile,
   onOpenStories,
 }) {
@@ -801,18 +812,63 @@ export function MatchPosterCard({
           </button>
         )}
 
-        {isProposed && perms.isParticipant && (
+        {isProposed && perms.isParticipant && perms.needsMyScoreConfirmation && onConfirmProposedScore && onDisputeProposedScore ? (
+          <>
+            <button
+              type="button"
+              className="tt-btn tt-btn-primary tt-btn-sm tt-glass-press"
+              style={{ flex: 1 }}
+              onClick={() => {
+                triggerHaptic('success');
+                onConfirmProposedScore(challenge);
+              }}
+            >
+              Confirmar Marcador
+            </button>
+            <button
+              type="button"
+              className="tt-btn tt-btn-ghost tt-btn-sm tt-glass-press"
+              onClick={() => {
+                triggerHaptic('warning');
+                onDisputeProposedScore(challenge);
+              }}
+            >
+              Impugnar
+            </button>
+          </>
+        ) : isProposed && perms.isParticipant ? (
           <div className="tt-waiting-banner">
             <TTIcon name="clock" size={15} />
             <span>
               {perms.judgeSubmitted
-                ? perms.needsMyScoreConfirmation
-                  ? 'El Árbitro cerró el marcador · Confirma o impugna en el aviso'
-                  : 'Ya confirmaste · Esperando confirmación de tu rival'
+                ? 'Ya confirmaste · Esperando confirmación de tu rival'
                 : challenge.proposedBy === currentUser?.id
                 ? 'Resultado enviado · Esperando confirmación del rival'
                 : 'Tu rival subió el marcador · Revisa la ventana de confirmación'}
             </span>
+          </div>
+        ) : null}
+
+        {isDisputed && (
+          <div className="tt-disputed-freeze-box">
+            <div className="tt-disputed-freeze-head">
+              <TTIcon name="shield" size={16} />
+              <strong>Marcador congelado · En revisión por el Administrador</strong>
+            </div>
+            {(challenge.disputeInfo?.reasonCategory || challenge.disputeInfo?.reasonText || challenge.disputeNote) && (
+              <p className="tt-disputed-freeze-reason">
+                {challenge.disputeInfo?.reasonCategory ? (
+                  <b>{challenge.disputeInfo.reasonCategory}: </b>
+                ) : null}
+                {challenge.disputeInfo?.reasonText || challenge.disputeNote}
+                {challenge.disputeInfo?.claimedScore
+                  ? ` (Marcador reclamado: ${challenge.disputeInfo.claimedScore})`
+                  : ''}
+              </p>
+            )}
+            <small className="tt-disputed-freeze-foot">
+              Ningún jugador puede modificar o volver a subir este marcador hasta el fallo del Comité.
+            </small>
           </div>
         )}
 
@@ -1158,6 +1214,164 @@ export function RetosCelebrationModal({
             </button>
           </div>
         </div>
+      )}
+    </ModalPortal>
+  );
+}
+
+
+/* ==========================================================================
+   MODAL 5: IMPUGNAR MARCADOR CON MOTIVO OBLIGATORIO (ENVÍO A SUITE ADMIN)
+   ========================================================================== */
+export function RetosDisputeModal({
+  challenge,
+  playerA,
+  playerB,
+  proposerName = '',
+  isSubmitting = false,
+  onSubmitDispute,
+  onClose,
+}) {
+  const [reasonCategory, setReasonCategory] = useState(DISPUTE_REASON_PRESETS[0]);
+  const [reasonText, setReasonText] = useState('');
+  const [claimedScore, setClaimedScore] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+
+  useEffect(() => {
+    if (!challenge) return;
+    setReasonCategory(DISPUTE_REASON_PRESETS[0]);
+    setReasonText('');
+    setClaimedScore('');
+    setErrorMsg('');
+  }, [challenge?.id]);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const cleanText = reasonText.trim();
+    if (cleanText.length < 6) {
+      triggerHaptic('warning');
+      setErrorMsg('Escribe al menos una breve explicación (mín. 6 caracteres) para que el Administrador pueda revisar el caso.');
+      return;
+    }
+    setErrorMsg('');
+    if (onSubmitDispute) {
+      onSubmitDispute({
+        challenge,
+        reasonCategory,
+        reasonText: cleanText,
+        claimedScore: claimedScore.trim(),
+      });
+    }
+  };
+
+  return (
+    <ModalPortal
+      isOpen={Boolean(challenge)}
+      onClose={() => {
+        if (!isSubmitting && onClose) onClose();
+      }}
+      title="Impugnar Marcador"
+      subtitle="El partido quedará congelado EN REVISIÓN para el Administrador"
+      icon={<IconBadge name="shield" variant="gold" size={38} />}
+      isTopLayer
+    >
+      {challenge && (
+        <form onSubmit={handleSubmit} className="tt-form-stack">
+          <div className="tt-rule-callout is-warn">
+            <TTIcon name="alert" size={18} />
+            <div>
+              <strong>
+                {playerA?.name || 'Jugador A'} vs. {playerB?.name || 'Jugador B'}
+              </strong>
+              <p style={{ margin: '3px 0 0', fontSize: '0.76rem', opacity: 0.9 }}>
+                Marcador observado: <b>{challenge.scoreSummary || 'Por confirmar'}</b>
+                {proposerName ? ` (cargado por ${proposerName})` : ''}. Al enviar esta impugnación,
+                nadie podrá cambiar el marcador ni se moverán puntos hasta que el Comité valide con
+                ambos jugadores.
+              </p>
+            </div>
+          </div>
+
+          <div className="tt-field-group">
+            <label className="tt-field-label">¿Cuál es el motivo principal?</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+              {DISPUTE_REASON_PRESETS.map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  className={`tt-choice-pill ${reasonCategory === preset ? 'is-selected' : ''}`}
+                  style={{ minHeight: 36, padding: '6px 11px', fontSize: '0.73rem' }}
+                  onClick={() => {
+                    triggerHaptic('light');
+                    setReasonCategory(preset);
+                  }}
+                >
+                  {preset}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="tt-field-group">
+            <label className="tt-field-label" htmlFor="tt-dispute-reason-text">
+              Explica por qué rechazas el resultado (obligatorio)
+            </label>
+            <textarea
+              id="tt-dispute-reason-text"
+              className="tt-input"
+              rows={3}
+              maxLength={360}
+              value={reasonText}
+              onChange={(e) => {
+                setReasonText(e.target.value);
+                if (errorMsg) setErrorMsg('');
+              }}
+              placeholder="Ej. El segundo set terminó 6-4 a mi favor, no 4-6; o el partido se suspendió por lluvia en el 1er set..."
+              required
+              style={{ minHeight: 84, paddingTop: 10, paddingBottom: 10, resize: 'vertical' }}
+            />
+          </div>
+
+          <div className="tt-field-group">
+            <label className="tt-field-label" htmlFor="tt-dispute-claimed-score">
+              Marcador que sostienes fue el real (opcional)
+            </label>
+            <input
+              id="tt-dispute-claimed-score"
+              type="text"
+              className="tt-input"
+              maxLength={40}
+              value={claimedScore}
+              onChange={(e) => setClaimedScore(e.target.value)}
+              placeholder="Ej. 6-4, 6-2 a favor mío / No se jugó"
+            />
+          </div>
+
+          {errorMsg && (
+            <p style={{ margin: 0, fontSize: '0.76rem', fontWeight: 800, color: '#F87171' }}>
+              {errorMsg}
+            </p>
+          )}
+
+          <div style={{ display: 'flex', gap: 9 }}>
+            <button
+              type="button"
+              className="tt-btn tt-btn-ghost tt-glass-press"
+              disabled={isSubmitting}
+              onClick={onClose}
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="tt-btn tt-btn-danger tt-glass-press"
+              style={{ flex: 1 }}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'Enviando al Comité...' : 'Enviar Impugnación al Comité'}
+            </button>
+          </div>
+        </form>
       )}
     </ModalPortal>
   );
