@@ -613,6 +613,8 @@ export function dbToClub(row) {
     vipBenefits: Array.isArray(row.vip_benefits) && row.vip_benefits.length > 0 ? row.vip_benefits : fb.vipBenefits,
     promos: Array.isArray(row.promos) ? row.promos : [],
     internalEvents: Array.isArray(row.internal_events) ? row.internal_events : [],
+    freeHoursToday: rates.freeHoursToday || '',
+    updatedAt: row.updated_at || rates.updatedAt || null,
     climaBase: { conditionKey: cond, updatedAt: row.weather_updated_at || null, reportedBy: row.weather_reported_by || '' },
     active: row.active !== false,
   };
@@ -661,6 +663,7 @@ export function dbToCoach(row) {
     profileViews: Number(row.profile_views) || 0,
     whatsappClicks: Number(row.whatsapp_clicks) || 0,
     featured: Boolean(row.featured),
+    updatedAt: row.updated_at || null,
     active: row.active !== false,
   };
 }
