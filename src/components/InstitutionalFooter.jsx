@@ -12,8 +12,8 @@ import { buildWhatsAppLink } from '../utils/tenisEngine';
 /* ==========================================================================
    ZONA DE EDICIÓN RÁPIDA (REDES SOCIALES, BRANDING Y ENLACES DEL FOOTER)
    --------------------------------------------------------------------------
-   - Reemplaza cada `url` conforme crees las cuentas oficiales de TOTAL TENIS.
-   - Si un link está vacío '', el botón avisará suavemente que el canal está
+- Reemplaza cada `url` conforme crees las cuentas oficiales de TOTAL TENIS.
+- Si un link está vacío '', el botón avisará suavemente que el canal está
      próximo a estrenarse sin abrir enlaces rotos.
    ========================================================================== */
 export const SOCIAL_LINKS_CONFIG = [
@@ -113,9 +113,9 @@ function SocialVectorGlyph({ id }) {
 /* ==========================================================================
    COMPONENTE PRINCIPAL: InstitutionalFooter (BLOQUE 24A DE 26)
    Estructura de 3 Niveles:
-   1. Píldora Blanca Superior (Instalación App PWA + 6 Redes con Aura Esmeralda)
-   2. 3 Columnas Editoriales sobre Púrpura Noche (#1E0734)
-   3. Barra Legal Inferior (Logo + Indecopi/Privacidad/Términos + Copyright)
+1. Píldora Blanca Superior (Instalación App PWA + 6 Redes con Aura Esmeralda)
+2. 3 Columnas Editoriales sobre Púrpura Noche (#1E0734)
+3. Barra Legal Inferior (Logo + Indecopi/Privacidad/Términos + Copyright)
    ========================================================================== */
 export default function InstitutionalFooter({
   sponsorsConfig = null,
@@ -127,6 +127,7 @@ export default function InstitutionalFooter({
   onOpenPartnerPortal,
   onOpenLegal,
   onOpenTutorial,
+  onOpenSupport,
   onNotify,
 }) {
   const [showPwaGuide, setShowPwaGuide] = useState(false);
@@ -231,6 +232,17 @@ export default function InstitutionalFooter({
                     }}
                   >
                     Portal Aliados (Clubes y Coaches)
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic('light');
+                      if (onOpenSupport) onOpenSupport();
+                    }}
+                  >
+                    Centro de Ayuda y Soporte
                   </button>
                 </li>
                 <li>
@@ -343,6 +355,16 @@ export default function InstitutionalFooter({
             </div>
 
             <div className="tt-if-legal-links">
+              <button
+                type="button"
+                className="is-help"
+                onClick={() => {
+                  triggerHaptic('light');
+                  if (onOpenSupport) onOpenSupport();
+                }}
+              >
+                Centro de Ayuda
+              </button>
               <button
                 type="button"
                 className="is-book"
@@ -594,6 +616,14 @@ export default function InstitutionalFooter({
           font-size: 0.72rem;
           font-weight: 700;
           color: rgba(250, 249, 245, 0.76);
+        }
+        .tt-if-legal-links button.is-help {
+          padding: 4px 10px;
+          border-radius: 999px;
+          background: rgba(0, 220, 125, 0.16);
+          border: 1px solid rgba(0, 220, 125, 0.48);
+          color: #7CF5C0;
+          font-weight: 800;
         }
         .tt-if-legal-links button.is-book {
           padding: 4px 10px;
