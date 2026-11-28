@@ -83,6 +83,7 @@ import AdminSuiteModal from './modals/AdminSuiteModal';
 import OnboardingTutorialModal, {
   TUTORIAL_STORAGE_KEY,
 } from './modals/OnboardingTutorialModal';
+import SupportBotModal from './modals/SupportBotModal';
 
 /* ==========================================================================
    CONFIGURACIÓN GLOBAL DEL MOTOR DE LA APP
@@ -515,6 +516,7 @@ export default function App() {
   const [partnerModalOpen, setPartnerModalOpen] = useState(false);
   const [adminModalOpen, setAdminModalOpen] = useState(false);
   const [tutorialOpen, setTutorialOpen] = useState(false);
+  const [supportModalOpen, setSupportModalOpen] = useState(false);
 
   const [inspectPlayerId, setInspectPlayerId] = useState(null);
   const [dismissedIncomingIds, setDismissedIncomingIds] = useState([]);
@@ -1193,7 +1195,8 @@ export default function App() {
       disputeModalTarget ||
       popupChallenge ||
       scoreConfirmChallenge ||
-      tutorialOpen
+      tutorialOpen ||
+      supportModalOpen
     ) {
       return;
     }
@@ -2395,6 +2398,21 @@ export default function App() {
         console.error('[TOTAL TENIS] Error guardando nuevo jugador:', err);
       }
 
+      // Correo automático de bienvenida (protegido a máx. 50/día para blindar 250/día de claves)
+      if (cleanPlayer.email && !cleanPlayer.isDemo && !cleanPlayer.isTutelado) {
+        const initCat = PlayersData.getCategoryByPoints(cleanPlayer.points)?.name || '5ª Categoría';
+        fetch('/api/welcome-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: cleanPlayer.email,
+            name: cleanPlayer.name,
+            categoryName: initCat,
+            points: cleanPlayer.points,
+          }),
+        }).catch(() => {});
+      }
+
       try {
         if (!window.localStorage.getItem(TUTORIAL_STORAGE_KEY)) {
           window.setTimeout(() => setTutorialOpen(true), 650);
@@ -2422,6 +2440,7 @@ export default function App() {
     setInspectPlayerId(null);
     setAdminModalOpen(false);
     setPartnerModalOpen(false);
+    setSupportModalOpen(false);
     setActiveTab((prev) => (prev === 'perfil' ? 'retos' : prev));
     showToast('Sesión cerrada. Puedes volver a entrar cuando quieras.', 'info');
   }, [showToast]);
@@ -2482,6 +2501,7 @@ export default function App() {
         }}
         onOpenLegal={(section = 'reclamaciones') => setLegalModal({ open: true, section })}
         onOpenTutorial={() => setTutorialOpen(true)}
+        onOpenSupport={() => setSupportModalOpen(true)}
         onSecretAdminTrigger={() => setAdminModalOpen(true)}
         onLogout={handleLogout}
       />
@@ -2651,6 +2671,7 @@ export default function App() {
             }}
             onOpenLegal={(section) => setLegalModal({ open: true, section })}
             onOpenTutorial={() => setTutorialOpen(true)}
+            onOpenSupport={() => setSupportModalOpen(true)}
             onNotify={showToast}
           />
         </div>
@@ -3407,6 +3428,26 @@ export default function App() {
         onNavigateTab={handleSelectTab}
       />
 
+      <SupportBotModal
+        isOpen={supportModalOpen}
+        onClose={() => setSupportModalOpen(false)}
+        currentUser={currentUser}
+        theme={theme}
+        onNavigateTab={(tabId) => {
+          if (tabId === 'torneos') handleOpenTournamentsAt('master');
+          else handleSelectTab(tabId);
+        }}
+        onOpenProShop={(mode) => setProShopModal({ open: true, mode })}
+        onOpenVipScale={(tab) => setVipScaleModal({ open: true, tab })}
+        onOpenLegal={(section) => setLegalModal({ open: true, section })}
+        onOpenPartnerPortal={() => {
+          if (activePartner || effectiveIsAdmin) setPartnerModalOpen(true);
+          else openAuthSheet('partner');
+        }}
+        onOpenAuth={openAuthSheet}
+        onOpenTutorial={() => setTutorialOpen(true)}
+      />
+
       {/* AUTH AL FINAL DEL ÁRBOL + CAPA MÁXIMA isAuthLayer */}
       <AuthAndOnboardingModal
         isOpen={authModal.open}
@@ -3448,7 +3489,8 @@ export default function App() {
             popupChallenge ||
             scoreConfirmChallenge ||
             disputeModalTarget ||
-            tutorialOpen
+            tutorialOpen ||
+            supportModalOpen
         )}
         previewCampaign={previewSponsorCampaign}
         onClosePreview={() => setPreviewSponsorCampaign(null)}
