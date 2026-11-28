@@ -10,9 +10,9 @@ import { getCategoryByPoints } from '../data/playersAndClubsData';
 
 /* ==========================================================================
    HEADER CENTRADO EN PÍLDORA BLANCA + MENÚ LATERAL (SIN "SOL INTENSO")
-   - Grid simétrico 3 columnas (1fr auto 1fr): Logo y TOTAL TENIS centrados.
-   - Sin recortes desde 360px (iPhone SE / Android) hasta Desktop.
-   - Menú ☰ en document.body (z-index 9990) con scroll blindado.
+- Grid simétrico 3 columnas (1fr auto 1fr): Logo y TOTAL TENIS centrados.
+- Sin recortes desde 360px (iPhone SE / Android) hasta Desktop.
+- Menú ☰ en document.body (z-index 9990) con scroll blindado.
    ========================================================================== */
 export default function HeaderAndDrawer({
   currentUser = null,
@@ -33,6 +33,7 @@ export default function HeaderAndDrawer({
   onOpenPartnerPortal,
   onOpenLegal,
   onOpenTutorial,
+  onOpenSupport,
   onOpenVisionIA,
   onSecretAdminTrigger,
   onLogout,
@@ -345,6 +346,14 @@ export default function HeaderAndDrawer({
                   >
                     <TTIcon name="users" size={17} />
                     <span>Portal Aliados (Clubes y Coaches)</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="is-support-btn"
+                    onClick={() => runDrawerAction(() => onOpenSupport && onOpenSupport())}
+                  >
+                    <TTIcon name="shield" size={17} />
+                    <span>Centro de Ayuda y Soporte</span>
                   </button>
                   <button
                     type="button"
@@ -783,6 +792,14 @@ export default function HeaderAndDrawer({
         .tt-drw-panel.is-light .tt-drw-list button.is-legal-book {
           background: rgba(245, 158, 11, 0.2);
           color: #92400E;
+        }
+        .tt-drw-list button.is-support-btn {
+          background: rgba(0, 220, 125, 0.14);
+          color: #7CF5C0;
+        }
+        .tt-drw-panel.is-light .tt-drw-list button.is-support-btn {
+          background: rgba(0, 155, 86, 0.13);
+          color: #007A44;
         }
 
         .tt-drw-foot {
